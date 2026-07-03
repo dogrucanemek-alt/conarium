@@ -1,0 +1,36 @@
+name: security-scan
+
+# Her push + PR'da deterministik güvenlik taraması:
+#  - Semgrep: kod deseni / injection / kripto / auth-misuse
+#  - Gitleaks: koda gömülü sır / anahtar
+# AI incelemesinin (agy/Claude) kör noktasını kapatır. İkisi birlikte = katmanlı savunma.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: Semgrep (static security)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep scan --config p/security-audit --config p/secrets --config p/javascript --config p/typescript --error
+        # --error => yeni güvenlik bulgusunda CI KIRILIR (uyarı görünür kalır)
+
+  gitleaks:
+    name: Gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

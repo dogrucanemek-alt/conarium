@@ -1,0 +1,3 @@
+{"timestamp":"2026-06-27T20:12:08.699Z","actor":"developer_emekcan","tool":"addUser","args":{"name":"John","email":"[MASKED_PII]","phone":"[MASKED_PII]"},"denied":false,"rowsReturned":1,"maskedCount":2,"status":"success"}
+{"timestamp":"2026-06-27T20:12:08.700Z","actor":"developer_emekcan","tool":"deleteUser","args":{"userId":123},"denied":true,"reason":"Policy deny","status":"rejected","maskedCount":0}
+{"timestamp":"2026-06-27T20:12:08.700Z","actor":"developer_emekcan","tool":"getUsers","args":{"status":"active"},"denied":false,"rowsReturned":15,"maskedCount":0,"status":"success"}

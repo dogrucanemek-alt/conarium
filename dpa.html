@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conarium — Data Processing Addendum</title>
+<meta name="description" content="Conarium's data-processing position: the product is self-hosted, so the vendor never processes your or your customers' data. KVKK/GDPR-aligned.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@500&family=Space+Grotesk:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{--void:#000208;--cyan:#6fe0e0;--gold:#f2d79a;--ink:#eaf0ff;--dim:#838dad;--faint:#4d5573;--line:rgba(120,150,255,.13);--disp:'Cormorant',serif;--body:'Space Grotesk',sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--void);color:#c7d0ea;font-family:var(--body);line-height:1.7;font-size:15.5px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:780px;margin:0 auto;padding:38px 24px 100px}a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
+nav{display:flex;justify-content:space-between;margin-bottom:48px;font-family:var(--mono);font-size:12px;letter-spacing:.06em}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink);letter-spacing:.32em}
+.o{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--cyan);position:relative}.o::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--cyan)}
+h1{font-family:var(--disp);font-weight:500;font-size:40px;margin:0 0 6px;color:var(--ink);letter-spacing:-.01em}
+h2{font-family:var(--disp);font-weight:500;font-size:25px;margin:44px 0 10px;color:var(--ink)}
+p{margin:0 0 13px}b{color:var(--ink)}
+.upd{color:var(--faint);font-family:var(--mono);font-size:12px;margin-bottom:30px}
+.card{border:1px solid var(--line);border-radius:13px;background:rgba(0,2,8,.3);padding:20px 22px;margin:18px 0}
+.card.hi{border-color:rgba(111,224,224,.3);background:rgba(111,224,224,.04)}
+ul{padding-left:20px}li{margin-bottom:8px}
+.foot{color:var(--faint);font-family:var(--mono);font-size:12px;margin-top:56px;border-top:1px solid var(--line);padding-top:22px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><a href="/" class="brand"><span class="o"></span>CONARIUM</a><a href="/">← conarium.dev</a></nav>
+  <h1>Data Processing Addendum</h1>
+  <div class="upd">Last updated: July 2026 · KVKK &amp; GDPR-aligned</div>
+
+  <div class="card hi">
+    <p style="margin:0"><b>The core point.</b> Conarium is <b>self-hosted</b>: it runs entirely inside your own infrastructure. In the product path, the vendor <b>does not receive, access, store or process</b> your data or your customers' personal data. You remain the sole controller and processor of your own data. There is, by design, nothing for us to mishandle.</p>
+  </div>
+
+  <p>This addendum sets out how personal data is handled between you ("Customer", the controller) and <b>Emek Can Doğru, trading as Conarium</b> ("Conarium") in connection with the website, the design-partner pilot and support. It is aligned with Turkey's KVKK (Law No. 6698) and the EU GDPR. For a signed, engagement-specific agreement, contact <a href="mailto:e.dogru@conarium.dev">e.dogru@conarium.dev</a>.</p>
+
+  <h2>1. Roles</h2>
+  <ul>
+    <li><b>Product / self-hosted software:</b> Conarium acts on data only within your environment, under your control. Conarium the vendor is <b>not a processor</b> of that data — it never leaves your perimeter and we never see it.</li>
+    <li><b>Website &amp; support:</b> for the limited personal data you share directly (a waitlist email, chat or support messages), Conarium acts as a processor/controller as described in the <a href="/privacy.html">Privacy Policy</a>.</li>
+  </ul>
+
+  <h2>2. Scope and purpose of processing</h2>
+  <p>The only personal data Conarium processes is what you voluntarily send us: your contact email (to arrange access/pilots) and the content of your messages (to respond and support you). No customer database content, no end-customer PII, ever reaches Conarium.</p>
+
+  <h2>3. Sub-processors</h2>
+  <p>For the website/support processing only:</p>
+  <ul>
+    <li><b>Vercel</b> — website hosting.</li>
+    <li><b>Supabase</b> — storage of the waitlist email.</li>
+    <li><b>An LLM provider</b> — generating Concierge chat replies (message content only).</li>
+  </ul>
+  <p>Because the product is self-hosted, there are <b>no product sub-processors</b> — your data does not flow to any third party through Conarium.</p>
+
+  <h2>4. Security measures</h2>
+  <ul>
+    <li>The product enforces read-only access, fail-closed policy checks, PII masking before the model, and a tamper-evident, PII-safe audit log — all inside your environment (see the <a href="/docs.html">technical docs</a>).</li>
+    <li>The website transmits over TLS, restricts source files from being served, and sets standard security headers.</li>
+    <li>Security disclosures: <a href="/.well-known/security.txt">security.txt</a>.</li>
+  </ul>
+
+  <h2>5. International transfers</h2>
+  <p>Product data stays wherever you host it — it never transfers to us. For the limited website data, our sub-processors may operate outside your country; we rely on their standard contractual safeguards.</p>
+
+  <h2>6. Data-subject requests &amp; breach</h2>
+  <p>For product data, you handle data-subject requests directly, since only you hold it. For website/support data, email <a href="mailto:e.dogru@conarium.dev">e.dogru@conarium.dev</a> and we will assist promptly. We will notify you without undue delay of any breach affecting personal data you shared with us.</p>
+
+  <h2>7. Term</h2>
+  <p>This addendum applies for as long as we process any personal data you have shared. On request we will delete or return it.</p>
+
+  <div class="foot">
+    Data protection contact → <a href="mailto:e.dogru@conarium.dev">e.dogru@conarium.dev</a><br>
+    <a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms of Service</a> · <a href="/docs.html">Technical docs</a><br>
+    © 2026 Conarium
+  </div>
+</div>
+</body>
+</html>

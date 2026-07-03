@@ -1,0 +1,53 @@
+{
+  "name": "@conarium-ai/core",
+  "version": "0.1.0",
+  "description": "The governed company-knowledge layer for AI coding assistants — a tool-agnostic MCP server with access policy, PII masking and audit.",
+  "keywords": [
+    "mcp",
+    "ai",
+    "coding-assistant",
+    "governance",
+    "data-governance",
+    "audit",
+    "pii",
+    "cursor",
+    "copilot",
+    "claude",
+    "self-hosted"
+  ],
+  "homepage": "https://github.com/dogrucanemek-alt/conarium",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "conarium": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "express": "^5.2.1",
+    "js-yaml": "^5.2.0",
+    "node-fetch": "^3.3.2",
+    "pgsql-ast-parser": "^12.0.2",
+    "postgres": "^3.4.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.20.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

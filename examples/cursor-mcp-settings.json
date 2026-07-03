@@ -1,0 +1,10 @@
+{
+  "_comment": "Add this to your Cursor MCP settings (~/.cursor/mcp.json or project .cursorrules)",
+  "mcpServers": {
+    "conarium": {
+      "command": "npx",
+      "args": ["-y", "@conarium-ai/core", "--config", "/path/to/your/conarium.config.json"],
+      "description": "Conarium — company-aware AI context"
+    }
+  }
+}

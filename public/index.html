@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conarium Governance Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-panel">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h2>Conarium</h2>
+            </div>
+            <nav>
+                <a href="#" class="nav-item active" data-tab="dashboard">Dashboard</a>
+                <a href="#" class="nav-item" data-tab="playground">Playground</a>
+                <a href="#" class="nav-item" data-tab="governance">Governance</a>
+                <a href="#" class="nav-item" data-tab="audit">Audit Logs</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header glass-panel">
+                <h1>Conarium Control Center</h1>
+                <div class="status-badge pulse"><span class="dot"></span> System Active</div>
+            </header>
+
+            <div class="tab-content active" id="tab-dashboard">
+                <div class="dashboard-grid">
+                    <div class="card glass-panel span-2">
+                        <h3>Connectors Health</h3>
+                        <div class="connector-list" id="connector-list">
+                            <div class="loader">Loading connectors...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-playground">
+                <div class="card glass-panel">
+                    <h3>Live Playground</h3>
+                    <p class="pg-sub">An AI assistant queries your data. Watch Conarium <strong>mask the secrets</strong> and <strong>block forbidden tables</strong> — live.</p>
+                    <div class="pg-samples">
+                        <button class="chip" data-q="SELECT * FROM customers">customers <span>(PII)</span></button>
+                        <button class="chip" data-q="SELECT * FROM orders">orders</button>
+                        <button class="chip chip-danger" data-q="SELECT * FROM secrets">secrets <span>(denied)</span></button>
+                        <button class="chip chip-danger" data-q="DELETE FROM customers">DELETE <span>(write)</span></button>
+                    </div>
+                    <div class="pg-input-row">
+                        <input type="text" id="pg-query" class="glass-input" value="SELECT * FROM customers" placeholder="SELECT * FROM customers">
+                        <button class="btn primary-btn" id="pg-run">Run through Conarium ▸</button>
+                    </div>
+                    <div id="pg-result" class="pg-result"></div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-governance">
+                <div class="card glass-panel">
+                    <h3>Governance Policy</h3>
+                    <form id="config-form" class="config-form">
+                        <div class="form-group">
+                            <label>Max Rows Limit</label>
+                            <input type="number" id="maxRows" name="maxRows" class="glass-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Allow Tools (comma separated)</label>
+                            <input type="text" id="allowTools" name="allowTools" class="glass-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Deny Tools (comma separated)</label>
+                            <input type="text" id="denyTools" name="denyTools" class="glass-input">
+                        </div>
+                        <div class="form-group flex-row">
+                            <label>Enable PII Masking</label>
+                            <label class="switch">
+                                <input type="checkbox" id="piiMasking" name="piiMasking">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn primary-btn">Save Policy</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-audit">
+                <div class="card glass-panel">
+                    <div class="card-header">
+                        <h3>Audit Logs</h3>
+                        <button class="btn secondary-btn" id="refresh-audit">Refresh</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="audit-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Actor</th>
+                                    <th>Tool</th>
+                                    <th>Query (SQL)</th>
+                                    <th>Rows</th>
+                                    <th>Masked</th>
+                                    <th>Status</th>
+                                    <th>Hash</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-body">
+                                <tr><td colspan="8" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">Saved successfully</div>
+
+    <script src="app.js"></script>
+</body>
+</html>

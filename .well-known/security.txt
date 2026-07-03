@@ -1,0 +1,5 @@
+Contact: mailto:e.dogru@conarium.dev
+Preferred-Languages: en, tr
+Canonical: https://conarium.dev/.well-known/security.txt
+Expires: 2027-07-03T00:00:00.000Z
+Policy: https://conarium.dev/docs.html

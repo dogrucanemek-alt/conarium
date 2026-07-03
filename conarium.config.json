@@ -1,0 +1,26 @@
+{
+  "serverName": "Conarium",
+  "consumer": "ai-assistant",
+  "connectors": [
+    {
+      "type": "postgres",
+      "name": "maindb",
+      "description": "Application Postgres database (read-only, governed access)",
+      "config": { "url": "env:DATABASE_READONLY_DSN" }
+    }
+  ],
+  "policy": {
+    "allowTables": ["public.customers", "public.orders", "public.products"],
+    "denyTables": ["public.secrets", "public.admin_users", "public.credit_cards", "public.salaries"],
+    "maskColumns": [
+      "public.customers.email",
+      "public.customers.phone",
+      "public.customers.national_id",
+      "public.customers.address",
+      "public.orders.card_number",
+      "public.orders.notes"
+    ],
+    "maxRows": 50
+  },
+  "audit": { "sink": "conarium-audit.jsonl", "failClosed": true }
+}

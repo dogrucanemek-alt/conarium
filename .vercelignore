@@ -1,0 +1,11 @@
+*
+!index.html
+!docs.html
+!privacy.html
+!terms.html
+!dpa.html
+!.well-known
+!.well-known/security.txt
+!api
+!api/chat.js
+!vercel.json

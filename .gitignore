@@ -1,0 +1,26 @@
+node_modules/
+dist/
+*.env
+.env*
+nexus.config.json
+*.local.json
+
+# session debris / sensitive (güvenlik denetimi 2026-06-29)
+*_dump.json
+telegram_dump.json
+temp_*.py
+*.tmp
+audit.log.jsonl
+src/scripts/*.py
+
+# NEO red-team çıktısı
+redteam/last-report.md
+
+# internal / junk
+telegram_dump.json
+ZION_NOTES.md
+*.log.jsonl
+temp_*.py
+test_ast*.ts
+conarium-i18n-*.js
+i18n_assessment.js
