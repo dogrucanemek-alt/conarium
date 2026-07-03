@@ -55,6 +55,10 @@ check('deny: function in WHERE subquery FROM', () =>
 // --- ROW CAP / FAIL-CLOSED ---
 check('limit: plain WITH gets LIMIT on executable SELECT', () =>
   assert.ok(rewritten("WITH c AS (SELECT 1 AS n) SELECT n FROM c", { allowTables: ['public.c'], maxRows: 50 }).includes('LIMIT')))
+check('limit: a smaller caller LIMIT is respected, never RAISED to the cap', () =>
+  assert.ok(rewritten("SELECT id FROM public.customers LIMIT 1", { allowTables: ['public.customers'], maxRows: 50 }).includes('LIMIT (1)')))
+check('limit: a LARGER caller LIMIT is clamped down to the cap', () =>
+  assert.ok(rewritten("SELECT id FROM public.customers LIMIT 9999", { allowTables: ['public.customers'], maxRows: 50 }).includes('LIMIT (50)')))
 check('fail-closed: unparseable WITH RECURSIVE is denied, never passed through', () =>
   expectDenied("WITH RECURSIVE c AS (SELECT 1 AS n UNION SELECT n+1 FROM c) SELECT n FROM c", { maxRows: 50 }))
 

@@ -25,9 +25,11 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "test:checks": "npm run build && node test/connectors.mjs && node test/governance_lineage_adversarial.mjs && node test/governance_security_regression.mjs && node test/security_hardening_14.mjs",
+    "test:all": "npm run lint && npm run test && npm run test:checks",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "lint": "eslint src/",
+    "lint": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

@@ -783,8 +783,16 @@ export class Governance {
     const target = this.limitTarget(statement)
     if (!target) return
 
+    const cap = this.maxRows()
+    const existing = target.limit?.limit as { type?: string; value?: number } | undefined
+    // Never RAISE a limit the caller already set below the cap — a request for
+    // 1 row must not become 50. Only clamp down; preserve any OFFSET.
+    if (existing && existing.type === 'integer' && typeof existing.value === 'number' && existing.value <= cap) {
+      return
+    }
     target.limit = {
-      limit: { type: 'integer', value: this.maxRows() },
+      ...(target.limit ?? {}),
+      limit: { type: 'integer', value: cap },
     }
   }
 

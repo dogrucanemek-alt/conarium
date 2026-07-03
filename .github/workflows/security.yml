@@ -1,9 +1,10 @@
-name: security-scan
+name: ci
 
-# Her push + PR'da deterministik güvenlik taraması:
+# Her push + PR'da deterministik kapı:
+#  - build + lint (tsc --noEmit) + test (vitest) + test:checks (adversarial .mjs)
 #  - Semgrep: kod deseni / injection / kripto / auth-misuse
 #  - Gitleaks: koda gömülü sır / anahtar
-# AI incelemesinin (agy/Claude) kör noktasını kapatır. İkisi birlikte = katmanlı savunma.
+# AI incelemesinin (agy/Claude) kör noktasını kapatır. Katmanlı savunma.
 on:
   push:
     branches: [main]
@@ -14,6 +15,20 @@ permissions:
   contents: read
 
 jobs:
+  build-test:
+    name: Build, lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:checks
+
   semgrep:
     name: Semgrep (static security)
     runs-on: ubuntu-latest

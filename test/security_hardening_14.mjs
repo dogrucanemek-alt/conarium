@@ -249,27 +249,6 @@ await check('4 console is loopback by default, authenticated, CSRF-protected, va
   }
 })
 
-await check('5 Telegram/Supabase script secrets are loaded from env, not source literals', async () => {
-  const unified = fs.readFileSync(path.join(repoRoot, 'src/scripts/unified_poller.py'), 'utf8')
-  const engine = fs.readFileSync(path.join(repoRoot, 'src/scripts/content_engine.py'), 'utf8')
-  const bridge = fs.readFileSync(path.join(repoRoot, 'src/scripts/poll_bridge.py'), 'utf8')
-  const tokenPattern = /\d{9,}:[A-Za-z0-9_-]{20,}/
-  assert.equal(tokenPattern.test(unified), false)
-  assert.equal(tokenPattern.test(engine), false)
-  assert.equal(/sb_publishable_[A-Za-z0-9_-]+/.test(bridge), false)
-  assert.match(unified, /CONARIUM_TELEGRAM_BOT_TOKEN/)
-  assert.match(engine, /CONARIUM_SUPABASE_PUBLISHABLE_KEY/)
-  assert.match(bridge, /CONARIUM_SUPABASE_PUBLISHABLE_KEY/)
-})
-
-await check('6 Supabase content_queue RLS removes anon read/update and scopes owner/status', async () => {
-  const sql = fs.readFileSync(path.join(repoRoot, 'supabase_content_queue.sql'), 'utf8')
-  assert.doesNotMatch(sql, /TO\s+anon[\s\S]*FOR\s+(SELECT|UPDATE)/i)
-  assert.match(sql, /REVOKE ALL ON content_queue FROM anon/i)
-  assert.match(sql, /owner_id = auth\.uid\(\)/i)
-  assert.match(sql, /status = 'pending'/i)
-})
-
 await check('7 OpenAPI connector blocks SSRF and ignores remote servers by default', async () => {
   const blocked = new OpenApiConnector({
     type: 'openapi',

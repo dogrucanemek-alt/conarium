@@ -50,7 +50,12 @@ export class Audit {
     masked = masked.replace(/\b[1-9][0-9]{10}\b/g, '[MASKED_PII]')
     masked = masked.replace(/(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/g, '[MASKED_PII]')
     masked = masked.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[MASKED_PII]')
-    
+    // Credentials / secrets — not just PII. Keeps API keys, tokens, passwords
+    // and connection-string credentials out of the audit log.
+    masked = masked.replace(/\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g, '[MASKED_SECRET]')
+    masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, '$1[MASKED_SECRET]$2')
+    masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, '$1[MASKED_SECRET]')
+
     if (typeof args === 'string') return masked
     try {
       return JSON.parse(masked)
