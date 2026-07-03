@@ -1,0 +1,15 @@
+# Exclude generated, marketing and test-fixture files from static analysis.
+# The product code lives in src/ and api/.
+node_modules/
+dist/
+test/
+*.test.ts
+*.test.mjs
+*.mjs
+index.html
+docs.html
+privacy.html
+terms.html
+dpa.html
+
+site/

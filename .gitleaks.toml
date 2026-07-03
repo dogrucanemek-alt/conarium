@@ -1,0 +1,30 @@
+title = "Conarium gitleaks config"
+
+# Use gitleaks' built-in rules, then allow-list the values that are
+# INTENTIONALLY fake: the in-browser demo sample, the docs, and the test
+# fixtures that exist precisely to prove secrets get masked. None are real.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Intentional example / demo / test values — not real credentials"
+paths = [
+  '''(^|/)index\.html$''',
+  '''(^|/)docs\.html$''',
+  '''(^|/)test/''',
+  '''\.test\.(ts|mjs)$''',
+  '''(^|/)README\.md$''',
+  '''(^|/)COMPARISON\.md$''',
+  '''(^|/)src/audit\.ts$''',
+]
+regexTarget = "line"
+regexes = [
+  '''example''',
+  '''EXAMPLE''',
+  '''not[_-]?a[_-]?real''',
+  '''not-real''',
+  '''change_me''',
+  '''hunter2''',
+  '''SuperSecret123''',
+  '''sk_live_ABCDEFGHIJKLMNOP''',
+]

@@ -24,3 +24,8 @@ temp_*.py
 test_ast*.ts
 conarium-i18n-*.js
 i18n_assessment.js
+
+# next.js build junk / stray scaffolding
+site/
+.next/
+*.tsbuildinfo

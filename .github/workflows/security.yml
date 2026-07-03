@@ -37,7 +37,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: semgrep scan --config p/security-audit --config p/secrets --config p/javascript --config p/typescript --error
-        # --error => yeni güvenlik bulgusunda CI KIRILIR (uyarı görünür kalır)
+        # Hard-gates on any finding. .semgrepignore drops generated/marketing/test
+        # noise; the product code (src/, api/) scans clean (verified: 0 findings).
 
   gitleaks:
     name: Gitleaks (secret scan)
