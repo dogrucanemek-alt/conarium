@@ -50,4 +50,22 @@ describe('conarium.config.json — governance is actually enforced', () => {
   it('row cap is 50 (not the default 100)', () => {
     expect(gov.maxRows()).toBe(50);
   });
+
+  it('SELECT * masks configured PII columns — no star-projection leak', () => {
+    const guard = gov.guardQuery('SELECT * FROM public.customers');
+    const result: QueryResult = {
+      rows: [{ id: 1, name: 'Alice', email: 'a@b.com', address: '42 Secret Street' }],
+      rowCount: 1, fields: ['id', 'name', 'email', 'address'],
+    };
+    const governed = gov.redact(result, guard.aliases, guard.metadata);
+    const flat = JSON.stringify(governed.rows);
+    expect(flat).not.toContain('42 Secret Street'); // address is a mask column
+    expect(flat).not.toContain('a@b.com');           // email is a mask column
+    expect(flat).toContain('Alice');                 // name is NOT masked
+  });
+
+  it('row-locking selects (FOR SHARE / FOR UPDATE) are refused', () => {
+    expect(blocked('SELECT * FROM public.customers FOR SHARE')).toBe(true);
+    expect(blocked('SELECT id FROM public.customers FOR UPDATE')).toBe(true);
+  });
 });

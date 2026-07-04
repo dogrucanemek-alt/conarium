@@ -59,22 +59,25 @@ export async function resolveGovernedSearchScope(
 }
 
 export function capSearchResult(result: QueryResult, maxRows: number, maxBytes: number = MAX_SEARCH_PAYLOAD_BYTES): QueryResult {
-  const rows = result.rows.slice(0, maxRows)
+  const capped = result.rows.slice(0, maxRows)
+  const fits = (n: number) =>
+    Buffer.byteLength(JSON.stringify({ ...result, rows: capped.slice(0, n), rowCount: n }), 'utf8') <= maxBytes
 
-  while (rows.length > 0) {
-    const candidate = { ...result, rows, rowCount: rows.length }
-    if (Buffer.byteLength(JSON.stringify(candidate), 'utf8') <= maxBytes) {
-      return candidate
+  // Binary search for the largest row-prefix under the byte cap: O(log n) size
+  // measurements instead of O(n) (was pop-one-then-restringify-the-whole-list,
+  // which blocks the event loop on large results).
+  let lo = 0, hi = capped.length
+  if (fits(hi)) {
+    lo = hi
+  } else {
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2)
+      if (fits(mid)) lo = mid
+      else hi = mid - 1
     }
-    rows.pop()
   }
-
-  return {
-    ...result,
-    rows: [],
-    rowCount: 0,
-    fields: result.fields,
-  }
+  const rows = capped.slice(0, lo)
+  return { ...result, rows, rowCount: rows.length, fields: result.fields }
 }
 
 export async function readGovernedSchemaResource(

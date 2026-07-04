@@ -157,7 +157,7 @@ await check('3 chat proxy requires caller auth, env key, HTTPS upstream, and rat
     let captured
     global.fetch = async (url, opts) => {
       captured = { url, opts }
-      return { json: async () => ({ reply: 'ok' }) }
+      return { ok: true, json: async () => ({ reply: 'ok' }) }
     }
     res = mockRes()
     await chatHandler({ method: 'POST', headers: {}, body: {} }, res)
@@ -182,7 +182,7 @@ await check('3b chat public mode (no token) allows anonymous; origin allowlist e
     delete process.env.CONARIUM_CHAT_ALLOWED_ORIGINS
     process.env.CONARIUM_PROXY_KEY = 'rotated-upstream-key'
     process.env.CONARIUM_CHAT_UPSTREAM_URL = 'https://example.com/chat'
-    global.fetch = async () => ({ json: async () => ({ reply: 'ok' }) })
+    global.fetch = async () => ({ ok: true, json: async () => ({ reply: 'ok' }) })
 
     // public mode: no token configured, no auth header -> allowed
     chatTest.rateBuckets.clear()

@@ -62,8 +62,13 @@ function enforceOrigin(req) {
 }
 
 function enforceRateLimit(req) {
-  const ip = getHeader(req, 'x-forwarded-for')?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
   const now = Date.now();
+  // Opportunistic eviction: bound the bucket map so many unique IPs can't grow it
+  // without limit (memory leak / DoS).
+  if (rateBuckets.size > 5000) {
+    for (const [k, b] of rateBuckets) if (now - b.start >= WINDOW_MS) rateBuckets.delete(k);
+  }
+  const ip = getHeader(req, 'x-forwarded-for')?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
   const bucket = rateBuckets.get(ip);
   if (!bucket || now - bucket.start >= WINDOW_MS) {
     rateBuckets.set(ip, { start: now, count: 1 });
@@ -110,6 +115,11 @@ export default async function handler(req, res) {
       body: JSON.stringify(body || {}),
       signal: AbortSignal.timeout(30000),
     });
+    if (!r.ok) {
+      // Never launder an upstream error into a 200. Report a gateway failure.
+      res.status(502).json({ reply: 'Unable to answer right now.' });
+      return;
+    }
     const d = await r.json();
     res.status(200).json(d);
   } catch (e) {

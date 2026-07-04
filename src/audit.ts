@@ -24,6 +24,7 @@ export class Audit {
   private consumer: string
   private failClosed: boolean
   private hmacKey?: string
+  private lastHash = '0000000000000000000000000000000000000000000000000000000000000000'
 
   constructor(opts: { sink?: string; consumer?: string; failClosed?: boolean } = {}) {
     this.sink = opts.sink
@@ -31,6 +32,9 @@ export class Audit {
     this.failClosed = opts.failClosed || false
     this.hmacKey = process.env.CONARIUM_AUDIT_HMAC_KEY
     this.validateChain()
+    // Read the tail hash ONCE at startup; keep it in memory afterwards so log()
+    // is O(1) instead of re-reading + splitting the whole sink on every call.
+    this.lastHash = this.getLastHash()
   }
 
   private getLastHash(): string {
@@ -54,13 +58,16 @@ export class Audit {
     // and connection-string credentials out of the audit log.
     masked = masked.replace(/\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g, '[MASKED_SECRET]')
     masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, '$1[MASKED_SECRET]$2')
+    masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, '$1[MASKED_SECRET]')
     masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, '$1[MASKED_SECRET]')
 
     if (typeof args === 'string') return masked
     try {
       return JSON.parse(masked)
     } catch {
-      return args
+      // Fail CLOSED: if masking corrupted the JSON, never return the raw object —
+      // it may still carry the secret/PII we tried to redact. Emit a safe marker.
+      return { _audit: 'unserializable-after-masking', length: str.length }
     }
   }
 
@@ -75,9 +82,10 @@ export class Audit {
       full.args = this.maskArgs(full.args)
     }
 
-    full.prevHash = this.getLastHash()
+    full.prevHash = this.lastHash
     const contentToHash = JSON.stringify({ ...full, prevHash: full.prevHash })
     full.hash = createHash('sha256').update(contentToHash).digest('hex')
+    this.lastHash = full.hash
     if (this.hmacKey) {
       full.signature = createHmac('sha256', this.hmacKey).update(full.hash).digest('hex')
     }

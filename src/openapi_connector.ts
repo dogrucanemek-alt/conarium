@@ -34,11 +34,13 @@ async function loadSpec(source: string): Promise<any> {
 /**
  * Resolves $ref in OpenAPI schema
  */
-function resolveRef(obj: any, doc: any): any {
+function resolveRef(obj: any, doc: any, seen: Set<string> = new Set()): any {
   if (!obj || typeof obj !== 'object') return obj;
   if ('$ref' in obj && typeof obj.$ref === 'string') {
     const ref = obj.$ref;
+    if (seen.has(ref)) return obj; // circular $ref (A->B->A) — stop, never recurse forever
     if (ref.startsWith('#/')) {
+      seen.add(ref);
       const parts = ref.slice(2).split('/');
       let current = doc;
       for (const part of parts) {
@@ -48,7 +50,7 @@ function resolveRef(obj: any, doc: any): any {
           return obj;
         }
       }
-      return resolveRef(current, doc);
+      return resolveRef(current, doc, seen);
     }
   }
   return obj;

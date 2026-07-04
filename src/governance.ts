@@ -169,6 +169,11 @@ export class Governance {
       if (regex.test(norm)) this.deny(emptyState, `Blocked write operation: ${tok.trim()}`)
     }
 
+    // Row-locking clauses acquire locks (a side effect) — refuse them on governed reads.
+    if (/\bFOR\s+(?:UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/.test(norm)) {
+      this.deny(emptyState, 'Row-locking clauses (FOR UPDATE/SHARE) are not permitted.')
+    }
+
     let ast: Statement[]
     try {
       ast = parse(sql)
@@ -212,7 +217,15 @@ export class Governance {
         const keyLower = key.toLowerCase()
         const qualifiedSource = table ? `${table}.${sourceKey}` : sourceKey
         
-        if (maskedFieldLookup.has(keyLower) || masks.some(m => match(m, qualifiedSource) || match(m, sourceKey) || match(m, key))) {
+        // Also mask by bare COLUMN NAME (last path segment of any mask rule). This
+        // closes the SELECT * / star-projection leak: when the executable rows carry
+        // no _table qualifier, a fully-qualified rule like public.customers.address
+        // would otherwise never match. For a PII tool, over-masking a configured
+        // column name across governed output is the safe direction.
+        const maskColMatch = masks.some(m =>
+          match(m, qualifiedSource) || match(m, sourceKey) || match(m, key) ||
+          m.slice(m.lastIndexOf('.') + 1).toLowerCase() === keyLower)
+        if (maskedFieldLookup.has(keyLower) || maskColMatch) {
           out[key] = '[MASKED_PII]'
           maskedFields.add(key)
           maskedCount++

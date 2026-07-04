@@ -18,6 +18,7 @@ describe('audit maskArgs — secrets, not just PII', () => {
         key: 'sk_live_ABCDEFGHIJKLMNOP',
         line: 'password=SuperSecret123',
         dsn: 'postgres://user:hunter2@db.internal:5432/app',
+        headers: { authorization: 'Bearer opaque-token-value-abcdef123456' },
       },
     });
     const content = fs.readFileSync(sink, 'utf8');
@@ -25,6 +26,7 @@ describe('audit maskArgs — secrets, not just PII', () => {
     expect(content).not.toContain('sk_live_ABCDEFGHIJKLMNOP');
     expect(content).not.toContain('hunter2');
     expect(content).not.toContain('SuperSecret123');
+    expect(content).not.toContain('opaque-token-value-abcdef123456'); // Bearer token remainder
     expect(content).toContain('[MASKED_SECRET]');
   });
 });
