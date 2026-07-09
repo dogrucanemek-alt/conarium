@@ -46,13 +46,13 @@
                     <h3>Live Playground</h3>
                     <p class="pg-sub">An AI assistant queries your data. Watch Conarium <strong>mask the secrets</strong> and <strong>block forbidden tables</strong> — live.</p>
                     <div class="pg-samples">
-                        <button class="chip" data-q="SELECT * FROM customers">customers <span>(PII)</span></button>
-                        <button class="chip" data-q="SELECT * FROM orders">orders</button>
-                        <button class="chip chip-danger" data-q="SELECT * FROM secrets">secrets <span>(denied)</span></button>
-                        <button class="chip chip-danger" data-q="DELETE FROM customers">DELETE <span>(write)</span></button>
+                        <button class="chip" data-q="SELECT * FROM public.customers">customers <span>(PII)</span></button>
+                        <button class="chip" data-q="SELECT * FROM public.orders">orders</button>
+                        <button class="chip chip-danger" data-q="SELECT * FROM public.secrets">secrets <span>(denied)</span></button>
+                        <button class="chip chip-danger" data-q="DELETE FROM public.customers">DELETE <span>(write)</span></button>
                     </div>
                     <div class="pg-input-row">
-                        <input type="text" id="pg-query" class="glass-input" value="SELECT * FROM customers" placeholder="SELECT * FROM customers">
+                        <input type="text" id="pg-query" class="glass-input" value="SELECT * FROM public.customers" placeholder="SELECT * FROM public.customers">
                         <button class="btn primary-btn" id="pg-run">Run through Conarium ▸</button>
                     </div>
                     <div id="pg-result" class="pg-result"></div>

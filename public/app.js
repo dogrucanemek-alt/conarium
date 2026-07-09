@@ -1,5 +1,32 @@
+// Console auth: token arrives via ?token=... (printed by start-console), then
+// lives in sessionStorage so a refresh keeps working after we scrub the URL.
+const CONSOLE_TOKEN_KEY = 'conarium_console_token';
+(function bootstrapConsoleToken() {
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get('token');
+    if (token) {
+        sessionStorage.setItem(CONSOLE_TOKEN_KEY, token);
+        url.searchParams.delete('token');
+        history.replaceState({}, '', url.pathname + url.search + url.hash);
+    }
+})();
+
+async function apiFetch(path, opts = {}) {
+    const token = sessionStorage.getItem(CONSOLE_TOKEN_KEY) || '';
+    opts.headers = Object.assign({
+        'Authorization': `Bearer ${token}`,
+        'x-csrf-token': token
+    }, opts.headers || {});
+    const res = await fetch(path, opts);
+    if (res.status === 401 || res.status === 403 || res.status === 503) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(`${body.error || 'Unauthorized'} — restart the console and open the tokenized URL printed in the terminal.`);
+    }
+    return res;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    
+
     // Tab Switching Logic
     const tabs = document.querySelectorAll('.nav-item');
     const contents = document.querySelectorAll('.tab-content');
@@ -20,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load Config
     async function loadConfig() {
         try {
-            const res = await fetch('/api/config');
+            const res = await apiFetch('/api/config');
             const data = await res.json();
             
             document.getElementById('maxRows').value = data.maxRows || 100;
@@ -47,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const res = await fetch('/api/config', {
+            const res = await apiFetch('/api/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newConfig)
@@ -64,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load Audit Logs
     async function loadAudit() {
         try {
-            const res = await fetch('/api/audit');
+            const res = await apiFetch('/api/audit');
             const data = await res.json();
             
             const tbody = document.getElementById('audit-body');
@@ -139,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load Connectors
     async function loadConnectors() {
         try {
-            const res = await fetch('/api/connectors');
+            const res = await apiFetch('/api/connectors');
             const data = await res.json();
             
             const list = document.getElementById('connector-list');
@@ -190,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const out = document.getElementById('pg-result');
         out.innerHTML = '<div class="loader">Running through Conarium…</div>';
         try {
-            const res = await fetch('/api/playground', {
+            const res = await apiFetch('/api/playground', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query })
             });

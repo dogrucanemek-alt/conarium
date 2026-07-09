@@ -72,7 +72,7 @@ npm install
 npx tsx demo.ts
 ```
 
-Want the visual console instead? Run `npx tsx start-console.ts` and open http://localhost:3000.
+Want the visual console instead? Run `npx tsx start-console.ts` and open the tokenized URL it prints (e.g. `http://127.0.0.1:3000/?token=...`).
 
 ## 🚀 Quick Start
 

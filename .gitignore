@@ -29,3 +29,8 @@ i18n_assessment.js
 site/
 .next/
 *.tsbuildinfo
+
+# internal review artifacts (never publish)
+neo-review-findings.json
+src/neo-council-findings.json
+console-run.log

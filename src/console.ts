@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { timingSafeEqual } from 'crypto'
+import { randomBytes, timingSafeEqual } from 'crypto'
 import { z } from 'zod'
 import { Governance } from './governance.js'
 
@@ -207,12 +207,25 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
 }
 
 export function startConsole(port: number = 3000, host: string = process.env.CONARIUM_CONSOLE_HOST || DEFAULT_CONSOLE_HOST) {
+  // Local quickstart: mint a one-off token so the console works out of the box
+  // while /api stays locked to holders of the printed URL.
+  let generatedToken: string | undefined
+  if (!process.env.CONARIUM_CONSOLE_TOKEN) {
+    generatedToken = randomBytes(24).toString('hex')
+    process.env.CONARIUM_CONSOLE_TOKEN = generatedToken
+  }
+
   const app = createConsoleApp()
   app.listen(port, host, () => {
     console.log(`[Conarium Console] Server started at http://${host}:${port}`)
+    if (generatedToken) {
+      console.log(`[Conarium Console] Open: http://${host}:${port}/?token=${generatedToken}`)
+      console.log('[Conarium Console] (set CONARIUM_CONSOLE_TOKEN to use your own token)')
+    }
   })
 }
 
-if (process.argv[1]?.endsWith('console.ts') || process.argv[1]?.endsWith('console.js')) {
+const entryBase = process.argv[1] ? path.basename(process.argv[1]) : ''
+if (entryBase === 'console.ts' || entryBase === 'console.js') {
   startConsole()
 }
