@@ -2,9 +2,10 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { randomBytes, timingSafeEqual } from 'crypto'
+import { timingSafeEqual } from 'crypto'
 import { z } from 'zod'
 import { Governance } from './governance.js'
+import { Audit } from './audit.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -71,6 +72,35 @@ function requireConsoleAuth(req: Request, res: Response, next: NextFunction): vo
   next()
 }
 
+// A pre-chain playground file: first line parses as JSON but was written before
+// entries carried hashes. A file whose entries HAVE hashes but fail validation is
+// not legacy — it is a broken or tampered chain and must stay a hard error.
+function isLegacyUnhashedSink(file: string): boolean {
+  try {
+    const first = fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean)[0]
+    if (!first) return false
+    const entry = JSON.parse(first) as Record<string, unknown>
+    return typeof entry === 'object' && entry !== null && !('hash' in entry)
+  } catch {
+    return false
+  }
+}
+
+// Playground writes go through the real hash-chained Audit — a plain appendFileSync
+// entry would sit outside the chain and read as tampering. Only a positively
+// identified legacy (pre-chain) file is moved aside for a clean chain; a failing
+// hash/HMAC chain or an I/O error rethrows — silently starting a fresh chain would
+// bury tampering evidence.
+export function createPlaygroundAudit(auditFile: string): Audit {
+  try {
+    return new Audit({ sink: auditFile, consumer: 'Console_Playground' })
+  } catch (err) {
+    if (!isLegacyUnhashedSink(auditFile)) throw err
+    fs.renameSync(auditFile, `${auditFile}.legacy-${Date.now()}`)
+    return new Audit({ sink: auditFile, consumer: 'Console_Playground' })
+  }
+}
+
 export function createConsoleApp(opts: { configFile?: string; auditFile?: string } = {}) {
   const app = express()
   app.use(express.json({ limit: '64kb' }))
@@ -78,6 +108,7 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
   const publicDir = path.join(__dirname, '../public')
   const configFile = opts.configFile || path.join(__dirname, '../conarium.config.json')
   const auditFile = opts.auditFile || path.join(__dirname, '../audit.log.jsonl')
+  const audit = createPlaygroundAudit(auditFile)
 
   app.use(express.static(publicDir))
   app.use('/api', requireConsoleAuth)
@@ -154,6 +185,9 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
 
     const gov = new Governance({
       maxRows: cfg.maxRows,
+      // Playground açık örnek-veri demosu: default-deny sonrası açık modu EXPLICIT belirt
+      // (secrets yine denyTables ile reddedilir). Üretim yolu (index.ts) config.policy kullanır.
+      allowTables: ['*'],
       denyTables: ['public.secrets'],
       maskColumns: cfg.piiMasking !== false ? ['*.email', '*.ssn', '*.tckn', '*.card', '*.phone'] : [],
     })
@@ -187,9 +221,7 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
       reason = (e as Error).message
     }
 
-    const entry = {
-      timestamp: new Date().toISOString(),
-      actor: 'Console_Playground',
+    const entry = audit.log({
       tool: 'query_db',
       target: table || 'n/a',
       args: { sql: query },
@@ -197,8 +229,7 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
       maskedCount,
       denied: decision === 'deny',
       reason,
-    }
-    try { fs.appendFileSync(auditFile, JSON.stringify(entry) + '\n') } catch {}
+    })
 
     res.json({ decision, reason, raw, governed, maskedCount, table, audit: entry })
   })
@@ -207,25 +238,12 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
 }
 
 export function startConsole(port: number = 3000, host: string = process.env.CONARIUM_CONSOLE_HOST || DEFAULT_CONSOLE_HOST) {
-  // Local quickstart: mint a one-off token so the console works out of the box
-  // while /api stays locked to holders of the printed URL.
-  let generatedToken: string | undefined
-  if (!process.env.CONARIUM_CONSOLE_TOKEN) {
-    generatedToken = randomBytes(24).toString('hex')
-    process.env.CONARIUM_CONSOLE_TOKEN = generatedToken
-  }
-
   const app = createConsoleApp()
   app.listen(port, host, () => {
     console.log(`[Conarium Console] Server started at http://${host}:${port}`)
-    if (generatedToken) {
-      console.log(`[Conarium Console] Open: http://${host}:${port}/?token=${generatedToken}`)
-      console.log('[Conarium Console] (set CONARIUM_CONSOLE_TOKEN to use your own token)')
-    }
   })
 }
 
-const entryBase = process.argv[1] ? path.basename(process.argv[1]) : ''
-if (entryBase === 'console.ts' || entryBase === 'console.js') {
+if (process.argv[1]?.endsWith('console.ts') || process.argv[1]?.endsWith('console.js')) {
   startConsole()
 }

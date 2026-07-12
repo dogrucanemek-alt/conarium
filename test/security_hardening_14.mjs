@@ -215,6 +215,48 @@ await check('3b chat public mode (no token) allows anonymous; origin allowlist e
   }
 })
 
+await check('3c rate-limit bucket key cannot be dodged via client-controlled x-forwarded-for prefix', async () => {
+  const oldEnv = { ...process.env }
+  const oldFetch = global.fetch
+  try {
+    delete process.env.CONARIUM_CHAT_AUTH_TOKEN
+    delete process.env.CONARIUM_CHAT_ALLOWED_ORIGINS
+    process.env.CONARIUM_PROXY_KEY = 'rotated-upstream-key'
+    process.env.CONARIUM_CHAT_UPSTREAM_URL = 'https://example.com/chat'
+    global.fetch = async () => ({ ok: true, json: async () => ({ reply: 'ok' }) })
+
+    // Attacker rotates the LEFTMOST XFF entry every request; the trusted rightmost
+    // hop stays the same, so all requests must land in the same bucket and 429.
+    chatTest.rateBuckets.clear()
+    let last
+    for (let i = 0; i < 31; i++) {
+      last = mockRes()
+      await chatHandler({
+        method: 'POST',
+        headers: { 'x-forwarded-for': `10.0.0.${i}, 203.0.113.7` },
+        body: {},
+      }, last)
+    }
+    assert.equal(last.statusCode, 429)
+    assert.equal(chatTest.rateBuckets.size, 1)
+
+    // x-real-ip (platform-set) wins over any forwarded chain.
+    chatTest.rateBuckets.clear()
+    const res = mockRes()
+    await chatHandler({
+      method: 'POST',
+      headers: { 'x-real-ip': '198.51.100.9', 'x-forwarded-for': 'spoofed, 203.0.113.7' },
+      body: {},
+    }, res)
+    assert.equal(res.statusCode, 200)
+    assert.ok(chatTest.rateBuckets.has('198.51.100.9'))
+  } finally {
+    process.env = oldEnv
+    global.fetch = oldFetch
+    chatTest.rateBuckets.clear()
+  }
+})
+
 await check('4 console is loopback by default, authenticated, CSRF-protected, validated, and redacts secrets', async () => {
   assert.equal(DEFAULT_CONSOLE_HOST, '127.0.0.1')
   assert.deepEqual(redactSecretFields({ config: { serviceKey: 'secret', url: 'postgres://pw', ok: 'yes' } }), {

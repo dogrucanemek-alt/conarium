@@ -118,6 +118,10 @@ hr{border:none;border-top:1px solid var(--line);margin:56px 0}
   <h2>Run it yourself</h2>
   <p>Conarium runs as a single service inside your infrastructure (local, VPC, or air-gapped). It's a standard MCP stdio server — your assistant launches it and speaks MCP over stdio. It needs no inbound port and never phones home.</p>
 
+  <h3>Get the code</h3>
+  <pre>git clone https://github.com/dogrucanemek-alt/conarium.git
+cd conarium</pre>
+
   <h3>With Docker</h3>
   <pre>docker build -t conarium .
 docker run --rm -i \
@@ -140,7 +144,7 @@ node dist/index.js --config ./conarium.config.json</pre>
   }
 }</pre>
   <p>From then on, every query the assistant issues passes through Conarium first. It sits in the query path, so plan for it as you would any component there. Its default is to fail closed: if it can't make a safe decision, the assistant gets a refusal — never raw data.</p>
-  <p style="color:var(--faint);font-size:13.5px">Source access: the repository and a published npm package are being opened up. Until then, request access at <a href="mailto:e.dogru@conarium.dev">e.dogru@conarium.dev</a>.</p>
+  <p style="color:var(--faint);font-size:13.5px">Source: <a href="https://github.com/dogrucanemek-alt/conarium">github.com/dogrucanemek-alt/conarium</a> — MIT-licensed. Read it, run it, fork it. Questions: <a href="mailto:e.dogru@conarium.dev">e.dogru@conarium.dev</a>.</p>
 
   <h2>Status &amp; maturity — honestly</h2>
   <p>Conarium is <b>early</b>. It is pre-1.0, built and run by a solo founder, with <b>one</b> production deployment so far (a live ERP: 115 real customer records, zero leaked to the model). It has <b>no</b> third-party security certification (SOC 2 / ISO) yet — those are on the roadmap, to be earned as the company matures, not claimed before. If you need a certified, multi-customer, enterprise-hardened vendor today, Conarium isn't there yet, and we'd rather tell you than pretend. What we offer right now is a genuinely self-hosted, inspectable governance layer and a direct line to the person who built it.</p>

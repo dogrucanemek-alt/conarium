@@ -137,10 +137,14 @@ export class Governance {
 
     if (denyTables?.some(p => match(p, qualified))) return false
 
+    // 🔒 DEFAULT-DENY (Codex denetimi 2026-07-06, P1): allowTables tanımlı DEĞİLSE hiçbir
+    // tabloya izin verme. docs.html "Nothing is allowed unless you allow it" + README
+    // "denied by default" bunu vaat ediyordu; eski kod (return true) TAM TERSİYDİ = güvenlik
+    // ürününde vaad ihlali. Açık mod isteyen (playground/demo) explicit allowTables:['*'] verir.
     if (allowTables && allowTables.length > 0) {
       return allowTables.some(p => match(p, qualified))
     }
-    return true
+    return false
   }
 
   filterTables(tables: SchemaTable[]): SchemaTable[] {
@@ -268,6 +272,18 @@ export class Governance {
       masked = masked.replace(phoneRegex, () => { count++; return '[MASKED_PII]'; });
       masked = masked.replace(cardRegex, () => { count++; return '[MASKED_PII]'; });
 
+      // Sertleştirme (Codex denetimi 2026-07-06, P1): README "secrets are redacted in the
+      // response stream" diyor ama yanıt yolu (maskPII) sadece PII yakalıyordu — API key /
+      // token / şifre / bağlantı-dizesi kimliği MODELE ham gidiyordu (ör. api_key sütunu
+      // maskColumns'ta değilse). Audit yolu (audit.ts maskArgs) bunu zaten yakalıyordu;
+      // aynı dedektörleri yanıt yoluna da taşıdık. Ürünün güvenlik vaadi = bu.
+      // sk- ailesi: yeni OpenAI anahtarları sk-proj-... (tire içerir) → tire/alt-çizgiye izin ver.
+      const secretRe = /\b(?:sk-[A-Za-z0-9_-]{12,}|sk_live_[A-Za-z0-9]{6,}|sk_test_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g;
+      masked = masked.replace(secretRe, () => { count++; return '[MASKED_SECRET]'; });
+      masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, (_m, p1, p2) => { count++; return `${p1}[MASKED_SECRET]${p2}`; });
+      masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, (_m, p1) => { count++; return `${p1}[MASKED_SECRET]`; });
+      masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, (_m, p1) => { count++; return `${p1}[MASKED_SECRET]`; });
+
       // Sertleştirme (Claude, 2026-07-02): encode(...,'base64') ile kaçırılan PII'yi de yakala.
       // NEO red-team harness bu deliği buldu (pii-base64 BYPASS). Saf base64 bir metin
       // çözülünce e-posta/TCKN içeriyorsa maskele.
@@ -303,6 +319,10 @@ export class Governance {
           const lowerKey = k.toLowerCase();
           if (lowerKey.includes('email') || lowerKey.includes('phone') || lowerKey.includes('tckn') || lowerKey.includes('card')) {
             out[k] = '[MASKED_PII]';
+            totalCount++;
+          } else if (/secret|token|password|passwd|pwd|api[_-]?key|access[_-]?key|\bkey\b|credential/.test(lowerKey)) {
+            // Sütun ADI sır ima ediyorsa (api_key, secret, token, password) değeri her hâlükârda maskele.
+            out[k] = '[MASKED_SECRET]';
             totalCount++;
           } else {
             const res = this.maskPII(v);
@@ -508,6 +528,14 @@ export class Governance {
 
       if (!from.name.schema) {
         this.deny(state, `Unqualified table '${from.name.name}' is not permitted; use schema.table.`)
+      }
+
+      // The parser folds unquoted identifiers to lowercase (PostgreSQL semantics), so an
+      // uppercase character here can only come from a quoted identifier — and Postgres
+      // treats `public."Customers"` as a DIFFERENT table than public.customers. Folding it
+      // for policy matching would let it ride an allow-list entry it doesn't belong to.
+      if (from.name.name !== from.name.name.toLowerCase() || from.name.schema !== from.name.schema.toLowerCase()) {
+        this.deny(state, `Quoted mixed-case identifier '${from.name.schema}.${from.name.name}' is not permitted; policy matching is lowercase-only.`)
       }
 
       const qualified = this.qualifiedTable(from.name.schema, from.name.name)

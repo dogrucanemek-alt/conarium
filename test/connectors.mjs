@@ -29,7 +29,8 @@ test('Governance: maskColumns masks PII', async () => {
 })
 
 test('Governance: denyTables hides tables', async () => {
-  const gov = new Governance({ denyTables: ['public.secrets'] })
+  // default-deny sonrası açık mod explicit (['*']); test niyeti: deny secrets'ı gizler, users kalır
+  const gov = new Governance({ allowTables: ['*'], denyTables: ['public.secrets'] })
   const tables = [
     { schema: 'public', name: 'secrets', columns: [] },
     { schema: 'public', name: 'users', columns: [] }

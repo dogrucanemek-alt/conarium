@@ -61,19 +61,6 @@ graph LR
 
 ---
 
-## ⚡ Try It in 60 Seconds (no database needed)
-
-See the full governance story — raw data → masked PII → blocked `secrets` table → hash-chained audit trail — with a single command:
-
-```bash
-git clone https://github.com/dogrucanemek-alt/conarium.git
-cd conarium
-npm install
-npx tsx demo.ts
-```
-
-Want the visual console instead? Run `npx tsx start-console.ts` and open the tokenized URL it prints (e.g. `http://127.0.0.1:3000/?token=...`).
-
 ## 🚀 Quick Start
 
 Conarium runs from source today. _(A one-command `npx conarium` CLI is on the [Roadmap](#️-roadmap).)_
@@ -81,7 +68,7 @@ Conarium runs from source today. _(A one-command `npx conarium` CLI is on the [R
 ```bash
 # 1. Clone & install
 git clone https://github.com/dogrucanemek-alt/conarium.git
-cd conarium
+cd nexus
 npm install
 
 # 2. Point it at your data (and write a policy — see Configuration)
@@ -103,7 +90,7 @@ Conarium speaks MCP over **stdio**, so your AI assistant launches it as a comman
 
 ## ⚙️ Configuration (Policy as Code)
 
-Control access using a simple `conarium.config.json` policy file:
+Control access using a simple `conarium.json` policy file:
 
 ```json
 {

@@ -38,6 +38,7 @@ async function runDemo() {
 
   // 2. Initialize Conarium
   const gov = new Governance({
+    allowTables: ['*'],           // demo açık mod (default-deny sonrası explicit); secrets denyTables ile reddedilir
     maskColumns: ['email', 'ssn'],
     denyTables: ['secrets']
   });

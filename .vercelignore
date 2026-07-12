@@ -9,3 +9,6 @@
 !api
 !api/chat.js
 !vercel.json
+!assets
+!assets/hero
+!assets/hero/*.webp

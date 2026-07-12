@@ -29,7 +29,10 @@ export class Audit {
   constructor(opts: { sink?: string; consumer?: string; failClosed?: boolean } = {}) {
     this.sink = opts.sink
     this.consumer = opts.consumer || 'unknown'
-    this.failClosed = opts.failClosed || false
+    // Fail CLOSED by default: docs promise "every access is appended". A sink write
+    // failure must stop the request, not silently drop the trail. Opt out explicitly
+    // with failClosed: false for throwaway/demo setups.
+    this.failClosed = opts.failClosed ?? true
     this.hmacKey = process.env.CONARIUM_AUDIT_HMAC_KEY
     this.validateChain()
     // Read the tail hash ONCE at startup; keep it in memory afterwards so log()
@@ -71,7 +74,7 @@ export class Audit {
     }
   }
 
-  log(entry: Omit<AuditEntry, 'timestamp' | 'actor' | 'prevHash' | 'hash'>): void {
+  log(entry: Omit<AuditEntry, 'timestamp' | 'actor' | 'prevHash' | 'hash'>): AuditEntry {
     const full: AuditEntry = {
       timestamp: new Date().toISOString(),
       actor: this.consumer,
@@ -102,6 +105,7 @@ export class Audit {
         }
       }
     }
+    return full
   }
 
   private validateChain(): void {

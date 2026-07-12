@@ -14,6 +14,25 @@ function expectPolicyError(fn, pattern) {
 
 const tests = [
   {
+    name: 'P1 DEFAULT-DENY: allowTables tanımsızsa hiçbir tablo okunamaz (Codex 2026-07-06)',
+    run: () => {
+      // Vaad: docs "Nothing is allowed unless you allow it". Kod bunu tutmalı.
+      const noAllow = new Governance({ maxRows: 50 })          // allowTables YOK
+      assert.equal(noAllow.allowsTable('public.salaries'), false, 'allowTables yoksa DENY olmalı')
+      assert.equal(noAllow.allowsTable('public.customers'), false)
+      expectPolicyError(
+        () => noAllow.guardQuery('SELECT * FROM public.salaries'),
+        /not permitted by policy/
+      )
+      const emptyAllow = new Governance({ allowTables: [] })    // boş liste = yine DENY
+      assert.equal(emptyAllow.allowsTable('public.customers'), false)
+      // Açık mod EXPLICIT olmalı:
+      const openMode = new Governance({ allowTables: ['*'], denyTables: ['public.secrets'] })
+      assert.equal(openMode.allowsTable('public.customers'), true)
+      assert.equal(openMode.allowsTable('public.secrets'), false, 'denyTables açık modda da öncelikli')
+    },
+  },
+  {
     name: 'P0 allowTables requires schema-qualified match',
     run: () => {
       const barePolicy = new Governance({ allowTables: ['customers'] })

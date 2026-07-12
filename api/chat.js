@@ -68,7 +68,15 @@ function enforceRateLimit(req) {
   if (rateBuckets.size > 5000) {
     for (const [k, b] of rateBuckets) if (now - b.start >= WINDOW_MS) rateBuckets.delete(k);
   }
-  const ip = getHeader(req, 'x-forwarded-for')?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+  // The LEFTMOST x-forwarded-for entry is client-controlled (a caller can prepend
+  // arbitrary values to hop buckets). Trust order: x-real-ip (set by the platform
+  // proxy), then the RIGHTMOST forwarded hop (appended by the nearest trusted proxy),
+  // then the socket peer. Deployment assumption: this function sits behind a proxy
+  // (Vercel) that overwrites x-real-ip; if you expose it directly, strip inbound
+  // x-real-ip/x-forwarded-for at your edge or the bucket key is spoofable.
+  const ip = getHeader(req, 'x-real-ip')?.trim()
+    || getHeader(req, 'x-forwarded-for')?.split(',').map(s => s.trim()).filter(Boolean).pop()
+    || req.socket?.remoteAddress || 'unknown';
   const bucket = rateBuckets.get(ip);
   if (!bucket || now - bucket.start >= WINDOW_MS) {
     rateBuckets.set(ip, { start: now, count: 1 });

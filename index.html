@@ -13,10 +13,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="assets/hero/eye-base.webp" fetchpriority="high">
+<link rel="preload" as="image" href="assets/hero/iris.webp">
 <style>
 :root{
   --void:#000208; --panel:#05070f; --panel2:#080b16;
-  --blue:#5a8cff; --blue-lt:#bed8ff; --cyan:#6fe0e0; --gold:#f2d79a; --rose:#ff6f80;
+  --blue:#5a8cff; --blue-lt:#bed8ff; --cyan:#6fe0e0; --gold:#f2d79a; --circuit:#c9a24d; --rose:#ff6f80;
   --ink:#eaf0ff; --dim:#838dad; --faint:#4d5573; --line:rgba(120,150,255,.13);
   --disp:'Cormorant',serif; --body:'Space Grotesk',sans-serif; --mono:'JetBrains Mono',monospace;
 }
@@ -38,29 +40,54 @@ nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:cent
 .lang:hover{border-color:var(--blue)}
 .lang option{background:#080b16;color:var(--ink)}
 
-/* HERO */
-.hero{position:relative;height:100vh;min-height:680px;overflow:hidden}
-#iris{position:absolute;inset:0;width:100%;height:100%}
-.hero .vignette{position:absolute;inset:0;background:radial-gradient(58% 58% at 50% 44%,transparent 42%,rgba(0,2,8,.6) 100%)}
-.hero .stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:11vh;text-align:center;z-index:3}
-.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.46em;text-transform:uppercase;color:#7fa8ff;opacity:0;animation:fade 2.2s 1.2s forwards}
-.hero h1{font-family:var(--disp);font-weight:300;font-size:clamp(2.4rem,5.4vw,4.6rem);line-height:1.04;margin-top:18px;max-width:18ch}
+/* HERO — canlı göz (2026-07-11) */
+.hero{position:relative;min-height:100vh;padding:108px 48px 36px;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.heroGrid{position:relative;z-index:2;display:grid;grid-template-columns:minmax(280px,400px) minmax(520px,1fr) 228px;gap:26px;align-items:center;max-width:1600px;margin:0 auto;width:100%}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.42em;text-transform:uppercase;color:#7fa8ff;opacity:0;animation:fade 2.2s .9s forwards}
+.hero h1{font-family:var(--disp);font-weight:300;font-size:clamp(2.2rem,3.4vw,3.7rem);line-height:1.06;margin-top:16px}
 .hero h1 em{font-style:italic;color:#a9c6ff}
 .hero h1 .ln{display:block;overflow:hidden}
 .hero h1 .ln i{display:inline-block;font-style:normal;transform:translateY(110%);animation:up 1.5s cubic-bezier(.2,.8,.2,1) forwards}
-.hero .sub{max-width:46ch;color:var(--dim);font-size:15.5px;margin:24px auto 0;opacity:0;animation:fade 2s 1.9s forwards}
-.hero .ctas{display:flex;gap:16px;margin-top:34px;justify-content:center;flex-wrap:wrap;opacity:0;animation:fade 2s 2.2s forwards}
-.metrics{display:flex;gap:46px;justify-content:center;flex-wrap:wrap;margin-top:38px;opacity:0;animation:fade 2s 2.7s forwards}
+.hero .sub{max-width:40ch;color:var(--dim);font-size:15px;margin-top:20px;opacity:0;animation:fade 2s 1.7s forwards}
+.hero .ctas{display:flex;gap:14px;margin-top:28px;flex-wrap:wrap;opacity:0;animation:fade 2s 2s forwards}
+.ctanote{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:12px;max-width:44ch;text-wrap:balance;opacity:0;animation:fade 2s 2.3s forwards}
+#eyeStage{position:relative;will-change:transform;container-type:inline-size}
+.imgLbl{position:absolute;transform:translateY(-50%);font-family:var(--body);font-size:clamp(8px,1.3cqw,14px);color:#cfe0ff;letter-spacing:.01em;pointer-events:none;white-space:nowrap;z-index:2}
+.imgLbl.r{color:#eed9a4}
+.imgLbl.hd{font-family:var(--mono);text-transform:uppercase;letter-spacing:.22em;font-size:clamp(7px,1.05cqw,12px);color:var(--gold)}
+#eyeBase{width:100%;display:block}
+#eyeIris{position:absolute;left:47.97%;top:35.24%;width:15.76%;will-change:transform}
+#eyeStage::after{content:'';position:absolute;inset:-2px;pointer-events:none;background:linear-gradient(90deg,var(--void) 0,transparent 4%,transparent 96%,var(--void) 100%),linear-gradient(180deg,var(--void) 0,transparent 6%,transparent 94%,var(--void) 100%)}
+#eyeGlow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 55.8% 49.7%,rgba(120,170,255,.10),transparent 26%);animation:breath 6.5s ease-in-out infinite}
+@keyframes breath{50%{opacity:.45}}
+#wireFlow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+#wireFlow path{fill:none;stroke:none}
+.pkt-in{fill:#bcd8ff;filter:drop-shadow(0 0 4px #7fb0ff) drop-shadow(0 0 10px #4a86ff)}
+.pkt-out{fill:#ffe2a0;filter:drop-shadow(0 0 4px #f2c368) drop-shadow(0 0 10px #c9922f)}
+.metrics{display:flex;gap:46px;justify-content:center;flex-wrap:wrap;margin-top:42px;opacity:0;animation:fade 2s 2.7s forwards}
 .metrics .m{text-align:center}
 .metrics .m b{font-family:var(--disp);font-weight:400;font-size:34px;color:var(--blue-lt);display:block;line-height:1}
 .metrics .m label{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-top:9px;display:block}
-.govpanel{position:absolute;top:14%;right:48px;width:228px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(160deg,rgba(10,14,26,.55),rgba(4,5,12,.45));backdrop-filter:blur(16px);padding:18px;z-index:4;opacity:0;transform:translateX(24px);animation:slideIn 1.6s 2.3s forwards;box-shadow:0 30px 60px rgba(0,0,0,.45)}
+.govpanel{border:1px solid var(--line);border-radius:14px;background:linear-gradient(160deg,rgba(10,14,26,.55),rgba(4,5,12,.45));backdrop-filter:blur(16px);padding:18px;opacity:0;transform:translateX(24px);animation:slideIn 1.6s 2.1s forwards;box-shadow:0 30px 60px rgba(0,0,0,.45)}
 .gp-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:8px;padding-bottom:13px;border-bottom:1px solid var(--line);margin-bottom:8px}
 .gp-dot{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 9px var(--cyan);animation:pulse 2s infinite}
 .gp-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:12px;color:var(--dim)}
 .gp-row i{font-style:normal;color:var(--cyan);font-size:13px}
+.gp-link{display:block;margin-top:10px;font-family:var(--mono);font-size:10.5px;color:var(--blue-lt)}
 @keyframes slideIn{to{opacity:1;transform:none}}
-@media(max-width:1120px){.govpanel{display:none}}
+@media(prefers-reduced-motion:reduce){#eyeGlow,.gp-dot{animation:none}}
+@media(max-width:1439px){
+  .heroGrid{grid-template-columns:minmax(260px,360px) 1fr;gap:20px}
+  .govpanel{display:none}
+}
+@media(max-width:1023px){
+  .hero{padding:96px 22px 32px}
+  .heroGrid{grid-template-columns:1fr;gap:26px}
+  #eyeStage{order:-1;max-width:640px;margin:0 auto;width:100%}
+  .heroCopy{text-align:center}
+  .hero .sub{margin:20px auto 0}.hero .ctas{justify-content:center}
+  .ctanote{margin-left:auto;margin-right:auto}
+}
 .btn{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;padding:15px 28px;border-radius:40px;cursor:pointer;transition:.45s;border:1px solid transparent;display:inline-flex;align-items:center;gap:10px}
 .btn-p{background:linear-gradient(120deg,var(--blue),#8a7cff);color:#000;font-weight:500}
 .btn-p:hover{box-shadow:0 0 36px rgba(120,140,255,.5);transform:translateY(-2px)}
@@ -185,22 +212,45 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
 </nav>
 
 <header class="hero">
-  <canvas id="iris"></canvas>
-  <div class="vignette"></div>
-  <div class="stage">
-    <div class="kicker">◇ AI meets your data — safely ◇</div>
-    <h1><span class="ln"><i style="animation-delay:1.2s">Let AI work with your data.</i></span><span class="ln"><i style="animation-delay:1.36s"><em>Without seeing your secrets.</em></i></span></h1>
-    <p class="sub">Cursor, Copilot and Claude write brilliant code — but point them at your company data and they read your passwords, customer records and secrets too. Conarium is the shield in between: the AI gets the help it needs, and everything sensitive stays invisible. It runs on your machine — nothing ever leaves.</p>
-    <div class="ctas"><a href="#cta" class="btn btn-p">Get early access →</a><a href="#demo" class="btn btn-g">Witness the demo</a></div>
-    <div class="metrics" id="metrics"><div class="m"><b data-to="100" data-suf="%">0</b><label>Self-hosted</label></div><div class="m"><b data-to="0">0</b><label>Secrets leaked</label></div><div class="m"><b data-to="100" data-suf="%">0</b><label>Auditable</label></div></div>
+  <div class="heroGrid">
+    <div class="heroCopy">
+      <div class="kicker">◇ AI meets your data — safely ◇</div>
+      <h1><span class="ln"><i style="animation-delay:1.2s">AI uses your data.</i></span><span class="ln"><i style="animation-delay:1.36s"><em>Conarium watches its every move.</em></i></span></h1>
+      <p class="sub">Conarium is the governance layer between enterprise AI and sensitive data. We enforce policy, mask data, and record every action — in real time.</p>
+      <div class="ctas"><a href="#seedemo" class="btn btn-p">Attack the live demo →</a><a href="#quickstart" class="btn btn-g">Deploy locally</a></div>
+      <p class="ctanote">Break it if you can — every attempt lands in the audit log.</p>
+    </div>
+    <div id="eyeStage">
+      <img id="eyeBase" src="assets/hero/eye-base.webp" alt="Conarium governance eye — incoming systems flow through the eye and exit as governed outputs" fetchpriority="high">
+      <img id="eyeIris" src="assets/hero/iris.webp" alt="">
+      <div id="eyeGlow"></div>
+      <svg id="wireFlow" aria-hidden="true"></svg>
+      <div class="imgLbl hd" style="left:5.1%;top:16.8%">Incoming systems</div>
+      <div class="imgLbl hd r" style="right:1.4%;top:16.8%">Governed outputs</div>
+      <div class="imgLbl" style="left:10%;top:24.65%">AI Agent</div>
+      <div class="imgLbl" style="left:10%;top:34.7%">Analytics Tool</div>
+      <div class="imgLbl" style="left:10%;top:44.76%">App / Service</div>
+      <div class="imgLbl" style="left:10%;top:54.92%">Data Pipeline</div>
+      <div class="imgLbl" style="left:10%;top:64.97%">Third-party AI</div>
+      <div class="imgLbl" style="left:10%;top:75.14%">BI Dashboard</div>
+      <div class="imgLbl r" style="right:5.9%;top:24.65%">Masked Data</div>
+      <div class="imgLbl r" style="right:5.9%;top:34.7%">Filtered Rows</div>
+      <div class="imgLbl r" style="right:5.9%;top:44.76%">Allowed Fields</div>
+      <div class="imgLbl r" style="right:5.9%;top:54.92%">Safe Context</div>
+      <div class="imgLbl r" style="right:5.9%;top:64.97%">Policy Applied</div>
+      <div class="imgLbl r" style="right:5.9%;top:75.14%">Audit Recorded</div>
+    </div>
+    <div class="govpanel">
+      <div class="gp-h"><span class="gp-dot"></span>Governance · Active</div>
+      <div class="gp-row"><span>◑ PII Masking</span><i>✓</i></div>
+      <div class="gp-row"><span>⊘ Deny by Default</span><i>✓</i></div>
+      <div class="gp-row"><span>≣ Row &amp; Field Controls</span><i>✓</i></div>
+      <div class="gp-row"><span>⌖ Immutable Audit Logs</span><i>✓</i></div>
+      <div class="gp-row"><span>◈ Policy Enforcement</span><i>✓</i></div>
+      <a class="gp-link" href="#demo">View live policy status →</a>
+    </div>
   </div>
-  <div class="govpanel">
-    <div class="gp-h"><span class="gp-dot"></span>Governance · Active</div>
-    <div class="gp-row"><span>◑ PII Masking</span><i>✓</i></div>
-    <div class="gp-row"><span>⊘ Allow / Deny</span><i>✓</i></div>
-    <div class="gp-row"><span>≣ Row Caps</span><i>✓</i></div>
-    <div class="gp-row"><span>⌖ Immutable Audit</span><i>✓</i></div>
-  </div>
+  <div class="metrics" id="metrics"><div class="m"><b data-to="100" data-suf="%">0</b><label>Self-hosted</label></div><div class="m"><b data-to="0">0</b><label>Secrets leaked</label></div><div class="m"><b data-to="100" data-suf="%">0</b><label>Auditable</label></div></div>
 </header>
 
 <div class="trust">
@@ -208,7 +258,7 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
   <div class="it"><span class="ic">⊘</span><div><b>Zero data egress</b><span style="color:var(--faint);font-size:11px">Nothing leaves your network</span></div></div>
   <div class="it"><span class="ic">⌖</span><div><b>KVKK / GDPR audit trail</b><span style="color:var(--faint);font-size:11px">Audit without raw PII</span></div></div>
 </div>
-<div class="logos"><span class="lbl">Built for engineering &amp; security teams ·</span><span>Financial Services</span><span>Healthcare</span><span>SaaS</span><span>Government</span><span>Enterprise IT</span></div>
+<div class="logos"><span class="lbl">Works with your stack ·</span><span>PostgreSQL</span><span>Docs &amp; Markdown</span><span>OpenAPI</span><span>Slack</span><span>Jira</span><span>Claude</span><span>Cursor</span><span>Copilot</span></div>
 
 <section id="plain">
   <div class="reveal" style="max-width:760px;margin:0 auto;text-align:center">
@@ -267,23 +317,66 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
 (function(){
   var lang=function(){try{return (localStorage.getItem('clang')||'en')}catch(e){return 'en'}};
   var STR={
-    en:{samps:{bank:'Bank record',hospital:'Patient record',hr:'HR export',config:'Config file'},
+    en:{samps:{bank:'Bank record',hospital:'Patient record',hr:'HR export',defense:'Defense industry',config:'Config file'},
         paste:'…or paste your own data here',
         on:'Turn on Conarium →', off:'← Turn Conarium off',
         leak:function(n){return n+' item'+(n===1?'':'s')+' would leave your building right now';},
         safe:'0 leaked · fully auditable',
         trust:'Everything here was processed <b>in your browser</b>. What you typed was never sent anywhere — that’s exactly how Conarium works in production.'},
-    tr:{samps:{bank:'Banka kaydı',hospital:'Hasta kaydı',hr:'İK dışa aktarımı',config:'Config dosyası'},
+    tr:{samps:{bank:'Banka kaydı',hospital:'Hasta kaydı',hr:'İK dışa aktarımı',defense:'Savunma sanayi',config:'Config dosyası'},
         paste:'…ya da kendi verini buraya yapıştır',
         on:'Conarium’u aç →', off:'← Conarium’u kapat',
         leak:function(n){return 'Şu an '+n+' gizli veri binandan çıkardı';},
         safe:'0 sızıntı · tam denetlenebilir',
-        trust:'Buradaki her şey <b>senin tarayıcında</b> işlendi. Yazdığın hiçbir şey hiçbir yere gönderilmedi — Conarium canlıda da tam olarak böyle çalışır.'}
+        trust:'Buradaki her şey <b>senin tarayıcında</b> işlendi. Yazdığın hiçbir şey hiçbir yere gönderilmedi — Conarium canlıda da tam olarak böyle çalışır.'},
+    es:{samps:{bank:'Registro bancario',hospital:'Historia clínica',hr:'Export de RR.HH.',defense:'Industria de defensa',config:'Archivo config'},
+        paste:'…o pega aquí tus propios datos',
+        on:'Activar Conarium →', off:'← Desactivar Conarium',
+        leak:function(n){return n+(n===1?' dato sensible saldría':' datos sensibles saldrían')+' de tu empresa ahora mismo';},
+        safe:'0 fugas · totalmente auditable',
+        trust:'Todo se procesó <b>en tu navegador</b>. Nada de lo que escribiste se envió a ningún sitio — así funciona Conarium en producción.'},
+    zh:{samps:{bank:'银行记录',hospital:'病历',hr:'人事导出',defense:'国防工业',config:'配置文件'},
+        paste:'…或在此粘贴你自己的数据',
+        on:'开启 Conarium →', off:'← 关闭 Conarium',
+        leak:function(n){return '此刻有 '+n+' 条敏感数据正在离开你的公司';},
+        safe:'0 泄露 · 完全可审计',
+        trust:'这里的一切都在<b>你的浏览器中</b>处理。你输入的内容从未被发送到任何地方 — Conarium 在生产环境中正是如此工作。'},
+    de:{samps:{bank:'Bankdatensatz',hospital:'Patientenakte',hr:'HR-Export',defense:'Verteidigungsindustrie',config:'Config-Datei'},
+        paste:'…oder fügen Sie hier eigene Daten ein',
+        on:'Conarium einschalten →', off:'← Conarium ausschalten',
+        leak:function(n){return n+(n===1?' sensibler Datensatz würde':' sensible Datensätze würden')+' Ihr Unternehmen jetzt verlassen';},
+        safe:'0 Lecks · vollständig auditierbar',
+        trust:'Alles hier wurde <b>in Ihrem Browser</b> verarbeitet. Nichts wurde irgendwohin gesendet — genau so arbeitet Conarium in Produktion.'},
+    fr:{samps:{bank:'Dossier bancaire',hospital:'Dossier patient',hr:'Export RH',defense:'Industrie de défense',config:'Fichier config'},
+        paste:'…ou collez vos propres données ici',
+        on:'Activer Conarium →', off:'← Désactiver Conarium',
+        leak:function(n){return n+(n===1?' donnée sensible quitterait':' données sensibles quitteraient')+' votre entreprise à l’instant';},
+        safe:'0 fuite · entièrement auditable',
+        trust:'Tout a été traité <b>dans votre navigateur</b>. Rien n’a été envoyé nulle part — c’est exactement ainsi que Conarium fonctionne en production.'},
+    it:{samps:{bank:'Registro bancario',hospital:'Cartella clinica',hr:'Export HR',defense:'Industria della difesa',config:'File config'},
+        paste:'…oppure incolla qui i tuoi dati',
+        on:'Attiva Conarium →', off:'← Disattiva Conarium',
+        leak:function(n){return n+(n===1?' dato sensibile uscirebbe':' dati sensibili uscirebbero')+' dalla tua azienda proprio ora';},
+        safe:'0 fughe · completamente verificabile',
+        trust:'Tutto è stato elaborato <b>nel tuo browser</b>. Nulla è stato inviato da nessuna parte — è esattamente così che Conarium funziona in produzione.'},
+    ru:{samps:{bank:'Банковская запись',hospital:'Карта пациента',hr:'Выгрузка HR',defense:'Оборонная отрасль',config:'Конфиг-файл'},
+        paste:'…или вставьте сюда свои данные',
+        on:'Включить Conarium →', off:'← Выключить Conarium',
+        leak:function(n){return 'Прямо сейчас из вашей компании утекло бы данных: '+n;},
+        safe:'0 утечек · полный аудит',
+        trust:'Всё здесь обработано <b>в вашем браузере</b>. Введённое никуда не отправлялось — именно так Conarium работает в продакшене.'},
+    hi:{samps:{bank:'बैंक रिकॉर्ड',hospital:'मरीज़ रिकॉर्ड',hr:'HR निर्यात',defense:'रक्षा उद्योग',config:'कॉन्फ़िग फ़ाइल'},
+        paste:'…या अपना डेटा यहाँ पेस्ट करें',
+        on:'Conarium चालू करें →', off:'← Conarium बंद करें',
+        leak:function(n){return 'अभी '+n+' संवेदनशील डेटा आपकी कंपनी से बाहर जा रहे हैं';},
+        safe:'0 लीक · पूर्ण ऑडिट योग्य',
+        trust:'यहाँ सब कुछ <b>आपके ब्राउज़र में</b> प्रोसेस हुआ। आपने जो लिखा वह कहीं नहीं भेजा गया — प्रोडक्शन में Conarium ठीक ऐसे ही काम करता है।'}
   };
   var SAMPLES={
     bank:'Destek talebi #4471\nMuşteri: Ayşe Demir\nIBAN: TR33 0006 1005 1978 6457 8413 26\nKart no: 4242 4242 4242 4242\nE-posta: ayse.demir@example.com\nTelefon: 0532 123 45 67\nTalep: ₺12.450 tutarında iade',
     hospital:'Hasta kaydı\nAd: Mehmet Yılmaz\nTC Kimlik No: 12345678901\nTelefon: 0505 987 65 43\nE-posta: m.yilmaz@example.com\nNot: Tip 2 diyabet takibi',
     hr:'Personel dışa aktarımı\nÇalışan: Zeynep Kaya\nTC Kimlik No: 98765432109\nMaaş: ₺85.000\nE-posta: zeynep.kaya@sirket.com\nIBAN: TR12 0001 0002 0003 0004 0005 06',
+    defense:'Savunma projesi dışa aktarımı\nProje kodu: KARTAL-7\nGizlilik derecesi: HİZMETE ÖZEL\nTedarikçi: XYZ Savunma A.Ş.\nİhale bedeli: ₺142.000.000\nTeknik şef: a.kaya@xyzsavunma.com.tr\nTelefon: 0532 456 78 90',
     config:'# .env\nDATABASE_URL=postgres://admin:example-pass@db.internal:5432/prod\nAWS_ACCESS_KEY=AKIA-EXAMPLE-not-a-real-key\nSTRIPE_KEY=sk_live_example_not_a_real_key\nJWT_SECRET=change_me_9f8a7b6c5d4e3f2g1h0i'
   };
   var PATTERNS=[
@@ -296,7 +389,9 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
     {re:/\b0?5\d{2}\s?\d{3}\s?\d{2}\s?\d{2}\b/g,tok:'‹phone›'},
     {re:/\bAKIA[0-9A-Z]{16}\b/g,tok:'‹aws-key›'},
     {re:/\bsk_live_[A-Za-z0-9]{10,}\b/g,tok:'‹stripe-key›'},
-    {re:/₺\s?\d[\d.,]*/g,tok:'‹amount›'}
+    {re:/₺\s?\d[\d.,]*/g,tok:'‹amount›'},
+    {re:/\b[A-Z]{3,}-\d{1,4}\b/g,tok:'‹project-code›'},
+    {re:/(?:ÇOK GİZLİ|HİZMETE ÖZEL|GİZLİ|TASNİF DIŞI)/g,tok:'‹classification›'}
   ];
   function esc(s){return s.replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
   function detect(text){
@@ -332,7 +427,7 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
   }
   function drawSamps(){
     var L=STR[lang()]||STR.en;elSamp.innerHTML='';
-    ['bank','hospital','hr','config'].forEach(function(k){
+    ['bank','hospital','hr','defense','config'].forEach(function(k){
       var b=document.createElement('button');b.type='button';b.className='sd-samp'+(st.key===k?' on':'');b.textContent=L.samps[k];
       b.onclick=function(){st.key=k;st.text=SAMPLES[k];st.gov=false;elIn.value="";drawSamps();draw();};
       elSamp.appendChild(b);
@@ -371,7 +466,7 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
 </section>
 
 <section id="how">
-  <div class="reveal"><div class="eyebrow">How it works</div><div class="h2">One eye between <em>the model</em> and <em>your data.</em></div></div>
+  <div class="reveal"><div class="eyebrow" style="color:var(--gold)">How it works</div><div class="h2">One eye between <em>the model</em> and <em>your data.</em></div></div>
   <div class="flow reveal">
     <div class="col"><div class="label">AI Assistants</div><div class="chips"><div class="chip">Cursor</div><div class="chip">GitHub Copilot</div><div class="chip">Claude Code</div><div class="chip">Windsurf</div></div></div>
     <div class="arr">→</div>
@@ -581,8 +676,8 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
   <!-- LIVE CASE STUDY -->
   <div class="reveal" style="margin-top:56px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(160deg,var(--panel2),var(--panel));padding:40px;box-shadow:0 40px 100px rgba(0,0,0,.5)">
     <div style="font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:9px;margin-bottom:14px"><span style="width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);display:inline-block"></span> Live in production</div>
-    <div id="cs-title" style="font-size:24px;color:var(--ink);margin-bottom:8px;letter-spacing:-.01em">115 identities protected. <em style="color:var(--blue-lt);font-style:normal">Zero intelligence lost.</em></div>
-    <p id="cs-body" style="color:var(--dim);font-size:14px;line-height:1.65;max-width:660px">A production AI assistant runs a real company's ERP — its customers, suppliers and staff. Every one of the <strong style="color:var(--ink);font-weight:600">115 real names</strong> is pseudonymized <em style="color:var(--ink);font-style:normal">before</em> it ever reaches the model. The AI reasons on opaque tokens; the operator sees the real names on the way back. Raw contact data — phone, email, tax IDs — never crosses the boundary at all.</p>
+    <div id="cs-title" style="font-size:24px;color:var(--ink);margin-bottom:8px;letter-spacing:-.01em">121,366 identities protected. <em style="color:var(--blue-lt);font-style:normal">Zero intelligence lost.</em></div>
+    <p id="cs-body" style="color:var(--dim);font-size:14px;line-height:1.65;max-width:660px">A production AI assistant runs a real company's ERP — its customers, suppliers and staff. Every one of the <strong style="color:var(--ink);font-weight:600">121,366 real identities</strong> is pseudonymized <em style="color:var(--ink);font-style:normal">before</em> it ever reaches the model. The AI reasons on opaque tokens; the operator sees the real names on the way back. Raw contact data — phone, email, tax IDs — never crosses the boundary at all.</p>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:30px" class="cs-grid">
       <div style="border:1px solid var(--line);border-radius:10px;padding:22px;background:rgba(0,2,8,.5)">
@@ -595,7 +690,7 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
       </div>
     </div>
 
-    <div style="font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:18px;padding:13px 16px;border:1px solid var(--line);border-radius:8px;background:rgba(0,2,8,.4);overflow-x:auto;white-space:nowrap">[CONARIUM-AUDIT] { pseudonymized: <span style="color:var(--cyan)">115</span>, leaked_to_model: <span style="color:var(--cyan)">0</span> }</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:18px;padding:13px 16px;border:1px solid var(--line);border-radius:8px;background:rgba(0,2,8,.4);overflow-x:auto;white-space:nowrap">[CONARIUM-AUDIT] { pseudonymized: <span style="color:var(--cyan)">121366</span>, leaked_to_model: <span style="color:var(--cyan)">0</span> }</div>
 
     <div style="margin-top:26px;border-left:2px solid var(--blue);padding-left:20px">
       <div style="font-size:15px;color:var(--ink);line-height:1.6;font-style:italic">"Your most valuable customer is also your single biggest concentration risk — when did anyone last speak to them?"</div>
@@ -607,7 +702,7 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
 <!-- SECURITY & ARCHITECTURE -->
 <section id="architecture">
   <div class="reveal">
-    <div class="eyebrow">Architecture</div>
+    <div class="eyebrow" style="color:var(--gold)">Architecture</div>
     <div class="h2">Zero Egress. <em>Total Control.</em></div>
     <p class="lead">Conarium is designed from the ground up for zero-trust environments. It runs inside your VPC, acts as a local MCP server, and ensures your raw data never leaves your perimeter.</p>
   </div>
@@ -688,7 +783,7 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
 <!-- QUICKSTART -->
 <section id="quickstart">
   <div class="reveal">
-    <div class="eyebrow">Quickstart</div>
+    <div class="eyebrow" style="color:var(--gold)">Quickstart</div>
     <div class="h2">From zero to <em>governed</em> in minutes.</div>
     <p class="lead">Deploy Conarium locally or in your VPC, configure your policy, and attach it to your IDE.</p>
   </div>
@@ -983,7 +1078,7 @@ npm run build</pre>
     <img src="data:image/jpeg;base64,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" alt="Emek Can Doğru, Founder of Conarium" width="128" height="128" style="width:128px;height:128px;border-radius:16px;object-fit:cover;object-position:top;border:1px solid var(--line);flex:none;box-shadow:0 20px 55px -24px rgba(0,0,0,.95)">
     <div style="flex:1;min-width:300px">
       <div style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);margin-bottom:14px">From the founder</div>
-      <p style="font-size:16px;line-height:1.72;color:var(--ink);margin:0 0 13px">I built Conarium because I needed it myself. Our own ERP had to let AI read 115 real customers' records — with zero chance of a leak. The governance layer that made that safe became this product.</p>
+      <p style="font-size:16px;line-height:1.72;color:var(--ink);margin:0 0 13px">I built Conarium because I needed it myself. Our own ERP had to let AI work across 100,000+ real customer records and 10,000+ incoming messages a month — with zero chance of a leak. The governance layer that made that safe became this product.</p>
       <p style="font-size:15px;line-height:1.72;color:var(--dim);margin:0 0 17px">If you're shipping AI on sensitive data and losing sleep over it, I'd like to hear from you. I answer every email personally.</p>
       <div style="font-family:var(--mono);font-size:13px;color:var(--ink)"><b style="font-weight:600">Emek Can Doğru</b> <span style="color:var(--dim)">— Founder ·</span> <a href="mailto:e.dogru@conarium.dev" style="color:var(--cyan);text-decoration:none">e.dogru@conarium.dev</a></div>
     </div>
@@ -997,51 +1092,76 @@ npm run build</pre>
     <p class="lead">Self-hosted, MCP-native, governed by you alone. Be among the first teams to let AI touch production — safely.</p>
     <form class="wl" id="wl"><input type="email" id="wlemail" placeholder="you@company.com" autocomplete="email" required><button type="submit" class="btn btn-p" id="wlbtn">Get early access →</button></form>
     <div class="wlmsg" id="wlmsg"></div>
-    <div style="margin-top:18px"><a href="/docs.html" class="btn btn-g">Read the docs</a></div>
+    <div style="margin-top:18px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><a href="/docs.html" class="btn btn-g">Read the docs</a><a href="https://github.com/dogrucanemek-alt/conarium" class="btn btn-g">View source ★</a></div>
   </div>
 </section>
 
 <footer>
   <div class="brand"><span class="o"></span>CONARIUM</div>
   <div>The third eye for your company's data · © 2026 · Self-hosted. Secure. Governed.</div>
-<div style="margin-top:16px;font-family:var(--mono);font-size:11px;letter-spacing:.05em"><a href="/docs.html" style="color:var(--dim);text-decoration:none">Docs</a> · <a href="/privacy.html" style="color:var(--dim);text-decoration:none">Privacy</a> · <a href="/terms.html" style="color:var(--dim);text-decoration:none">Terms</a> · <a href="/dpa.html" style="color:var(--dim);text-decoration:none">DPA</a> · <a href="/.well-known/security.txt" style="color:var(--dim);text-decoration:none">Security</a></div>
+<div style="margin-top:16px;font-family:var(--mono);font-size:11px;letter-spacing:.05em"><a href="https://github.com/dogrucanemek-alt/conarium" style="color:var(--dim);text-decoration:none">GitHub</a> · <a href="/docs.html" style="color:var(--dim);text-decoration:none">Docs</a> · <a href="/privacy.html" style="color:var(--dim);text-decoration:none">Privacy</a> · <a href="/terms.html" style="color:var(--dim);text-decoration:none">Terms</a> · <a href="/dpa.html" style="color:var(--dim);text-decoration:none">DPA</a> · <a href="/.well-known/security.txt" style="color:var(--dim);text-decoration:none">Security</a></div>
 </footer>
 
 <script>
-/* ===== hero iris (contained, calm) ===== */
-const cv=document.getElementById('iris'),x=cv.getContext('2d');
-let W,H,DPR=Math.min(devicePixelRatio||1,2),t=0,mx=.5,my=.5,intro=0;
-function rs(){const r=cv.getBoundingClientRect();W=cv.width=r.width*DPR;H=cv.height=r.height*DPR;}
-rs();addEventListener('resize',rs);
-addEventListener('mousemove',e=>{mx=e.clientX/innerWidth;my=e.clientY/innerHeight});
-const N=230,F=Array.from({length:N},(_,i)=>({a:(i/N)*6.283,seed:Math.random()*6.28,base:.55+Math.random()*.5,spark:Math.random()<.1,wob:.6+Math.random()*.9}));
-function draw(){
-  t+=.01; if(intro<1)intro+=.012; const ease=1-Math.pow(1-Math.min(intro,1),3);
-  x.globalCompositeOperation='source-over'; x.fillStyle='#000208'; x.fillRect(0,0,W,H);
-  const cx=W/2+(mx-.5)*46*DPR, cy=H*0.42+(my-.5)*32*DPR;
-  const R=Math.min(W,H)*.155, reach=Math.min(W,H)*.345, rot=t*.03;
-  x.globalCompositeOperation='lighter';
-  for(let i=0;i<N;i++){const f=F[i],a=f.a+rot;
-    const sh=.55+.45*Math.sin(t*1.6*f.wob+f.seed), pe=.72+.28*Math.sin(a*6+t*.5);
-    const L=reach*f.base*sh*pe*ease, r0=R*(.96+.06*Math.sin(t+f.seed));
-    const x0=cx+Math.cos(a)*r0,y0=cy+Math.sin(a)*r0,x1=cx+Math.cos(a)*(r0+L),y1=cy+Math.sin(a)*(r0+L);
-    const g=x.createLinearGradient(x0,y0,x1,y1);
-    g.addColorStop(0,`rgba(${f.spark?'255,255,255':'190,216,255'},${.82*sh})`);
-    g.addColorStop(.35,`rgba(${f.spark?'150,200,255':'70,130,255'},${.42*sh})`);
-    g.addColorStop(1,'rgba(40,90,200,0)');
-    x.strokeStyle=g; x.lineWidth=(f.spark?1.8:1.05)*DPR; x.lineCap='round';
-    x.beginPath();x.moveTo(x0,y0);x.lineTo(x1,y1);x.stroke();}
-  const ag=x.createRadialGradient(cx,cy,R*.7,cx,cy,R*1.5);ag.addColorStop(0,'rgba(120,170,255,.16)');ag.addColorStop(1,'rgba(0,0,0,0)');
-  x.fillStyle=ag;x.beginPath();x.arc(cx,cy,R*1.5,0,7);x.fill();
-  x.globalCompositeOperation='source-over';
-  const pg=x.createRadialGradient(cx,cy,0,cx,cy,R*1.15);pg.addColorStop(0,'#000208');pg.addColorStop(.72,'#01030a');pg.addColorStop(1,'rgba(20,40,90,0)');
-  x.fillStyle=pg;x.beginPath();x.arc(cx,cy,R*1.15,0,7);x.fill();
-  x.globalCompositeOperation='lighter';
-  const cg=x.createRadialGradient(cx,cy,0,cx,cy,R*.55);cg.addColorStop(0,`rgba(150,190,255,${.1+.05*Math.sin(t*1.5)})`);cg.addColorStop(1,'rgba(0,0,0,0)');
-  x.fillStyle=cg;x.beginPath();x.arc(cx,cy,R*.55,0,7);x.fill();
-  requestAnimationFrame(draw);
-}
-draw();
+/* ===== hero canli goz — kombine rig (patron kilidi 2026-07-11: mx0/my6/lag10/tilt2/pup10) ===== */
+(function(){
+  const stage=document.getElementById('eyeStage'),iris=document.getElementById('eyeIris');
+  if(!stage||!iris)return;
+  const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const P={mx:0,my:0,lag:10,tilt:0,pup:10,mode:'combo'}; // patron rev2 2026-07-11: goz sabit, SADECE bebek hareket eder
+  const IDLE=[[-.75,.05],[-.75,-.25],[0,0],[.75,-.2],[.75,.15],[0,0]];
+  let active=false,raf=0,tx=0,ty=0,cx=0,cy=0,hasMouse=false,idleT=0,ii=0,it=0,last=0;
+  addEventListener('mousemove',e=>{const r=stage.getBoundingClientRect();
+    tx=Math.max(-1,Math.min(1,(e.clientX-(r.left+r.width/2))/(r.width*.9)));
+    ty=Math.max(-1,Math.min(1,(e.clientY-(r.top+r.height/2))/(r.height*.9)));
+    hasMouse=true;idleT=0;},{passive:true});
+  function frame(now){if(!active)return;
+    const dt=Math.min(.05,(now-last)/1000||0);last=now;idleT+=dt;
+    let gx=tx,gy=ty;
+    if(!hasMouse||idleT>5){it+=dt;if(it>2.6){it=0;ii=(ii+1)%IDLE.length;}gx=IDLE[ii][0];gy=IDLE[ii][1];}
+    cx+=(gx-cx)*Math.min(1,dt*P.lag);cy+=(gy-cy)*Math.min(1,dt*P.lag);
+    const s=stage.clientWidth/640;
+    const t=`perspective(900px) translate(${(cx*P.mx*s).toFixed(1)}px,${(cy*P.my*s).toFixed(1)}px) rotateY(${(cx*P.tilt).toFixed(1)}deg) rotateX(${(-cy*P.tilt*.7).toFixed(1)}deg)`;
+    if(P.mode==='combo'){stage.style.transform=t;
+      iris.style.transform=`translate(${(cx*P.pup*s).toFixed(1)}px,${(cy*P.pup*.5*s).toFixed(1)}px)`;}
+    else if(P.mode==='whole'){iris.style.transform='';stage.style.transform=t;}
+    else if(P.mode==='iris'){stage.style.transform='';iris.style.transform=t;}
+    raf=requestAnimationFrame(frame);}
+  function start(){if(active||RM)return;active=true;last=performance.now();raf=requestAnimationFrame(frame);}
+  function stop(){active=false;cancelAnimationFrame(raf);}
+  new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting?start():stop()),{threshold:.05}).observe(stage);
+  document.addEventListener('visibilitychange',()=>document.hidden?stop():start());
+  window.__eye={start,stop,isActive:()=>active,params:P};
+})();
+
+/* ===== tel akisi: gorselden piksel-izlenen rotalarda isik paketleri (gorsel degismez) ===== */
+(function(){
+  const stage=document.getElementById('eyeStage'),svg=document.getElementById('wireFlow');
+  if(!stage||!svg)return;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const WL=[[[23.4,24.65],[24.46,24.44],[25.51,24.51],[26.57,25.48],[27.63,27.7],[28.69,30.17],[29.75,32.55],[30.81,34.27],[31.86,34.78],[32.92,34.81],[33.98,34.81],[35.04,34.76],[36.1,34.81],[37.15,34.81],[37.86,34.81]],[[23.4,34.7],[24.46,34.81],[25.51,35.32],[26.57,37.12],[27.63,39.32],[28.69,40.4],[29.75,40.53],[30.81,40.61],[31.86,40.54],[32.92,40.54],[33.98,40.54],[35.04,40.54],[36.1,40.54],[37.15,40.54],[37.86,40.68]],[[23.4,44.76],[24.46,44.96],[25.51,45.21],[26.57,46.56],[27.63,47.1],[28.69,47.18],[29.75,47.14],[30.81,47.14],[31.86,47.14],[32.92,47.07],[33.98,46.51],[35.04,45.04],[36.1,43.33],[37.15,40.97],[37.86,40.74]],[[23.4,54.92],[24.46,55.03],[25.51,55.05],[26.57,54.36],[27.63,52.66],[28.69,50.99],[29.75,50.14],[30.81,50.03],[31.86,48.69],[32.92,47.14],[33.98,46.51],[35.04,45.04],[36.1,43.33],[37.15,40.97],[37.86,40.74]],[[23.4,64.97],[24.46,65.18],[25.51,64.95],[26.57,63.56],[27.63,61.45],[28.69,59.48],[29.75,58.15],[30.81,57.48],[31.86,57.64],[32.92,58.77],[33.98,58.91],[35.04,58.92],[36.1,58.92],[37.15,57.52],[37.86,56.58]],[[23.4,75.14],[24.46,75.24],[25.51,75.24],[26.57,74.67],[27.63,72.92],[28.69,70.85],[29.75,68.71],[30.81,66.64],[31.86,65.37],[32.92,64.9],[33.98,64.86],[35.04,64.94],[36.1,64.86],[37.15,64.77],[37.86,63.99]]];
+  const WR=[[[82.07,24.65],[81.01,24.44],[79.95,24.51],[78.89,24.46],[77.84,24.77],[76.78,26.34],[75.72,28.75],[74.66,31.05],[73.6,32.58],[72.55,32.9],[71.49,32.97],[70.43,34.26],[69.37,33.87],[68.31,33.08],[67.25,32.25],[66.2,31.64],[65.14,31.22],[64.08,30.88],[64.08,30.88]],[[82.07,34.7],[81.01,34.81],[79.95,34.81],[78.89,34.83],[77.84,35.46],[76.78,37.37],[75.72,38.24],[74.66,38.03],[73.6,37.24],[72.55,36.42],[71.49,35.42],[70.43,34.55],[69.37,33.88],[68.31,33.08],[67.25,32.25],[66.2,31.64],[65.14,31.22],[64.08,30.88],[64.08,30.88]],[[82.07,44.76],[81.01,44.96],[79.95,44.97],[78.89,44.99],[77.84,44.97],[76.78,44.97],[75.72,44.97],[74.66,44.97],[73.6,44.97],[72.55,45.48],[71.49,46.89],[70.43,47.54],[69.37,47.59],[68.31,47.57],[67.25,47.57],[66.2,47.57],[65.14,47.57],[64.08,47.46],[64.08,47.46]],[[82.07,54.92],[81.01,55.03],[79.95,55.1],[78.89,55.15],[77.84,55.03],[76.78,54.82],[75.72,53.51],[74.66,53.1],[73.6,53.08],[72.55,53.08],[71.49,53.08],[70.43,53.08],[69.37,53.08],[68.31,53.08],[67.25,53.08],[66.2,52.45],[65.14,52.97],[64.08,53.35],[64.08,53.35]],[[82.07,64.97],[81.01,65.18],[79.95,65.19],[78.89,65.21],[77.84,65.19],[76.78,65.05],[75.72,63.77],[74.66,61.66],[73.6,60.3],[72.55,59.95],[71.49,59.89],[70.43,60.03],[69.37,61.29],[68.31,62.51],[67.25,63.41],[66.2,64.19],[65.14,64.79],[64.08,65.31],[64.08,65.31]],[[82.07,75.14],[81.01,75.24],[79.95,75.24],[78.89,75.22],[77.84,75.24],[76.78,75.24],[75.72,75.24],[74.66,74.48],[73.6,72.5],[72.55,70.42],[71.49,68.26],[70.43,66.51],[69.37,65.71],[68.31,65.62],[67.25,64.85],[66.2,64.26],[65.14,64.79],[64.08,65.31],[64.08,65.31]]];
+  function build(){
+    const w=stage.clientWidth,h=stage.clientHeight;
+    if(!w)return;
+    svg.setAttribute('viewBox','0 0 '+w+' '+h);svg.innerHTML='';
+    const NS='http://www.w3.org/2000/svg';
+    function ride(pts,cls,dur,delay){
+      const d='M'+pts.map(p=>(p[0]/100*w).toFixed(1)+','+(p[1]/100*h).toFixed(1)).join(' L');
+      const pa=document.createElementNS(NS,'path');pa.setAttribute('d',d);svg.appendChild(pa);
+      const c=document.createElementNS(NS,'circle');c.setAttribute('r','3.4');c.setAttribute('class',cls);
+      const am=document.createElementNS(NS,'animateMotion');
+      am.setAttribute('dur',dur+'s');am.setAttribute('begin',delay+'s');
+      am.setAttribute('repeatCount','indefinite');am.setAttribute('path',d);
+      c.appendChild(am);svg.appendChild(c);}
+    WL.forEach((pts,i)=>ride(pts,'pkt-in',3.6+i*.25,i*.6));
+    WR.forEach((pts,i)=>ride(pts.slice().reverse(),'pkt-out',3.6+i*.25,.8+i*.6));
+  }
+  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(build,200)});
+  const eb=document.getElementById('eyeBase');
+  if(eb.complete)build();else eb.addEventListener('load',build);
+  window.__wires=build;
+})();
 
 /* ===== demo ===== */
 const S=[
@@ -1128,6 +1248,37 @@ if(f){f.addEventListener('submit',async e=>{e.preventDefault();
 /* ===== i18n — 9 languages ===== */
 (function(){
 const T={
+/* ===== HERO canli goz (2026-07-11) — 8 dil tam ===== */
+"◇ AI meets your data — safely ◇":{es:"◇ La IA se encuentra con tus datos — de forma segura ◇",tr:"◇ Yapay zeka verinle buluşur — güvenle ◇",zh:"◇ AI 与你的数据相遇 — 安全无虞 ◇",de:"◇ KI trifft deine Daten — sicher ◇",fr:"◇ L'IA rencontre vos données — en toute sécurité ◇",it:"◇ L'IA incontra i tuoi dati — in sicurezza ◇",ru:"◇ ИИ встречает ваши данные — безопасно ◇",hi:"◇ AI आपके डेटा से मिलता है — सुरक्षित रूप से ◇"},
+"Conarium is the governance layer between enterprise AI and sensitive data. We enforce policy, mask data, and record every action — in real time.":{es:"Conarium es la capa de gobernanza entre la IA empresarial y los datos sensibles. Aplicamos políticas, enmascaramos datos y registramos cada acción — en tiempo real.",tr:"Conarium, kurumsal yapay zeka ile hassas veri arasındaki yönetişim katmanıdır. Politikayı uygular, veriyi maskeler ve her eylemi kaydeder — gerçek zamanlı.",zh:"Conarium 是企业 AI 与敏感数据之间的治理层。我们实施策略、脱敏数据并记录每一次操作——实时进行。",de:"Conarium ist die Governance-Schicht zwischen Unternehmens-KI und sensiblen Daten. Wir setzen Richtlinien durch, maskieren Daten und protokollieren jede Aktion — in Echtzeit.",fr:"Conarium est la couche de gouvernance entre l'IA d'entreprise et les données sensibles. Nous appliquons les politiques, masquons les données et enregistrons chaque action — en temps réel.",it:"Conarium è il livello di governance tra l'IA aziendale e i dati sensibili. Applichiamo le policy, mascheriamo i dati e registriamo ogni azione — in tempo reale.",ru:"Conarium — слой управления между корпоративным ИИ и чувствительными данными. Мы применяем политики, маскируем данные и записываем каждое действие — в реальном времени.",hi:"Conarium एंटरप्राइज़ AI और संवेदनशील डेटा के बीच की गवर्नेंस परत है। हम नीति लागू करते हैं, डेटा मास्क करते हैं और हर कार्रवाई रिकॉर्ड करते हैं — रियल-टाइम में।"},
+"Attack the live demo →":{es:"Ataca la demo en vivo →",tr:"Canlı demoya saldır →",zh:"攻击在线演示 →",de:"Greif die Live-Demo an →",fr:"Attaquez la démo en direct →",it:"Attacca la demo dal vivo →",ru:"Атакуйте живое демо →",hi:"लाइव डेमो पर हमला करें →"},
+"Deploy locally":{es:"Despliega en local",tr:"Kendi sunucunda kur",zh:"本地部署",de:"Lokal betreiben",fr:"Déployez en local",it:"Distribuisci in locale",ru:"Разверните локально",hi:"लोकल पर तैनात करें"},
+"Break it if you can — every attempt lands in the audit log.":{es:"Rómpela si puedes — cada intento queda en el registro de auditoría.",tr:"Kırabilirsen kır — her deneme audit log'a düşer.",zh:"能破解就试试——每一次尝试都会进入审计日志。",de:"Knack sie, wenn du kannst — jeder Versuch landet im Audit-Log.",fr:"Cassez-la si vous pouvez — chaque tentative finit dans le journal d'audit.",it:"Rompila se ci riesci — ogni tentativo finisce nell'audit log.",ru:"Взломайте, если сможете — каждая попытка попадает в журнал аудита.",hi:"तोड़ सको तो तोड़ो — हर कोशिश ऑडिट लॉग में दर्ज होती है।"},
+"Incoming systems":{es:"Sistemas entrantes",tr:"Gelen sistemler",zh:"接入系统",de:"Eingehende Systeme",fr:"Systèmes entrants",it:"Sistemi in ingresso",ru:"Входящие системы",hi:"आने वाले सिस्टम"},
+"Governed outputs":{es:"Salidas gobernadas",tr:"Yönetişimli çıktılar",zh:"受控输出",de:"Regulierte Ausgaben",fr:"Sorties gouvernées",it:"Output governati",ru:"Управляемые выходы",hi:"गवर्न्ड आउटपुट"},
+"AI Agent":{es:"Agente de IA",tr:"AI Ajanı",zh:"AI 智能体",de:"KI-Agent",fr:"Agent IA",it:"Agente IA",ru:"ИИ-агент",hi:"AI एजेंट"},
+"Analytics Tool":{es:"Herramienta de analítica",tr:"Analitik Aracı",zh:"分析工具",de:"Analyse-Tool",fr:"Outil d'analytique",it:"Strumento di analisi",ru:"Аналитический инструмент",hi:"एनालिटिक्स टूल"},
+"App / Service":{es:"App / Servicio",tr:"Uygulama / Servis",zh:"应用 / 服务",de:"App / Dienst",fr:"App / Service",it:"App / Servizio",ru:"Приложение / Сервис",hi:"ऐप / सेवा"},
+"Data Pipeline":{es:"Pipeline de datos",tr:"Veri Hattı",zh:"数据管道",de:"Daten-Pipeline",fr:"Pipeline de données",it:"Pipeline dati",ru:"Конвейер данных",hi:"डेटा पाइपलाइन"},
+"Third-party AI":{es:"IA de terceros",tr:"Üçüncü Taraf AI",zh:"第三方 AI",de:"Dritt-KI",fr:"IA tierce",it:"IA di terze parti",ru:"Сторонний ИИ",hi:"थर्ड-पार्टी AI"},
+"BI Dashboard":{es:"Panel de BI",tr:"BI Panosu",zh:"BI 仪表盘",de:"BI-Dashboard",fr:"Tableau de bord BI",it:"Dashboard BI",ru:"BI-дашборд",hi:"BI डैशबोर्ड"},
+"Masked Data":{es:"Datos enmascarados",tr:"Maskeli Veri",zh:"已脱敏数据",de:"Maskierte Daten",fr:"Données masquées",it:"Dati mascherati",ru:"Замаскированные данные",hi:"मास्क किया डेटा"},
+"Filtered Rows":{es:"Filas filtradas",tr:"Filtrelenmiş Satırlar",zh:"已过滤行",de:"Gefilterte Zeilen",fr:"Lignes filtrées",it:"Righe filtrate",ru:"Отфильтрованные строки",hi:"फ़िल्टर की गई पंक्तियाँ"},
+"Allowed Fields":{es:"Campos permitidos",tr:"İzinli Alanlar",zh:"允许的字段",de:"Erlaubte Felder",fr:"Champs autorisés",it:"Campi consentiti",ru:"Разрешённые поля",hi:"अनुमत फ़ील्ड"},
+"Safe Context":{es:"Contexto seguro",tr:"Güvenli Bağlam",zh:"安全上下文",de:"Sicherer Kontext",fr:"Contexte sûr",it:"Contesto sicuro",ru:"Безопасный контекст",hi:"सुरक्षित संदर्भ"},
+"Policy Applied":{es:"Política aplicada",tr:"Politika Uygulandı",zh:"策略已应用",de:"Richtlinie angewendet",fr:"Politique appliquée",it:"Policy applicata",ru:"Политика применена",hi:"नीति लागू"},
+"Audit Recorded":{es:"Auditoría registrada",tr:"Denetim Kaydedildi",zh:"审计已记录",de:"Audit protokolliert",fr:"Audit enregistré",it:"Audit registrato",ru:"Аудит записан",hi:"ऑडिट दर्ज"},
+"Governance · Active":{es:"Gobernanza · Activa",tr:"Yönetişim · Aktif",zh:"治理 · 已启用",de:"Governance · Aktiv",fr:"Gouvernance · Active",it:"Governance · Attiva",ru:"Управление · Активно",hi:"गवर्नेंस · सक्रिय"},
+"◑ PII Masking":{es:"◑ Enmascaramiento de PII",tr:"◑ PII Maskeleme",zh:"◑ PII 脱敏",de:"◑ PII-Maskierung",fr:"◑ Masquage des PII",it:"◑ Mascheramento PII",ru:"◑ Маскировка PII",hi:"◑ PII मास्किंग"},
+"⊘ Deny by Default":{es:"⊘ Denegación por defecto",tr:"⊘ Varsayılan Red",zh:"⊘ 默认拒绝",de:"⊘ Standardmäßig verweigern",fr:"⊘ Refus par défaut",it:"⊘ Nega per default",ru:"⊘ Запрет по умолчанию",hi:"⊘ डिफ़ॉल्ट रूप से अस्वीकार"},
+"≣ Row & Field Controls":{es:"≣ Control de filas y campos",tr:"≣ Satır & Alan Kontrolleri",zh:"≣ 行与字段控制",de:"≣ Zeilen- & Feldkontrollen",fr:"≣ Contrôle des lignes et des champs",it:"≣ Controlli di righe e campi",ru:"≣ Контроль строк и полей",hi:"≣ पंक्ति और फ़ील्ड नियंत्रण"},
+"⌖ Immutable Audit Logs":{es:"⌖ Registros de auditoría inmutables",tr:"⌖ Değişmez Denetim Kayıtları",zh:"⌖ 不可篡改的审计日志",de:"⌖ Unveränderliche Audit-Logs",fr:"⌖ Journaux d'audit immuables",it:"⌖ Log di audit immutabili",ru:"⌖ Неизменяемые журналы аудита",hi:"⌖ अपरिवर्तनीय ऑडिट लॉग"},
+"◈ Policy Enforcement":{es:"◈ Aplicación de políticas",tr:"◈ Politika Yaptırımı",zh:"◈ 策略执行",de:"◈ Richtliniendurchsetzung",fr:"◈ Application des politiques",it:"◈ Applicazione delle policy",ru:"◈ Применение политик",hi:"◈ नीति प्रवर्तन"},
+"View live policy status →":{es:"Ver estado de políticas en vivo →",tr:"Canlı politika durumunu gör →",zh:"查看实时策略状态 →",de:"Live-Richtlinienstatus ansehen →",fr:"Voir l'état des politiques en direct →",it:"Vedi lo stato delle policy in tempo reale →",ru:"Смотреть статус политик в реальном времени →",hi:"लाइव नीति स्थिति देखें →"},
+"Works with your stack ·":{es:"Funciona con tu stack ·",tr:"Stack'inle çalışır ·",zh:"兼容你的技术栈 ·",de:"Funktioniert mit deinem Stack ·",fr:"Compatible avec votre stack ·",it:"Funziona con il tuo stack ·",ru:"Работает с вашим стеком ·",hi:"आपके स्टैक के साथ काम करता है ·"},
+/* ===== /HERO ===== */
+"View source ★":{tr:"Kaynağı gör ★"},
+
 "No public list price yet — we set a fair number together during your pilot, and design partners keep the lowest rate we ever offer, for good.":{tr:"Henüz herkese açık liste fiyatı yok — adil rakamı pilotun sırasında birlikte belirliyoruz, ve tasarım ortakları bir daha değişmeyen en düşük fiyatı kalıcı koruyor."},
 
 /* docs link + demo honesty note */
@@ -1195,7 +1346,7 @@ const T={
 "Conarium intercepts PII and secrets before they reach the LLM; and because it runs self-hosted, you choose which model to use — including zero-retention endpoints — so the end-to-end data flow stays under your control.":{tr:"Conarium, PII ve sırları LLM'e ulaşmadan önce yakalar; ve self-hosted çalıştığı için hangi modeli kullanacağını sen seçersin — sıfır-saklama uçları dahil — böylece uçtan uca veri akışı tamamen senin kontrolünde kalır."},
 /* founder + design-partner pricing (added) */
 "From the founder":{tr:"Kurucudan"},
-"I built Conarium because I needed it myself. Our own ERP had to let AI read 115 real customers' records — with zero chance of a leak. The governance layer that made that safe became this product.":{tr:"Conarium'u kendim ihtiyaç duyduğum için kurdum. Kendi ERP'mizin, yapay zekânın 115 gerçek müşterinin kaydını okumasına izin vermesi gerekiyordu — sızma ihtimali sıfır olacak şekilde. Bunu güvenli kılan yönetişim katmanı bu ürüne dönüştü."},
+"I built Conarium because I needed it myself. Our own ERP had to let AI work across 100,000+ real customer records and 10,000+ incoming messages a month — with zero chance of a leak. The governance layer that made that safe became this product.":{tr:"Conarium'u kendim ihtiyaç duyduğum için kurdum. Kendi ERP'mizin, yapay zekânın 100.000'i aşkın gerçek müşteri kaydı ve ayda 10.000'den fazla gelen mesaj üzerinde çalışmasına izin vermesi gerekiyordu — sızma ihtimali sıfır olacak şekilde. Bunu güvenli kılan yönetişim katmanı bu ürüne dönüştü."},
 "If you're shipping AI on sensitive data and losing sleep over it, I'd like to hear from you. I answer every email personally.":{tr:"Hassas veri üzerinde yapay zekâ geliştiriyor ve bunun için uykunuz kaçıyorsa, sizden haber almak isterim. Her e-postayı bizzat yanıtlıyorum."},
 "— Founder ·":{tr:"— Kurucu ·"},
 "Design partner":{tr:"Tasarım ortağı"},
@@ -2075,8 +2226,8 @@ const HD=[
 {s:"#features .grid > .card:nth-child(6) p",t:{tr:'PII base64 ile ya da bir takma adın arkasına gizlenmiş (<code>email AS contact</code>) mi? Yine yakalanır. Maskeleme sütun adını değil, <em>verinin kendisini</em> takip eder.'}},
 {s:"#proven .h2",t:{tr:'Bilerek saldırıya uğruyor. Hem de <em>kendi red-team\'imizce.</em>'}},
 {s:"#proven .lead",t:{tr:'Çoğu araç sadece güvenli olacak şekilde <em>ayarlanmıştır</em>. Conarium ise her politikayı kırmaya çalışan hasmane bir red-team tarafından saldırıya uğrar — yazma-kaçakçılığı, yetkisiz erişim, maskeyi geçen PII. Neyi aşarsa sertleştiririz — sonra düzeltmeyi doğrulamak için tekrar saldırır. Güvenli demiyoruz; kanıtlıyoruz, sonra tekrar kanıtlıyoruz.'}},
-{s:"#cs-title",t:{tr:'115 kimlik korundu. <em style="color:var(--blue-lt);font-style:normal">Sıfır zekâ kaybı.</em>'}},
-{s:"#cs-body",t:{tr:'Üretimdeki bir yapay zeka asistanı gerçek bir şirketin ERP\'sini çalıştırıyor — müşterileri, tedarikçileri ve çalışanları. <strong style="color:var(--ink);font-weight:600">115 gerçek ismin</strong> her biri, modele ulaşmadan <em style="color:var(--ink);font-style:normal">önce</em> takma-adlanır. Yapay zeka anlamsız tokenlar üzerinde düşünür; operatör gerçek isimleri dönüşte görür. Ham iletişim verisi — telefon, e-posta, vergi numarası — sınırı hiç geçmez.'}},
+{s:"#cs-title",t:{tr:'121.366 kimlik korundu. <em style="color:var(--blue-lt);font-style:normal">Sıfır zekâ kaybı.</em>'}},
+{s:"#cs-body",t:{tr:'Üretimdeki bir yapay zeka asistanı gerçek bir şirketin ERP\'sini çalıştırıyor — müşterileri, tedarikçileri ve çalışanları. <strong style="color:var(--ink);font-weight:600">121.366 gerçek kimliğin</strong> her biri, modele ulaşmadan <em style="color:var(--ink);font-style:normal">önce</em> takma-adlanır. Yapay zeka anlamsız tokenlar üzerinde düşünür; operatör gerçek isimleri dönüşte görür. Ham iletişim verisi — telefon, e-posta, vergi numarası — sınırı hiç geçmez.'}},
 
 {s:"#assessment .h2",t:{"tr":"Verileriniz ne kadar <em>açıkta?</em>","es":"¿Qué tan expuestos están sus <em>datos?</em>","zh":"您的<em>数据</em>有多容易泄露？","de":"Wie stark sind Ihre <em>Daten</em> exponiert?","fr":"À quel point vos <em>données</em> sont-elles exposées ?","it":"Quanto sono esposti i tuoi <em>dati?</em>","ru":"Насколько уязвимы ваши <em>данные?</em>","hi":"आपका <em>डेटा</em> कितना असुरक्षित है?"}},
 {s:"#honeypot .h2",t:{"tr":"<em>Sırlarımızı</em> çalmayı dene.","es":"Intenta robar nuestros <em>secretos.</em>","zh":"尝试窃取我们的<em>机密。</em>","de":"Versuche, unsere <em>Geheimnisse</em> zu stehlen.","fr":"Essayez de voler nos <em>secrets.</em>","it":"Prova a rubare i nostri <em>segreti.</em>","ru":"Попробуйте украсть наши <em>секреты.</em>","hi":"हमारे <em>रहस्य</em> चुराने की कोशिश करें।"}},
@@ -2084,7 +2235,7 @@ const HD=[
 {s:"#architecture .h2",t:{"tr":"Sıfır Çıkış. <em>Tam Kontrol.</em>","es":"Cero Salida. <em>Control Total.</em>","zh":"零出口。<em>完全控制。</em>","de":"Null Ausgang. <em>Volle Kontrolle.</em>","fr":"Zéro Sortie. <em>Contrôle Total.</em>","it":"Zero Uscita. <em>Controllo Totale.</em>","ru":"Ноль исходящего. <em>Полный контроль.</em>","hi":"शून्य निकास। <em>पूर्ण नियंत्रण।</em>"}},
 {s:"#ciso-faq .h2",t:{"tr":"CISO <em>S.S.S.</em>","es":"<em>Preguntas Frecuentes</em> del CISO","zh":"CISO <em>常见问题解答</em>","de":"CISO <em>F.A.Q.</em>","fr":"<em>FAQ</em> CISO","it":"<em>FAQ</em> CISO","ru":"CISO <em>ЧаВо</em>","hi":"CISO <em>F.A.Q.</em>"}},
 {s:"#quickstart .h2",t:{"tr":"Dakikalar içinde sıfırdan <em>korumalı</em> sisteme.","es":"De cero a <em>gobernado</em> en minutos.","zh":"在几分钟内从零到<em>受控</em>。","de":"In Minuten von Null auf <em>reguliert</em>.","fr":"De zéro à <em>gouverné</em> en quelques minutes.","it":"Da zero a <em>governato</em> in pochi minuti.","ru":"От нуля до <em>управляемости</em> за минуты.","hi":"मिनटों में शून्य से <em>गवर्न्ड</em> तक।"}},
-{s:".hero h1",t:{tr:"Yapay zeka verinle çalışsın. <em>Sırlarını görmeden.</em>"}},
+{s:".hero h1",t:{tr:"Yapay zeka verini kullanır. <em>Conarium her hamlesini izler.</em>",es:"La IA usa tus datos. <em>Conarium vigila cada uno de sus movimientos.</em>",zh:"AI 使用你的数据。<em>Conarium 紧盯它的每一步。</em>",de:"KI nutzt deine Daten. <em>Conarium beobachtet jeden ihrer Schritte.</em>",fr:"L'IA utilise vos données. <em>Conarium surveille chacun de ses gestes.</em>",it:"L'IA usa i tuoi dati. <em>Conarium osserva ogni sua mossa.</em>",ru:"ИИ использует ваши данные. <em>Conarium следит за каждым его шагом.</em>",hi:"AI आपका डेटा इस्तेमाल करता है। <em>Conarium उसकी हर चाल पर नज़र रखता है।</em>"}},
 {s:"#problem .h2",t:{es:'La IA lo ve todo.<br>Y también <span class="risk">el riesgo.</span>',tr:'Yapay zeka her şeyi görür.<br>Risk de <span class="risk">öyle.</span>',zh:'AI 看得见一切。<br>风险<span class="risk">也是。</span>',de:'KI sieht alles.<br>Das Risiko <span class="risk">auch.</span>',fr:"L'IA voit tout.<br>Le risque <span class=\"risk\">aussi.</span>",it:"L'IA vede tutto.<br>Anche <span class=\"risk\">il rischio.</span>",ru:'ИИ видит всё.<br>Как и <span class="risk">риск.</span>',hi:'AI सब कुछ देखता है।<br>जोखिम <span class="risk">भी।</span>'}},
 {s:"#how .h2",t:{es:"Un ojo entre <em>el modelo</em> y <em>tus datos.</em>",tr:"<em>Model</em> ile <em>veriniz</em> arasında tek bir göz.",zh:"在<em>模型</em>与<em>数据</em>之间的一只眼。",de:"Ein Auge zwischen <em>dem Modell</em> und <em>deinen Daten.</em>",fr:"Un œil entre <em>le modèle</em> et <em>vos données.</em>",it:"Un occhio tra <em>il modello</em> e <em>i tuoi dati.</em>",ru:"Один глаз между <em>моделью</em> и <em>вашими данными.</em>",hi:"<em>मॉडल</em> और <em>आपके डेटा</em> के बीच एक आँख।"}},
 {s:"#demo .h2",t:{es:"Míralo <em>gobernar</em> en tiempo real.",tr:"Gerçek zamanlı <em>korumayı</em> izleyin.",zh:"实时见证它的<em>治理</em>。",de:"Sieh die <em>Governance</em> in Echtzeit.",fr:"Voyez-le <em>gouverner</em> en temps réel.",it:"Guardalo <em>governare</em> in tempo reale.",ru:"Наблюдайте <em>управление</em> в реальном времени.",hi:"इसे रियल-टाइम में <em>गवर्न</em> करते देखें।"}},

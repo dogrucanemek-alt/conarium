@@ -1,2 +1,2 @@
 import { startConsole } from './src/console.js';
-startConsole();
+startConsole(7777);
