@@ -20,7 +20,7 @@ export const AuditConfigSchema = z.object({
 }).strict()
 
 export const ConnectorConfigSchema = z.object({
-  type: z.enum(['postgres', 'supabase', 'openapi', 'files', 'docs', 'slack', 'jira']),
+  type: z.enum(['postgres', 'supabase', 'supabase-rest', 'openapi', 'files', 'docs', 'slack', 'jira']),
   name: z.string().min(1),
   description: z.string().min(1),
   config: z.record(z.string()).default({}),

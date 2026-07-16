@@ -17,6 +17,7 @@ import type { GovernanceMetadata } from './governance.js'
 import { Audit } from './audit.js'
 import { parseConariumConfig } from './config.js'
 import { capSearchResult, readGovernedSchemaResource, resolveGovernedSearchScope } from './search_policy.js'
+import { SupabaseRestConnector } from './connectors/supabase_rest.js'
 
 function loadConfig(): ConariumConfig {
   const args = process.argv.slice(2)
@@ -181,20 +182,48 @@ async function main() {
         let guardedSql = a.sql
         let aliases: Record<string, string> = {}
         let guardMetadata: GovernanceMetadata | undefined
+        let result
 
-        try {
-          const res = governance.guardQuery(a.sql)
-          guardedSql = res.sql
-          aliases = res.aliases
-          guardMetadata = res.metadata
-        } catch (err) {
-          const policyMetadata = err instanceof PolicyError ? err.metadata : undefined
-          audit.log({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message, governance: policyMetadata })
-          throw err
+        // PostgREST path: no Postgres AST rewrite (would break MSSQL/REST simple SELECT).
+        if (conn instanceof SupabaseRestConnector) {
+          let parsed
+          try {
+            parsed = conn.parseSimpleSelect(a.sql)
+          } catch (err) {
+            audit.log({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message })
+            throw err
+          }
+          const qualified = `zion.${parsed.table}`
+          if (!governance.allowsTable(qualified)) {
+            audit.log({ tool: 'query', target: qualified, args: a, denied: true, reason: 'policy' })
+            throw new PolicyError(`Access to table '${qualified}' is not permitted by policy.`)
+          }
+          const lim = Math.min(parsed.limit, governance.maxRows())
+          guardedSql = `SELECT ${parsed.columns.join(', ')} FROM zion.${parsed.table} LIMIT ${lim}`
+          guardMetadata = {
+            accessedTables: [qualified],
+            accessedFunctions: [],
+            appliedRowCap: lim,
+            maskedFields: [],
+            maskedCount: 0,
+            denied: false,
+          }
+          result = governance.redact(await conn.query(guardedSql), aliases, guardMetadata)
+        } else {
+          try {
+            const res = governance.guardQuery(a.sql)
+            guardedSql = res.sql
+            aliases = res.aliases
+            guardMetadata = res.metadata
+          } catch (err) {
+            const policyMetadata = err instanceof PolicyError ? err.metadata : undefined
+            audit.log({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message, governance: policyMetadata })
+            throw err
+          }
+          result = governance.redact(await conn.query(guardedSql), aliases, guardMetadata)
         }
 
         const cap = governance.maxRows()
-        const result = governance.redact(await conn.query(guardedSql), aliases, guardMetadata)
         const responseJson = JSON.stringify(
           {
             rowCount: result.rowCount,

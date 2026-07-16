@@ -30,3 +30,14 @@ site/
 .next/
 *.tsbuildinfo
 .gstack/
+
+# internal review artifacts (never publish)
+neo-review-findings.json
+src/neo-council-findings.json
+console-run.log
+
+# Dogrucan-ozel deployment (public repoya girmez; ozel yedek: Obsidian vault)
+conarium-audit-*.jsonl*
+conarium.config.c*.json
+AGENTS.md
+PROJECT_CONTEXT.md

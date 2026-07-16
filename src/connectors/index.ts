@@ -5,6 +5,7 @@ import { DocsConnector } from './docs.js'
 import { OpenApiConnector } from './openapi.js'
 import { SlackConnector } from './slack.js'
 import { JiraConnector } from './jira.js'
+import { SupabaseRestConnector } from './supabase_rest.js'
 import { ConnectorConfigSchema } from '../config.js'
 
 export { PostgresConnector } from './postgres.js'
@@ -13,6 +14,7 @@ export { DocsConnector } from './docs.js'
 export { OpenApiConnector } from './openapi.js'
 export { SlackConnector } from './slack.js'
 export { JiraConnector } from './jira.js'
+export { SupabaseRestConnector } from './supabase_rest.js'
 
 export function createConnector(config: ConnectorConfig): Connector {
   const parsed = ConnectorConfigSchema.parse(config)
@@ -21,6 +23,8 @@ export function createConnector(config: ConnectorConfig): Connector {
       return new PostgresConnector(parsed)
     case 'supabase':
       return new ZionConnector(parsed)
+    case 'supabase-rest':
+      return new SupabaseRestConnector(parsed)
     case 'docs':
       return new DocsConnector(parsed)
     case 'openapi':
@@ -30,6 +34,6 @@ export function createConnector(config: ConnectorConfig): Connector {
     case 'jira':
       return new JiraConnector(parsed)
     default:
-      throw new Error(`Unknown connector type: ${parsed.type}. Supported: postgres, supabase, docs, openapi, slack, jira`)
+      throw new Error(`Unknown connector type: ${parsed.type}. Supported: postgres, supabase, supabase-rest, docs, openapi, slack, jira`)
   }
 }
