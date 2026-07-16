@@ -52,12 +52,15 @@ export class SupabaseRestConnector implements Connector {
   async connect(): Promise<void> {
     if (!this.baseUrl) throw new Error(`${this.name}: CONARIUM_SUPABASE_URL / config.url required`)
     if (!this.apiKey) throw new Error(`${this.name}: CONARIUM_SUPABASE_KEY / config.key required`)
-    // cheap health: OpenAPI root
-    const res = await fetch(`${this.baseUrl}/rest/v1/`, {
-      headers: this.headers(),
-    })
+    // Saglik kontrolu: OpenAPI koku Kong'da yalniz service_role'a acik — kisitli rol JWT'si
+    // orada hep 401 yer. Allowlist varsa ilk tabloya limit=0 sorgusu at (veri donmez).
+    const first = [...this.allow].sort()[0]
+    const url = first
+      ? `${this.baseUrl}/rest/v1/${encodeURIComponent(first)}?select=*&limit=0`
+      : `${this.baseUrl}/rest/v1/`
+    const res = await fetch(url, { headers: this.headers() })
     if (!res.ok && res.status !== 200) {
-      // some projects return 200 with empty; 401/403 = bad key
+      // 401/403 = bad key / yetkisiz rol
       if (res.status === 401 || res.status === 403) {
         throw new Error(`${this.name}: Supabase REST auth failed (${res.status})`)
       }
