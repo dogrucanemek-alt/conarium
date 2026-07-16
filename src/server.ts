@@ -210,13 +210,16 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
             audit.log({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message })
             throw err
           }
-          const qualified = `zion.${parsed.table}`
+          // Sema konnektorun yapilandirmasindan gelir — sabit 'zion' varsayimi baska semali
+          // kurulumlarda (demo, musteri tenant'i) her sorguyu yanlislikla policy'ye takiyordu.
+          const schema = conn.schemaName
+          const qualified = `${schema}.${parsed.table}`
           if (!governance.allowsTable(qualified)) {
             audit.log({ tool: 'query', target: qualified, args: a, denied: true, reason: 'policy' })
             throw new PolicyError(`Access to table '${qualified}' is not permitted by policy.`)
           }
           const lim = Math.min(parsed.limit, governance.maxRows())
-          guardedSql = `SELECT ${parsed.columns.join(', ')} FROM zion.${parsed.table} LIMIT ${lim}`
+          guardedSql = `SELECT ${parsed.columns.join(', ')} FROM ${schema}.${parsed.table} LIMIT ${lim}`
           guardMetadata = {
             accessedTables: [qualified],
             accessedFunctions: [],

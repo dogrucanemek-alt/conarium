@@ -30,6 +30,11 @@ export class SupabaseRestConnector implements Connector {
   private schema: string
   private allow: Set<string>
 
+  /** Configured Postgres schema — callers must qualify tables with this, never a hard-coded name. */
+  get schemaName(): string {
+    return this.schema
+  }
+
   constructor(config: ConnectorConfig) {
     this.name = config.name
     this.description = config.description || 'Supabase PostgREST (ZION RO mirror)'
@@ -75,7 +80,7 @@ export class SupabaseRestConnector implements Connector {
       name,
       schema: this.schema,
       columns: [],
-      description: `ZION mirror table/view (Codes sync): ${this.schema}.${name}`,
+      description: `${this.schema}.${name}`,
     }))
   }
 
