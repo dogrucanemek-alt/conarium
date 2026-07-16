@@ -157,24 +157,29 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
 
     try {
       if (name === 'list_tables') {
-        const conn = getConnector((args as Record<string, string>)?.connector)
-        const tables = governance.filterTables(await conn.listTables())
-        audit.log({ tool: 'list_tables', target: conn.name, rowsReturned: tables.length, denied: false })
+        // Ad verilmediyse TUM izinli konnektorler listelenir — arac "all connectors" vaat ediyor,
+        // ilkine dusmek cok-konnektorlu kurulumda gerisini gorunmez yapiyordu.
+        const preferred = (args as Record<string, string>)?.connector
+        const targets = preferred
+          ? [getConnector(preferred)]
+          : connectors.filter(c => governance.allowsConnector(c.name) && c.capabilities.canListSchema)
+        if (!targets.length) throw new PolicyError('No connector is permitted by policy.')
+
+        const listed: Array<{ connector: string; name: string; description: string; rowCount?: number }> = []
+        for (const conn of targets) {
+          const tables = governance.filterTables(await conn.listTables())
+          audit.log({ tool: 'list_tables', target: conn.name, rowsReturned: tables.length, denied: false })
+          for (const t of tables) {
+            listed.push({
+              connector: conn.name,
+              name: `${t.schema}.${t.name}`,
+              description: t.description || '',
+              rowCount: t.rowCount,
+            })
+          }
+        }
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                tables.map(t => ({
-                  name: `${t.schema}.${t.name}`,
-                  description: t.description || '',
-                  rowCount: t.rowCount,
-                })),
-                null,
-                2
-              ),
-            },
-          ],
+          content: [{ type: 'text', text: JSON.stringify(listed, null, 2) }],
         }
       }
 
