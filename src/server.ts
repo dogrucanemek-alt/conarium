@@ -12,7 +12,7 @@ import {
 import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 import type { ConariumConfig } from './types.js'
-import type { Connector } from './types.js'
+import type { Connector, ConnectorCapabilities } from './types.js'
 import { createConnector } from './connectors/index.js'
 import { Governance, PolicyError } from './governance.js'
 import type { GovernanceMetadata } from './governance.js'
@@ -139,7 +139,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params
 
-    const getConnector = (preferredName?: string): Connector => {
+    const getConnector = (preferredName?: string, need?: keyof ConnectorCapabilities): Connector => {
       if (!connectors.length) throw new Error('No connectors available. Check your conarium.config.json.')
       if (preferredName) {
         const found = connectors.find(c => c.name === preferredName)
@@ -147,7 +147,10 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
         if (!governance.allowsConnector(found.name)) throw new PolicyError(`Connector '${found.name}' is not permitted by policy.`)
         return found
       }
-      const allowed = connectors.find(c => governance.allowsConnector(c.name))
+      // Ad verilmediyse: aracin ihtiyacini (or. canQuery) karsilayan ilk izinli konnektore dus —
+      // aksi halde SQL sorgusu docs gibi sorgu bilmeyen ilk konnektore gidip "Not supported" yiyor.
+      const allowedAll = connectors.filter(c => governance.allowsConnector(c.name))
+      const allowed = need ? (allowedAll.find(c => c.capabilities[need]) ?? allowedAll[0]) : allowedAll[0]
       if (!allowed) throw new PolicyError('No connector is permitted by policy.')
       return allowed
     }
@@ -177,7 +180,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
 
       if (name === 'describe_table') {
         const a = args as { table: string; connector?: string }
-        const conn = getConnector(a.connector)
+        const conn = getConnector(a.connector, 'canDescribeTable')
         if (!governance.allowsTable(a.table)) {
           audit.log({ tool: 'describe_table', target: a.table, args: a, denied: true, reason: 'policy' })
           throw new PolicyError(`Access to table '${a.table}' is not permitted by policy.`)
@@ -191,7 +194,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
 
       if (name === 'query') {
         const a = args as { sql: string; connector?: string }
-        const conn = getConnector(a.connector)
+        const conn = getConnector(a.connector, 'canQuery')
 
         let guardedSql = a.sql
         let aliases: Record<string, string> = {}
@@ -279,7 +282,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
 
       if (name === 'search') {
         const a = args as { query: string; tables?: string[]; connector?: string }
-        const conn = getConnector(a.connector)
+        const conn = getConnector(a.connector, 'canSearch')
         let requested: string[]
 
         try {
