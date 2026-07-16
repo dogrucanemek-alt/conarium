@@ -26,6 +26,7 @@ export class SupabaseRestConnector implements Connector {
 
   private baseUrl: string
   private apiKey: string
+  private anonKey: string
   private schema: string
   private allow: Set<string>
 
@@ -34,6 +35,9 @@ export class SupabaseRestConnector implements Connector {
     this.description = config.description || 'Supabase PostgREST (ZION RO mirror)'
     this.baseUrl = (config.config.url || process.env.CONARIUM_SUPABASE_URL || '').replace(/\/$/, '')
     this.apiKey = config.config.key || process.env.CONARIUM_SUPABASE_KEY || ''
+    // Kong gateway'i apikey basliginda BILINEN bir anahtar ister (anon yeter);
+    // kisitli-rol JWT'si yalniz Authorization: Bearer'da rol secer. Ayri verilmezse eski davranis.
+    this.anonKey = config.config.anonKey || process.env.CONARIUM_SUPABASE_ANON || this.apiKey
     this.schema = config.config.schema || 'zion'
     const raw = config.config.allowTables || ''
     this.allow = new Set(
@@ -142,7 +146,7 @@ export class SupabaseRestConnector implements Connector {
 
   private headers(): Record<string, string> {
     return {
-      apikey: this.apiKey,
+      apikey: this.anonKey,
       Authorization: `Bearer ${this.apiKey}`,
       'Accept-Profile': this.schema,
       'Content-Profile': this.schema,
