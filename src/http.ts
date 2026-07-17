@@ -8,6 +8,8 @@
  *    has no header field) or as Authorization: Bearer <token>. Comparison is timing-safe.
  *  - Bind 127.0.0.1 by default: TLS termination is a reverse proxy's job (Caddy/Let's Encrypt).
  *  - Same governance/audit pipeline as stdio mode — allowlist, deny, mask, row caps unchanged.
+ *  - CONARIUM_MCP_RATE_PER_MIN caps requests per client per minute (0 = off). Public demo
+ *    deployments hand the URL to strangers and must set it.
  *
  * Session model: canonical SDK pattern — an initialize POST opens a session (own Server+transport),
  * subsequent requests route by Mcp-Session-Id header; DELETE closes the session.
@@ -17,10 +19,12 @@ import { randomUUID, createHash, timingSafeEqual } from 'node:crypto'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { loadConfig, bootDeps, buildServer } from './server.js'
+import { RateLimiter, clientKey } from './rate_limit.js'
 
 const PORT = Number(process.env.CONARIUM_MCP_PORT || 8791)
 const HOST = process.env.CONARIUM_MCP_HOST || '127.0.0.1'
 const TOKEN = process.env.CONARIUM_MCP_TOKEN || ''
+const RATE_PER_MIN = Number(process.env.CONARIUM_MCP_RATE_PER_MIN || 0)
 
 function tokenOk(supplied: string): boolean {
   if (!supplied) return false
@@ -57,6 +61,9 @@ async function main() {
   const config = loadConfig()
   const deps = await bootDeps(config)
   const transports = new Map<string, StreamableHTTPServerTransport>()
+  const limiter = new RateLimiter({ perWindow: RATE_PER_MIN })
+  const sweepTimer = setInterval(() => limiter.sweep(), 5 * 60_000)
+  sweepTimer.unref()
 
   const httpServer = createHttpServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
@@ -79,6 +86,15 @@ async function main() {
       const supplied = pathMatch ? decodeURIComponent(pathMatch[1]) : bearer
       if (!tokenOk(supplied)) {
         res.writeHead(401, { 'content-type': 'text/plain' }).end('unauthorized')
+        return
+      }
+
+      // Limit AFTER auth: an unauthorized flood must not burn a real client's budget.
+      const client = clientKey(req.headers as Record<string, unknown>, req.socket.remoteAddress ?? undefined)
+      if (!limiter.take(client)) {
+        res
+          .writeHead(429, { 'content-type': 'text/plain', 'retry-after': String(limiter.retryAfter(client)) })
+          .end('rate limited')
         return
       }
 
@@ -118,7 +134,10 @@ async function main() {
   })
 
   httpServer.listen(PORT, HOST, () => {
-    console.error(`[conarium-http] remote MCP hazır — http://${HOST}:${PORT} (token: SET, ${deps.connectors.length} connector)`)
+    const rate = limiter.enabled ? `${RATE_PER_MIN}/dk` : 'KAPALI'
+    console.error(
+      `[conarium-http] remote MCP hazır — http://${HOST}:${PORT} (token: SET, ${deps.connectors.length} connector, rate-limit: ${rate})`
+    )
   })
 
   process.on('SIGINT', async () => {
