@@ -1,5 +1,6 @@
-import { appendFileSync, readFileSync, existsSync } from 'fs'
-import { createHash, createHmac } from 'crypto'
+import { appendFileSync, readFileSync, existsSync, statSync } from 'fs'
+import { createHmac } from 'crypto'
+import { computeEntryHash, GENESIS_HASH } from './audit-hash.js'
 
 export interface AuditEntry {
   timestamp: string
@@ -24,7 +25,9 @@ export class Audit {
   private consumer: string
   private failClosed: boolean
   private hmacKey?: string
-  private lastHash = '0000000000000000000000000000000000000000000000000000000000000000'
+  private lastHash = GENESIS_HASH
+  /** Sink byte size at last sync — başka yazıcı araya girdiyse stale lastHash yakalanır. */
+  private sinkSize = -1
 
   constructor(opts: { sink?: string; consumer?: string; failClosed?: boolean } = {}) {
     this.sink = opts.sink
@@ -37,13 +40,39 @@ export class Audit {
     this.validateChain()
     // Read the tail hash ONCE at startup; keep it in memory afterwards so log()
     // is O(1) instead of re-reading + splitting the whole sink on every call.
+    // NOT: başka bir Audit instance araya yazarsa lastHash bayatlar — syncLastHashIfStale
+    // bunu kapatır. Aynı milisaniyede iki yazıcı (gerçek yarış) dosya kilidi ister;
+    // tek kullanıcılı kurulum için kabul.
     this.lastHash = this.getLastHash()
+    this.sinkSize = this.currentSinkSize()
+  }
+
+  private currentSinkSize(): number {
+    if (!this.sink || !existsSync(this.sink)) return -1
+    try {
+      return statSync(this.sink).size
+    } catch {
+      return -1
+    }
+  }
+
+  /**
+   * Başka bir yazıcı sink'e ekleme yaptıysa bellekdeki lastHash bayat kalır.
+   * Size değişmediyse ucuz çık; değiştiyse kuyruğu yeniden oku.
+   * İki instance'ın aynı anda yazdığı gerçek yarışı kapatmaz — dosya kilidi gerekir.
+   */
+  private syncLastHashIfStale(): void {
+    if (!this.sink) return
+    const size = this.currentSinkSize()
+    if (size === this.sinkSize) return
+    this.lastHash = this.getLastHash()
+    this.sinkSize = size
   }
 
   private getLastHash(): string {
-    if (!this.sink || !existsSync(this.sink)) return '0000000000000000000000000000000000000000000000000000000000000000'
+    if (!this.sink || !existsSync(this.sink)) return GENESIS_HASH
     const content = readFileSync(this.sink, 'utf-8').trim().split('\n').filter(Boolean)
-    if (content.length === 0) return '0000000000000000000000000000000000000000000000000000000000000000'
+    if (content.length === 0) return GENESIS_HASH
     const lastLine = JSON.parse(content[content.length - 1]) as AuditEntry
     if (!lastLine.hash) throw new Error('Audit sink is corrupt: last entry has no hash.')
     return lastLine.hash
@@ -85,9 +114,9 @@ export class Audit {
       full.args = this.maskArgs(full.args)
     }
 
+    this.syncLastHashIfStale()
     full.prevHash = this.lastHash
-    const contentToHash = JSON.stringify({ ...full, prevHash: full.prevHash })
-    full.hash = createHash('sha256').update(contentToHash).digest('hex')
+    full.hash = computeEntryHash(full as unknown as Record<string, unknown>)
     this.lastHash = full.hash
     if (this.hmacKey) {
       full.signature = createHmac('sha256', this.hmacKey).update(full.hash).digest('hex')
@@ -99,6 +128,7 @@ export class Audit {
     if (this.sink) {
       try {
         appendFileSync(this.sink, line + '\n')
+        this.sinkSize = this.currentSinkSize()
       } catch (err) {
         if (this.failClosed) {
           throw new Error(`Audit sink write failed: ${(err as Error).message}`)
@@ -113,7 +143,7 @@ export class Audit {
     const raw = readFileSync(this.sink, 'utf-8').trim()
     if (!raw) return
 
-    let previous = '0000000000000000000000000000000000000000000000000000000000000000'
+    let previous = GENESIS_HASH
     const lines = raw.split('\n').filter(Boolean)
     for (const line of lines) {
       let entry: AuditEntry
@@ -130,10 +160,7 @@ export class Audit {
         throw new Error('Audit sink is corrupt: missing entry hash.')
       }
 
-      const signed = { ...entry }
-      delete signed.hash
-      delete signed.signature
-      const expectedHash = createHash('sha256').update(JSON.stringify(signed)).digest('hex')
+      const expectedHash = computeEntryHash(entry as unknown as Record<string, unknown>)
       if (entry.hash !== expectedHash) {
         throw new Error('Audit sink is corrupt: entry hash mismatch.')
       }
