@@ -70,11 +70,11 @@ export interface ReceiptSig {
   value: string
 }
 
+/** Hash-exterior reference; OTS proof lives in `<sink>.anchors.jsonl`. */
 export interface ReceiptAnchor {
   log: string
-  entryId: string
-  inclusionProof?: unknown
-  loggedAt: string
+  ref: string
+  state: 'pending' | 'bitcoin'
 }
 
 export interface Receipt {

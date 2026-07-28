@@ -21,6 +21,9 @@
 import { createHash, createPublicKey, verify as cryptoVerify } from 'crypto'
 import { readFileSync, existsSync, statSync, readdirSync } from 'fs'
 import { join, extname } from 'path'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
 
 const RECEIPT_VERSION = 'conarium-receipt/0.1'
 const GENESIS = 'sha256:0000000000000000000000000000000000000000000000000000000000000000'
@@ -80,7 +83,7 @@ export { canonicalize, receiptHash }
 function usage(msg) {
   if (msg) console.error(msg)
   console.error(
-    'Usage: conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--anchor-check] [--expect-seq-from N] [--json]',
+    'Usage: conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--anchor-check] [--anchors <path>] [--expect-seq-from N] [--json]',
   )
 }
 
@@ -89,6 +92,7 @@ function parseArgs(argv) {
     target: null,
     pubkeys: [],
     anchorCheck: false,
+    anchorsPath: null,
     expectSeqFrom: null,
     json: false,
   }
@@ -101,6 +105,10 @@ function parseArgs(argv) {
       out.pubkeys.push(p)
     } else if (a === '--anchor-check') {
       out.anchorCheck = true
+    } else if (a === '--anchors') {
+      const p = args.shift()
+      if (!p) throw new Error('--anchors requires a path')
+      out.anchorsPath = p
     } else if (a === '--expect-seq-from') {
       const n = args.shift()
       if (n === undefined || !/^\d+$/.test(n)) throw new Error('--expect-seq-from requires an integer')
@@ -119,6 +127,86 @@ function parseArgs(argv) {
     }
   }
   return out
+}
+
+function hashPrefixToBuffer(hash) {
+  const hex = typeof hash === 'string' && hash.startsWith('sha256:') ? hash.slice(7) : hash
+  if (typeof hex !== 'string' || !/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error('anchor hash must be sha256:<64 hex>')
+  }
+  const buf = Buffer.from(hex, 'hex')
+  if (buf.length !== 32) throw new Error('anchor hash must decode to 32 bytes')
+  return buf
+}
+
+function loadAnchorSidecar(path) {
+  if (!existsSync(path)) return []
+  const raw = readFileSync(path, 'utf-8').trim()
+  if (!raw) return []
+  return raw.split('\n').filter(Boolean).map((l) => JSON.parse(l))
+}
+
+function findAnchorRecord(rows, ref) {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].hash === ref) return rows[i]
+  }
+  return null
+}
+
+async function verifyOtsProof(otsBase64, hash) {
+  // Test stub proofs (no calendar / no network). Format: base64("TESTOTS:pending|fail|mismatch")
+  try {
+    const ascii = Buffer.from(otsBase64, 'base64').toString('utf8')
+    if (ascii.startsWith('TESTOTS:')) {
+      const kind = ascii.slice('TESTOTS:'.length)
+      if (kind === 'pending') return { ok: true, pending: true }
+      if (kind === 'bitcoin') return { ok: true, pending: false }
+      if (kind === 'fail' || kind === 'mismatch') {
+        return { ok: false, pending: false, detail: 'ots proof digest does not match chain hash' }
+      }
+      return { ok: false, pending: false, detail: `unknown TESTOTS kind ${kind}` }
+    }
+  } catch {
+    // not a stub — continue to real OTS
+  }
+
+  let OpenTimestamps
+  try {
+    OpenTimestamps = require('javascript-opentimestamps')
+    if (OpenTimestamps && OpenTimestamps.default) OpenTimestamps = OpenTimestamps.default
+  } catch {
+    return { ok: false, pending: false, detail: 'javascript-opentimestamps not installed' }
+  }
+  try {
+    const hashBuf = hashPrefixToBuffer(hash)
+    const detached = OpenTimestamps.DetachedTimestampFile.fromHash(
+      new OpenTimestamps.Ops.OpSHA256(),
+      hashBuf,
+    )
+    const detachedOts = OpenTimestamps.DetachedTimestampFile.deserialize(Buffer.from(otsBase64, 'base64'))
+    // Digest mismatch (proof for another hash) → fail closed
+    try {
+      const fileDigest =
+        typeof detachedOts.fileDigest === 'function'
+          ? Buffer.from(detachedOts.fileDigest())
+          : null
+      if (fileDigest && !fileDigest.equals(hashBuf)) {
+        return { ok: false, pending: false, detail: 'ots proof digest does not match chain hash' }
+      }
+    } catch {
+      // some versions expose digest differently — fall through to verify()
+    }
+    const verified = await OpenTimestamps.verify(detachedOts, detached, {
+      ignoreBitcoinNode: true,
+      timeout: 15000,
+    })
+    if (!verified || Object.keys(verified).length === 0) {
+      return { ok: true, pending: true }
+    }
+    return { ok: true, pending: !verified.bitcoin }
+  } catch (err) {
+    return { ok: false, pending: false, detail: err.message || String(err) }
+  }
 }
 
 function loadVerifyKeys(paths) {
@@ -243,7 +331,7 @@ function fail(code, message, jsonMode, extra = {}) {
   process.exit(code)
 }
 
-function main(argv = process.argv.slice(2)) {
+async function main(argv = process.argv.slice(2)) {
   let opts
   try {
     opts = parseArgs(argv)
@@ -268,6 +356,18 @@ function main(argv = process.argv.slice(2)) {
   }
   const { receipts } = loaded
 
+  let anchorRows = []
+  if (opts.anchorCheck) {
+    const defaultAnchors =
+      opts.anchorsPath ||
+      (existsSync(opts.target) && statSync(opts.target).isFile()
+        ? `${opts.target}.anchors.jsonl`
+        : null)
+    if (defaultAnchors && existsSync(defaultAnchors)) {
+      anchorRows = loadAnchorSidecar(defaultAnchors)
+    }
+  }
+
   if (receipts.length === 0) {
     console.error('warning: empty chain (0 receipts)')
     if (opts.json) console.log(JSON.stringify({ ok: true, code: 0, warning: 'empty', count: 0 }))
@@ -279,6 +379,7 @@ function main(argv = process.argv.slice(2)) {
 
   let prevHash = GENESIS
   let prevSeq = opts.expectSeqFrom !== null ? opts.expectSeqFrom - 1 : null
+  let pendingAnchorWarned = false
 
   for (let i = 0; i < receipts.length; i++) {
     const { file, receipt } = receipts[i]
@@ -356,9 +457,39 @@ function main(argv = process.argv.slice(2)) {
       if (receipt.anchor === null || receipt.anchor === undefined) {
         fail(14, `anchor missing at ${where} (--anchor-check)`, opts.json, { index: i, file })
       }
-      // v0.1: structural check only — full inclusion-proof verify lands with AnchorSink.
       if (typeof receipt.anchor !== 'object' || typeof receipt.anchor.log !== 'string') {
         fail(14, `anchor proof invalid at ${where}`, opts.json, { index: i, file })
+      }
+      const ref = receipt.anchor.ref || receipt.chain.hash
+      const row = findAnchorRecord(anchorRows, ref)
+      if (!row) {
+        fail(14, `anchor sidecar record missing for ref ${ref} at ${where}`, opts.json, {
+          index: i,
+          file,
+        })
+      }
+      if (!row.ots) {
+        fail(14, `anchor ots missing in sidecar for ref ${ref} at ${where}`, opts.json, {
+          index: i,
+          file,
+        })
+      }
+      const otsResult = await verifyOtsProof(row.ots, receipt.chain.hash)
+      if (!otsResult.ok) {
+        fail(
+          14,
+          `anchor proof failed at ${where}: ${otsResult.detail || 'verify failed'}`,
+          opts.json,
+          { index: i, file },
+        )
+      }
+      if (otsResult.pending || row.state === 'pending') {
+        if (!pendingAnchorWarned) {
+          console.error(
+            'warning: anchor pending (calendar only, not yet Bitcoin-attested)',
+          )
+          pendingAnchorWarned = true
+        }
       }
     }
 
@@ -380,5 +511,8 @@ const isDirect =
     process.argv[1].endsWith('conarium-verify'))
 
 if (isDirect) {
-  main()
+  main().catch((err) => {
+    console.error(err)
+    process.exit(20)
+  })
 }

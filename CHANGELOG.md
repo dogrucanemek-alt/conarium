@@ -20,6 +20,14 @@
 - `validateChain` treats missing `sig` / foreign `keyId` as out-of-scope (legacy /
   rotation), not tampering (GATE 1 / F1).
 
+### Added — OpenTimestamps anchoring (Katman 0 / A)
+
+- `OpenTimestampsSink` + sidecar `<sink>.anchors.jsonl` (hash-only; opt-in via
+  `CONARIUM_ANCHOR_SINK=opentimestamps`)
+- `bin/conarium-anchor-upgrade.mjs` (pending → bitcoin)
+- `conarium-verify --anchor-check` verifies OTS against chain head (pending warns)
+- Rekor explicitly rejected; RFC3161 deferred — see `docs/RECEIPT-SPEC.md` §Anchoring
+
 ### Docs (GATE 2)
 
 - Official claim: English is canonical; Turkish kept as translation (G2-1).

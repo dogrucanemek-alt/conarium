@@ -63,8 +63,40 @@ Fail-closed: if the verifier is unsure, it does not exit 0.
 1. **`actor` is a service identity in v0.1**, not a natural person. Per-user OAuth is Layer 2. Until then, marketing must not claim "who accessed".
 2. **No bypass detection.** Disabling Conarium and reading the DB directly produces no receipt; the chain still looks healthy. Coverage proofs (v0.2) partially address this against a declared schema.
 3. **Creation-time truth is not proven.** Without hardware attestation, an operator can still write false-but-well-formed receipts *before* anchoring.
-4. **In-file `sig` stripping + HMAC/`anchor` reduction.** Content `hash` is computed with `{hash, sig, anchor}` (and audit `signature`/`sig`) excluded, so an operator who controls the file can drop or thin those fields without invalidating the content hash itself. Contiguity and the trust store catch some boot-time cases, but full protection against in-file strip/reduce games is **not solvable in-file** (*in-file çözülemez*) — it needs an external transparency-log anchor and/or out-of-band key ceremony. **Mitigation available today, measured:** keep `CONARIUM_AUDIT_HMAC_KEY` enabled alongside Ed25519. HMAC is keyed, so an actor who strips `sig` and recomputes the unkeyed hashes still fails the HMAC check (`entry signature mismatch`). Verified by test: Ed25519 alone → strip-all passes the boot check; Ed25519 + HMAC → caught. `conarium-verify --pubkey` also catches it (exit 13, `missing sig`) because it is told to expect signatures.
+4. **In-file `sig` stripping + HMAC/`anchor` reduction.** Content `hash` is computed with `{hash, sig, anchor}` (and audit `signature`/`sig`) excluded, so an operator who controls the file can drop or thin those fields without invalidating the content hash itself. Contiguity and the trust store catch some boot-time cases, but full protection against in-file strip/reduce games is **not solvable in-file** (*in-file çözülemez*) — it needs an external transparency-log anchor and/or out-of-band key ceremony. **Mitigation available today, measured:** keep `CONARIUM_AUDIT_HMAC_KEY` enabled alongside Ed25519. HMAC is keyed, so an actor who strips `sig` and recomputes the unkeyed hashes still fails the HMAC check (`entry signature mismatch`). Verified by test: Ed25519 alone → strip-all passes the boot check; Ed25519 + HMAC → caught. `conarium-verify --pubkey` also catches it (exit 13, `missing sig`) because it is told to expect signatures. **Anchor is available** (`CONARIUM_ANCHOR_SINK=opentimestamps`) but starts as `pending` — Bitcoin finality is delayed (hours); see §Anchoring.
 5. **`argsHash` hurts debugging.** Support cases need the customer's own logs to correlate.
+
+## Anchoring (OpenTimestamps)
+
+Chain-head hashes are optionally stamped with **OpenTimestamps** (opt-in:
+`CONARIUM_ANCHOR_SINK=opentimestamps`). Only the raw 32-byte digest is sent
+(our `sha256:<hex>` prefix is stripped first). Proofs live in a sidecar
+`<sink>.anchors.jsonl`; the receipt’s `anchor` field is a hash-exterior
+reference: `{ "log": "opentimestamps", "ref": "sha256:…", "state": "pending"|"bitcoin" }`.
+
+| State | Meaning |
+|---|---|
+| `pending` | Calendar attestation only — **not yet** Bitcoin-confirmed (hours). |
+| `bitcoin` | Upgraded via `conarium-anchor-upgrade`; Bitcoin block height recorded. |
+
+**Why not Sigstore Rekor?** `hashedrekord` does not accept plain Ed25519 the way
+we sign (it digests internally / wants the original artifact); the `rekord` type
+uploads content — which we refuse. Public Rekor is also aimed at software supply
+chain, not hash calendars.
+
+**RFC3161 TSA:** deferred. `AnchorSink` stays pluggable for a later TSA
+implementation; institutional buyers may prefer it, but it requires trusting a TSA.
+
+**Honest latency:** “not backdated” becomes Bitcoin-hard only after upgrade. Pending
+is disclosed — `conarium-verify --anchor-check` exits 0 with a stderr warning while
+pending, and exits 14 if the proof is missing or does not match the hash.
+
+Manual dogfood (fill after one live stamp): submitted hash = _TBD_ · `.ots` size =
+_TBD_ · upgraded block = _TBD_.
+
+Known gap #4 note: an external OTS anchor is the out-of-file mitigation for
+in-file `sig`/HMAC/`anchor` stripping; while `state` is `pending`, backdating
+resistance is calendar-grade, not Bitcoin-final.
 
 ## Key material
 

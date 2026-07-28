@@ -54,7 +54,13 @@ export CONARIUM_AUDIT_SIGNING_KEY=./audit-ed25519.pem
 
 # Verify a receipt chain (exit 0 = intact)
 npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem
+
+# Optional: check OpenTimestamps sidecar (pending → exit 0 + warning; missing → 14)
+npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --anchor-check
 ```
+
+Opt-in anchoring: `CONARIUM_ANCHOR_SINK=opentimestamps`. Upgrade pending proofs later with
+`npx conarium-anchor-upgrade ./audit.jsonl.anchors.jsonl`.
 
 Full schema, exit codes, and known gaps: [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
 

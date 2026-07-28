@@ -21,12 +21,14 @@
   "main": "./dist/index.js",
   "bin": {
     "conarium": "./dist/index.js",
-    "conarium-verify": "./bin/conarium-verify.mjs"
+    "conarium-verify": "./bin/conarium-verify.mjs",
+    "conarium-anchor-upgrade": "./bin/conarium-anchor-upgrade.mjs"
   },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "test:checks": "npm run build && node test/connectors.mjs && node test/governance_lineage_adversarial.mjs && node test/governance_security_regression.mjs && node test/security_hardening_14.mjs",
+    "test:anchor-verify": "npm run build && node test/anchor_verify.mjs",
+    "test:checks": "npm run build && node test/connectors.mjs && node test/governance_lineage_adversarial.mjs && node test/governance_security_regression.mjs && node test/security_hardening_14.mjs && node test/anchor_verify.mjs",
     "test:all": "npm run lint && npm run test && npm run test:checks",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
@@ -36,6 +38,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "express": "^5.2.1",
+    "javascript-opentimestamps": "^0.4.5",
     "js-yaml": "^5.2.0",
     "node-fetch": "^3.3.2",
     "pgsql-ast-parser": "^12.0.2",
