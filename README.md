@@ -38,9 +38,13 @@ The AI gets the context it needs to write code, but never sees your secrets.
 Conarium can emit portable **receipts** (Art. 12 / 19 shaped) that a third party
 verifies offline with a single file — no Conarium install required.
 
-**Official claim (do not widen):** Conarium Makbuzu, kayıtların **oluşturulduktan
-sonra değiştirilmediğini, silinmediğini, yeniden sıralanmadığını ve geriye dönük
-tarihlenmediğini** kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
+**Official claim (do not widen):** A Conarium Receipt proves that records have
+**not been altered, deleted, reordered, or backdated after they were created**.
+It does **not** prove they were correct at the moment of creation.
+
+*(TR)* Conarium Makbuzu, kayıtların **oluşturulduktan sonra değiştirilmediğini,
+silinmediğini, yeniden sıralanmadığını ve geriye dönük tarihlenmediğini**
+kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
 
 ```bash
 # Generate an Ed25519 keypair (private PEM + .pub.pem + .keyid sidecars)

@@ -8,9 +8,13 @@ Design source: `docs/superpowers/specs/2026-07-29-conarium-receipt-design.md`.
 
 ## Official claim (do not widen)
 
-> Conarium Makbuzu, kayıtların **oluşturulduktan sonra değiştirilmediğini,
-> silinmediğini, yeniden sıralanmadığını ve geriye dönük tarihlenmediğini**
-> kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
+> A Conarium Receipt proves that records have **not been altered, deleted,
+> reordered, or backdated after they were created**. It does **not** prove they
+> were correct at the moment of creation.
+
+*(TR)* Conarium Makbuzu, kayıtların **oluşturulduktan sonra değiştirilmediğini,
+silinmediğini, yeniden sıralanmadığını ve geriye dönük tarihlenmediğini**
+kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
 
 ## Schema
 
@@ -59,7 +63,8 @@ Fail-closed: if the verifier is unsure, it does not exit 0.
 1. **`actor` is a service identity in v0.1**, not a natural person. Per-user OAuth is Layer 2. Until then, marketing must not claim "who accessed".
 2. **No bypass detection.** Disabling Conarium and reading the DB directly produces no receipt; the chain still looks healthy. Coverage proofs (v0.2) partially address this against a declared schema.
 3. **Creation-time truth is not proven.** Without hardware attestation, an operator can still write false-but-well-formed receipts *before* anchoring.
-4. **`argsHash` hurts debugging.** Support cases need the customer's own logs to correlate.
+4. **In-file `sig` stripping + HMAC/`anchor` reduction.** Content `hash` is computed with `{hash, sig, anchor}` (and audit `signature`/`sig`) excluded, so an operator who controls the file can drop or thin those fields without invalidating the content hash itself. Contiguity and the trust store catch some boot-time cases, but full protection against in-file strip/reduce games is **not solvable in-file** (*in-file çözülemez*) — it needs an external transparency-log anchor and/or out-of-band key ceremony.
+5. **`argsHash` hurts debugging.** Support cases need the customer's own logs to correlate.
 
 ## Key material
 

@@ -53,20 +53,20 @@ export function generateKeyPair(keyId: KeyId): { privatePem: string; publicPem: 
 export function writeKeyPairFiles(
   dirBase: string,
   keyId: KeyId,
-): { privatePath: string; publicPath: string; keyIdPath: string } {
+): { privatePath: string; publicPath: string; keyIdPath: string; publicKeyIdPath: string } {
   const pair = generateKeyPair(keyId)
   const privatePath = `${dirBase}.pem`
   const publicPath = `${dirBase}.pub.pem`
   const keyIdPath = `${privatePath}.keyid`
-  const pubKeyIdPath = `${publicPath}.keyid`
+  const publicKeyIdPath = `${publicPath}.keyid`
   writeFileSync(privatePath, pair.privatePem, { encoding: 'utf-8', flag: 'wx' })
   writeFileSync(publicPath, pair.publicPem, { encoding: 'utf-8', flag: 'wx' })
   writeFileSync(keyIdPath, keyId + '\n', { encoding: 'utf-8', flag: 'wx' })
-  writeFileSync(pubKeyIdPath, keyId + '\n', { encoding: 'utf-8', flag: 'wx' })
+  writeFileSync(publicKeyIdPath, keyId + '\n', { encoding: 'utf-8', flag: 'wx' })
   if (platform() !== 'win32') {
     chmodSync(privatePath, 0o600)
   }
-  return { privatePath, publicPath, keyIdPath }
+  return { privatePath, publicPath, keyIdPath, publicKeyIdPath }
 }
 
 function readKeyIdSidecar(pemPath: string): KeyId | null {

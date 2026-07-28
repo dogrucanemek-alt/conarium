@@ -20,6 +20,12 @@
 - `validateChain` treats missing `sig` / foreign `keyId` as out-of-scope (legacy /
   rotation), not tampering (GATE 1 / F1).
 
+### Docs (GATE 2)
+
+- Official claim: English is canonical; Turkish kept as translation (G2-1).
+- Known gaps §4: in-file sig stripping + HMAC/anchor reduction — *in-file çözülemez* (G2-2).
+- `writeKeyPairFiles` now returns `publicKeyIdPath` (G2-3).
+
 ### Fixed (GATE 1 follow-up / F5)
 
 - `validateChain` Ed25519 **contiguity**: after the first signed line, missing

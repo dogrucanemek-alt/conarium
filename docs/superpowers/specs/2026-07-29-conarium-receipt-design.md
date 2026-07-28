@@ -39,11 +39,15 @@ Değerlendirilen yollar:
 | (c) Sadece çıpalama: yalnızca zincir başı bize gelir | ✅ **SEÇİLDİ** |
 | (d) Daraltılmış iddia beyanı | ✅ **SEÇİLDİ (c ile birlikte)** |
 
-**Sonuç ve resmî iddia metni:**
+**Sonuç ve resmî iddia metni** (asıl = İngilizce; TR çeviri):
 
-> Conarium Makbuzu, kayıtların **oluşturulduktan sonra değiştirilmediğini, silinmediğini,
-> yeniden sıralanmadığını ve geriye dönük tarihlenmediğini** kanıtlar.
-> **Oluşturma anında doğru olduğunu kanıtlamaz.**
+> A Conarium Receipt proves that records have **not been altered, deleted,
+> reordered, or backdated after they were created**. It does **not** prove they
+> were correct at the moment of creation.
+
+> *(TR)* Conarium Makbuzu, kayıtların **oluşturulduktan sonra değiştirilmediğini,
+> silinmediğini, yeniden sıralanmadığını ve geriye dönük tarihlenmediğini**
+> kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
 
 Bu daraltma bir zayıflık değil, satılabilir tek dürüst konum: rakiplerin "audit logging" iddiası
 bundan daha geniş ve daha az kanıtlanabilir.
@@ -155,7 +159,12 @@ Bu neden önemli: çıpa olmadan operatör tüm zinciri baştan yeniden üretip 
    erişirse makbuz hiç üretilmez ve zincir yine sağlam görünür. Kapsama kanıtı (v0.2) bunu
    *beyan edilmiş şema* karşısında kısmen tespit edebilir, tamamen çözemez.
 3. **Oluşturma anı doğruluğu kanıtlanamıyor** (bkz. §3). Donanım tasdiki olmadan çözümü yok.
-4. **`argsHash` ile hata ayıklama zorlaşıyor.** Ham sorguyu tutmuyoruz; destek vakalarında
+4. **In-file `sig` stripping + HMAC/`anchor` azaltımı.** İçerik `hash`'i `{hash, sig, anchor}`
+   (ve audit `signature`/`sig`) hariç hesaplanır; dosyayı kontrol eden operatör bu alanları
+   düşürüp/inceltebilir ve içerik hash'i bozulmaz. Bitişiklik + trust store boot'ta bir kısmını
+   yakalar, ama in-file strip/reduce oyunlarına karşı tam koruma **in-file çözülemez** —
+   dış çıpa (şeffaflık kütüğü) ve/veya band-dışı anahtar töreni gerekir.
+5. **`argsHash` ile hata ayıklama zorlaşıyor.** Ham sorguyu tutmuyoruz; destek vakalarında
    müşterinin kendi tarafındaki logla eşleştirmek gerekecek. Kabul edilen ödün.
 
 ## 8. Geçiş (mevcut zincirler bozulmayacak)
