@@ -1,0 +1,31 @@
+# Satır sonlarını LF'e sabitle.
+#
+# NEDEN: `core.autocrlf=true` olan bir Windows makinesinde checkout,
+# `bin/conarium-verify.mjs`'i CRLF'e çeviriyordu. Dosya `node` ile sorunsuz
+# çalışıyor, ama vitest/esbuild shebang + CRLF birleşimini parse edemiyor ve
+# T5.10 (src ile bin aynı hash'i üretiyor mu) SyntaxError ile düşüyordu.
+# Sonuç: repoyu Windows'ta klonlayan biri, en kritik testi kırık bir repo alıyordu.
+# "Klonla ve kendin doğrula" diyen bir proje için bu kabul edilemez.
+#
+# Doğrulayıcı taşınabilir ve çalıştırılabilir olmak zorunda → LF kanonik.
+
+* text=auto eol=lf
+
+*.mjs   text eol=lf
+*.ts    text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.jsonl text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.pem   text eol=lf
+*.sh    text eol=lf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.pdf  binary
+*.ico  binary
