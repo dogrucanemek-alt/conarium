@@ -20,7 +20,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
-    "conarium": "./dist/index.js"
+    "conarium": "./dist/index.js",
+    "conarium-verify": "./bin/conarium-verify.mjs"
   },
   "scripts": {
     "build": "tsc",

@@ -1,9 +1,20 @@
 import { mkdtempSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { Audit } from './audit.js'
 import { createPlaygroundAudit } from './console.js'
+
+// These suites exercise sink/chain behaviour, not signing. Opt into unsigned mode
+// so fail-closed signing (Receipt v0.1) does not mask the assertions under test.
+const PREV_UNSIGNED = process.env.CONARIUM_AUDIT_UNSIGNED
+beforeAll(() => {
+  process.env.CONARIUM_AUDIT_UNSIGNED = '1'
+})
+afterAll(() => {
+  if (PREV_UNSIGNED === undefined) delete process.env.CONARIUM_AUDIT_UNSIGNED
+  else process.env.CONARIUM_AUDIT_UNSIGNED = PREV_UNSIGNED
+})
 
 // Regression: Codex denetimi 2026-07-06 P2 — audit failClosed defaulted to false,
 // so a broken sink silently dropped the trail while docs promised append-always.
@@ -26,6 +37,21 @@ describe('audit fail-closed default', () => {
     const entry = audit.log({ tool: 'query_db', denied: false })
     expect(entry.hash).toMatch(/^[a-f0-9]{64}$/)
     expect(entry.actor).toBe('test')
+  })
+
+  it('refuses unsigned log when CONARIUM_AUDIT_UNSIGNED is unset', () => {
+    const saved = process.env.CONARIUM_AUDIT_UNSIGNED
+    delete process.env.CONARIUM_AUDIT_UNSIGNED
+    delete process.env.CONARIUM_AUDIT_HMAC_KEY
+    delete process.env.CONARIUM_AUDIT_SIGNING_KEY
+    try {
+      const sink = join(mkdtempSync(join(tmpdir(), 'conarium-audit-')), 'audit.jsonl')
+      const audit = new Audit({ sink, consumer: 'test' })
+      expect(() => audit.log({ tool: 'query_db', denied: false })).toThrow(/refusing to write unsigned/)
+    } finally {
+      if (saved === undefined) process.env.CONARIUM_AUDIT_UNSIGNED = '1'
+      else process.env.CONARIUM_AUDIT_UNSIGNED = saved
+    }
   })
 })
 

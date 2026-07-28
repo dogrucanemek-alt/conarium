@@ -2,10 +2,19 @@ import { appendFileSync, existsSync, mkdtempSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { execFileSync } from 'child_process'
 import { Audit } from './audit.js'
 import { computeEntryHash } from './audit-hash.js'
+
+const PREV_UNSIGNED = process.env.CONARIUM_AUDIT_UNSIGNED
+beforeAll(() => {
+  process.env.CONARIUM_AUDIT_UNSIGNED = '1'
+})
+afterAll(() => {
+  if (PREV_UNSIGNED === undefined) delete process.env.CONARIUM_AUDIT_UNSIGNED
+  else process.env.CONARIUM_AUDIT_UNSIGNED = PREV_UNSIGNED
+})
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')

@@ -1,8 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { beforeAll, afterAll, describe, it, expect } from 'vitest';
 import { Audit } from './audit.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+
+const PREV_UNSIGNED = process.env.CONARIUM_AUDIT_UNSIGNED;
+beforeAll(() => {
+  process.env.CONARIUM_AUDIT_UNSIGNED = '1';
+});
+afterAll(() => {
+  if (PREV_UNSIGNED === undefined) delete process.env.CONARIUM_AUDIT_UNSIGNED;
+  else process.env.CONARIUM_AUDIT_UNSIGNED = PREV_UNSIGNED;
+});
 
 // Regression for the audit "no raw secrets in the log" claim: the sink must
 // redact API keys, passwords and connection-string credentials, not only PII.

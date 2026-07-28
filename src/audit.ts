@@ -1,6 +1,7 @@
 import { appendFileSync, readFileSync, existsSync, statSync } from 'fs'
-import { createHmac } from 'crypto'
+import { createHmac, createPublicKey, verify as cryptoVerify } from 'crypto'
 import { computeEntryHash, GENESIS_HASH } from './audit-hash.js'
+import { loadSigningKey, signHash, type SigningKey } from './keys.js'
 
 export interface AuditEntry {
   timestamp: string
@@ -18,6 +19,27 @@ export interface AuditEntry {
   prevHash?: string
   hash?: string
   signature?: string
+  /** Ed25519 signature over entry.hash (v0.1). */
+  sig?: { alg: 'Ed25519'; keyId: string; value: string }
+}
+
+let unsignedWarned = false
+
+function warnUnsignedOnce(): void {
+  if (unsignedWarned) return
+  unsignedWarned = true
+  console.warn(
+    '[conarium:audit] CONARIUM_AUDIT_UNSIGNED=1 — audit entries are written without HMAC or Ed25519 signature. Not suitable for compliance claims.',
+  )
+}
+
+function verifyEd25519WithPrivate(key: SigningKey, hash: string, signatureBase64: string): boolean {
+  try {
+    const publicKey = createPublicKey(key.privateKey)
+    return cryptoVerify(null, Buffer.from(hash, 'utf-8'), publicKey, Buffer.from(signatureBase64, 'base64'))
+  } catch {
+    return false
+  }
 }
 
 export class Audit {
@@ -25,6 +47,7 @@ export class Audit {
   private consumer: string
   private failClosed: boolean
   private hmacKey?: string
+  private signingKey: SigningKey | null
   private lastHash = GENESIS_HASH
   /** Sink byte size at last sync — başka yazıcı araya girdiyse stale lastHash yakalanır. */
   private sinkSize = -1
@@ -37,6 +60,10 @@ export class Audit {
     // with failClosed: false for throwaway/demo setups.
     this.failClosed = opts.failClosed ?? true
     this.hmacKey = process.env.CONARIUM_AUDIT_HMAC_KEY
+    this.signingKey = loadSigningKey()
+    if (!this.hmacKey && !this.signingKey && process.env.CONARIUM_AUDIT_UNSIGNED === '1') {
+      warnUnsignedOnce()
+    }
     this.validateChain()
     // Read the tail hash ONCE at startup; keep it in memory afterwards so log()
     // is O(1) instead of re-reading + splitting the whole sink on every call.
@@ -45,6 +72,17 @@ export class Audit {
     // tek kullanıcılı kurulum için kabul.
     this.lastHash = this.getLastHash()
     this.sinkSize = this.currentSinkSize()
+  }
+
+  private requireSigningCapability(): void {
+    if (this.hmacKey || this.signingKey) return
+    if (process.env.CONARIUM_AUDIT_UNSIGNED === '1') {
+      warnUnsignedOnce()
+      return
+    }
+    throw new Error(
+      'Audit: refusing to write unsigned entries — set CONARIUM_AUDIT_SIGNING_KEY (Ed25519) or CONARIUM_AUDIT_HMAC_KEY, or explicitly CONARIUM_AUDIT_UNSIGNED=1',
+    )
   }
 
   private currentSinkSize(): number {
@@ -85,7 +123,7 @@ export class Audit {
     masked = masked.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[MASKED_PII]')
     masked = masked.replace(/\b[1-9][0-9]{10}\b/g, '[MASKED_PII]')
     masked = masked.replace(/(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/g, '[MASKED_PII]')
-    masked = masked.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[MASKED_PII]')
+    masked = masked.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[MASKED_SECRET]')
     // Credentials / secrets — not just PII. Keeps API keys, tokens, passwords
     // and connection-string credentials out of the audit log.
     masked = masked.replace(/\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g, '[MASKED_SECRET]')
@@ -104,6 +142,8 @@ export class Audit {
   }
 
   log(entry: Omit<AuditEntry, 'timestamp' | 'actor' | 'prevHash' | 'hash'>): AuditEntry {
+    this.requireSigningCapability()
+
     const full: AuditEntry = {
       timestamp: new Date().toISOString(),
       actor: this.consumer,
@@ -116,15 +156,25 @@ export class Audit {
 
     this.syncLastHashIfStale()
     full.prevHash = this.lastHash
+    // Strip sig/signature before hashing (mirrors exclusions in audit-hash).
+    delete full.sig
+    delete full.signature
     full.hash = computeEntryHash(full as unknown as Record<string, unknown>)
     this.lastHash = full.hash
     if (this.hmacKey) {
       full.signature = createHmac('sha256', this.hmacKey).update(full.hash).digest('hex')
     }
+    if (this.signingKey) {
+      full.sig = {
+        alg: 'Ed25519',
+        keyId: this.signingKey.keyId,
+        value: signHash(this.signingKey, full.hash),
+      }
+    }
 
     const line = JSON.stringify(full)
     console.error(`[conarium:audit] ${line}`)
-    
+
     if (this.sink) {
       try {
         appendFileSync(this.sink, line + '\n')
@@ -164,11 +214,27 @@ export class Audit {
       if (entry.hash !== expectedHash) {
         throw new Error('Audit sink is corrupt: entry hash mismatch.')
       }
+      // Fail-closed verification: if we have a key, signatures MUST match.
+      // If we have neither key, do NOT silently "pass" — report unverifiable
+      // unless explicitly opted into unsigned mode.
       if (this.hmacKey) {
         const expectedSignature = createHmac('sha256', this.hmacKey).update(entry.hash).digest('hex')
         if (entry.signature !== expectedSignature) {
           throw new Error('Audit sink is corrupt: entry signature mismatch.')
         }
+      }
+      if (this.signingKey) {
+        if (!entry.sig || entry.sig.alg !== 'Ed25519' || entry.sig.keyId !== this.signingKey.keyId) {
+          throw new Error('Audit sink is corrupt: entry Ed25519 sig missing or keyId mismatch.')
+        }
+        if (!verifyEd25519WithPrivate(this.signingKey, entry.hash, entry.sig.value)) {
+          throw new Error('Audit sink is corrupt: entry Ed25519 signature mismatch.')
+        }
+      }
+      if (!this.hmacKey && !this.signingKey && process.env.CONARIUM_AUDIT_UNSIGNED !== '1') {
+        throw new Error(
+          'Audit sink cannot be verified: no HMAC or Ed25519 key configured (refusing silent pass). Set a key or CONARIUM_AUDIT_UNSIGNED=1.',
+        )
       }
       previous = entry.hash
     }

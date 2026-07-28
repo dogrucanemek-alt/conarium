@@ -29,8 +29,33 @@ The AI gets the context it needs to write code, but never sees your secrets.
 - **Allow / Deny Lists:** Whitelist what AI can access. Your `secrets` and `financials` tables stay invisible.
 - **Row Caps:** Hard per-query limits. Prevent the silent exfiltration of millions of rows. 
 - **Immutable Audit Ledger:** Every access is logged (who, what, when, rows, decision). SOC2 & GDPR-ready, with no raw PII ever written to the logs.
+- **Verifiable Receipts (v0.1):** Ed25519-signed, independently verifiable receipts — see below.
 - **100% Self-Hosted:** Runs entirely on your infrastructure. Your data never crosses your perimeter. 
 - **MCP-Native:** Works out of the box with **Cursor**, **GitHub Copilot**, **Claude Code**, and **Windsurf**.
+
+### Verifiable Receipts
+
+Conarium can emit portable **receipts** (Art. 12 / 19 shaped) that a third party
+verifies offline with a single file — no Conarium install required.
+
+**Official claim (do not widen):** Conarium Makbuzu, kayıtların **oluşturulduktan
+sonra değiştirilmediğini, silinmediğini, yeniden sıralanmadığını ve geriye dönük
+tarihlenmediğini** kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
+
+```bash
+# Generate an Ed25519 keypair (private PEM + .pub.pem + .keyid sidecars)
+node -e "import('./dist/keys.js').then(k=>console.log(JSON.stringify(k.writeKeyPairFiles('audit-ed25519','cnr-2026-07'),null,2)))"
+
+export CONARIUM_AUDIT_SIGNING_KEY=./audit-ed25519.pem
+
+# Verify a receipt chain (exit 0 = intact)
+npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem
+```
+
+Full schema, exit codes, and known gaps: [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
+
+Signing is fail-closed: set `CONARIUM_AUDIT_SIGNING_KEY` and/or
+`CONARIUM_AUDIT_HMAC_KEY`, or explicitly `CONARIUM_AUDIT_UNSIGNED=1` for throwaway setups.
 
 ---
 
