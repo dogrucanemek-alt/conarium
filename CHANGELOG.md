@@ -14,5 +14,13 @@
 
 - Audit signing is **fail-closed**: without `CONARIUM_AUDIT_HMAC_KEY` or
   `CONARIUM_AUDIT_SIGNING_KEY`, writes throw unless `CONARIUM_AUDIT_UNSIGNED=1`
-  is set explicitly (was: silent skip).
+  is set explicitly (was: silent skip). Capability is checked at **construction**
+  as well as `log()` (GATE 1 / F3).
 - Audit entries may carry Ed25519 `sig` alongside legacy HMAC `signature`.
+- `validateChain` treats missing `sig` / foreign `keyId` as out-of-scope (legacy /
+  rotation), not tampering (GATE 1 / F1).
+
+### Deferred
+
+- GATE 1 / F4: multi-key trust-store verification in `validateChain` —
+  see `docs/superpowers/TODO-gate1-f4.md`.

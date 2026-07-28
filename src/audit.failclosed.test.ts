@@ -39,15 +39,14 @@ describe('audit fail-closed default', () => {
     expect(entry.actor).toBe('test')
   })
 
-  it('refuses unsigned log when CONARIUM_AUDIT_UNSIGNED is unset', () => {
+  it('refuses unsigned construction when CONARIUM_AUDIT_UNSIGNED is unset (F3)', () => {
     const saved = process.env.CONARIUM_AUDIT_UNSIGNED
     delete process.env.CONARIUM_AUDIT_UNSIGNED
     delete process.env.CONARIUM_AUDIT_HMAC_KEY
     delete process.env.CONARIUM_AUDIT_SIGNING_KEY
     try {
       const sink = join(mkdtempSync(join(tmpdir(), 'conarium-audit-')), 'audit.jsonl')
-      const audit = new Audit({ sink, consumer: 'test' })
-      expect(() => audit.log({ tool: 'query_db', denied: false })).toThrow(/refusing to write unsigned/)
+      expect(() => new Audit({ sink, consumer: 'test' })).toThrow(/refusing to write unsigned/)
     } finally {
       if (saved === undefined) process.env.CONARIUM_AUDIT_UNSIGNED = '1'
       else process.env.CONARIUM_AUDIT_UNSIGNED = saved

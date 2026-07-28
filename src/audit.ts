@@ -61,9 +61,8 @@ export class Audit {
     this.failClosed = opts.failClosed ?? true
     this.hmacKey = process.env.CONARIUM_AUDIT_HMAC_KEY
     this.signingKey = loadSigningKey()
-    if (!this.hmacKey && !this.signingKey && process.env.CONARIUM_AUDIT_UNSIGNED === '1') {
-      warnUnsignedOnce()
-    }
+    // Fail fast at boot — do not wait for the first log() to discover missing keys.
+    this.requireSigningCapability()
     this.validateChain()
     // Read the tail hash ONCE at startup; keep it in memory afterwards so log()
     // is O(1) instead of re-reading + splitting the whole sink on every call.
@@ -123,7 +122,7 @@ export class Audit {
     masked = masked.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[MASKED_PII]')
     masked = masked.replace(/\b[1-9][0-9]{10}\b/g, '[MASKED_PII]')
     masked = masked.replace(/(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/g, '[MASKED_PII]')
-    masked = masked.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[MASKED_SECRET]')
+    masked = masked.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[MASKED_PII]')
     // Credentials / secrets — not just PII. Keeps API keys, tokens, passwords
     // and connection-string credentials out of the audit log.
     masked = masked.replace(/\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g, '[MASKED_SECRET]')
@@ -223,13 +222,16 @@ export class Audit {
           throw new Error('Audit sink is corrupt: entry signature mismatch.')
         }
       }
-      if (this.signingKey) {
-        if (!entry.sig || entry.sig.alg !== 'Ed25519' || entry.sig.keyId !== this.signingKey.keyId) {
-          throw new Error('Audit sink is corrupt: entry Ed25519 sig missing or keyId mismatch.')
+      // Ed25519: only verify when this entry carries our current keyId.
+      // Missing sig (pre-Ed25519 / HMAC-only era) and foreign keyId (rotation) are
+      // out of scope for this instance — not tampering. Wrong sig for *our* keyId is.
+      if (this.signingKey && entry.sig) {
+        if (entry.sig.alg === 'Ed25519' && entry.sig.keyId === this.signingKey.keyId) {
+          if (!verifyEd25519WithPrivate(this.signingKey, entry.hash, entry.sig.value)) {
+            throw new Error('Audit sink is corrupt: entry Ed25519 signature mismatch.')
+          }
         }
-        if (!verifyEd25519WithPrivate(this.signingKey, entry.hash, entry.sig.value)) {
-          throw new Error('Audit sink is corrupt: entry Ed25519 signature mismatch.')
-        }
+        // else: no sig / other keyId → skip (legacy or rotated key)
       }
       if (!this.hmacKey && !this.signingKey && process.env.CONARIUM_AUDIT_UNSIGNED !== '1') {
         throw new Error(
