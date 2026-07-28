@@ -20,7 +20,9 @@
 - `validateChain` treats missing `sig` / foreign `keyId` as out-of-scope (legacy /
   rotation), not tampering (GATE 1 / F1).
 
-### Deferred
+### Fixed (GATE 1 follow-up / F5)
 
-- GATE 1 / F4: multi-key trust-store verification in `validateChain` —
-  see `docs/superpowers/TODO-gate1-f4.md`.
+- `validateChain` Ed25519 **contiguity**: after the first signed line, missing
+  `sig` is corrupt; foreign `keyId` accepted when present in the trust store.
+- Multi-keyId trust store: current signing pubkey + `CONARIUM_AUDIT_TRUST_PUBKEYS`.
+- See `docs/superpowers/TODO-gate1-f4.md` (F4 text; implemented as F5).

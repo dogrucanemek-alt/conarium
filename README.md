@@ -56,6 +56,8 @@ Full schema, exit codes, and known gaps: [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-S
 
 Signing is fail-closed: set `CONARIUM_AUDIT_SIGNING_KEY` and/or
 `CONARIUM_AUDIT_HMAC_KEY`, or explicitly `CONARIUM_AUDIT_UNSIGNED=1` for throwaway setups.
+Key rotation: keep prior public PEMs in `CONARIUM_AUDIT_TRUST_PUBKEYS` (`,` / `;`
+separated). After the first signed audit line, every later line must carry `sig`.
 
 ---
 

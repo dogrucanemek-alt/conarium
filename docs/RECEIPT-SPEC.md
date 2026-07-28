@@ -66,5 +66,9 @@ Fail-closed: if the verifier is unsure, it does not exit 0.
 - Algorithm: Ed25519 (Node `crypto`, no extra dependency)
 - Private key path: `CONARIUM_AUDIT_SIGNING_KEY`
 - `keyId` sidecar: `<pem-path>.keyid` (UTF-8 single line), or `CONARIUM_AUDIT_KEY_ID`
+- Trust store (rotation): `CONARIUM_AUDIT_TRUST_PUBKEYS` — comma/semicolon-separated
+  public PEM paths (each with `.keyid`). Current signing pubkey is always included.
+- Contiguity: after the first audit line that carries `sig`, every later line must
+  also carry `sig` (absence → corrupt). Foreign `keyId` OK if in the trust store.
 - HMAC (`CONARIUM_AUDIT_HMAC_KEY` → audit `signature` field) remains for backwards compatibility with `scripts/audit-chain-check.mjs`
 - No signing key and no `CONARIUM_AUDIT_UNSIGNED=1` → production refuses to write (fail-closed)

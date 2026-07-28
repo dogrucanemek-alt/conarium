@@ -7,8 +7,12 @@
  *   public:   (any path; verify loads path + path+".keyid")
  *
  * Env:
- *   CONARIUM_AUDIT_SIGNING_KEY  — path to Ed25519 private PEM
- *   CONARIUM_AUDIT_KEY_ID       — optional override; else read sidecar
+ *   CONARIUM_AUDIT_SIGNING_KEY   — path to Ed25519 private PEM
+ *   CONARIUM_AUDIT_KEY_ID        — optional override; else read sidecar
+ *   CONARIUM_AUDIT_TRUST_PUBKEYS — comma/semicolon-separated public PEM paths
+ *                                  (each needs a sibling `.keyid`); forms the
+ *                                  multi-keyId trust store together with the
+ *                                  current signing key's derived public key
  */
 import {
   generateKeyPairSync,
@@ -163,4 +167,35 @@ export function verifyHash(key: VerifyKey, hash: string, signatureBase64: string
   } catch {
     return false
   }
+}
+
+/** Parse CONARIUM_AUDIT_TRUST_PUBKEYS (`,` or `;` separated). Empty → []. */
+export function parseTrustPubkeyPaths(envValue: string | undefined = process.env.CONARIUM_AUDIT_TRUST_PUBKEYS): string[] {
+  if (!envValue) return []
+  return envValue
+    .split(/[,;]/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
+}
+
+/**
+ * Trust store for validateChain / rotation:
+ * current signing key (derived public) + CONARIUM_AUDIT_TRUST_PUBKEYS.
+ * Map is keyed by keyId; later paths override earlier ones for the same id.
+ */
+export function loadTrustStore(signingKey: SigningKey | null = null): Map<KeyId, VerifyKey> {
+  const map = new Map<KeyId, VerifyKey>()
+  if (signingKey) {
+    map.set(signingKey.keyId, {
+      keyId: signingKey.keyId,
+      publicKey: createPublicKey(signingKey.privateKey),
+    })
+  }
+  const extraPaths = parseTrustPubkeyPaths()
+  if (extraPaths.length > 0) {
+    for (const vk of loadVerifyKeys(extraPaths)) {
+      map.set(vk.keyId, vk)
+    }
+  }
+  return map
 }

@@ -1,7 +1,15 @@
 import { appendFileSync, readFileSync, existsSync, statSync } from 'fs'
-import { createHmac, createPublicKey, verify as cryptoVerify } from 'crypto'
+import { createHmac } from 'crypto'
 import { computeEntryHash, GENESIS_HASH } from './audit-hash.js'
-import { loadSigningKey, signHash, type SigningKey } from './keys.js'
+import {
+  loadSigningKey,
+  loadTrustStore,
+  signHash,
+  verifyHash,
+  type SigningKey,
+  type VerifyKey,
+  type KeyId,
+} from './keys.js'
 
 export interface AuditEntry {
   timestamp: string
@@ -33,21 +41,14 @@ function warnUnsignedOnce(): void {
   )
 }
 
-function verifyEd25519WithPrivate(key: SigningKey, hash: string, signatureBase64: string): boolean {
-  try {
-    const publicKey = createPublicKey(key.privateKey)
-    return cryptoVerify(null, Buffer.from(hash, 'utf-8'), publicKey, Buffer.from(signatureBase64, 'base64'))
-  } catch {
-    return false
-  }
-}
-
 export class Audit {
   private sink?: string
   private consumer: string
   private failClosed: boolean
   private hmacKey?: string
   private signingKey: SigningKey | null
+  /** keyId → verify key (current signing pubkey + CONARIUM_AUDIT_TRUST_PUBKEYS). */
+  private trustStore: Map<KeyId, VerifyKey>
   private lastHash = GENESIS_HASH
   /** Sink byte size at last sync — başka yazıcı araya girdiyse stale lastHash yakalanır. */
   private sinkSize = -1
@@ -61,6 +62,7 @@ export class Audit {
     this.failClosed = opts.failClosed ?? true
     this.hmacKey = process.env.CONARIUM_AUDIT_HMAC_KEY
     this.signingKey = loadSigningKey()
+    this.trustStore = loadTrustStore(this.signingKey)
     // Fail fast at boot — do not wait for the first log() to discover missing keys.
     this.requireSigningCapability()
     this.validateChain()
@@ -193,8 +195,11 @@ export class Audit {
     if (!raw) return
 
     let previous = GENESIS_HASH
+    /** F5 contiguity: after the first entry that carries `sig`, every later entry must too. */
+    let seenSig = false
     const lines = raw.split('\n').filter(Boolean)
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
       let entry: AuditEntry
       try {
         entry = JSON.parse(line) as AuditEntry
@@ -222,17 +227,36 @@ export class Audit {
           throw new Error('Audit sink is corrupt: entry signature mismatch.')
         }
       }
-      // Ed25519: only verify when this entry carries our current keyId.
-      // Missing sig (pre-Ed25519 / HMAC-only era) and foreign keyId (rotation) are
-      // out of scope for this instance — not tampering. Wrong sig for *our* keyId is.
-      if (this.signingKey && entry.sig) {
-        if (entry.sig.alg === 'Ed25519' && entry.sig.keyId === this.signingKey.keyId) {
-          if (!verifyEd25519WithPrivate(this.signingKey, entry.hash, entry.sig.value)) {
-            throw new Error('Audit sink is corrupt: entry Ed25519 signature mismatch.')
-          }
-        }
-        // else: no sig / other keyId → skip (legacy or rotated key)
+
+      const hasSig = Boolean(entry.sig && typeof entry.sig === 'object')
+      if (hasSig) {
+        seenSig = true
+      } else if (seenSig) {
+        // Contiguity (F5): once sig appears, absence is rejected. Foreign keyId is OK.
+        throw new Error(
+          `Audit sink is corrupt: Ed25519 sig contiguity break at line ${i + 1} — sig required after the first signed entry.`,
+        )
       }
+
+      // Trust-store verify (F5): any keyId in the store is accepted if crypto checks out;
+      // unknown keyId fails closed. Empty store → skip Ed25519 crypto (HMAC-only / unsigned).
+      if (hasSig && this.trustStore.size > 0) {
+        if (!entry.sig || entry.sig.alg !== 'Ed25519') {
+          throw new Error(`Audit sink is corrupt: unsupported or missing Ed25519 sig at line ${i + 1}.`)
+        }
+        const trusted = this.trustStore.get(entry.sig.keyId)
+        if (!trusted) {
+          throw new Error(
+            `Audit sink is corrupt: unknown Ed25519 keyId "${entry.sig.keyId}" at line ${i + 1} (not in trust store).`,
+          )
+        }
+        if (!verifyHash(trusted, entry.hash, entry.sig.value)) {
+          throw new Error(
+            `Audit sink is corrupt: entry Ed25519 signature mismatch (keyId=${entry.sig.keyId}) at line ${i + 1}.`,
+          )
+        }
+      }
+
       if (!this.hmacKey && !this.signingKey && process.env.CONARIUM_AUDIT_UNSIGNED !== '1') {
         throw new Error(
           'Audit sink cannot be verified: no HMAC or Ed25519 key configured (refusing silent pass). Set a key or CONARIUM_AUDIT_UNSIGNED=1.',
