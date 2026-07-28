@@ -154,22 +154,6 @@ function findAnchorRecord(rows, ref) {
 }
 
 async function verifyOtsProof(otsBase64, hash) {
-  // Test stub proofs (no calendar / no network). Format: base64("TESTOTS:pending|fail|mismatch")
-  try {
-    const ascii = Buffer.from(otsBase64, 'base64').toString('utf8')
-    if (ascii.startsWith('TESTOTS:')) {
-      const kind = ascii.slice('TESTOTS:'.length)
-      if (kind === 'pending') return { ok: true, pending: true }
-      if (kind === 'bitcoin') return { ok: true, pending: false }
-      if (kind === 'fail' || kind === 'mismatch') {
-        return { ok: false, pending: false, detail: 'ots proof digest does not match chain hash' }
-      }
-      return { ok: false, pending: false, detail: `unknown TESTOTS kind ${kind}` }
-    }
-  } catch {
-    // not a stub — continue to real OTS
-  }
-
   let OpenTimestamps
   try {
     OpenTimestamps = require('javascript-opentimestamps')
@@ -184,17 +168,12 @@ async function verifyOtsProof(otsBase64, hash) {
       hashBuf,
     )
     const detachedOts = OpenTimestamps.DetachedTimestampFile.deserialize(Buffer.from(otsBase64, 'base64'))
-    // Digest mismatch (proof for another hash) → fail closed
-    try {
-      const fileDigest =
-        typeof detachedOts.fileDigest === 'function'
-          ? Buffer.from(detachedOts.fileDigest())
-          : null
-      if (fileDigest && !fileDigest.equals(hashBuf)) {
+    // Digest mismatch (proof for another hash) → fail closed before calendar I/O when possible
+    if (typeof detachedOts.fileDigest === 'function') {
+      const fileDigest = Buffer.from(detachedOts.fileDigest())
+      if (!fileDigest.equals(hashBuf)) {
         return { ok: false, pending: false, detail: 'ots proof digest does not match chain hash' }
       }
-    } catch {
-      // some versions expose digest differently — fall through to verify()
     }
     const verified = await OpenTimestamps.verify(detachedOts, detached, {
       ignoreBitcoinNode: true,
