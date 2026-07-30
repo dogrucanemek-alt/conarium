@@ -1,7 +1,7 @@
 <div align="center">
   <h1>Conarium</h1>
   <p><strong>The Third Eye for Your Company's Data.</strong></p>
-  <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data—without exposing a single secret.</p>
+  <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data—without exposing a single secret—and hands you a signed, independently verifiable receipt of every access.</p>
   
   <p>
     <a href="https://conarium.dev"><img src="https://img.shields.io/badge/Website-conarium.dev-5a8cff?style=for-the-badge" alt="Website" /></a>
@@ -68,6 +68,30 @@ Signing is fail-closed: set `CONARIUM_AUDIT_SIGNING_KEY` and/or
 `CONARIUM_AUDIT_HMAC_KEY`, or explicitly `CONARIUM_AUDIT_UNSIGNED=1` for throwaway setups.
 Key rotation: keep prior public PEMs in `CONARIUM_AUDIT_TRUST_PUBKEYS` (`,` / `;`
 separated). After the first signed audit line, every later line must carry `sig`.
+
+### Where this sits among similar projects
+
+Conarium is **not** the first project to produce signed, verifiable receipts for AI
+activity. [Acta](https://github.com/VeritasActa/Acta),
+[Emilia Protocol](https://github.com/emiliaprotocol/emilia-protocol),
+[AuthProof](https://github.com/Commonguy25/authproof-sdk),
+[Agent Receipts](https://github.com/agent-receipts) and
+[Invariant SVR](https://github.com/Jasonleonardvolk/invariant-svr) all do a form of this,
+and some are ahead of us on standardisation — Acta and Emilia both have IETF
+Internet-Drafts. Related research: Aegon (arXiv 2604.06693), Decentralised Trust Layers
+(ACM Web Conf 2026), and ISO/IEC TS 27560:2023 for signed consent records.
+
+Those receipts attest to what an agent **did**. A Conarium receipt attests to what the
+model was **prevented from seeing** — because the component that masks the data is the
+same component that signs the record. Enforcement and evidence are one part here, not
+two systems that have to be reconciled.
+
+What we will defend: Conarium is the only implementation we are aware of that combines
+inline enforcement with a portable, offline-verifiable receipt of that enforcement, and
+has measured it end to end on a real operating company's live ERP — 121,374 records,
+121,366 identities masked, 485,496 fields masked, zero leaked to the model
+([Governance Report 001](https://conarium.dev/report-001.html)). If you know of another,
+open an issue and this section will be corrected.
 
 ---
 
