@@ -38,7 +38,7 @@ Kimliğin tek kaynağı. Diğer iki görev buna dayanır.
   - `export function loadTokenStore(path?: string): Map<string, string> | null` — karma → kişi id haritası; dosya yoksa `null`
   - `export function resolveActor(supplied: string, store: Map<string, string> | null, fallbackId: string): ResolvedActor`
 
-- [ ] **Step 1: Testi yaz (kırmızı)**
+- [x] **Step 1: Testi yaz (kırmızı)**
 
 `src/tokens.test.ts`:
 
@@ -95,12 +95,12 @@ describe('token deposu', () => {
 
 `readFileSync`'i import listesine ekle: `import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs'`.
 
-- [ ] **Step 2: Kırmızıyı doğrula**
+- [x] **Step 2: Kırmızıyı doğrula**
 
 Çalıştır: `npx vitest run src/tokens.test.ts`
 Beklenen: FAIL — `Cannot find module './tokens.js'`
 
-- [ ] **Step 3: Asgari uygulamayı yaz**
+- [x] **Step 3: Asgari uygulamayı yaz**
 
 `src/tokens.ts`:
 
@@ -160,17 +160,17 @@ export function resolveActor(
 }
 ```
 
-- [ ] **Step 4: Yeşili doğrula**
+- [x] **Step 4: Yeşili doğrula**
 
 Çalıştır: `npx vitest run src/tokens.test.ts`
 Beklenen: PASS (5 test)
 
-- [ ] **Step 5: Tüm takım hâlâ yeşil mi**
+- [x] **Step 5: Tüm takım hâlâ yeşil mi**
 
 Çalıştır: `npm test`
 Beklenen: 97 passed (92 mevcut + 5 yeni)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/tokens.ts src/tokens.test.ts
