@@ -41,3 +41,19 @@ conarium-audit-*.jsonl*
 conarium.config.c*.json
 AGENTS.md
 PROJECT_CONTEXT.md
+
+# Anahtar malzemesi — asla depoya girmesin.
+# 2026-07-31'de yakalandi: bir ajan calisma sirasinda tmp-test/test-key.pem
+# (Ed25519 ozel anahtari) uretti ve burasi PUBLIC repo; hicbir desen onu
+# kapsamiyordu, "git add ." demek yeterdi. Uretilen anahtar test bile olsa
+# ozel anahtarin public repoda isi yok.
+*.pem
+*.key
+*.pfx
+*.p12
+*.keystore
+*.jks
+*.pem.keyid
+# Acik anahtarlar guvenli ve testlerin ihtiyaci — istisna.
+!*.pub.pem
+!test/fixtures/**/pubkey.pem
