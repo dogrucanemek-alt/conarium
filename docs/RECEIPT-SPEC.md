@@ -91,8 +91,29 @@ implementation; institutional buyers may prefer it, but it requires trusting a T
 is disclosed — `conarium-verify --anchor-check` exits 0 with a stderr warning while
 pending, and exits 14 if the proof is missing or does not match the hash.
 
-Manual dogfood (fill after one live stamp): submitted hash = _TBD_ · `.ots` size =
-_TBD_ · upgraded block = _TBD_.
+**Manual dogfood — done 31 July 2026.** A real stamp was submitted, not simulated.
+The proof is committed at `docs/dogfood/2026-07-31-anchor.anchors.jsonl` so anyone can
+re-verify it, or upgrade it themselves with `conarium-anchor-upgrade`.
+
+| | |
+|---|---|
+| Submitted hash | `sha256:6b32ebdf4e6674b6187155a81c2b25fb71e93b5a2691d106f0cd7b5d01f2affd` |
+| Calendars reached | `a.pool.opentimestamps.org`, `b.pool.opentimestamps.org`, `a.pool.eternitywall.com`, `ots.btc.catallaxy.com` |
+| Submit latency | 2.08 s |
+| `.ots` proof size | **980 bytes** |
+| State | `pending` |
+| Upgraded block | **not yet** — see below |
+
+`upgraded block` is still empty on purpose, and this is the honest part: Bitcoin
+finality takes hours, so a stamp cannot be born confirmed. Until the sidecar is
+upgraded, backdating resistance is calendar-grade, not Bitcoin-hard — exactly what
+§Anchoring already says. Run `npx conarium-anchor-upgrade docs/dogfood/2026-07-31-anchor.anchors.jsonl`
+after the wait and this row gets a block height.
+
+What this dogfood does and does not establish: it establishes that the anchoring path
+works end to end against the real OpenTimestamps network and that the sidecar carries
+only `{seq, hash, log, ots, state, submittedAt, upgradedAt, bitcoinBlock}` — no query,
+no rows, no PII. It does not establish Bitcoin finality yet.
 
 Known gap #4 note: an external OTS anchor is the out-of-file mitigation for
 in-file `sig`/HMAC/`anchor` stripping; while `state` is `pending`, backdating
