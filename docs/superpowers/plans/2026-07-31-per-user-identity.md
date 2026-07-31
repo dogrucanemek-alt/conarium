@@ -196,7 +196,7 @@ Canlı etkisi olan parça. Halka açık olarak kabul ettiğimiz açık (*"record
 - Consumes: Task 1'den `resolveActor`, `loadTokenStore`, `ActorAssurance`.
 - Produces: `AuditEntry` artık isteğe bağlı `actor` girdisi ve `actorAssurance` alanı taşır.
 
-- [ ] **Step 1: Testi yaz (kırmızı)**
+- [x] **Step 1: Testi yaz (kırmızı)**
 
 `src/audit.actor.test.ts`:
 
@@ -231,12 +231,12 @@ describe('denetim kaydı aktörü', () => {
 
 Not: `Audit` sınıfı imzalama gerektiriyorsa test başında `process.env.CONARIUM_AUDIT_UNSIGNED = '1'` kur ve sonunda temizle — `src/audit.chain.test.ts` bu deseni kullanıyor, ona bak.
 
-- [ ] **Step 2: Kırmızıyı doğrula**
+- [x] **Step 2: Kırmızıyı doğrula**
 
 Çalıştır: `npx vitest run src/audit.actor.test.ts`
 Beklenen: FAIL — `actorAssurance` yok, `log()` `actor` kabul etmiyor
 
-- [ ] **Step 3: `AuditEntry`'ye alanı ekle**
+- [x] **Step 3: `AuditEntry`'ye alanı ekle**
 
 `src/audit.ts`, `AuditEntry` arayüzünde `actor: string` satırının hemen altına:
 
@@ -251,7 +251,7 @@ Dosyanın import bloğuna ekle:
 import type { ActorAssurance } from './tokens.js'
 ```
 
-- [ ] **Step 4: `log()` imzasını genişlet**
+- [x] **Step 4: `log()` imzasını genişlet**
 
 `src/audit.ts`, `log()` metodu — `actor`'ı Omit listesinden çıkar ve isteğe bağlı yap:
 
@@ -275,12 +275,12 @@ import type { ActorAssurance } from './tokens.js'
     }
 ```
 
-- [ ] **Step 5: Yeşili doğrula**
+- [x] **Step 5: Yeşili doğrula**
 
 Çalıştır: `npx vitest run src/audit.actor.test.ts`
 Beklenen: PASS (3 test)
 
-- [ ] **Step 6: HTTP katmanında kimliği çöz**
+- [x] **Step 6: HTTP katmanında kimliği çöz**
 
 `src/http.ts` — import ekle:
 
@@ -307,7 +307,7 @@ const TOKEN_STORE = loadTokenStore()
 
 Consumer değeri `deps.config.consumer` — `src/server.ts:51` `new Audit({ ..., consumer: config.consumer })` ile aynı kaynak. Yeni kavram uydurma.
 
-- [ ] **Step 7: Kimliği oturum sunucusuna geçir**
+- [x] **Step 7: Kimliği oturum sunucusuna geçir**
 
 Mimari kanca hazır: `src/http.ts:127` her oturum için ayrı `Server` kuruyor (`buildServer(deps)`), governance/audit ise ortak. Bir oturum tek token'la açıldığı için **kimlik oturuma sabittir** — global değişken kullanma, eşzamanlı oturumlarda kimlikler karışır.
 
@@ -345,12 +345,12 @@ grep -n "audit\.log(" src/server.ts    # once say, sonra degistir, sonra tekrar 
 
 `src/index.ts:12` (stdio modu) **değişmez** — aktör verilmez, `service` kalır. Stdio'da kişi kavramı yok.
 
-- [ ] **Step 8: Tüm takım yeşil**
+- [x] **Step 8: Tüm takım yeşil**
 
 Çalıştır: `npm test`
 Beklenen: 100 passed
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/audit.ts src/http.ts src/audit.actor.test.ts

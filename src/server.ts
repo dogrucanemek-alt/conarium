@@ -17,6 +17,7 @@ import { createConnector } from './connectors/index.js'
 import { Governance, PolicyError } from './governance.js'
 import type { GovernanceMetadata } from './governance.js'
 import { Audit } from './audit.js'
+import type { ResolvedActor } from './tokens.js'
 import { parseConariumConfig } from './config.js'
 import { capSearchResult, readGovernedSchemaResource, resolveGovernedSearchScope } from './search_policy.js'
 import { SupabaseRestConnector } from './connectors/supabase_rest.js'
@@ -69,8 +70,23 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
   return { config, governance, audit, connectors }
 }
 
-/** Build an MCP Server wired to the shared deps. One instance per transport/session. */
-export function buildServer({ config, governance, audit, connectors }: ConariumDeps): Server {
+/**
+ * Build an MCP Server wired to the shared deps. One instance per transport/session.
+ *
+ * `aktor`: bu OTURUMU açan kişi. Oturum tek token'la açıldığı için kimlik oturum
+ * boyunca sabittir. Bilerek parametre — modül seviyesinde bir global kullanmak
+ * eşzamanlı oturumlarda kimlikleri birbirine karıştırırdı ve denetim kaydı
+ * yanlış kişiyi suçlardı. Verilmezse davranış eskisi gibi (consumer).
+ */
+export function buildServer(
+  { config, governance, audit, connectors }: ConariumDeps,
+  aktor?: ResolvedActor,
+): Server {
+  // Oturumun kimliğini her denetim satırına TEK yerden geçir: audit.log çağrısı
+  // bu dosyada 8+ yerde ve tek tek alan eklemek er geç birinde unutulur.
+  const kaydet: typeof audit.log = (e) =>
+    audit.log(aktor ? { ...e, actor: aktor.id, actorAssurance: aktor.assurance } : e)
+
   const server = new Server(
     {
       name: config.serverName || 'Conarium',
@@ -168,7 +184,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
         const listed: Array<{ connector: string; name: string; description: string; rowCount?: number }> = []
         for (const conn of targets) {
           const tables = governance.filterTables(await conn.listTables())
-          audit.log({ tool: 'list_tables', target: conn.name, rowsReturned: tables.length, denied: false })
+          kaydet({ tool: 'list_tables', target: conn.name, rowsReturned: tables.length, denied: false })
           for (const t of tables) {
             listed.push({
               connector: conn.name,
@@ -187,11 +203,11 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
         const a = args as { table: string; connector?: string }
         const conn = getConnector(a.connector, 'canDescribeTable')
         if (!governance.allowsTable(a.table)) {
-          audit.log({ tool: 'describe_table', target: a.table, args: a, denied: true, reason: 'policy' })
+          kaydet({ tool: 'describe_table', target: a.table, args: a, denied: true, reason: 'policy' })
           throw new PolicyError(`Access to table '${a.table}' is not permitted by policy.`)
         }
         const table = await conn.describeTable(a.table)
-        audit.log({ tool: 'describe_table', target: a.table, args: a, denied: false })
+        kaydet({ tool: 'describe_table', target: a.table, args: a, denied: false })
         return {
           content: [{ type: 'text', text: JSON.stringify(table, null, 2) }],
         }
@@ -212,7 +228,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
           try {
             parsed = conn.parseSimpleSelect(a.sql)
           } catch (err) {
-            audit.log({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message })
+            kaydet({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message })
             throw err
           }
           // Sema konnektorun yapilandirmasindan gelir — sabit 'zion' varsayimi baska semali
@@ -220,7 +236,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
           const schema = conn.schemaName
           const qualified = `${schema}.${parsed.table}`
           if (!governance.allowsTable(qualified)) {
-            audit.log({ tool: 'query', target: qualified, args: a, denied: true, reason: 'policy' })
+            kaydet({ tool: 'query', target: qualified, args: a, denied: true, reason: 'policy' })
             throw new PolicyError(`Access to table '${qualified}' is not permitted by policy.`)
           }
           const lim = Math.min(parsed.limit, governance.maxRows())
@@ -242,7 +258,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
             guardMetadata = res.metadata
           } catch (err) {
             const policyMetadata = err instanceof PolicyError ? err.metadata : undefined
-            audit.log({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message, governance: policyMetadata })
+            kaydet({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message, governance: policyMetadata })
             throw err
           }
           result = governance.redact(await conn.query(guardedSql), aliases, guardMetadata)
@@ -262,7 +278,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
 
         if (Buffer.byteLength(responseJson, 'utf8') > 50000) {
           const limitErr = new Error('Response payload exceeds 50KB limit. Aggregation or massive row detected.')
-          audit.log({
+          kaydet({
             tool: 'query',
             target: conn.name,
             args: { sql: a.sql },
@@ -273,7 +289,7 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
           throw limitErr
         }
 
-        audit.log({
+        kaydet({
           tool: 'query',
           target: conn.name,
           args: { sql: a.sql },
@@ -296,13 +312,13 @@ export function buildServer({ config, governance, audit, connectors }: ConariumD
         try {
           requested = await resolveGovernedSearchScope(conn, governance, a.query, a.tables)
         } catch (err) {
-          audit.log({ tool: 'search', target: conn.name, args: a, denied: true, reason: (err as Error).message })
+          kaydet({ tool: 'search', target: conn.name, args: a, denied: true, reason: (err as Error).message })
           throw err
         }
 
         const capped = capSearchResult(await conn.search(a.query, requested), governance.maxRows())
         const result = governance.redact(capped)
-        audit.log({ tool: 'search', target: conn.name, args: a, rowsReturned: result.rowCount, denied: false })
+        kaydet({ tool: 'search', target: conn.name, args: a, rowsReturned: result.rowCount, denied: false })
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         }

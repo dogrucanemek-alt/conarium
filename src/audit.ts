@@ -10,10 +10,13 @@ import {
   type VerifyKey,
   type KeyId,
 } from './keys.js'
+import type { ActorAssurance } from './tokens.js'
 
 export interface AuditEntry {
   timestamp: string
   actor: string
+  /** Kimliğin nasıl kurulduğu. Artefakt kimi değil, NASIL bilindiğini de taşır. */
+  actorAssurance?: ActorAssurance
   tool: string
   args?: any
   source?: string
@@ -142,13 +145,23 @@ export class Audit {
     }
   }
 
-  log(entry: Omit<AuditEntry, 'timestamp' | 'actor' | 'prevHash' | 'hash'>): AuditEntry {
+  log(
+    entry: Omit<AuditEntry, 'timestamp' | 'actor' | 'prevHash' | 'hash'> & {
+      /** Erişimi yapan kişi. Verilmezse örnek başına sabit consumer kullanılır. */
+      actor?: string
+      actorAssurance?: ActorAssurance
+    },
+  ): AuditEntry {
     this.requireSigningCapability()
 
     const full: AuditEntry = {
       timestamp: new Date().toISOString(),
-      actor: this.consumer,
       ...entry,
+      // Yayılımdan SONRA ve açıkça: eskiden `actor: this.consumer` yayılımın
+      // ÖNÜNDEYDİ, yani çağıran aktörü sessizce ezebiliyordu (tipte yasak,
+      // çalışma zamanında serbest). Varsayılan artık belirsizliğe bırakılmıyor.
+      actor: entry.actor ?? this.consumer,
+      actorAssurance: entry.actorAssurance ?? 'shared-token',
     }
 
     if (full.args) {

@@ -20,11 +20,14 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { loadConfig, bootDeps, buildServer } from './server.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
+import { loadTokenStore, resolveActor } from './tokens.js'
 
 const PORT = Number(process.env.CONARIUM_MCP_PORT || 8791)
 const HOST = process.env.CONARIUM_MCP_HOST || '127.0.0.1'
 const TOKEN = process.env.CONARIUM_MCP_TOKEN || ''
 const RATE_PER_MIN = Number(process.env.CONARIUM_MCP_RATE_PER_MIN || 0)
+// Bir kez yuklenir; dosya yoksa null = kisi bazli kimlik kapali (davranis birebir eski).
+const TOKEN_STORE = loadTokenStore()
 
 function tokenOk(supplied: string): boolean {
   if (!supplied) return false
@@ -84,7 +87,11 @@ async function main() {
       }
       const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
       const supplied = pathMatch ? decodeURIComponent(pathMatch[1]) : bearer
-      if (!tokenOk(supplied)) {
+      // Kimlik: kişiye özel token eşleşirse o kişi, yoksa paylaşılan token.
+      // İkisi de tutmuyorsa 401 — kişi bazlı kimlik yetkiyi GENİŞLETMEZ, sadece
+      // kimin geçtiğini adlandırır. Eşleşmeyen token hâlâ kapıda kalır.
+      const kisi = resolveActor(supplied, TOKEN_STORE, deps.config.consumer ?? 'unknown')
+      if (!kisi.isUser && !tokenOk(supplied)) {
         res.writeHead(401, { 'content-type': 'text/plain' }).end('unauthorized')
         return
       }
@@ -124,7 +131,7 @@ async function main() {
       transport.onclose = () => {
         if (transport.sessionId) transports.delete(transport.sessionId)
       }
-      const server = buildServer(deps)   // oturum başına Server; connectors/governance/audit ORTAK
+      const server = buildServer(deps, kisi)   // oturum başına Server + oturumun kimligi; connectors/governance/audit ORTAK
       await server.connect(transport)
       await transport.handleRequest(req, res, body)
     } catch (err) {
