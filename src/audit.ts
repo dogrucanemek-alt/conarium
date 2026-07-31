@@ -16,6 +16,7 @@ import {
   hashArgs,
   RECEIPT_GENESIS_HASH,
   type Receipt,
+  type ReceiptDataRef,
   type ReceiptInput,
 } from './receipt.js'
 import type { GovernanceMetadata } from './governance.js'
@@ -61,15 +62,27 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
       ? 'partial'
       : 'allow'
 
-  const dataRefs = (g.accessedTables ?? []).map((t) => {
+  // dataRefs — makbuzun dokunduğu nesneler. Kaynak ARACA GÖRE değişir:
+  //  - query:   governance.accessedTables (SQL ayrıştırıcısı doldurur)
+  //  - search:  governance.accessedTables (server.ts sonuç satırlarındaki _table'dan doldurur)
+  //  - describe_table: entry.target zaten nesnenin ta kendisi → doğrudan kullan
+  //  - list_tables:    sema listeleme, veri nesnesi erişimi DEĞİL → boş kalması doğru
+  // Tek kaynağa (accessedTables) bağlı kalmak describe_table/search'i boş bırakıp
+  // kapsama beyanını yanlış "kaydedilmedi" demeye itiyordu — bu kusurun tekrarını
+  // önlemek için nesne kaynağı araca göre seçilir.
+  const dataRefs: ReceiptDataRef[] = []
+  const seenObjects = new Set<string>()
+  for (const t of g.accessedTables ?? []) {
+    if (seenObjects.has(t)) continue
+    seenObjects.add(t)
     const prefix = `${t}.`
     const fields = (g.maskedFields ?? []).filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length))
-    return {
-      source: entry.source ?? 'unknown',
-      object: t,
-      fieldsRequested: fields,
-    }
-  })
+    dataRefs.push({ source: entry.source ?? 'unknown', object: t, fieldsRequested: fields })
+  }
+  if (entry.tool === 'describe_table' && entry.target && !seenObjects.has(entry.target)) {
+    seenObjects.add(entry.target)
+    dataRefs.push({ source: entry.source ?? 'unknown', object: entry.target, fieldsRequested: [] })
+  }
 
   return {
     period: { start: entry.timestamp, end: entry.timestamp },

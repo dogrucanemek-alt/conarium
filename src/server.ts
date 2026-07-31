@@ -327,7 +327,22 @@ export function buildServer(
 
         const capped = capSearchResult(await conn.search(a.query, requested), governance.maxRows())
         const result = governance.redact(capped)
-        kaydet({ tool: 'search', target: conn.name, args: a, rowsReturned: result.rowCount, denied: false })
+        // Arama sonucunun GERÇEKTEN dokunduğu tabloları satırlardaki _table'dan topla.
+        // entry.target konnektör adıdır (tablo değil) — onu makbuza nesne olarak yazmak
+        // yanlış veri olur. Sonuç satırları _table taşıyorsa onları kaydet; taşımıyorsa
+        // boş bırak (kapsama "bilinmiyor" sayacına düşer — uydurma yok).
+        const searchTables = [...new Set(result.rows.map((r) => (r as Record<string, unknown>)._table).filter(Boolean))] as string[]
+        const searchGovernance = searchTables.length
+          ? { ...result.governance, accessedTables: searchTables }
+          : result.governance
+        kaydet({
+          tool: 'search',
+          target: conn.name,
+          args: a,
+          rowsReturned: result.rowCount,
+          denied: false,
+          governance: searchGovernance,
+        })
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         }

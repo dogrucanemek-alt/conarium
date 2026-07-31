@@ -22,6 +22,7 @@
   "bin": {
     "conarium": "./dist/index.js",
     "conarium-verify": "./bin/conarium-verify.mjs",
+    "conarium-coverage": "./bin/conarium-coverage.mjs",
     "conarium-anchor-upgrade": "./bin/conarium-anchor-upgrade.mjs"
   },
   "scripts": {
