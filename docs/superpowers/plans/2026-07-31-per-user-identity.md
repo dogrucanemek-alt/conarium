@@ -558,7 +558,7 @@ Spec §8'in doğrulayıcı tarafı ve "hiçbir şey değişmedi" garantisi. Task
 - Consumes: Task 3'ten `RECEIPT_V2` şeması ve `bin/conarium-verify.mjs` çıkış kodları.
 - Produces: yok (yalnız test).
 
-- [ ] **Step 1: Doğrulayıcı şema testlerini yaz**
+- [x] **Step 1: Doğrulayıcı şema testlerini yaz**
 
 `test/verify_actor.test.mjs` — doğrulayıcıyı alt süreç olarak koşturup **çıkış kodunu** ölçer (kütüphaneyi değil, gerçek CLI'yi test eder):
 
@@ -602,12 +602,12 @@ describe('dogrulayici aktor semasi', () => {
 
 `v2Receipt(actor)` yardımcısını dosyanın başında yaz: `buildReceipt` ile geçerli bir makbuz üret, sonra `actor` alanını verilen değerle **değiştir**. Uyarı: imza `chain.hash` üzerinden atıldığı için elle bozulan makbuz imza kontrolünden de düşebilir; bu testler **imzasız** makbuzla koşulmalı (`CONARIUM_AUDIT_UNSIGNED=1`) ki ölçülen şey şema olsun, imza olmasın.
 
-- [ ] **Step 2: Kırmızıyı doğrula**
+- [x] **Step 2: Kırmızıyı doğrula**
 
 Çalıştır: `npx vitest run test/verify_actor.test.mjs`
 Beklenen: Task 3 yapılmadıysa hepsi FAIL; yapıldıysa geçer.
 
-- [ ] **Step 3: Geriye uyum parite testini yaz**
+- [x] **Step 3: Geriye uyum parite testini yaz**
 
 Aynı dosyaya ekle — spec §8/8: token dosyası yokken hiçbir şey değişmemeli.
 
@@ -624,7 +624,7 @@ describe('geriye uyum', () => {
 })
 ```
 
-- [ ] **Step 4: 401 yolunu test et**
+- [x] **Step 4: 401 yolunu test et**
 
 Spec §8/6: depo varken bilinmeyen token kimlik üretmemeli **ve** istek reddedilmeli. Bunu `src/tokens.test.ts`'e ek olarak HTTP seviyesinde doğrula — `src/http.ts` içindeki kontrolün gerçekten 401 döndürdüğünü kanıtla. Mevcut HTTP testi yoksa **bu adımı atlama**, `resolveActor` + `tokenOk` bileşiminin 401 verdiğini birim seviyede kanıtla:
 
@@ -637,12 +637,12 @@ it('depo varken bilinmeyen token ne kimlik uretir ne gecer', () => {
 })
 ```
 
-- [ ] **Step 5: Tüm takım yeşil**
+- [x] **Step 5: Tüm takım yeşil**
 
 Çalıştır: `npm test`
 Beklenen: hepsi geçiyor, v0.1 fixture'ları dahil.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add test/verify_actor.test.mjs
