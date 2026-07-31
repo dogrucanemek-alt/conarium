@@ -33,6 +33,12 @@ export interface AuditConfig {
   /** Append-only JSONL file path. If unset, audit goes to stderr only. */
   sink?: string
   failClosed?: boolean
+  /** Optional: append-only JSONL file for verifiable access receipts. If unset, no receipts are produced. */
+  receiptSink?: string
+  /** Model identification for receipts (provider/name/version). */
+  receiptModel?: { provider: string; name: string; version: string }
+  /** Client identification for receipts (name/version). */
+  receiptClient?: { name: string; version: string }
 }
 
 export interface ConnectorConfig {

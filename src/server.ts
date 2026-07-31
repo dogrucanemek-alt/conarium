@@ -49,7 +49,16 @@ export function loadConfig(): ConariumConfig {
 /** Connect all configured connectors once (shared across sessions in HTTP mode). */
 export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
   const governance = new Governance(config.policy)
-  const audit = new Audit({ sink: config.audit?.sink, consumer: config.consumer, failClosed: config.audit?.failClosed })
+  const audit = new Audit({
+    sink: config.audit?.sink,
+    consumer: config.consumer,
+    failClosed: config.audit?.failClosed,
+    receiptSink: config.audit?.receiptSink,
+    receiptMeta:
+      config.audit?.receiptModel && config.audit?.receiptClient
+        ? { model: config.audit.receiptModel, client: config.audit.receiptClient }
+        : undefined,
+  })
   const connectors: Connector[] = []
 
   for (const cfg of config.connectors) {
