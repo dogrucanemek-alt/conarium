@@ -101,14 +101,17 @@ re-verify it, or upgrade it themselves with `conarium-anchor-upgrade`.
 | Calendars reached | `a.pool.opentimestamps.org`, `b.pool.opentimestamps.org`, `a.pool.eternitywall.com`, `ots.btc.catallaxy.com` |
 | Submit latency | 2.08 s |
 | `.ots` proof size | **980 bytes** |
-| State | `pending` |
-| Upgraded block | **not yet** — see below |
+| State | `bitcoin` |
+| Upgraded block | **960327** (upgraded 2026-07-31T09:20:23Z) |
 
-`upgraded block` is still empty on purpose, and this is the honest part: Bitcoin
-finality takes hours, so a stamp cannot be born confirmed. Until the sidecar is
-upgraded, backdating resistance is calendar-grade, not Bitcoin-hard — exactly what
-§Anchoring already says. Run `npx conarium-anchor-upgrade docs/dogfood/2026-07-31-anchor.anchors.jsonl`
-after the wait and this row gets a block height.
+The stamp was born `pending` and stayed that way for about ten hours, which is the
+honest part: Bitcoin finality takes hours, so a stamp cannot be born confirmed. During
+that window backdating resistance was calendar-grade, not Bitcoin-hard — exactly what
+§Anchoring says. `npx conarium-anchor-upgrade docs/dogfood/2026-07-31-anchor.anchors.jsonl`
+then collected attestations from three of the four calendars (eternitywall timed out;
+three are sufficient) and wrote the block height above. From this point the claim
+"these records were not created after block 960327" is verifiable by anyone, against
+Bitcoin, without trusting us.
 
 What this dogfood does and does not establish: it establishes that the anchoring path
 works end to end against the real OpenTimestamps network and that the sidecar carries
