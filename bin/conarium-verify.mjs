@@ -25,7 +25,8 @@ import { createRequire } from 'module'
 
 const require = createRequire(import.meta.url)
 
-const RECEIPT_VERSION = 'conarium-receipt/0.1'
+const RECEIPT_V1 = 'conarium-receipt/0.1'
+const RECEIPT_V2 = 'conarium-receipt/0.2'
 const GENESIS = 'sha256:0000000000000000000000000000000000000000000000000000000000000000'
 
 // ─── JCS subset (must match src/receipt.ts canonicalize) ─────────────────────
@@ -266,20 +267,34 @@ function loadReceipts(target) {
 
 function schemaOk(r) {
   if (!r || typeof r !== 'object') return 'not an object'
-  if (r.v !== RECEIPT_VERSION) return `unsupported version ${r.v}`
+  if (r.v !== RECEIPT_V1 && r.v !== RECEIPT_V2) return `unsupported version ${r.v}`
   if (typeof r.id !== 'string' || !r.id) return 'missing id'
   if (typeof r.ts !== 'string') return 'missing ts'
   if (!r.chain || typeof r.chain !== 'object') return 'missing chain'
   if (!Number.isInteger(r.chain.seq)) return 'chain.seq not integer'
   if (typeof r.chain.prevHash !== 'string') return 'missing chain.prevHash'
   if (typeof r.chain.hash !== 'string') return 'missing chain.hash'
+  // Her iki surumde de null olmali; undefined sema kaymasi sayilir -> 20.
+  // (Riza baglama gelecek bir surumun isi, v0.2'nin degil.)
   if (r.consentRef !== null && r.consentRef !== undefined) {
-    // v0.1: must be null if present; undefined treated as schema drift → 20
-    if (r.consentRef !== null) return 'consentRef must be null in v0.1'
+    return 'consentRef must be null'
   }
   if (!('consentRef' in r)) return 'missing consentRef (must be null)'
   if (!('anchor' in r)) return 'missing anchor field'
-  if (!r.actor || r.actor.type !== 'service') return 'actor.type must be "service" in v0.1'
+  // v0.1: aktör "service" olmak zorunda (degismedi — eski makbuzlar aynen dogrulanir)
+  if (r.v === RECEIPT_V1) {
+    if (!r.actor || r.actor.type !== 'service') return 'actor.type must be "service" in v0.1'
+  } else {
+    if (!r.actor || (r.actor.type !== 'service' && r.actor.type !== 'user')) {
+      return 'actor.type must be "service" or "user" in v0.2'
+    }
+    if (typeof r.actor.assurance !== 'string' || !r.actor.assurance) {
+      return 'actor.assurance is required in v0.2'
+    }
+    if (r.actor.type === 'user' && r.actor.assurance === 'shared-token') {
+      return 'actor.type "user" cannot carry assurance "shared-token"'
+    }
+  }
   return null
 }
 

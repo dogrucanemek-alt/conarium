@@ -377,7 +377,7 @@ Artefaktın kendisi. **En kritik testi ilk sırada:** eski v0.1 makbuzları hâl
 - Consumes: Task 1'den `ActorAssurance`.
 - Produces: `RECEIPT_VERSION = 'conarium-receipt/0.2'`; `ReceiptActor` artık `assurance` taşır; `ReceiptInput.actor` artık `{ id: string; type?: ActorType; assurance?: ActorAssurance }`.
 
-- [ ] **Step 1: Testi yaz (kırmızı)**
+- [x] **Step 1: Testi yaz (kırmızı)**
 
 `src/receipt.actor.test.ts`:
 
@@ -415,12 +415,12 @@ describe('makbuz v0.2 aktörü', () => {
 
 Test imzasız makbuz üretiyorsa `process.env.CONARIUM_AUDIT_UNSIGNED = '1'` kur; `src/receipt.leak.test.ts` bu deseni kullanıyor.
 
-- [ ] **Step 2: Kırmızıyı doğrula**
+- [x] **Step 2: Kırmızıyı doğrula**
 
 Çalıştır: `npx vitest run src/receipt.actor.test.ts`
 Beklenen: FAIL — sürüm 0.1, `assurance` yok
 
-- [ ] **Step 3: Şemayı ve sürümü güncelle**
+- [x] **Step 3: Şemayı ve sürümü güncelle**
 
 `src/receipt.ts`:
 
@@ -451,7 +451,7 @@ export interface ReceiptActor {
 import type { ActorAssurance } from './tokens.js'
 ```
 
-- [ ] **Step 4: `buildReceipt`'i güncelle**
+- [x] **Step 4: `buildReceipt`'i güncelle**
 
 Satır ~255'teki sabit satırı değiştir:
 
@@ -482,12 +482,12 @@ function buildActor(a: { id: string; type?: ActorType; assurance?: ActorAssuranc
 
 Ayrıca satır ~229'daki artık yanlış olan yorumu güncelle: `actor.type is always "service" in v0.1` → v0.2 kuralını anlat.
 
-- [ ] **Step 5: Yeşili doğrula**
+- [x] **Step 5: Yeşili doğrula**
 
 Çalıştır: `npx vitest run src/receipt.actor.test.ts`
 Beklenen: PASS (4 test)
 
-- [ ] **Step 6: Doğrulayıcıyı iki sürüme aç**
+- [x] **Step 6: Doğrulayıcıyı iki sürüme aç**
 
 `bin/conarium-verify.mjs` satır 28:
 
@@ -517,7 +517,7 @@ const RECEIPT_V2 = 'conarium-receipt/0.2'
   }
 ```
 
-- [ ] **Step 7: Doğrulayıcı regresyonunu koş — EN KRİTİK ADIM**
+- [x] **Step 7: Doğrulayıcı regresyonunu koş — EN KRİTİK ADIM**
 
 Çalıştır: `npm test`
 Beklenen: mevcut OTS fixture testleri (`test/fixtures/ots/`) **hâlâ geçiyor**. Bunlar v0.1 makbuzları; kırılırsa kendi geçmişimizi bozmuşuz demektir ve devam edilmez.
@@ -529,7 +529,7 @@ node bin/conarium-verify.mjs test/fixtures/ots/receipts.jsonl --pubkey test/fixt
 ```
 Beklenen: çıkış 0 (fixture adları farklıysa `test/fixtures/ots/` içeriğine bak).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/receipt.ts bin/conarium-verify.mjs src/receipt.actor.test.ts

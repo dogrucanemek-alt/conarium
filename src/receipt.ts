@@ -1,11 +1,13 @@
 /**
- * Conarium Receipt v0.1 — schema, canonicalize (JCS subset), hash, sign.
+ * Conarium Receipt v0.2 — schema, canonicalize (JCS subset), hash, sign.
+ * v0.1 receipts remain verifiable forever; the verifier accepts both.
  * Spec: docs/superpowers/specs/2026-07-29-conarium-receipt-design.md §4
  */
 import { createHash, randomBytes } from 'crypto'
 import { type SigningKey, signHash } from './keys.js'
+import type { ActorAssurance } from './tokens.js'
 
-export const RECEIPT_VERSION = 'conarium-receipt/0.1' as const
+export const RECEIPT_VERSION = 'conarium-receipt/0.2' as const
 
 export type ActorType = 'service' | 'user'
 export type PolicyDecision = 'allow' | 'deny' | 'partial'
@@ -14,6 +16,8 @@ export type OutcomeStatus = 'complete' | 'error' | 'denied'
 export interface ReceiptActor {
   type: ActorType
   id: string
+  /** Kimliğin nasıl kurulduğu — makbuz kimi değil, NASIL bilindiğini de taşır. */
+  assurance: ActorAssurance
 }
 
 export interface ReceiptModel {
@@ -97,12 +101,12 @@ export interface Receipt {
   anchor: ReceiptAnchor | null
 }
 
-/** Input for buildReceipt — no chain/hash/sig/anchor; actor.type forced to service. */
+/** Input for buildReceipt — no chain/hash/sig/anchor. */
 export interface ReceiptInput {
   id?: string
   ts?: string
   period: { start: string; end: string }
-  actor: { id: string }
+  actor: { id: string; type?: ActorType; assurance?: ActorAssurance }
   model: ReceiptModel
   client: ReceiptClient
   request: ReceiptRequest
@@ -225,9 +229,26 @@ function assertSigningAllowed(key: SigningKey | null): void {
 }
 
 /**
+ * Kanıtsız kişi iddiasını YAPISAL olarak imkânsız kılar: 'user' yalnızca
+ * doğrulanmış bir güvenceyle yazılabilir. Bu kural yorum değil, kod olmalı —
+ * yorum bir sonraki değişiklikte unutulur.
+ */
+function buildActor(a: { id: string; type?: ActorType; assurance?: ActorAssurance }): ReceiptActor {
+  const assurance: ActorAssurance = a.assurance ?? 'shared-token'
+  const type: ActorType = a.type ?? 'service'
+  if (type === 'user' && assurance === 'shared-token') {
+    throw new Error(
+      'buildReceipt: actor.type "user" cannot be claimed with assurance "shared-token" — ' +
+        'a person may only be named when a per-user credential was verified',
+    )
+  }
+  return { type, id: a.id, assurance }
+}
+
+/**
  * Build a signed (or explicitly unsigned) receipt.
- * actor.type is always "service" in v0.1 — never emit "user".
- * consentRef is always null (reserved for v0.2).
+ * consentRef is always null — reserved for consent binding (ISO/IEC TS 27560),
+ * which is NOT part of v0.2. Naming it "v0.2" was wrong once v0.2 shipped.
  * seq must be provided via chain and is written as-is (caller owns monotonicity).
  */
 export function buildReceipt(
@@ -252,7 +273,7 @@ export function buildReceipt(
     id: input.id ?? ulid(),
     ts,
     period: input.period,
-    actor: { type: 'service', id: input.actor.id },
+    actor: buildActor(input.actor),
     model: input.model,
     client: input.client,
     request: input.request,
