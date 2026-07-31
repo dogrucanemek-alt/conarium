@@ -60,7 +60,7 @@ Fail-closed: if the verifier is unsure, it does not exit 0.
 
 ## Known gaps (documented, not hidden)
 
-1. **`actor` is a service identity in v0.1**, not a natural person. Per-user OAuth is Layer 2. Until then, marketing must not claim "who accessed".
+1. **`actor` is a service identity unless per-user tokens are configured.** With a token file (`CONARIUM_TOKENS_FILE`, default `conarium.tokens.json`), the audit line and the receipt name the individual and set `assurance: "per-user-token"`. Without it the actor is the connecting service, with `assurance: "shared-token"`. This is an operator-managed token map — **not** OAuth or SSO; there is no identity-provider integration, so the assurance is only as good as the operator's token hygiene. For shared-token deployments, marketing must not claim "who accessed".
 2. **No bypass detection.** Disabling Conarium and reading the DB directly produces no receipt; the chain still looks healthy. Coverage proofs (v0.2) partially address this against a declared schema.
 3. **Creation-time truth is not proven.** Without hardware attestation, an operator can still write false-but-well-formed receipts *before* anchoring.
 4. **In-file `sig` stripping + HMAC/`anchor` reduction.** Content `hash` is computed with `{hash, sig, anchor}` (and audit `signature`/`sig`) excluded, so an operator who controls the file can drop or thin those fields without invalidating the content hash itself. Contiguity and the trust store catch some boot-time cases, but full protection against in-file strip/reduce games is **not solvable in-file** (*in-file çözülemez*) — it needs an external transparency-log anchor and/or out-of-band key ceremony. **Mitigation available today, measured:** keep `CONARIUM_AUDIT_HMAC_KEY` enabled alongside Ed25519. HMAC is keyed, so an actor who strips `sig` and recomputes the unkeyed hashes still fails the HMAC check (`entry signature mismatch`). Verified by test: Ed25519 alone → strip-all passes the boot check; Ed25519 + HMAC → caught. `conarium-verify --pubkey` also catches it (exit 13, `missing sig`) because it is told to expect signatures. **Anchor is available** (`CONARIUM_ANCHOR_SINK=opentimestamps`) but starts as `pending` — Bitcoin finality is delayed (hours); see §Anchoring.
@@ -101,14 +101,17 @@ re-verify it, or upgrade it themselves with `conarium-anchor-upgrade`.
 | Calendars reached | `a.pool.opentimestamps.org`, `b.pool.opentimestamps.org`, `a.pool.eternitywall.com`, `ots.btc.catallaxy.com` |
 | Submit latency | 2.08 s |
 | `.ots` proof size | **980 bytes** |
-| State | `pending` |
-| Upgraded block | **not yet** — see below |
+| State | `bitcoin` |
+| Upgraded block | **960327** (upgraded 2026-07-31T09:20:23Z) |
 
-`upgraded block` is still empty on purpose, and this is the honest part: Bitcoin
-finality takes hours, so a stamp cannot be born confirmed. Until the sidecar is
-upgraded, backdating resistance is calendar-grade, not Bitcoin-hard — exactly what
-§Anchoring already says. Run `npx conarium-anchor-upgrade docs/dogfood/2026-07-31-anchor.anchors.jsonl`
-after the wait and this row gets a block height.
+The stamp was born `pending` and stayed that way for about ten hours, which is the
+honest part: Bitcoin finality takes hours, so a stamp cannot be born confirmed. During
+that window backdating resistance was calendar-grade, not Bitcoin-hard — exactly what
+§Anchoring says. `npx conarium-anchor-upgrade docs/dogfood/2026-07-31-anchor.anchors.jsonl`
+then collected attestations from three of the four calendars (eternitywall timed out;
+three are sufficient) and wrote the block height above. From this point the claim
+"these records were not created after block 960327" is verifiable by anyone, against
+Bitcoin, without trusting us.
 
 What this dogfood does and does not establish: it establishes that the anchoring path
 works end to end against the real OpenTimestamps network and that the sidecar carries
