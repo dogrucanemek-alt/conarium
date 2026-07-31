@@ -272,6 +272,22 @@ export class Governance {
   maskPII(obj: unknown): { masked: unknown, count: number } {
     if (!obj) return { masked: obj, count: 0 };
 
+    // SAYISAL PII (NEO guvenlik taramasi, 2026-07-31 — deneysel dogrulandi).
+    // Maskeleme yalnizca string ve object dallarinda calisiyordu; number/bigint
+    // hicbir kontrolden gecmeden HAM donuyordu. Olculen sonuc:
+    //   tckn_metin "12345678901" -> [MASKED_PII]   ·  tckn_sayi 12345678901 -> SIZDI
+    // Turkiye'de TCKN ve telefonun bigint tutulmasi yaygin; bu teorik degil.
+    //
+    // Sayi metne cevrilip AYNI desenlerden geciriliyor — ayri bir "hangi sayi
+    // PII'dir" kural seti tutmak ikinci bir kaynak yaratir ve biri bayatlar.
+    // Desen tutmazsa sayi TIPI KORUNARAK aynen doner: id/adet/fiyat/yil bozulmaz.
+    // Bilinerek kabul edilen yanlis pozitif: 10, 11 veya 13-16 haneli bir siparis
+    // numarasi da maskelenir. Maskeleme urununde guvenli yon budur.
+    if (typeof obj === 'number' || typeof obj === 'bigint') {
+      const sonuc = this.maskPII(String(obj));
+      return sonuc.count > 0 ? sonuc : { masked: obj, count: 0 };
+    }
+
     if (typeof obj === 'string') {
       let count = 0;
       let masked = obj;
