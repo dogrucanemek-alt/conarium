@@ -45,7 +45,11 @@ const sahteKonnektor: Connector = {
 function depsKur(audit: Audit): ConariumDeps {
   return {
     config: { serverName: 'test', consumer: 'conarium_c2', connectors: [] } as ConariumDeps['config'],
-    governance: new Governance({}),
+    // Konnektörler v0.3'ten beri fail-closed: boş politika artık hiçbir
+    // konnektöre erişemez. Bu testin konusu aktör kimliğinin denetim satırına
+    // ulaşması; konnektörü açıkça izinli yapmak konuyu değiştirmez, sadece
+    // testi yeni varsayılana göre kurar.
+    governance: new Governance({ allowConnectors: [sahteKonnektor.name] }),
     audit,
     connectors: [sahteKonnektor],
   }

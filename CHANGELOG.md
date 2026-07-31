@@ -12,6 +12,18 @@
 
 ### Changed
 
+- **BREAKING — Connectors are fail-closed (v0.3).** `policy.allowConnectors` is
+  now a strict allow-list: if it is missing or empty, **no** connector is
+  permitted (previously an empty list meant "allow all"). This matches the
+  existing default-deny posture of `allowTables` — the product's stated position
+  is "Nothing is allowed unless you allow it", and the connector path was the one
+  exception that contradicted it. `bootDeps` now refuses to start when connectors
+  are configured but `allowConnectors` is empty, naming the missing field and the
+  connectors it should list — so an operator blames the changed default, not
+  their own policy. **Migration:** add `policy.allowConnectors: ["connector1", "connector2"]`
+  to your config (or remove the connectors). `denyConnectors` still takes
+  precedence over `allowConnectors`.
+
 - Audit signing is **fail-closed**: without `CONARIUM_AUDIT_HMAC_KEY` or
   `CONARIUM_AUDIT_SIGNING_KEY`, writes throw unless `CONARIUM_AUDIT_UNSIGNED=1`
   is set explicitly (was: silent skip). Capability is checked at **construction**

@@ -48,8 +48,31 @@ export function loadConfig(): ConariumConfig {
 
 /** Connect all configured connectors once (shared across sessions in HTTP mode). */
 export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
+  // `allowsConnector` is fail-closed as of v0.3. Without this guard the symptom
+  // would be a server that starts fine and answers every request with "not
+  // permitted" — the operator would blame their policy, not a changed default.
+  // Name the missing field and the connectors it should list.
+  const allowList = config.policy?.allowConnectors
+  if (config.connectors.length > 0 && (!allowList || allowList.length === 0)) {
+    const names = config.connectors.map((c) => c.name).join('", "')
+    throw new Error(
+      `Conarium: ${config.connectors.length} connector(s) are configured but policy.allowConnectors is empty. ` +
+        `Connectors are fail-closed as of v0.3 (previously an empty list meant "allow all"). ` +
+        `Add policy.allowConnectors: ["${names}"] to your config, or remove the connectors.`,
+    )
+  }
+
   const governance = new Governance(config.policy)
-  const audit = new Audit({ sink: config.audit?.sink, consumer: config.consumer, failClosed: config.audit?.failClosed })
+  const audit = new Audit({
+    sink: config.audit?.sink,
+    consumer: config.consumer,
+    failClosed: config.audit?.failClosed,
+    receiptSink: config.audit?.receiptSink,
+    receiptMeta:
+      config.audit?.receiptModel && config.audit?.receiptClient
+        ? { model: config.audit.receiptModel, client: config.audit.receiptClient }
+        : undefined,
+  })
   const connectors: Connector[] = []
 
   for (const cfg of config.connectors) {
@@ -318,7 +341,22 @@ export function buildServer(
 
         const capped = capSearchResult(await conn.search(a.query, requested), governance.maxRows())
         const result = governance.redact(capped)
-        kaydet({ tool: 'search', target: conn.name, args: a, rowsReturned: result.rowCount, denied: false })
+        // Arama sonucunun GERÇEKTEN dokunduğu tabloları satırlardaki _table'dan topla.
+        // entry.target konnektör adıdır (tablo değil) — onu makbuza nesne olarak yazmak
+        // yanlış veri olur. Sonuç satırları _table taşıyorsa onları kaydet; taşımıyorsa
+        // boş bırak (kapsama "bilinmiyor" sayacına düşer — uydurma yok).
+        const searchTables = [...new Set(result.rows.map((r) => (r as Record<string, unknown>)._table).filter(Boolean))] as string[]
+        const searchGovernance = searchTables.length
+          ? { ...result.governance, accessedTables: searchTables }
+          : result.governance
+        kaydet({
+          tool: 'search',
+          target: conn.name,
+          args: a,
+          rowsReturned: result.rowCount,
+          denied: false,
+          governance: searchGovernance,
+        })
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         }

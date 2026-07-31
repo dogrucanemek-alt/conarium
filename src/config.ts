@@ -17,6 +17,16 @@ export const GovernancePolicySchema = z.object({
 export const AuditConfigSchema = z.object({
   sink: z.string().min(1).optional(),
   failClosed: z.boolean().optional(),
+  receiptSink: z.string().min(1).optional(),
+  receiptModel: z.object({
+    provider: z.string().min(1),
+    name: z.string().min(1),
+    version: z.string().min(1),
+  }).optional(),
+  receiptClient: z.object({
+    name: z.string().min(1),
+    version: z.string().min(1),
+  }).optional(),
 }).strict()
 
 export const ConnectorConfigSchema = z.object({
