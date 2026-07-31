@@ -193,7 +193,21 @@ export class Governance {
     const output = this.analyzeRead(ast[0], state, new Set())
 
     this.applyRowCap(ast[0])
-    const rewrittenSql = toSql.statement(ast[0])
+    let rewrittenSql = toSql.statement(ast[0])
+
+    // KÜME İŞLEMLERİ (UNION / UNION ALL / INTERSECT / EXCEPT) — satır sınırı boşluğu.
+    // applyRowCap yalnızca 'select' ve 'with' düğümlerine LIMIT ekleyebiliyor;
+    // küme işlemleri limitTarget'tan undefined dönüp SESSİZCE sınırsız geçiyordu.
+    // Bu, ürünün "row caps stop bulk extraction" vaadini deliyordu: politika ve
+    // maskeleme çalışıyor, ama satır sayısı sınırsız.
+    //
+    // AST'de küme düğümü limit taşıyamıyor (yalnız type/left/right), üstelik parser
+    // kullanıcının yazdığı `A UNION ALL B LIMIT 50`'yi sağ kola koyup anlamı
+    // değiştiriyor. O yüzden sınır DIŞARIDAN sarmalanarak uygulanıyor — iç SQL
+    // zaten doğrulanmış ve yeniden yazılmış AST'den geliyor.
+    if (!this.limitTarget(ast[0])) {
+      rewrittenSql = `SELECT * FROM (${rewrittenSql}) AS conarium_capped LIMIT ${this.maxRows()}`
+    }
     const metadata = this.metadataFrom(state, {
       rewrittenSql,
       appliedRowCap: this.maxRows(),
