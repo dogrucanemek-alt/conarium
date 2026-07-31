@@ -48,6 +48,20 @@ export function loadConfig(): ConariumConfig {
 
 /** Connect all configured connectors once (shared across sessions in HTTP mode). */
 export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
+  // `allowsConnector` is fail-closed as of v0.3. Without this guard the symptom
+  // would be a server that starts fine and answers every request with "not
+  // permitted" — the operator would blame their policy, not a changed default.
+  // Name the missing field and the connectors it should list.
+  const allowList = config.policy?.allowConnectors
+  if (config.connectors.length > 0 && (!allowList || allowList.length === 0)) {
+    const names = config.connectors.map((c) => c.name).join('", "')
+    throw new Error(
+      `Conarium: ${config.connectors.length} connector(s) are configured but policy.allowConnectors is empty. ` +
+        `Connectors are fail-closed as of v0.3 (previously an empty list meant "allow all"). ` +
+        `Add policy.allowConnectors: ["${names}"] to your config, or remove the connectors.`,
+    )
+  }
+
   const governance = new Governance(config.policy)
   const audit = new Audit({
     sink: config.audit?.sink,

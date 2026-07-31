@@ -151,13 +151,21 @@ export class Governance {
     return tables.filter(t => this.allowsTable(`${t.schema}.${t.name}`))
   }
 
+  /**
+   * Fail-closed, like `allowsTable`. Before v0.3 an unset `allowConnectors`
+   * meant "every connector is reachable", while an unset `allowTables` meant
+   * "no table is readable" — two opposite defaults in the same policy object.
+   * A gateway whose whole claim is fail-closed cannot ship that asymmetry.
+   *
+   * BREAKING: a config with connectors but no `allowConnectors` now reaches
+   * nothing. That is deliberate — see `bootDeps`, which refuses to start with
+   * a named error rather than silently serving zero connectors.
+   */
   allowsConnector(connectorName: string): boolean {
     const { allowConnectors, denyConnectors } = this.policy
     if (denyConnectors?.some(p => match(p, connectorName))) return false
-    if (allowConnectors && allowConnectors.length > 0) {
-      return allowConnectors.some(p => match(p, connectorName))
-    }
-    return true
+    if (!allowConnectors || allowConnectors.length === 0) return false
+    return allowConnectors.some(p => match(p, connectorName))
   }
 
   guardQuery(sql: string): GuardedQuery {
