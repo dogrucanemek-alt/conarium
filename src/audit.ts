@@ -169,6 +169,19 @@ export class Audit {
             'Set the key or remove receiptSink from config.',
         )
       }
+      // Fail-closed: receiptSink açıkken makbuz üretimi için gerekli meta (model + client)
+      // eksikse sessizce sıfır makbuz üretmek yerine boot anında hata ver. Operator makbuzu
+      // var sanıp denetim günü eli boş kalmasın. Meta'yı uydurma varsayılanla doldurmak
+      // makbuzdaki model/client alanını (Madde 19 "model identification") yalancı yapar —
+      // zorunlu kılmak doğru olan.
+      if (!this.receiptMeta) {
+        throw new Error(
+          'Audit: receiptSink is configured but receiptMeta is missing — ' +
+            'receipts require both audit.receiptModel (provider/name/version) and ' +
+            'audit.receiptClient (name/version) in config. ' +
+            'Set both fields or remove receiptSink from config.',
+        )
+      }
       this.loadReceiptChainState()
     }
   }

@@ -79,6 +79,20 @@ describe('audit receipt — yapılandırma anında imza kontrolü (regresyon)', 
     delete process.env[ENV_HMAC]
   })
 
+  it('receiptSink var + receiptMeta yok → Audit YAPICISI throw eder (sessiz sıfır üretim yok)', () => {
+    // Ed25519 anahtarı mevcut (beforeAll'da kuruldu) — yalnızca meta eksik.
+    const dir = mkdtempSync(join(tmpdir(), 'conarium-receipt-meta-'))
+    const receiptSink = join(dir, 'receipts.jsonl')
+
+    // receiptSink verildi ama receiptMeta verilmedi → constructor throw etmeli.
+    expect(() => new Audit({ sink: join(dir, 'audit.jsonl'), receiptSink })).toThrow(
+      /receiptSink is configured but receiptMeta is missing/,
+    )
+
+    // Makbuz dosyası hiç oluşmamalı.
+    expect(existsSync(receiptSink)).toBe(false)
+  })
+
   it('Ed25519 yok + receiptSink yok → yine de çalışır (HMAC yeterli, geriye uyum)', () => {
     delete process.env[ENV_SIGNING]
     delete process.env[ENV_KEY_ID]
