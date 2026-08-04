@@ -98,7 +98,9 @@ await check('1 resources/read filters tables and audits schema reads', async () 
   }
   const content = await readGovernedSchemaResource(
     conn,
-    new Governance({ allowTables: ['public.allowed'] }),
+    // Konnektörler fail-closed: bu testin konusu tablo filtresi, konnektör izni
+    // değil — konnektörü açıkça izinli yaz ki test kendi konusunu ölçsün.
+    new Governance({ allowTables: ['public.allowed'], allowConnectors: ['mock'] }),
     { log: entry => auditEntries.push(entry) },
     'conarium://mock/schema'
   )
@@ -120,8 +122,11 @@ await check('2 search denies empty scope and connectors honor allowed scopes', a
     async query() { throw new Error('not used') },
     async search() { throw new Error('search should not run') },
   }
+  // Konnektör izinli, ama hiçbir kapsam (tablo) izinli değil — reddin sebebi
+  // konnektör değil BOŞ KAPSAM olmalı. İzin yazılmazsa test kendi konusunu
+  // değil, konnektör fail-closed'ını ölçer.
   await assert.rejects(
-    resolveGovernedSearchScope(noScope, new Governance(), 'needle'),
+    resolveGovernedSearchScope(noScope, new Governance({ allowConnectors: ['empty'] }), 'needle'),
     /no allowed scope/
   )
 
@@ -266,6 +271,9 @@ await check('4 console is loopback by default, authenticated, CSRF-protected, va
 
   const oldEnv = { ...process.env }
   const dir = tempDir()
+  // Denetim imzası fail-closed ve yetenek CONSTRUCTOR'da kontrol ediliyor —
+  // anahtar createConsoleApp'ten ÖNCE verilmeli, sonra değil.
+  process.env.CONARIUM_AUDIT_HMAC_KEY = 'example-not-a-real-key'
   const app = createConsoleApp({
     configFile: path.join(dir, 'console.json'),
     auditFile: path.join(dir, 'audit.jsonl'),
@@ -336,20 +344,39 @@ await check('8 search enforces min length and Docs caps traversal/results/bytes'
 })
 
 await check('9 audit.failClosed is passed from config into Audit construction', async () => {
-  const indexSource = fs.readFileSync(path.join(repoRoot, 'src/index.ts'), 'utf8')
-  assert.match(indexSource, /failClosed:\s*config\.audit\?\.failClosed/)
+  // Bu bağ bir kez `src/index.ts`'teydi, `bootDeps` ile `src/server.ts`'e taşındı
+  // ve test dosya adına kilitli olduğu için SESSİZCE bayatladı — davranış
+  // yerindeyken kırmızı yandı. Artık `src/` genelinde aranıyor: bağ nerede
+  // yaşarsa yaşasın bulunur, koptuğunda kırılır.
+  const srcDir = path.join(repoRoot, 'src')
+  const birlesik = fs
+    .readdirSync(srcDir)
+    .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .map(f => fs.readFileSync(path.join(srcDir, f), 'utf8'))
+    .join('\n')
+  assert.match(birlesik, /failClosed:\s*config\.audit\?\.failClosed/)
 })
 
 await check('10 audit hash chain fails closed on corrupt state', async () => {
-  const dir = tempDir()
-  const sink = path.join(dir, 'audit.jsonl')
-  fs.writeFileSync(sink, '{not-json}\n')
-  assert.throws(() => new Audit({ sink }), /Audit sink is corrupt/)
+  // İmza yeteneği constructor'da kontrol ediliyor ve bozuk-sink kontrolünden
+  // önce geliyor. Anahtar verilmezse test bozuk sink'i değil imza eksikliğini
+  // ölçer — konusunu kaybeder.
+  const oldHmac = process.env.CONARIUM_AUDIT_HMAC_KEY
+  process.env.CONARIUM_AUDIT_HMAC_KEY = 'example-not-a-real-key'
+  try {
+    const dir = tempDir()
+    const sink = path.join(dir, 'audit.jsonl')
+    fs.writeFileSync(sink, '{not-json}\n')
+    assert.throws(() => new Audit({ sink }), /Audit sink is corrupt/)
 
-  const valid = path.join(dir, 'valid.jsonl')
-  const audit = new Audit({ sink: valid })
-  audit.log({ tool: 'query', denied: false })
-  assert.doesNotThrow(() => new Audit({ sink: valid }))
+    const valid = path.join(dir, 'valid.jsonl')
+    const audit = new Audit({ sink: valid })
+    audit.log({ tool: 'query', denied: false })
+    assert.doesNotThrow(() => new Audit({ sink: valid }))
+  } finally {
+    if (oldHmac === undefined) delete process.env.CONARIUM_AUDIT_HMAC_KEY
+    else process.env.CONARIUM_AUDIT_HMAC_KEY = oldHmac
+  }
 })
 
 await check('11 public audit log rendering uses textContent instead of innerHTML for log fields', async () => {
