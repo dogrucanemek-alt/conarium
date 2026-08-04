@@ -165,7 +165,7 @@ Control access using a simple `conarium.json` policy file:
 
 Anything not in `allowTables` is denied by default; matched `maskColumns` are redacted to `[MASKED]` before the data ever reaches the model.
 
-> **Connectors are fail-closed (v0.3).** `allowConnectors` is a strict allow-list:
+> **Connectors are fail-closed.** `allowConnectors` is a strict allow-list:
 > if it is missing or empty, **no** connector is permitted (previously an empty
 > list meant "allow all"). If you configure connectors, you must list them here —
 > otherwise the server refuses to start and tells you exactly which field to add.

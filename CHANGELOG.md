@@ -12,7 +12,7 @@
 
 ### Changed
 
-- **BREAKING — Connectors are fail-closed (v0.3).** `policy.allowConnectors` is
+- **BREAKING — Connectors are fail-closed.** `policy.allowConnectors` is
   now a strict allow-list: if it is missing or empty, **no** connector is
   permitted (previously an empty list meant "allow all"). This matches the
   existing default-deny posture of `allowTables` — the product's stated position

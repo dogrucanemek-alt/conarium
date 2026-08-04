@@ -1,7 +1,7 @@
 /**
- * KONNEKTÖR FAIL-CLOSED (v0.3) — kilit testleri.
+ * KONNEKTÖR FAIL-CLOSED — kilit testleri.
  *
- * v0.3'te `Governance.allowsConnector` ve `bootDeps` fail-closed oldu:
+ * `Governance.allowsConnector` ve `bootDeps` fail-closed oldu:
  *   - `policy.allowConnectors` yazılmamışsa / boşsa HİÇBİR konnektöre izin YOK
  *     (eskiden boş liste "hepsine izin" demekti).
  *   - `bootDeps` artık konnektör yapılandırılmış ama allowConnectors boşsa

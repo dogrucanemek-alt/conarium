@@ -152,7 +152,7 @@ export class Governance {
   }
 
   /**
-   * Fail-closed, like `allowsTable`. Before v0.3 an unset `allowConnectors`
+   * Fail-closed, like `allowsTable`. Previously an unset `allowConnectors`
    * meant "every connector is reachable", while an unset `allowTables` meant
    * "no table is readable" — two opposite defaults in the same policy object.
    * A gateway whose whole claim is fail-closed cannot ship that asymmetry.
