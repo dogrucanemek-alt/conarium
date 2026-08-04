@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Changed — Receipt v0.3: meta provenance
+
+- `model` and `client` now carry a `source` field alongside the value:
+  `protocol` (measured from MCP `initialize`), `operator-declared` (declared in config,
+  **not** verified by Conarium), or `undeclared` (`null` fields — nothing invented).
+- **`audit.receiptModel` / `audit.receiptClient` are no longer required.** Previously,
+  configuring `receiptSink` without both fields threw at construction, which kept receipt
+  generation permanently off: model identity does not exist in the MCP protocol, so it
+  could only ever come from an operator's declaration. Receipts are now emitted and the
+  missing field is recorded as `undeclared` instead of being invented.
+- Verifier accepts `0.1`, `0.2` and `0.3`; older receipts remain verifiable (regression-locked).
+  It reports undeclared counts: `ok: 3 receipt(s) verified (2 with undeclared model)`.
+- ⚠️ Ed25519 remains **required** for receipts — this was not relaxed.
+- Spec: `docs/superpowers/specs/2026-08-05-receipt-meta-provenance-design.md`
+
 ### Added — Receipt v0.1 (verifiable audit receipts)
 
 - Ed25519 key management (`src/keys.ts`) with `.keyid` sidecars

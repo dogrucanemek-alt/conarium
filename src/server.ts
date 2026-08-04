@@ -68,10 +68,12 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
     consumer: config.consumer,
     failClosed: config.audit?.failClosed,
     receiptSink: config.audit?.receiptSink,
-    receiptMeta:
-      config.audit?.receiptModel && config.audit?.receiptClient
-        ? { model: config.audit.receiptModel, client: config.audit.receiptClient }
-        : undefined,
+    // v0.3: ikisi de opsiyonel. Eksik alan makbuzda `source: 'undeclared'` olur —
+    // eskiden ikisi birden yoksa makbuz HİÇ üretilmiyordu.
+    receiptMeta: {
+      model: config.audit?.receiptModel,
+      client: config.audit?.receiptClient,
+    },
   })
   const connectors: Connector[] = []
 
@@ -107,8 +109,19 @@ export function buildServer(
 ): Server {
   // Oturumun kimliğini her denetim satırına TEK yerden geçir: audit.log çağrısı
   // bu dosyada 8+ yerde ve tek tek alan eklemek er geç birinde unutulur.
-  const kaydet: typeof audit.log = (e) =>
-    audit.log(aktor ? { ...e, actor: aktor.id, actorAssurance: aktor.assurance } : e)
+  //
+  // Aynı yerden istemci kimliği de geçer. `getClientVersion()` MCP `initialize`
+  // sırasında karşı tarafın BİLDİRDİĞİ değerdir — yani beyan değil, protokolden
+  // ölçülmüş veri; makbuzda `source: 'protocol'` ile işaretlenir. Handshake henüz
+  // olmadıysa undefined döner ve makbuz config beyanına ya da "bildirilmedi"ye düşer.
+  const kaydet: typeof audit.log = (e) => {
+    const ci = server.getClientVersion()
+    return audit.log({
+      ...e,
+      ...(aktor ? { actor: aktor.id, actorAssurance: aktor.assurance } : {}),
+      ...(ci?.name ? { client: { name: ci.name, version: ci.version ?? '', source: 'protocol' as const } } : {}),
+    })
+  }
 
   const server = new Server(
     {

@@ -15,6 +15,7 @@ import {
   buildReceipt,
   hashArgs,
   RECEIPT_GENESIS_HASH,
+  type MetaSource,
   type Receipt,
   type ReceiptDataRef,
   type ReceiptInput,
@@ -36,6 +37,11 @@ export interface AuditEntry {
   target?: string
   reason?: string
   governance?: unknown
+  /**
+   * Bağlanan istemci, MCP `initialize` sırasında bildirdiyse (`clientInfo`).
+   * Config'teki beyanı EZER: ölçülmüş değer, beyan edilmiş değerden üstündür.
+   */
+  client?: { name: string; version: string; source?: MetaSource }
   prevHash?: string
   hash?: string
   signature?: string
@@ -43,10 +49,18 @@ export interface AuditEntry {
   sig?: { alg: 'Ed25519'; keyId: string; value: string }
 }
 
-/** Makbuz üretimi için gerekli meta bilgi (config'den gelir). */
+/**
+ * Makbuz meta bilgisi. v0.3'ten beri İKİSİ DE OPSİYONEL — eksiklik uydurulmaz,
+ * makbuza `source: 'undeclared'` olarak yazılır.
+ *
+ * Neden gevşetildi: model kimliği MCP protokolünde yok, yani operatör beyan etmedikçe
+ * hiçbir yerden gelemez. Zorunlu tutmak makbuzu tamamen kapalı tutuyordu — "her erişim
+ * için imzalı makbuz" vaadi bu yüzden canlıda karşılıksızdı. Artık makbuz üretilir ve
+ * bilinmeyen alanı gizlemek yerine bildirilmedi olarak işaretler.
+ */
 export interface ReceiptMeta {
-  model: { provider: string; name: string; version: string }
-  client: { name: string; version: string }
+  model?: { provider: string; name: string; version: string }
+  client?: { name: string; version: string; source?: MetaSource }
 }
 
 /**
@@ -88,7 +102,8 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
     period: { start: entry.timestamp, end: entry.timestamp },
     actor: { id: entry.actor, type: 'service', assurance: entry.actorAssurance ?? 'shared-token' },
     model: meta.model,
-    client: meta.client,
+    // Ölçülmüş (protokolden gelen) client, config'teki beyanı ezer.
+    client: entry.client ?? meta.client,
     request: {
       tool: entry.tool,
       target: entry.target ?? '',
@@ -182,19 +197,17 @@ export class Audit {
             'Set the key or remove receiptSink from config.',
         )
       }
-      // Fail-closed: receiptSink açıkken makbuz üretimi için gerekli meta (model + client)
-      // eksikse sessizce sıfır makbuz üretmek yerine boot anında hata ver. Operator makbuzu
-      // var sanıp denetim günü eli boş kalmasın. Meta'yı uydurma varsayılanla doldurmak
-      // makbuzdaki model/client alanını (Madde 19 "model identification") yalancı yapar —
-      // zorunlu kılmak doğru olan.
-      if (!this.receiptMeta) {
-        throw new Error(
-          'Audit: receiptSink is configured but receiptMeta is missing — ' +
-            'receipts require both audit.receiptModel (provider/name/version) and ' +
-            'audit.receiptClient (name/version) in config. ' +
-            'Set both fields or remove receiptSink from config.',
-        )
-      }
+      // v0.3: receiptMeta ARTIK ZORUNLU DEĞİL.
+      //
+      // Eski davranış (zorunlu) doğru bir kaygıdan doğmuştu: uydurma varsayılan, makbuzun
+      // model alanını (Md.19 "model identification") yalancı yapar. Kaygı hâlâ geçerli —
+      // ama çözümü "makbuzu hiç üretme" değil. Model kimliği MCP protokolünde yok, yani
+      // operatör beyan etmedikçe hiçbir yerden gelemez; zorunluluk makbuzu kalıcı olarak
+      // kapalı tutuyordu ve "her erişim için imzalı makbuz" vaadi karşılıksız kalıyordu.
+      //
+      // Artık makbuz üretilir ve bilinmeyen alanı UYDURMAK yerine `source: 'undeclared'`
+      // ile işaretler. Uydurmama kuralı korunuyor, üretim engeli kalkıyor.
+      // ⚠️ Ed25519 zorunluluğu (yukarıda) GEVŞETİLMEDİ: imzasız makbuz makbuz değildir.
       this.loadReceiptChainState()
     }
   }
@@ -335,7 +348,7 @@ export class Audit {
     }
 
     // Makbuz üretimi — opt-in (receiptSink yapılandırıldıysa).
-    if (this.receiptSink && this.receiptMeta) {
+    if (this.receiptSink) {
       this.writeReceipt(full)
     }
 
@@ -357,7 +370,7 @@ export class Audit {
       seq: this.receiptSeq + 1,
       prevHash: this.receiptLastHash,
     }
-    const input = entryToReceiptInput(entry, this.receiptMeta!)
+    const input = entryToReceiptInput(entry, this.receiptMeta ?? {})
     const receipt = buildReceipt(input, chain, this.signingKey)
 
     try {

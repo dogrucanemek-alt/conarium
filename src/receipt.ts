@@ -1,13 +1,14 @@
 /**
- * Conarium Receipt v0.2 — schema, canonicalize (JCS subset), hash, sign.
- * v0.1 receipts remain verifiable forever; the verifier accepts both.
+ * Conarium Receipt v0.3 — schema, canonicalize (JCS subset), hash, sign.
+ * v0.1 ve v0.2 makbuzları sonsuza kadar doğrulanabilir kalır; doğrulayıcı üçünü de kabul eder.
  * Spec: docs/superpowers/specs/2026-07-29-conarium-receipt-design.md §4
+ *      + docs/superpowers/specs/2026-08-05-receipt-meta-provenance-design.md (v0.3)
  */
 import { createHash, randomBytes } from 'crypto'
 import { type SigningKey, signHash } from './keys.js'
 import type { ActorAssurance } from './tokens.js'
 
-export const RECEIPT_VERSION = 'conarium-receipt/0.2' as const
+export const RECEIPT_VERSION = 'conarium-receipt/0.3' as const
 
 export type ActorType = 'service' | 'user'
 export type PolicyDecision = 'allow' | 'deny' | 'partial'
@@ -20,15 +21,30 @@ export interface ReceiptActor {
   assurance: ActorAssurance
 }
 
+/**
+ * Bir meta alanının değeri NEREDEN geldi.
+ *
+ * Makbuz "model şuydu" demez — "şu olarak beyan edildi" ya da "bildirilmedi" der.
+ * `ReceiptActor.assurance` ile aynı disiplin: değerin yanında, onu ne kadar
+ * ciddiye alabileceğini söyleyen kanıt seviyesi taşınır.
+ *
+ *  - `protocol`           bağlantı sırasında ÖLÇÜLDÜ (MCP initialize → clientInfo)
+ *  - `operator-declared`  operatör config'te beyan etti; Conarium DOĞRULAMADI
+ *  - `undeclared`         bildirilmedi; alanlar null, uydurulmadı
+ */
+export type MetaSource = 'protocol' | 'operator-declared' | 'undeclared'
+
 export interface ReceiptModel {
-  provider: string
-  name: string
-  version: string
+  source: MetaSource
+  provider: string | null
+  name: string | null
+  version: string | null
 }
 
 export interface ReceiptClient {
-  name: string
-  version: string
+  source: MetaSource
+  name: string | null
+  version: string | null
 }
 
 export interface ReceiptRequest {
@@ -107,8 +123,16 @@ export interface ReceiptInput {
   ts?: string
   period: { start: string; end: string }
   actor: { id: string; type?: ActorType; assurance?: ActorAssurance }
-  model: ReceiptModel
-  client: ReceiptClient
+  /**
+   * Verilmezse `undeclared` yazılır. Model kimliği MCP protokolünde YOK; operatör
+   * beyan etmediyse makbuz bunu gizlemek yerine "bildirilmedi" der.
+   */
+  model?: { provider: string; name: string; version: string }
+  /**
+   * `source` verilmezse beyan sayılır. MCP `initialize`'dan ölçülen değer
+   * `source: 'protocol'` ile gelmelidir — ölçülmüş ile beyan edilmiş karışmasın.
+   */
+  client?: { name: string; version: string; source?: MetaSource }
   request: ReceiptRequest
   dataRefs: ReceiptDataRef[]
   policy: ReceiptPolicy
@@ -246,6 +270,28 @@ function buildActor(a: { id: string; type?: ActorType; assurance?: ActorAssuranc
 }
 
 /**
+ * Model kimliği MCP protokolünde YOKTUR — bağlanan istemci hangi modeli kullandığını
+ * sunucuya bildirmez. Bu yüzden değer ancak operatörün beyanı olabilir, ölçüm değil.
+ * Beyan yoksa boş string / "unknown" / config varsayılanı UYDURULMAZ: makbuz
+ * "bildirilmedi" der. Uydurulan bir model kimliği makbuzu Md.19 karşısında yalancı yapar
+ * ve ürünün tek savunulabilir konumunu (ölçtüğü ile beyanı ayırmak) çürütür.
+ */
+function buildModel(m?: { provider: string; name: string; version: string }): ReceiptModel {
+  if (!m) return { source: 'undeclared', provider: null, name: null, version: null }
+  return { source: 'operator-declared', provider: m.provider, name: m.name, version: m.version }
+}
+
+/**
+ * Client, modelden farklı olarak GERÇEKTEN ölçülebilir (MCP `initialize` → `clientInfo`).
+ * Ölçülen değer `source: 'protocol'` ile gelir. Kaynak belirtilmemişse beyan sayılır —
+ * ölçüldü diye işaretlemek, doğrulayanın makbuza fazladan güvenmesine yol açardı.
+ */
+function buildClient(c?: { name: string; version: string; source?: MetaSource }): ReceiptClient {
+  if (!c) return { source: 'undeclared', name: null, version: null }
+  return { source: c.source ?? 'operator-declared', name: c.name, version: c.version }
+}
+
+/**
  * Build a signed (or explicitly unsigned) receipt.
  * consentRef is always null — reserved for consent binding (ISO/IEC TS 27560),
  * which is NOT part of v0.2. Naming it "v0.2" was wrong once v0.2 shipped.
@@ -274,8 +320,8 @@ export function buildReceipt(
     ts,
     period: input.period,
     actor: buildActor(input.actor),
-    model: input.model,
-    client: input.client,
+    model: buildModel(input.model),
+    client: buildClient(input.client),
     request: input.request,
     dataRefs: input.dataRefs,
     policy: input.policy,

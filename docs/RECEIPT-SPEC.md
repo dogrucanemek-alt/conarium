@@ -18,12 +18,13 @@ kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
 
 ## Schema
 
-Version string: `conarium-receipt/0.1`
+Version string: `conarium-receipt/0.3` (verifier also accepts `0.1` and `0.2` — forever)
 
 | Field | Art. 19 role | Notes |
 |---|---|---|
 | `ts`, `period` | timestamp / usage period | ISO-8601 |
-| `model` | model identification | provider / name / version |
+| `model` | model identification | `source` + provider / name / version — see **Meta provenance** below |
+| `client` | calling client | `source` + name / version |
 | `dataRefs` | reference databases consulted | source + object + field *names* only |
 | `policy` | applied governance | decision + rule ids |
 | `flags` | triggered policy flags | strings |
@@ -39,6 +40,32 @@ Version string: `conarium-receipt/0.1`
 stripped before hashing. Prefix: `sha256:` + hex.
 
 Raw data **never** enters a field — only numbers, class names, and hashes.
+
+### Meta provenance (v0.3)
+
+`model` and `client` carry **where the value came from**, not just the value. A receipt
+never says *"the model was X"* — it says *"X was declared"* or *"not declared"*.
+
+| `source` | meaning |
+|---|---|
+| `protocol` | measured during the connection (MCP `initialize` → `clientInfo`) |
+| `operator-declared` | the operator declared it in config; **Conarium did not verify it** |
+| `undeclared` | not declared — fields are `null`, nothing was invented |
+
+Why this exists: **model identity does not exist in the MCP protocol.** A connecting
+client never tells the server which model it is using. Writing a fixed value into config
+and signing it would mean Conarium attesting to something it never observed — precisely
+the claim this whole artifact is supposed to make impossible. Rather than invent a value
+or refuse to emit receipts at all, the receipt records the gap.
+
+`undeclared` is a **valid receipt**, not a broken or incomplete one. The verifier counts
+them and reports them (`3 receipt(s) verified (2 with undeclared model)`), so a reader is
+never left thinking the signature covers a fact it does not. `source` is inside the hash,
+so promoting `undeclared` to `operator-declared` after the fact breaks the chain.
+
+This mirrors `actor.assurance`, which answers *how* an identity is known rather than
+merely *who* it is, and the coverage declaration's rule that absence is reported as
+*"access NOT RECORDED"*, never *"no access occurred"*.
 
 ## Verifier
 

@@ -27,6 +27,11 @@ const require = createRequire(import.meta.url)
 
 const RECEIPT_V1 = 'conarium-receipt/0.1'
 const RECEIPT_V2 = 'conarium-receipt/0.2'
+const RECEIPT_V3 = 'conarium-receipt/0.3'
+const SURUMLER = [RECEIPT_V1, RECEIPT_V2, RECEIPT_V3]
+// v0.3 meta kaynaklari. Bilinmeyen bir kaynak sema hatasidir: "protocol" yazip
+// olcmemis olmak, dogrulayanin makbuza fazladan guvenmesi demek olurdu.
+const META_KAYNAKLARI = ['protocol', 'operator-declared', 'undeclared']
 const GENESIS = 'sha256:0000000000000000000000000000000000000000000000000000000000000000'
 
 // ─── JCS subset (must match src/receipt.ts canonicalize) ─────────────────────
@@ -267,7 +272,7 @@ function loadReceipts(target) {
 
 function schemaOk(r) {
   if (!r || typeof r !== 'object') return 'not an object'
-  if (r.v !== RECEIPT_V1 && r.v !== RECEIPT_V2) return `unsupported version ${r.v}`
+  if (!SURUMLER.includes(r.v)) return `unsupported version ${r.v}`
   if (typeof r.id !== 'string' || !r.id) return 'missing id'
   if (typeof r.ts !== 'string') return 'missing ts'
   if (!r.chain || typeof r.chain !== 'object') return 'missing chain'
@@ -293,6 +298,24 @@ function schemaOk(r) {
     }
     if (r.actor.type === 'user' && r.actor.assurance === 'shared-token') {
       return 'actor.type "user" cannot carry assurance "shared-token"'
+    }
+  }
+  // v0.3: model/client artik DEGERI ile birlikte KAYNAGINI da tasir.
+  // "undeclared" gecerli bir makbuzdur — eksik degil, durustce bos.
+  if (r.v === RECEIPT_V3) {
+    for (const alan of ['model', 'client']) {
+      const m = r[alan]
+      if (!m || typeof m !== 'object') return `missing ${alan}`
+      if (!META_KAYNAKLARI.includes(m.source)) {
+        return `${alan}.source must be one of ${META_KAYNAKLARI.join('|')} in v0.3`
+      }
+      // Bildirilmedi denip deger tasimak celiskidir: makbuz ya bilmiyordur ya bilir.
+      if (m.source === 'undeclared') {
+        const dolu = alan === 'model'
+          ? [m.provider, m.name, m.version].some((x) => x !== null)
+          : [m.name, m.version].some((x) => x !== null)
+        if (dolu) return `${alan}.source is "undeclared" but carries values`
+      }
     }
   }
   return null
@@ -491,10 +514,28 @@ async function main(argv = process.argv.slice(2)) {
     prevSeq = receipt.chain.seq
   }
 
+  // Bildirilmemis meta BASARISIZLIK DEGILDIR — ama sessizce de gecmez. Denetci
+  // "N makbuz dogrulandi" cumlesini okurken, kacinin model kimligi tasimadigini
+  // gormeli; aksi halde dogrulama, olcmedigi bir seyi onaylamis gibi okunur.
+  // NOT: receipts elemanlari {file, receipt} sarmalidir — dogrudan r.model okumak
+  // sessizce hep 0 verir (bu tam olarak bir kez yasandi, e2e kosusu yakaladi).
+  const modelBildirilmemis = receipts.filter((r) => r.receipt?.model?.source === 'undeclared').length
+  const clientBildirilmemis = receipts.filter((r) => r.receipt?.client?.source === 'undeclared').length
+  const notlar = []
+  if (modelBildirilmemis) notlar.push(`${modelBildirilmemis} with undeclared model`)
+  if (clientBildirilmemis) notlar.push(`${clientBildirilmemis} with undeclared client`)
+
   if (opts.json) {
-    console.log(JSON.stringify({ ok: true, code: 0, count: receipts.length }))
+    console.log(JSON.stringify({
+      ok: true,
+      code: 0,
+      count: receipts.length,
+      undeclaredModel: modelBildirilmemis,
+      undeclaredClient: clientBildirilmemis,
+    }))
   } else {
-    console.log(`ok: ${receipts.length} receipt(s) verified`)
+    const ek = notlar.length ? ` (${notlar.join(', ')})` : ''
+    console.log(`ok: ${receipts.length} receipt(s) verified${ek}`)
   }
   process.exit(0)
 }

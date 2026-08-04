@@ -79,18 +79,28 @@ describe('audit receipt — yapılandırma anında imza kontrolü (regresyon)', 
     delete process.env[ENV_HMAC]
   })
 
-  it('receiptSink var + receiptMeta yok → Audit YAPICISI throw eder (sessiz sıfır üretim yok)', () => {
-    // Ed25519 anahtarı mevcut (beforeAll'da kuruldu) — yalnızca meta eksik.
+  it('receiptSink var + receiptMeta yok → makbuz ÜRETİLİR, model "undeclared" olur (v0.3)', () => {
+    // v0.2'de bu durum constructor'da throw ediyordu. Kaygı doğruydu (uydurma model
+    // kimliği makbuzu Md.19 karşısında yalancı yapar) ama bedeli ağırdı: model MCP
+    // protokolünde hiç yok, yani operatör beyan etmedikçe zorunluluk makbuzu KALICI
+    // olarak kapatıyordu. v0.3 uydurmayı değil ÜRETİMİ serbest bırakır: alan boş
+    // kalır ve boş olduğu makbuza yazılır.
+    //
+    // ⚠️ Eski testin koruduğu asıl değer BURADA DA korunuyor: "sessiz sıfır üretim yok".
+    // Fark şu ki artık sessizlik yerine makbuz var, içinde de dürüst bir boşluk.
     const dir = mkdtempSync(join(tmpdir(), 'conarium-receipt-meta-'))
     const receiptSink = join(dir, 'receipts.jsonl')
 
-    // receiptSink verildi ama receiptMeta verilmedi → constructor throw etmeli.
-    expect(() => new Audit({ sink: join(dir, 'audit.jsonl'), receiptSink })).toThrow(
-      /receiptSink is configured but receiptMeta is missing/,
-    )
+    const audit = new Audit({ sink: join(dir, 'audit.jsonl'), receiptSink })
+    audit.log({ tool: 'query', target: 'demo.sales', denied: false })
 
-    // Makbuz dosyası hiç oluşmamalı.
-    expect(existsSync(receiptSink)).toBe(false)
+    expect(existsSync(receiptSink)).toBe(true)
+    const makbuz = JSON.parse(readFileSync(receiptSink, 'utf-8').trim().split('\n')[0])
+    expect(makbuz.v).toBe('conarium-receipt/0.3')
+    expect(makbuz.model).toEqual({ source: 'undeclared', provider: null, name: null, version: null })
+    expect(makbuz.client).toEqual({ source: 'undeclared', name: null, version: null })
+    // İmza hâlâ zorunlu — gevşetilen tek şey meta.
+    expect(makbuz.sig?.alg).toBe('Ed25519')
   })
 
   it('Ed25519 yok + receiptSink yok → yine de çalışır (HMAC yeterli, geriye uyum)', () => {
