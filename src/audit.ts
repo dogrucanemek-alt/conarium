@@ -394,6 +394,8 @@ export class Audit {
     let previous = GENESIS_HASH
     /** F5 contiguity: after the first entry that carries `sig`, every later entry must too. */
     let seenSig = false
+    /** Aynı kural HMAC `signature` alanı için (2026-08-05, F1'in HMAC tarafı). */
+    let seenSignature = false
     const lines = raw.split('\n').filter(Boolean)
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
@@ -415,14 +417,36 @@ export class Audit {
       if (entry.hash !== expectedHash) {
         throw new Error('Audit sink is corrupt: entry hash mismatch.')
       }
-      // Fail-closed verification: if we have a key, signatures MUST match.
-      // If we have neither key, do NOT silently "pass" — report unverifiable
-      // unless explicitly opted into unsigned mode.
-      if (this.hmacKey) {
-        const expectedSignature = createHmac('sha256', this.hmacKey).update(entry.hash).digest('hex')
-        if (entry.signature !== expectedSignature) {
-          throw new Error('Audit sink is corrupt: entry signature mismatch.')
+      // HMAC bitişiklik kuralı — F1/F5'in HMAC tarafı (2026-08-05).
+      //
+      // Eskiden `entry.signature !== expected` tek kontroldü ve imzası HİÇ OLMAYAN satır da
+      // buna takılıyordu. Sonuç: 07-29 öncesi yazılmış (imzasız) her denetim dosyası, HMAC
+      // anahtarı verildiği anda "corrupt" ilan ediliyordu ve sunucu açılmıyordu. Bu, F1'in
+      // Ed25519 için düzelttiği kavram karışmasının aynısı: *"bu anahtarla doğrulanamaz"*
+      // ile *"kurcalanmış"* aynı şey değildir. 08-05'te canlıda çarptı (Hetzner c2/c3) ve
+      // HMAC kapatılmak zorunda kalındı — ama HMAC'siz kurulum strip-all saldırısına açık
+      // (RECEIPT-SPEC known gap #4), yani bunu kapatmak zorunluydu.
+      //
+      // Kural artık Ed25519 ile birebir simetrik:
+      //   imza YOK  + henüz imzalı satır görülmedi → eski kayıt, kabul
+      //   imza YOK  + daha önce imzalı satır var   → strip girişimi, reddet
+      //   imza VAR  ama eşleşmiyor                 → kurcalama, her zaman reddet
+      const hasSignature = typeof entry.signature === 'string' && entry.signature.length > 0
+      if (hasSignature) {
+        // Doğrulama yalnızca anahtar varken yapılabilir; anahtarsızken imzanın VARLIĞI
+        // yine de bitişiklik için sayılır, yoksa "anahtarı kaldır + imzaları sil" açık kalırdı.
+        if (this.hmacKey) {
+          const expectedSignature = createHmac('sha256', this.hmacKey).update(entry.hash).digest('hex')
+          if (entry.signature !== expectedSignature) {
+            throw new Error('Audit sink is corrupt: entry signature mismatch.')
+          }
         }
+        seenSignature = true
+      } else if (seenSignature) {
+        throw new Error(
+          `Audit sink is corrupt: HMAC signature contiguity break at line ${i + 1} — ` +
+            'an entry without a signature follows signed entries (signatures cannot be removed).',
+        )
       }
 
       const hasSig = Boolean(entry.sig && typeof entry.sig === 'object')

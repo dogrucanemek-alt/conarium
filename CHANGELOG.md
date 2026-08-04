@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Fixed — HMAC signature contiguity (the HMAC half of F1)
+
+- `validateChain` rejected **unsigned legacy entries** as corrupt whenever an HMAC key was
+  present: `entry.signature !== expected` was the only check, so a missing signature failed
+  it. Any audit sink written before signing existed became unopenable the moment HMAC was
+  configured — the server would not boot. This is the same conflation F1 fixed for Ed25519
+  in July (*"cannot be verified with this key"* ≠ *"tampered"*), left open on the HMAC side.
+  It hit production on 2026-08-05 and forced HMAC to be disabled, which in turn left the
+  install exposed to the strip-all attack that HMAC is the documented mitigation for
+  (RECEIPT-SPEC known gap #4).
+- Now symmetric with Ed25519: unsigned entries **before** the first signed entry are legacy
+  and accepted; an unsigned entry **after** a signed one is a signature-removal attempt and
+  is rejected; a present-but-wrong signature is always rejected. Signature *presence* counts
+  toward contiguity even without a key, so "drop the key, then strip the signatures" fails.
+
 ### Changed — Receipt v0.3: meta provenance
 
 - `model` and `client` now carry a `source` field alongside the value:
