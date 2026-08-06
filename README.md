@@ -85,6 +85,10 @@ The language is deliberate: absence is reported as **"access NOT RECORDED"** /
 **"not receipted"**, never "no access occurred" — an absent record is ambiguous
 by nature, and a tool that pretends otherwise is lying to its auditor.
 
+Run against our own production ERP the day it shipped, including a real bypass we
+performed on ourselves and the tool caught:
+[`docs/dogfood/2026-08-06-reconcile.md`](docs/dogfood/2026-08-06-reconcile.md).
+
 Full schema, exit codes, and known gaps: [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
 
 Signing is fail-closed: set `CONARIUM_AUDIT_SIGNING_KEY` and/or

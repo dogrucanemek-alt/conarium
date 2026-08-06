@@ -1,7 +1,7 @@
 {
   "name": "@conarium-ai/core",
   "version": "0.1.0",
-  "description": "The governed company-knowledge layer for AI coding assistants — a tool-agnostic MCP server with access policy, PII masking and audit.",
+  "description": "Governed MCP gateway for AI data access: policy enforcement and PII masking, an Ed25519-signed receipt per access that a third party verifies offline, and coverage reconciliation against the database's own query counters so access that bypassed the gateway is surfaced.",
   "keywords": [
     "mcp",
     "ai",
@@ -9,6 +9,13 @@
     "governance",
     "data-governance",
     "audit",
+    "audit-log",
+    "verifiable-receipts",
+    "tamper-evident",
+    "ed25519",
+    "bypass-detection",
+    "reconciliation",
+    "eu-ai-act",
     "pii",
     "cursor",
     "copilot",
