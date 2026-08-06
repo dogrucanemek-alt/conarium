@@ -28,6 +28,23 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:checks
+      # Gitleaks runs HERE, not as its own job. As a third parallel job it never
+      # got a runner — queued indefinitely on two separate runs, then cancelled,
+      # with no steps ever created. Two jobs start reliably; a third did not.
+      # It costs ~0.1s on this tree, so a dedicated job bought nothing anyway.
+      #
+      # Pinned binary instead of gitleaks/gitleaks-action@v2: that action also
+      # scanned only the pushed diff, so anything already in the tree was never
+      # checked. Same binary version locally and in CI = reproducible result.
+      - name: Install gitleaks 8.30.1 (checksum-pinned)
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o gitleaks.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+      # Whole working tree, not the diff. --redact so a finding never prints the
+      # value it found into a public build log.
+      - name: Gitleaks (secret scan, whole tree)
+        run: ./gitleaks dir . -c .gitleaks.toml --redact --no-banner
 
   semgrep:
     name: Semgrep (static security)
@@ -39,25 +56,3 @@ jobs:
       - run: semgrep scan --config p/security-audit --config p/secrets --config p/javascript --config p/typescript --error
         # Hard-gates on any finding. .semgrepignore drops generated/marketing/test
         # noise; the product code (src/, api/) scans clean (verified: 0 findings).
-
-  gitleaks:
-    name: Gitleaks (secret scan)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # Pinned binary instead of gitleaks/gitleaks-action@v2. That action hung
-      # this job for two days — first "Failed to resolve action download info:
-      # Service Unavailable", then queued with no runner — which left the whole
-      # run showing as `queued` and the repo looking like CI never ran. It also
-      # scanned only the pushed diff, so nothing already in the tree was ever
-      # checked. A pinned release + checksum is one less moving part, and the
-      # version is reproducible: same binary locally and in CI.
-      - name: Install gitleaks 8.30.1 (checksum-pinned)
-        run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o gitleaks.tar.gz
-          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
-          tar -xzf gitleaks.tar.gz gitleaks
-      # Scans the whole working tree, not just the diff. --redact so a finding
-      # never prints the value it found into a public build log.
-      - name: Scan working tree
-        run: ./gitleaks dir . -c .gitleaks.toml --redact --no-banner
