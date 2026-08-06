@@ -29,7 +29,11 @@ async function runDemo() {
       };
     } else if (sql.includes('secrets')) {
        return {
-        rows: [{ api_key: 'sk_live_123456789' }],
+        // Explicitly-fake value: secret scanners flag `sk_live_123456789` as a
+        // real credential, and a security product's repo should not need an
+        // allow-list entry to stay clean. Still matches the masking rule
+        // (`sk_live_[A-Za-z0-9]{6,}`), so the demo output is unchanged.
+        rows: [{ api_key: 'sk_live_example_not_a_real_key' }],
         rowCount: 1, fields: ['api_key'], sql
       };
     }
