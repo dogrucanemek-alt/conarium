@@ -27,6 +27,32 @@ export interface GovernancePolicy {
   allowConnectors?: string[]
   /** Denied connector names (glob); takes precedence over allow. */
   denyConnectors?: string[]
+  /**
+   * Named masking overlays, applied per person.
+   *
+   * The problem this solves: masking that is right for an AI agent is wrong for
+   * the data controller. A shop owner asking "which customer owes the most" needs
+   * the name; the assistant summarising revenue does not. A global on/off switch
+   * would answer that by disabling the product's only real guarantee.
+   *
+   * Deliberately narrow: a profile may override `maskColumns` and `maxRows` and
+   * NOTHING else. Table, tool and connector permissions stay global, so a profile
+   * can never widen what is reachable — only what is legible within it.
+   */
+  profiles?: Record<string, MaskingProfile>
+  /**
+   * Actor id → profile name. Honoured ONLY for actors authenticated with a
+   * per-user token (`assurance: 'per-user-token'`). A shared token never receives
+   * a profile: "whoever holds this token sees unmasked PII" is exactly the
+   * property this product exists to prevent.
+   */
+  actorProfiles?: Record<string, string>
+}
+
+/** Per-person overlay. See `GovernancePolicy.profiles`. */
+export interface MaskingProfile {
+  maskColumns?: string[]
+  maxRows?: number
 }
 
 export interface AuditConfig {

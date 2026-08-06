@@ -1,4 +1,5 @@
 import type { GovernancePolicy, SchemaTable, QueryResult } from './types.js'
+import type { ActorAssurance } from './tokens.js'
 import { parse, toSql } from 'pgsql-ast-parser'
 import type {
   Expr,
@@ -126,9 +127,55 @@ interface SelectAnalysis {
 
 export class Governance {
   private policy: GovernancePolicy
+  private profileName: string | null
 
-  constructor(policy: GovernancePolicy = {}) {
+  constructor(policy: GovernancePolicy = {}, profileName: string | null = null) {
     this.policy = policy
+    this.profileName = profileName
+  }
+
+  /** Name of the masking profile in force, or null for the base policy. */
+  appliedProfile(): string | null {
+    return this.profileName
+  }
+
+  /**
+   * Resolve the policy for a specific person.
+   *
+   * Masking that fits an AI agent does not fit the data controller: the owner
+   * asking "which customer owes the most" needs the name. Rather than a global
+   * switch that would turn the guarantee off for everyone, a named profile
+   * overlays `maskColumns`/`maxRows` for one identified person, and the receipt
+   * records which profile was in force (`policy.id`).
+   *
+   * Fail-closed at every step — anything unexpected falls back to the BASE
+   * policy, never to a wider one:
+   *  - no actor, or actor authenticated with a SHARED token → base. A shared
+   *    token means "whoever holds this string", and handing unmasked PII to a
+   *    bearer is the failure mode the product exists to prevent.
+   *  - actor not listed in `actorProfiles` → base
+   *  - profile name not found in `profiles` → base
+   */
+  forActor(actor?: { id: string; assurance: ActorAssurance }): Governance {
+    if (!actor) return this
+    if (actor.assurance !== 'per-user-token') return this
+    const wanted = this.policy.actorProfiles?.[actor.id]
+    if (!wanted) return this
+    const profile = this.policy.profiles?.[wanted]
+    if (!profile) {
+      console.error(
+        `[conarium:policy] actor "${actor.id}" is mapped to profile "${wanted}", which is not defined in policy.profiles — falling back to the base policy`,
+      )
+      return this
+    }
+    // Only these two fields. Table/tool/connector permissions are NOT overlayable,
+    // so a profile cannot widen reachability — only legibility within it.
+    const merged: GovernancePolicy = {
+      ...this.policy,
+      ...(profile.maskColumns !== undefined ? { maskColumns: profile.maskColumns } : {}),
+      ...(profile.maxRows !== undefined ? { maxRows: profile.maxRows } : {}),
+    }
+    return new Governance(merged, wanted)
   }
 
   allowsTable(qualified: string): boolean {

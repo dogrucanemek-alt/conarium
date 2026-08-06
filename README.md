@@ -30,6 +30,7 @@ The AI gets the context it needs to write code, but never sees your secrets.
 - **Row Caps:** Hard per-query limits. Prevent the silent exfiltration of millions of rows. 
 - **Immutable Audit Ledger:** Every access is logged (who, what, when, rows, decision). SOC2 & GDPR-ready, with no raw PII ever written to the logs.
 - **Verifiable Receipts (v0.1):** Ed25519-signed, independently verifiable receipts — see below.
+- **Per-person masking profiles:** what to mask for an AI agent is not what to mask for the data controller. A named profile relaxes masking for one identified person, and the receipt records which profile applied — see below.
 - **Coverage & Reconciliation:** a signed coverage declaration over the receipt chain (`conarium-coverage`), plus two-sided reconciliation against the database's own query counters (`conarium-reconcile`) — DB-recorded activity that no receipt covers is surfaced instead of staying invisible.
 - **100% Self-Hosted:** Runs entirely on your infrastructure. Your data never crosses your perimeter. 
 - **MCP-Native:** Works out of the box with **Cursor**, **GitHub Copilot**, **Claude Code**, and **Windsurf**.
@@ -62,6 +63,48 @@ npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --anchor-c
 
 Opt-in anchoring: `CONARIUM_ANCHOR_SINK=opentimestamps`. Upgrade pending proofs later with
 `npx conarium-anchor-upgrade ./audit.jsonl.anchors.jsonl`.
+
+### Per-person masking profiles
+
+Masking that is correct for an AI agent is wrong for the person who owns the data.
+The owner asking *"which customer owes the most"* needs the name; the assistant
+summarising revenue does not. Answering that with a global on/off switch would
+disable the product's only real guarantee, so masking resolves **per person**:
+
+```jsonc
+{
+  "policy": {
+    "allowTables": ["zion.customers", "zion.orders"],
+    "maskColumns": ["*.customer_name", "*.email", "*.phone"],  // default: everyone
+    "maxRows": 100,
+
+    "profiles": {
+      // The controller sees customer names; email and phone stay masked.
+      "controller-full": { "maskColumns": ["*.email", "*.phone"], "maxRows": 1000 }
+    },
+    "actorProfiles": { "emekcan": "controller-full" }
+  }
+}
+```
+
+Deliberately narrow, because this is the one feature that can *loosen* protection:
+
+- A profile may override **`maskColumns` and `maxRows` and nothing else.** Table,
+  tool and connector permissions stay global — a profile can never widen what is
+  reachable, only what is legible within it.
+- **Per-user tokens only.** An actor authenticated with a shared token never
+  receives a profile. "Whoever holds this string sees unmasked PII" is precisely
+  the failure this product exists to prevent.
+- **Fail-closed everywhere else:** no actor, unlisted actor, or a profile name that
+  does not exist all fall back to the base policy, never to a wider one.
+- **The content scanner still runs.** A profile overrides column rules; it does not
+  switch off the email / national-ID / card / secret detectors, so PII appearing
+  inside free text is masked regardless of profile.
+- **The receipt says which profile applied** — `policy.id` becomes
+  `conarium.policy/<profile>`, inside the signed hash. An access made under a
+  relaxed profile cannot later be presented as having been fully masked. This is
+  what keeps the audit story honest: the point was never "nobody sees PII", it is
+  "every access is governed, and the evidence says under which rules."
 
 ### Coverage & reconciliation (bypass detection)
 

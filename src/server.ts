@@ -104,9 +104,12 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
  * yanlış kişiyi suçlardı. Verilmezse davranış eskisi gibi (consumer).
  */
 export function buildServer(
-  { config, governance, audit, connectors }: ConariumDeps,
+  { config, governance: temelGovernance, audit, connectors }: ConariumDeps,
   aktor?: ResolvedActor,
 ): Server {
+  // Maskeleme bu oturumu açan KİŞİYE göre çözülür. Profil yoksa, aktör yoksa ya da
+  // paylaşılan token'sa taban politika döner — genişleme yönünde sessiz sapma yok.
+  const governance = temelGovernance.forActor(aktor)
   // Oturumun kimliğini her denetim satırına TEK yerden geçir: audit.log çağrısı
   // bu dosyada 8+ yerde ve tek tek alan eklemek er geç birinde unutulur.
   //
@@ -119,6 +122,10 @@ export function buildServer(
     return audit.log({
       ...e,
       ...(aktor ? { actor: aktor.id, actorAssurance: aktor.assurance } : {}),
+      // Hangi maskeleme profili yürürlükteydi. Bu alan olmadan, profili olan bir
+      // kişinin makbuzu profili olmayanınkiyle aynı görünür — imzalı ama eksik
+      // beyan. Denetçinin sorduğu soru tam olarak budur: kime göre maskelendi.
+      ...(governance.appliedProfile() ? { policyProfile: governance.appliedProfile()! } : {}),
       ...(ci?.name ? { client: { name: ci.name, version: ci.version ?? '', source: 'protocol' as const } } : {}),
     })
   }

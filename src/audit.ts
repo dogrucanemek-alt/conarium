@@ -27,6 +27,8 @@ export interface AuditEntry {
   actor: string
   /** Kimliğin nasıl kurulduğu. Artefakt kimi değil, NASIL bilindiğini de taşır. */
   actorAssurance?: ActorAssurance
+  /** Yürürlükteki maskeleme profilinin adı (varsa). Taban politikada tanımsız. */
+  policyProfile?: string
   tool: string
   args?: any
   source?: string
@@ -111,7 +113,9 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
     },
     dataRefs,
     policy: {
-      id: 'conarium.policy',
+      // Profil yürürlükteyse makbuz bunu TAŞIR. Hash'in içinde olduğu için sonradan
+      // "taban politikaydı" diye gösterilemez.
+      id: entry.policyProfile ? `conarium.policy/${entry.policyProfile}` : 'conarium.policy',
       version: '1',
       decision,
       rulesApplied: g.accessedFunctions ?? [],
