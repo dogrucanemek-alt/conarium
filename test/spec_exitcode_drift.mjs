@@ -15,6 +15,7 @@ const BIN_PATHS = [
   path.join(repoRoot, 'bin', 'conarium-verify.mjs'),
   path.join(repoRoot, 'bin', 'conarium-coverage.mjs'),
   path.join(repoRoot, 'bin', 'conarium-reconcile.mjs'),
+  path.join(repoRoot, 'bin', 'conarium-stamp.mjs'),
 ];
 const DOCS_PATH = path.join(repoRoot, 'docs', 'RECEIPT-SPEC.md');
 

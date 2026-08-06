@@ -123,6 +123,23 @@ of absence. Both mistakes have been made on this project before.
    implementation reconciling those counters against a receipt or audit chain was
    found.
 
+## What we will claim about being early
+
+We will not claim to be first in the world at any of the three parts, and certainly
+not at data masking — Presidio, hoop.dev and Lasso all mask, and several of them mask
+better than we do.
+
+The claim we will make is narrower and checkable: **this specification and this scan
+were published on a date we can prove.** Both files are stamped to OpenTimestamps and
+upgradeable to a Bitcoin block height (see [RECEIPT-SPEC §Stamping](RECEIPT-SPEC.md)).
+A git commit date proves nothing — `git commit --date` accepts any value — so we do
+not rely on one.
+
+That converts an unwinnable argument into an evidentiary one. We are not asserting
+that no earlier implementation exists. We are putting our date on the record in a
+form nobody has to trust us for, and any competing priority claim can be settled the
+same way: show the artifact, show the timestamp.
+
 ## Why the claim stays hedged
 
 We will not write "the world's first" or "the only one in existence". Those are

@@ -162,6 +162,37 @@ Rules that keep the verdict honest:
 | 20 | Input invalid or window unreliable (schema error, counter regression) |
 | 40 | Unreconciled DB activity — recorded by the database, not receipted |
 
+## Stamping a document (priority dates)
+
+```
+conarium-stamp <file> [--sidecar <path>] [--json]
+```
+
+| Exit | Meaning |
+|---|---|
+| 0 | Stamped; sidecar written (`pending` until upgraded) |
+| 50 | Stamping failed — calendars unreachable or timed out |
+
+Receipts are anchored automatically. Documents are not, and **a git commit date is
+not evidence** — `git commit --date` accepts whatever you type. This stamps the
+SHA-256 of a file to the OpenTimestamps calendars and writes the same sidecar shape
+receipt anchoring uses, so `conarium-anchor-upgrade` upgrades it to a Bitcoin block
+height unchanged. Only the 32-byte digest leaves the machine.
+
+**What a stamp proves, exactly:** this file existed, byte for byte in this form, no
+later than the anchored time. It does **not** prove the file is correct, and it does
+**not** prove nobody published something similar earlier. What it does is make our
+own publication date checkable by someone who does not trust us — and put any
+competing priority claim on the same footing: if an earlier one exists, it can be
+demonstrated the same way, with the same kind of evidence.
+
+This specification and [`PRIOR-ART.md`](PRIOR-ART.md) are stamped. Their sidecars sit
+beside them (`*.anchors.jsonl`) and re-verify with
+`conarium-verify --anchor-check --anchors <sidecar>` or against any OpenTimestamps
+client. Because the digest covers the exact bytes, editing either document
+invalidates its stamp — a new one is taken and the old sidecar entry stays, so the
+revision history is itself timestamped.
+
 ## Known gaps (documented, not hidden)
 
 1. **`actor` is a service identity unless per-user tokens are configured.** With a token file (`CONARIUM_TOKENS_FILE`, default `conarium.tokens.json`), the audit line and the receipt name the individual and set `assurance: "per-user-token"`. Without it the actor is the connecting service, with `assurance: "shared-token"`. This is an operator-managed token map — **not** OAuth or SSO; there is no identity-provider integration, so the assurance is only as good as the operator's token hygiene. For shared-token deployments, marketing must not claim "who accessed".
