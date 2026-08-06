@@ -123,8 +123,14 @@ portable receipts is common; reconciling both sides against the data source's
 own bookkeeping is the part we have not found elsewhere. Measured end to end on
 a real operating company's live ERP — 121,374 records, 121,366 identities
 masked, 485,496 fields masked, zero leaked to the model
-([Governance Report 001](https://conarium.dev/report-001.html)). If you know of
-another, open an issue and this section will be corrected.
+([Governance Report 001](https://conarium.dev/report-001.html)).
+
+That claim is hedged on purpose, and [`docs/PRIOR-ART.md`](docs/PRIOR-ART.md) is the
+evidence behind it: ten projects checked on 6 August 2026, what each one has, the
+closest academic prior art ([Sello / *Notarized Agents*](https://arxiv.org/html/2606.04193v1),
+which names this gap better than we did), and nine things we could **not** verify. If
+you know of an implementation combining all three, open an issue and it will be
+corrected.
 
 ---
 
