@@ -85,10 +85,87 @@ conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [
 
 Fail-closed: if the verifier is unsure, it does not exit 0.
 
+## Coverage declaration (one-sided)
+
+```
+conarium-coverage <declaration.json> --pubkey <path> [--receipts <receipts.jsonl>] [--allow-gaps] [--json]
+```
+
+A signed declaration over a period and the declared scope (`policy.allowTables`):
+is the receipt chain contiguous, which declared objects have recorded access and
+which do not. The declaration says **"access NOT RECORDED", never "no access
+occurred"** — an absent record is ambiguous by nature.
+
+| Exit | Meaning |
+|---|---|
+| 0 | Declaration signature valid (+ consistent with receipts if given), chain contiguous |
+| 12 | Chain has gaps — coverage incomplete (`--allow-gaps` verifies authenticity only) |
+| 13 | Signature invalid / pubkey missing (fail-closed) |
+| 20 | Schema invalid |
+| 30 | Inconsistent with the receipts file |
+
+## Reconciliation (two-sided, v0.1)
+
+```
+conarium-reconcile --before <snapshot.json> --after <snapshot.json> --receipts <receipts.jsonl> [--json]
+```
+
+The coverage declaration is one-sided: it reports what the receipt chain says
+about itself. Reconciliation adds the other side — **the database's own query
+counters** — and answers the question receipts alone cannot:
+
+> *The database recorded query activity in this window. Is every bit of it
+> receipted — or did something reach the data without passing through the
+> gateway?*
+
+Snapshots are taken from the data source's counters (reference implementation:
+PostgreSQL `pg_stat_statements`, per role — see `scripts/pg-snapshot.sql`),
+once at window start and once at window end, as
+`conarium-dbsnapshot/0.1` documents:
+
+```json
+{ "v": "conarium-dbsnapshot/0.1", "ts": "…", "role": "conarium_c2",
+  "source": "pg_stat_statements",
+  "entries": [ { "queryid": "…", "query": "…", "calls": 76 } ] }
+```
+
+A query pattern whose calls increased during the window, touching a user table
+no in-window receipt covers, is reported as **UNRECONCILED**: access was
+**recorded by the database but not receipted**. The gateway may have been
+bypassed, or the receipt sink failed — the tool states that fact and does not
+claim intent.
+
+Rules that keep the verdict honest:
+
+- **Per pattern and per table, never per call count.** One REST request can
+  produce more than one SQL statement (PostgREST does), so call counts and
+  receipt counts are not compared 1:1.
+- **Nothing is silently cleared.** A pattern whose target table cannot be
+  determined is reported UNATTRIBUTED and fails the run. Session/catalog
+  housekeeping (`SET`, `pg_catalog`, `information_schema`) is listed as
+  infrastructure, visibly.
+- **Unreliable windows are refused.** If a counter went backwards or a pattern
+  disappeared (stats reset / eviction mid-window), the run fails with exit 20
+  instead of producing a verdict from bad data.
+- **Receipts with no attributable object make findings non-definitive** and the
+  tool says so — same rule as the coverage declaration.
+- **A dedicated DB role is a prerequisite.** Reconciling a shared role's
+  counters would blame the gateway for other clients' queries.
+- **Signatures are not re-checked here.** Run `conarium-verify` first;
+  reconciliation assumes an already-verified receipts file. And the counters
+  belong to the database: reconciliation trusts the DB's own bookkeeping, so an
+  attacker who can silently falsify `pg_stat_statements` is out of scope.
+
+| Exit | Meaning |
+|---|---|
+| 0 | Every DB query pattern in the window is covered by receipts |
+| 20 | Input invalid or window unreliable (schema error, counter regression) |
+| 40 | Unreconciled DB activity — recorded by the database, not receipted |
+
 ## Known gaps (documented, not hidden)
 
 1. **`actor` is a service identity unless per-user tokens are configured.** With a token file (`CONARIUM_TOKENS_FILE`, default `conarium.tokens.json`), the audit line and the receipt name the individual and set `assurance: "per-user-token"`. Without it the actor is the connecting service, with `assurance: "shared-token"`. This is an operator-managed token map — **not** OAuth or SSO; there is no identity-provider integration, so the assurance is only as good as the operator's token hygiene. For shared-token deployments, marketing must not claim "who accessed".
-2. **No bypass detection — partially addressed as of coverage v0.2.** Disabling Conarium and reading the DB directly still produces no receipt. What coverage proofs add is that *absence becomes checkable*: `conarium-coverage` emits a signed declaration over a period and the declared scope (`policy.allowTables`), asserting whether the receipt chain is contiguous (and naming the gap if not), and listing which declared objects have recorded access and which do not. **The declaration says "access NOT RECORDED", never "no access occurred"** — an absent record is ambiguous by nature: the access may not have happened, Conarium may have been bypassed, or logging may have failed. Receipts whose object cannot be determined are counted in `unassignedReceiptCount` and the verifier warns that the `notRecorded` list is not definitive while that count is above zero. Full bypass detection needs reconciliation against the data source's own logs (e.g. `pg_stat_statements`) — not implemented.
+2. **Bypass detection — addressed as of reconcile v0.1, with stated limits.** Disabling Conarium and reading the DB directly still produces no receipt — no gateway can prevent that from inside. What changed: absence is now *checkable from both sides*. One-sided: `conarium-coverage` emits a signed declaration (chain contiguity + which declared objects have recorded access). Two-sided: `conarium-reconcile` compares the database's own per-role query counters against the in-window receipts and reports any DB-recorded pattern no receipt covers (see §Reconciliation). Remaining limits, stated: reconciliation trusts the DB's own counters (an attacker who can falsify `pg_stat_statements` is out of scope), requires a dedicated DB role per gateway instance, and matches per pattern/table — never per call count. **The language rule stands: "access NOT RECORDED", never "no access occurred."**
 3. **Creation-time truth is not proven.** Without hardware attestation, an operator can still write false-but-well-formed receipts *before* anchoring.
 4. **In-file `sig` stripping + HMAC/`anchor` reduction.** Content `hash` is computed with `{hash, sig, anchor}` (and audit `signature`/`sig`) excluded, so an operator who controls the file can drop or thin those fields without invalidating the content hash itself. Contiguity and the trust store catch some boot-time cases, but full protection against in-file strip/reduce games is **not solvable in-file** (*in-file çözülemez*) — it needs an external transparency-log anchor and/or out-of-band key ceremony. **Mitigation available today, measured:** keep `CONARIUM_AUDIT_HMAC_KEY` enabled alongside Ed25519. HMAC is keyed, so an actor who strips `sig` and recomputes the unkeyed hashes still fails the HMAC check (`entry signature mismatch`). Verified by test: Ed25519 alone → strip-all passes the boot check; Ed25519 + HMAC → caught. `conarium-verify --pubkey` also catches it (exit 13, `missing sig`) because it is told to expect signatures. **Anchor is available** (`CONARIUM_ANCHOR_SINK=opentimestamps`) but starts as `pending` — Bitcoin finality is delayed (hours); see §Anchoring.
 5. **`argsHash` hurts debugging.** Support cases need the customer's own logs to correlate.

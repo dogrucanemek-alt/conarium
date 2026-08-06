@@ -30,6 +30,7 @@ The AI gets the context it needs to write code, but never sees your secrets.
 - **Row Caps:** Hard per-query limits. Prevent the silent exfiltration of millions of rows. 
 - **Immutable Audit Ledger:** Every access is logged (who, what, when, rows, decision). SOC2 & GDPR-ready, with no raw PII ever written to the logs.
 - **Verifiable Receipts (v0.1):** Ed25519-signed, independently verifiable receipts — see below.
+- **Coverage & Reconciliation:** a signed coverage declaration over the receipt chain (`conarium-coverage`), plus two-sided reconciliation against the database's own query counters (`conarium-reconcile`) — DB-recorded activity that no receipt covers is surfaced instead of staying invisible.
 - **100% Self-Hosted:** Runs entirely on your infrastructure. Your data never crosses your perimeter. 
 - **MCP-Native:** Works out of the box with **Cursor**, **GitHub Copilot**, **Claude Code**, and **Windsurf**.
 
@@ -62,6 +63,28 @@ npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --anchor-c
 Opt-in anchoring: `CONARIUM_ANCHOR_SINK=opentimestamps`. Upgrade pending proofs later with
 `npx conarium-anchor-upgrade ./audit.jsonl.anchors.jsonl`.
 
+### Coverage & reconciliation (bypass detection)
+
+Receipts prove what went **through** the gateway. Reconciliation asks the database
+what it saw, and compares:
+
+```bash
+# One-sided: signed coverage declaration over a period + declared scope
+npx conarium-coverage ./declaration.json --pubkey ./audit-ed25519.pub.pem --receipts ./receipts.jsonl
+
+# Two-sided: reconcile the DB's own per-role query counters against receipts.
+# Snapshots come from pg_stat_statements (scripts/pg-snapshot.sql), taken at
+# window start and window end with a dedicated DB role per gateway instance.
+npx conarium-reconcile --before before.json --after after.json --receipts ./receipts.jsonl
+# exit 0  = every DB query pattern in the window is covered by receipts
+# exit 40 = the DB recorded activity no receipt covers — the gateway may have
+#           been bypassed, or the receipt sink failed
+```
+
+The language is deliberate: absence is reported as **"access NOT RECORDED"** /
+**"not receipted"**, never "no access occurred" — an absent record is ambiguous
+by nature, and a tool that pretends otherwise is lying to its auditor.
+
 Full schema, exit codes, and known gaps: [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
 
 Signing is fail-closed: set `CONARIUM_AUDIT_SIGNING_KEY` and/or
@@ -87,11 +110,17 @@ same component that signs the record. Enforcement and evidence are one part here
 two systems that have to be reconciled.
 
 What we will defend: Conarium is the only implementation we are aware of that combines
-inline enforcement with a portable, offline-verifiable receipt of that enforcement, and
-has measured it end to end on a real operating company's live ERP — 121,374 records,
-121,366 identities masked, 485,496 fields masked, zero leaked to the model
-([Governance Report 001](https://conarium.dev/report-001.html)). If you know of another,
-open an issue and this section will be corrected.
+all three of **(1) inline enforcement** (policy + masking), **(2) a portable,
+offline-verifiable receipt** of that enforcement, and **(3) coverage
+reconciliation** — checking the database's own query counters against the receipt
+chain, so access that bypassed the gateway is surfaced instead of staying
+invisible. Signing receipts without enforcing is common; enforcing without
+portable receipts is common; reconciling both sides against the data source's
+own bookkeeping is the part we have not found elsewhere. Measured end to end on
+a real operating company's live ERP — 121,374 records, 121,366 identities
+masked, 485,496 fields masked, zero leaked to the model
+([Governance Report 001](https://conarium.dev/report-001.html)). If you know of
+another, open an issue and this section will be corrected.
 
 ---
 

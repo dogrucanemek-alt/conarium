@@ -8,7 +8,14 @@ import { fileURLToPath } from 'node:url';
 const here     = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..');
 
-const SRC_PATH  = path.join(repoRoot, 'bin', 'conarium-verify.mjs');
+// All CLIs whose exit codes the spec documents. Union semantics: every literal
+// code in any of these bins must appear in a RECEIPT-SPEC exit-code table row,
+// and every documented code must exist in at least one bin.
+const BIN_PATHS = [
+  path.join(repoRoot, 'bin', 'conarium-verify.mjs'),
+  path.join(repoRoot, 'bin', 'conarium-coverage.mjs'),
+  path.join(repoRoot, 'bin', 'conarium-reconcile.mjs'),
+];
 const DOCS_PATH = path.join(repoRoot, 'docs', 'RECEIPT-SPEC.md');
 
 // Collect literal exit-code integers from the CLI source. Three patterns,
@@ -41,16 +48,27 @@ function codesInDocs(text) {
   return [...out].sort((a, b) => a - b);
 }
 
-const sourceText  = readFileSync(SRC_PATH, 'utf8');
-const docsText    = readFileSync(DOCS_PATH, 'utf8');
-const codeNumbers = codesInCode(sourceText);
-const docNumbers  = codesInDocs(docsText);
+const docsText = readFileSync(DOCS_PATH, 'utf8');
+const docNumbers = codesInDocs(docsText);
+
+// Per-bin scan, so an undocumented code names the file it lives in.
+const perBin = BIN_PATHS.map(p => ({
+  path: p,
+  name: path.basename(p),
+  codes: codesInCode(readFileSync(p, 'utf8')),
+}));
+const codeNumbers = [...new Set(perBin.flatMap(b => b.codes))].sort((a, b) => a - b);
 
 const codeSet = new Set(codeNumbers);
 const docSet  = new Set(docNumbers);
 
-const undocumented = codeNumbers.filter(n => !docSet.has(n));
-const stale        = docNumbers.filter(n => !codeSet.has(n));
+const undocumented = [];
+for (const bin of perBin) {
+  for (const n of bin.codes) {
+    if (!docSet.has(n)) undocumented.push({ code: n, bin: bin.name });
+  }
+}
+const stale = docNumbers.filter(n => !codeSet.has(n));
 
 // This note is written in EVERY case, success or failure.
 process.stderr.write(
@@ -63,8 +81,8 @@ if (undocumented.length === 0 && stale.length === 0) {
   process.exit(0);
 }
 
-for (const n of undocumented) {
-  process.stderr.write(`UNDOCUMENTED exit code ${n} in bin/conarium-verify.mjs\n`);
+for (const u of undocumented) {
+  process.stderr.write(`UNDOCUMENTED exit code ${u.code} in bin/${u.bin}\n`);
 }
 for (const n of stale) {
   process.stderr.write(`STALE exit code ${n} in docs/RECEIPT-SPEC.md\n`);

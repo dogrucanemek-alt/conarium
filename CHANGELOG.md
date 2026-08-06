@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Added — conarium-reconcile v0.1: two-sided coverage (bypass detection)
+
+- New standalone CLI `bin/conarium-reconcile.mjs` (zero imports from `src/`):
+  reconciles the database's **own per-role query counters** (reference:
+  `pg_stat_statements`, snapshot helper `scripts/pg-snapshot.sql`) against the
+  in-window receipts. A DB-recorded query pattern no receipt covers exits 40:
+  *access was recorded by the database but not receipted* — gateway bypassed or
+  receipt sink failed; the tool states the fact, not the intent.
+- Honesty rules carried over from the coverage declaration: per-pattern/per-table
+  matching (never per call count — PostgREST fans one request into several
+  statements), nothing silently cleared (unattributable patterns fail the run),
+  unreliable windows refused (counter regression → exit 20), unassigned receipts
+  make findings explicitly non-definitive.
+- `test/spec_exitcode_drift.mjs` now guards **all three** CLIs
+  (verify / coverage / reconcile) against the RECEIPT-SPEC exit-code tables;
+  proven to fail in both directions.
+- RECEIPT-SPEC known gap #2 updated: bypass detection is now addressed with
+  stated limits (DB counters are trusted, dedicated role required).
+
 ### Fixed — HMAC signature contiguity (the HMAC half of F1)
 
 - `validateChain` rejected **unsigned legacy entries** as corrupt whenever an HMAC key was
