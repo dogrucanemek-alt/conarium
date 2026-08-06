@@ -19,6 +19,19 @@ export interface GovernancePolicy {
   maskColumns?: string[]
   /** Hard cap on rows returned to the AI assistant (default 100). */
   maxRows?: number
+  /**
+   * Mask names that the text itself marks as names — a title ("Sn. Ahmet
+   * Yılmaz") or a field label ("Yetkili: Ayşe Demir"). Default true.
+   *
+   * Names are the one identifier with no shape of their own, so column policy
+   * was the only thing catching them and free text went through untouched.
+   * This is NOT name recognition: a bare name in running prose is not detected,
+   * because guessing would trade this gateway's deterministic decisions for a
+   * confidence score. Set false where the labelled form is legitimate output —
+   * typically via a profile, so it stays off for one identified person rather
+   * than for everyone.
+   */
+  maskLabelledNames?: boolean
   /** Allowed API tools (e.g. "addPet", "getUser*"). */
   allowTools?: string[]
   /** Denied API tools. */
@@ -53,6 +66,7 @@ export interface GovernancePolicy {
 export interface MaskingProfile {
   maskColumns?: string[]
   maxRows?: number
+  maskLabelledNames?: boolean
 }
 
 export interface AuditConfig {

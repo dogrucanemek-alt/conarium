@@ -89,22 +89,51 @@ disable the product's only real guarantee, so masking resolves **per person**:
 
 Deliberately narrow, because this is the one feature that can *loosen* protection:
 
-- A profile may override **`maskColumns` and `maxRows` and nothing else.** Table,
-  tool and connector permissions stay global — a profile can never widen what is
-  reachable, only what is legible within it.
+- A profile may override **`maskColumns`, `maxRows` and `maskLabelledNames` — and
+  nothing else.** Table, tool and connector permissions stay global; a profile can
+  never widen what is reachable, only what is legible within it.
 - **Per-user tokens only.** An actor authenticated with a shared token never
   receives a profile. "Whoever holds this string sees unmasked PII" is precisely
   the failure this product exists to prevent.
 - **Fail-closed everywhere else:** no actor, unlisted actor, or a profile name that
   does not exist all fall back to the base policy, never to a wider one.
-- **The content scanner still runs.** A profile overrides column rules; it does not
-  switch off the email / national-ID / card / secret detectors, so PII appearing
-  inside free text is masked regardless of profile.
+- **The content scanners still run.** The email / national-ID / phone / card /
+  secret detectors are not overridable at all, so those stay masked in free text
+  no matter which profile applied. Name masking is the one detector a profile can
+  switch off (`maskLabelledNames: false`), because the controller reading their
+  own customer list is the case this feature exists for.
 - **The receipt says which profile applied** — `policy.id` becomes
   `conarium.policy/<profile>`, inside the signed hash. An access made under a
   relaxed profile cannot later be presented as having been fully masked. This is
   what keeps the audit story honest: the point was never "nobody sees PII", it is
   "every access is governed, and the evidence says under which rules."
+
+### Names in free text
+
+Every other identifier has a shape. An email has an `@`, a national ID has a
+checksum, a card has a length — a regex decides, and the decision reproduces.
+A name has no shape, so `maskColumns` was the only thing catching one, and a name
+typed into a free-text `note` reached the model verbatim.
+
+Two deterministic passes close the part of that gap that can be closed honestly:
+
+| Pass | What triggers it | Example |
+|---|---|---|
+| **Carry-over** | The value is one **this policy already masks** in some column | `customer_name` is masked, so `note: "Ayşe Demir called"` is masked too — including across rows |
+| **Labelled** | The **text itself** marks it: a title or a field label | `Sn. Ahmet Yılmaz`, `Yetkili: Ayşe Demir`, `customer: John Smith` |
+
+**What this does not do, deliberately: a bare name in running prose is not
+detected.** "Ahmet called yesterday" goes through. Catching that needs NER — a
+model, a dictionary and a confidence score — and every decision this gateway
+makes is meant to be reproducible from the rule alone, by someone who does not
+trust us. A probabilistic masker would also be a probabilistic *receipt*. Tools
+that do run NER (Presidio-based ones, for instance) cover more entity types; they
+buy that with a confidence threshold. Neither position dominates — this one is
+stated so an auditor knows which one they are holding.
+
+Carry-over ignores values under three characters (a two-character value matches
+everywhere and would shred the output) and matches on Unicode word boundaries, so
+`Ali` is masked in `Ali onayladı` but not inside `Kalite`.
 
 ### Coverage & reconciliation (bypass detection)
 

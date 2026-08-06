@@ -57,6 +57,78 @@ function match(pattern: string, value: string): boolean {
   return p === v
 }
 
+/**
+ * Free-text carry-over of values the policy already calls PII.
+ *
+ * The gap this closes: `maskColumns` masks `customer_name`, but the same name
+ * written into a `note` column left verbatim, so an operator who had masked
+ * every name column still shipped names to the model. There is no name
+ * detector here and none is claimed — the only strings treated as names are
+ * ones THIS policy already declared, which keeps the rule deterministic and
+ * explainable ("your own policy called this value PII; we honoured it
+ * everywhere it appears") instead of probabilistic.
+ *
+ * Deliberate limits, restated in docs so nobody reads more into it:
+ *  - a name that appears ONLY in free text is not detected here (see the
+ *    labelled-name pass for the narrow, contextual half of that problem);
+ *  - values under MIN_KNOWN_VALUE_LENGTH are ignored, because a one or two
+ *    character value matches everywhere and would shred the output;
+ *  - longest-first, so masking "Ayse Demir" never leaves a dangling "Demir".
+ */
+const MIN_KNOWN_VALUE_LENGTH = 3
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function knownValueMatchers(values: string[]): RegExp[] {
+  const unique = new Set<string>()
+  for (const value of values) {
+    const trimmed = value.trim()
+    if (trimmed.length >= MIN_KNOWN_VALUE_LENGTH) unique.add(trimmed)
+  }
+  return [...unique]
+    .sort((a, b) => b.length - a.length)
+    // Unicode-aware boundaries: \b is wrong for Turkish (it treats "ş" as a
+    // boundary), so "Ali" must not match inside "Kalite" but must match at
+    // "Ali," or "(Ali)".
+    .map(v => new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(v)}(?![\\p{L}\\p{N}])`, 'giu'))
+}
+
+function redactKnownValues(text: string, matchers: RegExp[]): { text: string; count: number } {
+  let out = text
+  let count = 0
+  for (const matcher of matchers) {
+    out = out.replace(matcher, () => {
+      count++
+      return '[MASKED_PII]'
+    })
+  }
+  return { text: out, count }
+}
+
+/**
+ * A capitalised run of one to three words — the shape of a written name once
+ * something else has already told us a name is coming.
+ */
+const NAME_SHAPE = String.raw`\p{Lu}\p{L}+(?:\s+\p{Lu}\p{L}+){0,2}`
+
+/** "Sn. Ahmet Yılmaz", "Dr. Ayşe Demir" — the title marks it, not a dictionary. */
+const TITLED_NAME_RE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}])(Sn\.|Sayın|Sayin|Bayan|Bay|Mrs\.|Mr\.|Ms\.|Dr\.|Av\.|Prof\.)\s+(${NAME_SHAPE})`,
+  'gu',
+)
+
+/**
+ * "Yetkili: Ayşe Demir", "customer: John Smith" — the field label marks it.
+ * The leading boundary is what keeps `filename: Rapor` out: the `name` inside
+ * `filename` is preceded by a letter, so it never starts a match.
+ */
+const LABELLED_NAME_RE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}])(müşteri|musteri|yetkili|kişi|kisi|temsilci|adı soyadı|adi soyadi|ad soyad|customer|contact|full name|name)\s*:\s*(${NAME_SHAPE})`,
+  'giu',
+)
+
 const WRITE_TOKENS = [
   'DROP ', 'TRUNCATE ', 'DELETE ', 'UPDATE ', 'INSERT ', 'ALTER ', 'CREATE ',
   'GRANT ', 'REVOKE ', 'MERGE ', 'COPY ', 'CALL ', 'DO ', 'VACUUM ',
@@ -168,12 +240,15 @@ export class Governance {
       )
       return this
     }
-    // Only these two fields. Table/tool/connector permissions are NOT overlayable,
+    // Only these three fields. Table/tool/connector permissions are NOT overlayable,
     // so a profile cannot widen reachability — only legibility within it.
+    // `maskLabelledNames` belongs to that same class: it changes how much of a
+    // reachable row one identified person can read, never which rows exist.
     const merged: GovernancePolicy = {
       ...this.policy,
       ...(profile.maskColumns !== undefined ? { maskColumns: profile.maskColumns } : {}),
       ...(profile.maxRows !== undefined ? { maxRows: profile.maxRows } : {}),
+      ...(profile.maskLabelledNames !== undefined ? { maskLabelledNames: profile.maskLabelledNames } : {}),
     }
     return new Governance(merged, wanted)
   }
@@ -277,39 +352,48 @@ export class Governance {
   }
 
   redact(result: QueryResult, aliases: Record<string, string> = {}, metadata?: GovernanceMetadata): GovernedQueryResult {
-    const masks = this.policy.maskColumns ?? []
     const maskedFieldLookup = new Set((metadata?.maskedFields ?? []).map(f => f.toLowerCase()))
     const maskedFields = new Set(metadata?.maskedFields ?? [])
     let maskedCount = 0
 
+    // PASS 1 — collect the raw values this policy has already declared to be PII.
+    // See `knownValueMatchers`: the same name that gets masked in `customer_name`
+    // was leaving verbatim inside a free-text `note` on the very same row.
+    const declared: string[] = []
+    for (const row of result.rows) {
+      for (const key of Object.keys(row)) {
+        if (!this.masksColumn(row, key, aliases, maskedFieldLookup)) continue
+        const value = row[key]
+        if (typeof value === 'string') declared.push(value)
+      }
+    }
+    const matchers = knownValueMatchers(declared)
+
+    // PASS 2 — mask.
     const rows = result.rows.map(row => {
       const out: Record<string, unknown> = { ...row }
       for (const key of Object.keys(out)) {
-        const table = typeof out._table === 'string' ? out._table : ''
-        const sourceKey = aliases?.[key.toLowerCase()] || key
-        const keyLower = key.toLowerCase()
-        const qualifiedSource = table ? `${table}.${sourceKey}` : sourceKey
-        
-        // Also mask by bare COLUMN NAME (last path segment of any mask rule). This
-        // closes the SELECT * / star-projection leak: when the executable rows carry
-        // no _table qualifier, a fully-qualified rule like public.customers.address
-        // would otherwise never match. For a PII tool, over-masking a configured
-        // column name across governed output is the safe direction.
-        const maskColMatch = masks.some(m =>
-          match(m, qualifiedSource) || match(m, sourceKey) || match(m, key) ||
-          m.slice(m.lastIndexOf('.') + 1).toLowerCase() === keyLower)
-        if (maskedFieldLookup.has(keyLower) || maskColMatch) {
+        if (this.masksColumn(out, key, aliases, maskedFieldLookup)) {
           out[key] = '[MASKED_PII]'
           maskedFields.add(key)
           maskedCount++
           continue
         }
-        
+
         const scanRes = this.maskPII(out[key])
         out[key] = scanRes.masked
         if (scanRes.count > 0) {
           maskedFields.add(key)
           maskedCount += scanRes.count
+        }
+
+        if (typeof out[key] === 'string' && matchers.length > 0) {
+          const carried = redactKnownValues(out[key] as string, matchers)
+          if (carried.count > 0) {
+            out[key] = carried.text
+            maskedFields.add(key)
+            maskedCount += carried.count
+          }
         }
       }
       return out
@@ -322,6 +406,31 @@ export class Governance {
     })
 
     return { ...result, rows, governance }
+  }
+
+  /** True when `key` of `row` is masked by policy (or by upstream query analysis). */
+  private masksColumn(
+    row: Record<string, unknown>,
+    key: string,
+    aliases: Record<string, string>,
+    maskedFieldLookup: Set<string>,
+  ): boolean {
+    const keyLower = key.toLowerCase()
+    if (maskedFieldLookup.has(keyLower)) return true
+
+    const masks = this.policy.maskColumns ?? []
+    const table = typeof row._table === 'string' ? row._table : ''
+    const sourceKey = aliases?.[keyLower] || key
+    const qualifiedSource = table ? `${table}.${sourceKey}` : sourceKey
+
+    // Also mask by bare COLUMN NAME (last path segment of any mask rule). This
+    // closes the SELECT * / star-projection leak: when the executable rows carry
+    // no _table qualifier, a fully-qualified rule like public.customers.address
+    // would otherwise never match. For a PII tool, over-masking a configured
+    // column name across governed output is the safe direction.
+    return masks.some(m =>
+      match(m, qualifiedSource) || match(m, sourceKey) || match(m, key) ||
+      m.slice(m.lastIndexOf('.') + 1).toLowerCase() === keyLower)
   }
 
   maskPII(obj: unknown): { masked: unknown, count: number } {
@@ -368,6 +477,28 @@ export class Governance {
       masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, (_m, p1, p2) => { count++; return `${p1}[MASKED_SECRET]${p2}`; });
       masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, (_m, p1) => { count++; return `${p1}[MASKED_SECRET]`; });
       masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, (_m, p1) => { count++; return `${p1}[MASKED_SECRET]`; });
+
+      // LABELLED NAMES. A person's name is the one identifier this gateway could
+      // not see: emails, national ids, phones and cards have shape, names do not.
+      // Column policy caught `customer_name`; a name written into a free-text
+      // note went to the model verbatim.
+      //
+      // What this does NOT do, deliberately: detect a bare name in running prose
+      // ("Ahmet called yesterday"). That needs NER — a model, a dictionary and a
+      // confidence score — and this gateway's whole claim is that its decisions
+      // are deterministic and reproducible from the rule alone. Only names the
+      // TEXT ITSELF marks as names, via a title or a field label, are masked.
+      // The residual gap is documented rather than papered over.
+      if (this.policy.maskLabelledNames !== false) {
+        masked = masked.replace(TITLED_NAME_RE, (_m, title: string) => {
+          count++
+          return `${title} [MASKED_PII]`
+        })
+        masked = masked.replace(LABELLED_NAME_RE, (_m, label: string) => {
+          count++
+          return `${label}: [MASKED_PII]`
+        })
+      }
 
       // Sertleştirme (Claude, 2026-07-02): encode(...,'base64') ile kaçırılan PII'yi de yakala.
       // NEO red-team harness bu deliği buldu (pii-base64 BYPASS). Saf base64 bir metin
