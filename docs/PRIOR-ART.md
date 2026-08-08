@@ -142,10 +142,16 @@ uncertainty is unresolved and cannot be resolved from outside.
 
 - `EP 3861676 B1` was granted 2025-08-06 and **Turkey is among its designated states**.
   Designation is not validation: enforceability in Turkey requires a national
-  validation filing, which is recorded only in the national register. That register
-  is captcha-gated and was not read. Suggestive but not conclusive: of the 27
-  countries with national post-grant events on this patent, Turkey is not one — and
-  the proprietor let it lapse in 18 contracting states during 2026.
+  validation filing. **The Turkish register was searched on 2026-08-08 and returned
+  no record** (TÜRKPATENT patent search, *EPC Yayın Numarası B1* = `EP3861676B1`).
+  The search method was verified against a positive control first: `EP3547077B1`, a
+  Google EP that **is** validated in Turkey, returns its Turkish record
+  (`2024/002851`). A first attempt using the bare number `3547077` returned nothing
+  for that known-good patent — the field requires the full `EPxxxxxxxB1` form, so the
+  format had to be fixed before the negative meant anything. Consistent with INPADOC:
+  of the 27 countries with national post-grant events on this patent Turkey is not
+  one, and the proprietor let it lapse in 18 contracting states during 2026.
+  This is a register search, not legal advice, and a register can lag.
 - Only claim 1 of each patent was analysed. Other independent claims were not.
 - Prosecution history, claim construction and the doctrine of equivalents are
   outside what a document scan can reach.
