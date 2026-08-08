@@ -95,6 +95,62 @@ invention. Enforcement, Ed25519 receipts and query counters are all mature. The
 combination is the claim — the same way SPDX and CycloneDX did not invent dependency
 lists.
 
+## Patent scan, 8 August 2026 — including a correction to this document
+
+The scan above looked at *projects*. This section looks at *patents*, and it corrects
+a claim made earlier in this file.
+
+**Method:** claim 1 of each patent was read in full and mapped element-by-element
+against the design in [CONSENT-BINDING-SPEC.md](CONSENT-BINDING-SPEC.md). Family and
+legal-status data from Google Patents (INPADOC-derived). Claim texts from
+freepatentsonline; **not yet checked against the official USPTO PDFs.** This is a
+scan, not a freedom-to-operate opinion, and it was not performed by a lawyer.
+
+| Patent | Owner | Family | Nearest-element verdict |
+|---|---|---|---|
+| `US 11032071 B2` — Secure and verifiable data access logging system | **Microsoft** | US only | 4 of 7 elements absent: no request token is generated or returned to the client, and the data server never calls back for a request digest. Their architecture is three-party and requires changes at the data server; ours is a single in-line gateway against an unmodified PostgreSQL. |
+| `US 10678945` · `US 10440062` · `US 10776518` — Consent receipt management systems | **OneTrust** | US only | At least 5 elements absent in each. These claim a *consent collection* platform: a UI shown to the data subject, generation of a consent receipt key, a virtual browser capturing the blank consent form, and transmission of a receipt **to the data subject**. Conarium never interacts with a data subject and does not collect consent — it hashes a consent record someone else holds into an access receipt. |
+| `US 11790111` · `US 12105843` · **`EP 3861676 B1`** — Verifiable consent for privacy protection | **Google** | US · EP · CN · WO | **Conceptually the closest found.** An attestation token carrying user consent data and a digital signature. But the direction is inverted: theirs is an *input* credential validated before an action is permitted (including a token-freshness window and, in `11790111`, selecting ad components); ours is an *output* artifact recording what already happened. Elements (a), (d) and (f) are absent. |
+| `US 7770032 B2` — Secure logging for irrefutable administration | — | US · EP · WO | **Expired.** Hash-chained, MAC-protected log entries — the technique underneath our own chain. Its expiry is worth stating plainly: tamper-evident logging is old, public art, and we have never claimed otherwise. |
+
+### 🔴 Correction to this document
+
+This file names **h33.ai** as one of two projects doing both enforcement and portable
+evidence, and cites its ten stated patent applications. That product-level reading
+stands — it came from their own site and nothing here refutes it. What was wrong was
+the inference drawn from it: that those applications might cover the consent-binding
+ground. The six published application numbers were read on 8 August 2026 and their
+subject matter is **not** consent-to-access binding:
+
+| Application | Subject |
+|---|---|
+| `19/645,499` | Substrate — FHE ↔ post-quantum interface architecture |
+| `19/656,024` | NTT — number-theoretic transform optimisation |
+| `19/661,294` | Upstream — asset provenance and encrypted metadata |
+| `19/669,799` | TFHE routing — homomorphic engine selection |
+| `19/683,841` | Q-Sign — authorisation and signing |
+| `19/693,384` | Agent-Zero — multi-agent accountability |
+
+`19/645,499` is a post-quantum attestation primitive that commits a computation result
+in 58 bytes and anchors it to Bitcoin. That is a different object from binding a
+consent record to a data-access record. The earlier framing overstated the overlap.
+
+Four of the stated ten applications remain unpublished and therefore invisible. That
+uncertainty is unresolved and cannot be resolved from outside.
+
+### What this scan does not settle
+
+- `EP 3861676 B1` was granted 2025-08-06 and **Turkey is among its designated states**.
+  Designation is not validation: enforceability in Turkey requires a national
+  validation filing, which is recorded only in the national register. That register
+  is captcha-gated and was not read. Suggestive but not conclusive: of the 27
+  countries with national post-grant events on this patent, Turkey is not one — and
+  the proprietor let it lapse in 18 contracting states during 2026.
+- Only claim 1 of each patent was analysed. Other independent claims were not.
+- Prosecution history, claim construction and the doctrine of equivalents are
+  outside what a document scan can reach.
+- Maintenance-fee status was not verified at USPTO Patent Center.
+
 ## Limitations of this scan — read these before citing it
 
 An unread source is not a cleared source, and an empty search result is not evidence
@@ -108,7 +164,9 @@ of absence. Both mistakes have been made on this project before.
    audit log. Then I found 13 breaks in it"* — touches exactly the integrity-versus-
    coverage distinction. Unevaluated, not dismissed.
 3. **h33patent.com could not be fetched** (TLS certificate mismatch). h33.ai publishes
-   6 application numbers of a stated 10; the remainder are not public.
+   6 application numbers of a stated 10; the remainder are not public. The six were
+   read on 2026-08-08 — see the correction above — but the four unpublished ones
+   remain invisible.
 4. Only four h33.ai pages were read. Its blog archive, PDFs and whitepapers were not.
 5. hoop.dev's full `docs/*` tree was not traversed — README and search snippets only.
 6. No formal "non-goals / limitations" section was found for Acta; we could not

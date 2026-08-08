@@ -114,8 +114,16 @@ async function main(argv = process.argv.slice(2)) {
 
   // Same sidecar shape the receipt anchoring writes, so conarium-anchor-upgrade
   // works on it unchanged.
+  //
+  // A revised document is stamped again and appended: the earlier row keeps proving
+  // the earlier revision existed, and the new row proves the current one. Sequence
+  // continues from what is already in the sidecar — two rows both claiming seq 1
+  // would misreport the order of revisions.
+  const priorRows = existsSync(sidecarPath)
+    ? readFileSync(sidecarPath, 'utf-8').split('\n').filter((l) => l.trim()).length
+    : 0
   const record = {
-    seq: 1,
+    seq: priorRows + 1,
     hash,
     log: 'opentimestamps',
     ots: otsBase64,
