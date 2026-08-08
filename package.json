@@ -1,7 +1,7 @@
 {
   "name": "@conarium-ai/core",
   "version": "0.1.0",
-  "description": "Governed MCP gateway for AI data access: policy enforcement and PII masking, an Ed25519-signed receipt per access that a third party verifies offline, and coverage reconciliation against the database's own query counters so access that bypassed the gateway is surfaced.",
+  "description": "Governed MCP gateway for AI data access: policy enforcement and PII masking, an Ed25519-signed receipt per access that a third party verifies offline, coverage reconciliation against the database's own query counters to surface access that bypassed the gateway, and conformance vectors so the receipt format can be implemented without us. Self-hosted, MIT.",
   "keywords": [
     "mcp",
     "ai",
@@ -20,7 +20,10 @@
     "cursor",
     "copilot",
     "claude",
-    "self-hosted"
+    "self-hosted",
+    "conformance-vectors",
+    "opentimestamps",
+    "codex"
   ],
   "homepage": "https://github.com/dogrucanemek-alt/conarium",
   "license": "MIT",

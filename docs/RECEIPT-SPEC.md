@@ -85,6 +85,36 @@ conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [
 
 Fail-closed: if the verifier is unsure, it does not exit 0.
 
+⚠️ Known deviation: under `--anchor-check`, a network error reaching a block
+explorer currently surfaces as exit 14 — the same code as a proof that does not
+hold. *Could not check* and *invalid* are not the same fact, and this document
+does not pretend otherwise. Tracked, not fixed.
+
+## Conformance vectors
+
+A specification that cannot be implemented from the document alone is a blog
+post. [`test-vectors/`](../test-vectors/) is the difference: nine frozen cases,
+the public key, and a machine-readable manifest.
+
+```
+npm run test:vectors
+```
+
+Feed each case's `receipts.jsonl` to your verifier with the arguments in
+`manifest.json` and compare the exit code. No network, no server, no account.
+
+Two of the cases exist because they are easy to get wrong:
+
+- **005** — the chain still links across a deleted receipt; only `seq` reveals
+  the gap. A verifier that checks hashes but not sequence passes it and is wrong.
+- **008** — an unsigned receipt with no `--pubkey` still fails. There is no mode
+  in which the verifier reports success on a signature it did not check.
+
+The private key is deliberately absent. `expected-hashes.json` publishes the
+canonical hashes instead: JCS (RFC 8785) → SHA-256. Match those and your
+canonical bytes match ours, which is all interoperability requires — sign with
+your own key.
+
 ## Coverage declaration (one-sided)
 
 ```

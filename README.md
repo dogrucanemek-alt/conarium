@@ -163,6 +163,43 @@ performed on ourselves and the tool caught:
 
 Full schema, exit codes, and known gaps: [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
 
+### Implementing the format yourself
+
+The receipt is meant to outlive this implementation, so it ships with
+conformance vectors — nine frozen cases plus a machine-readable manifest in
+[`test-vectors/`](test-vectors/):
+
+```bash
+npm run test:vectors     # our verifier against the frozen cases
+```
+
+Point your own verifier at each `receipts.jsonl`, pass the arguments listed in
+`manifest.json`, and compare the exit code. `expected-hashes.json` gives the
+canonical JCS → SHA-256 hashes so you can check your canonicalisation without
+needing our private key, which is deliberately not published.
+
+The vectors found two things in this repository on their first run: a schema
+check that reported a structurally invalid receipt as *tampered*, and a wrong
+assumption of ours about unsigned receipts. Both are now frozen as cases 007
+and 008.
+
+### Anchoring your chain (optional)
+
+`conarium-stamp` anchors a file to the OpenTimestamps calendars, and
+`conarium-anchor-upgrade` fills in the Bitcoin block height once it lands.
+Those two are all most setups need.
+
+If you would rather expose anchoring as a small service — for several
+gateways, or to hand an auditor a stable URL —
+[`bin/conarium-anchor-service.mjs`](bin/conarium-anchor-service.mjs) is one:
+it submits hashes, retains proofs, serves the raw `.ots` at a permanent path,
+and upgrades pending anchors on a timer.
+
+It is code you run, not a service we operate — there is no hosted instance to
+sign up for. It also serves the raw proof precisely so a third party can verify
+with the reference OpenTimestamps client and ignore the service entirely. An
+anchoring endpoint you have to trust would defeat the purpose of anchoring.
+
 Signing is fail-closed: set `CONARIUM_AUDIT_SIGNING_KEY` and/or
 `CONARIUM_AUDIT_HMAC_KEY`, or explicitly `CONARIUM_AUDIT_UNSIGNED=1` for throwaway setups.
 Key rotation: keep prior public PEMs in `CONARIUM_AUDIT_TRUST_PUBKEYS` (`,` / `;`
@@ -286,10 +323,32 @@ Anything not in `allowTables` is denied by default; matched `maskColumns` are re
 
 Conarium is **early access** — and honest about what's real:
 
-**Shipping now:** governed MCP gateway (stdio) · inline PII masking · allow/deny + row caps · immutable audit ledger · Postgres, docs & OpenAPI connectors.
+**Shipping now:** governed MCP gateway (stdio + HTTP) · deterministic PII masking,
+including labelled names in free text · allow/deny + row caps · per-person masking
+profiles · immutable hash-chained audit ledger · Ed25519-signed receipt per access
+with an offline verifier · signed coverage declarations · two-sided reconciliation
+against the database's own counters · OpenTimestamps anchoring and an optional
+anchoring service · conformance vectors · Postgres, Supabase, docs, OpenAPI, Jira
+and Slack connectors.
 
-**On the way:** one-command `npx conarium` CLI · hosted cloud console · SSO / RBAC · compliance reports (SOC2 / GDPR exports) · semantic (LLM-based) masking · Jira & Slack connectors.
+**Next:** consent binding ([spec published](docs/CONSENT-BINDING-SPEC.md), no code —
+patent review first) · a second independent implementation of the receipt format ·
+per-user identity bound to an identity provider rather than an operator token map.
+
+**Deliberately not planned**, so nobody waits for it:
+
+- **LLM-based "semantic" masking.** The gate is deterministic on purpose. A
+  probabilistic mask would make a probabilistic receipt, which is not a receipt.
+- **Hosted cloud console.** Self-hosted is the claim; a hosted console would put
+  us in the data path we tell you we are not in.
+- **SOC 2.** It audits organisations that hold customer data. We never receive
+  yours. If that ever stops being true, this line changes first.
+
+Known gaps are listed in the README above and in
+[`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md) rather than hidden here.
 
 ## 📜 License
 
-Conarium core is licensed under the [MIT License](LICENSE). Enterprise features and priority support will be available via [conarium.dev](https://conarium.dev).
+MIT — all of it, including the verifier, the reconciliation tooling and the
+anchoring service. There is no feature held back for a paid tier; what
+[conarium.dev](https://conarium.dev) sells is support, not access to code.
