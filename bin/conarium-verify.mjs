@@ -286,6 +286,18 @@ function schemaOk(r) {
   }
   if (!('consentRef' in r)) return 'missing consentRef (must be null)'
   if (!('anchor' in r)) return 'missing anchor field'
+  // Govde alanlari da semaya dahildir. Bunlar olmadan da hash zaten tutmaz ve
+  // exit 10 doner — ama "kurcalanmis" TESHISI yanlis olur: eksik alanli bir
+  // kayit degistirilmis bir makbuz degil, hic makbuz degildir. Teshis dogru
+  // olsun diye burada yakalaniyor (test-vectors/007 bunu kilitliyor).
+  for (const alan of ['period', 'request', 'dataRefs', 'policy', 'flags', 'masking', 'outcome']) {
+    if (!(alan in r) || r[alan] === null || r[alan] === undefined) return `missing ${alan}`
+  }
+  if (!Array.isArray(r.dataRefs)) return 'dataRefs must be an array'
+  if (!Array.isArray(r.flags)) return 'flags must be an array'
+  if (typeof r.policy !== 'object' || typeof r.policy.decision !== 'string') {
+    return 'policy.decision is required'
+  }
   // v0.1: aktör "service" olmak zorunda (degismedi — eski makbuzlar aynen dogrulanir)
   if (r.v === RECEIPT_V1) {
     if (!r.actor || r.actor.type !== 'service') return 'actor.type must be "service" in v0.1'

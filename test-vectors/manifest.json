@@ -1,0 +1,95 @@
+{
+  "format": "conarium-receipt",
+  "versionUnderTest": "conarium-receipt/0.3",
+  "keyId": "cnr-vectors",
+  "publicKey": "keys/vector-key.pub.pem",
+  "note": "Frozen conformance vectors. Run each case through your verifier and compare the exit code. KEYS/ in args resolves to the keys/ directory at the root of test-vectors.",
+  "exitCodes": {
+    "0": "chain intact, signatures valid",
+    "10": "hash mismatch — record altered",
+    "11": "prevHash break — deleted or inserted",
+    "12": "seq gap / non-increasing",
+    "13": "signature invalid or missing while a pubkey was supplied",
+    "20": "schema invalid"
+  },
+  "cases": [
+    {
+      "name": "001-single-receipt",
+      "description": "One valid signed receipt. The smallest passing case.",
+      "exitCode": 0,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "002-chain-of-three",
+      "description": "Three receipts linked by prevHash. Contiguous, all signed.",
+      "exitCode": 0,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "003-tampered-field",
+      "description": "outcome.rows changed from 2 to 999 after signing. The stored hash no longer matches the body.",
+      "exitCode": 10,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "004-prevhash-break",
+      "description": "The middle receipt of the chain was deleted. #3 points at a hash that is no longer present.",
+      "exitCode": 11,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "005-seq-gap",
+      "description": "seq jumps 1 -> 7. prevHash still links, so only the counter reveals the gap.",
+      "exitCode": 12,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "006-bad-signature",
+      "description": "First byte of the signature flipped. Body and hash are untouched — only the signature is wrong.",
+      "exitCode": 13,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "007-schema-invalid",
+      "description": "policy removed. The verifier must reject the shape before it trusts anything else in the file.",
+      "exitCode": 20,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "008-unsigned-no-pubkey",
+      "description": "An unsigned receipt, verified without --pubkey. Hash and chain are intact, yet the answer is still 13: the verifier never reports success on a signature it did not check.",
+      "exitCode": 13,
+      "args": []
+    },
+    {
+      "name": "009-unsigned-but-pubkey-given",
+      "description": "The same unsigned receipt, but the caller asked for signature verification. Fail-closed: a missing signature is not a passing signature.",
+      "exitCode": 13,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    }
+  ]
+}

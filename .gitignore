@@ -57,3 +57,9 @@ PROJECT_CONTEXT.md
 # Acik anahtarlar guvenli ve testlerin ihtiyaci — istisna.
 !*.pub.pem
 !test/fixtures/**/pubkey.pem
+# Konformans vektorlerinin ACIK anahtari ve keyId yan dosyasi yayimlanmali:
+# dogrulayici keyId sidecar'i olmadan exit 13 verir, yani bu satir olmadan
+# TAZE KLONDA butun vektorler kirik gelir. (Ozel anahtar yukaridaki *.pem
+# kuralinda kaliyor ve BILEREK yayimlanmiyor — bkz test-vectors/README.md.)
+!test-vectors/keys/*.pub.pem
+!test-vectors/keys/*.pub.pem.keyid

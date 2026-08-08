@@ -1,0 +1,24 @@
+{
+  "note": "Canonicalise the receipt with JCS (RFC 8785) excluding chain.hash, sig and anchor, then SHA-256. If your hash matches, your canonical form matches byte for byte.",
+  "genesisPrevHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "receipts": [
+    {
+      "case": "001-single-receipt",
+      "seq": 1,
+      "prevHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "sha256:dbbbd3139923cdf7f854283b495386526de0629a71dc4d5407a3a810ee3e1847"
+    },
+    {
+      "case": "002-chain-of-three",
+      "seq": 2,
+      "prevHash": "sha256:dbbbd3139923cdf7f854283b495386526de0629a71dc4d5407a3a810ee3e1847",
+      "hash": "sha256:56937472179de1567fee9f0b863c7c5d16d8d6b7a8e613e9bf50fb321f82433c"
+    },
+    {
+      "case": "002-chain-of-three",
+      "seq": 3,
+      "prevHash": "sha256:56937472179de1567fee9f0b863c7c5d16d8d6b7a8e613e9bf50fb321f82433c",
+      "hash": "sha256:a06a30c3fb4bdbd46bb9400da0815fb3a7007b703cc9cb41208be08413e254c7"
+    }
+  ]
+}
