@@ -2,7 +2,27 @@
 
 ## Unreleased
 
-Nothing yet — 0.1.1 is the current cut.
+Nothing yet — 0.1.2 is the current cut.
+
+## 0.1.2 — 2026-08-13
+
+Patch. `conarium-doctor` aborted instead of exiting when a connector was
+unreachable.
+
+### Fixed
+
+- **The documented exit contract (`0` clean / `1` problems / `2` could not run)
+  was not honoured on the network path.** The TCP probe resolved on the socket's
+  `error` event and the process then exited while the handle was still closing;
+  on Windows libuv asserted (`UV_HANDLE_CLOSING`) and the run ended with **127**
+  — a code this tool does not define, printed under an assertion trace. Anything
+  gating a deployment on the exit status could not read it. Reproduced 3/3 with
+  a refused connection; `--no-net` was never affected.
+
+  The probe now resolves after the socket has actually closed, and the tool sets
+  `process.exitCode` instead of calling `process.exit()`, so the loop drains on
+  its own. A regression test pins it: an unreachable connector must exit `1` and
+  the output must not contain an assertion.
 
 ## 0.1.1 — 2026-08-13
 

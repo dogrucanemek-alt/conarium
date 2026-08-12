@@ -237,6 +237,24 @@ test('unreachable registry is a warning, doctor still exits 0', async () => {
   assert.ok(/registry unreachable/.test(out), 'must warn, not stay silent')
 })
 
+// --- exit contract with the network probe on -----------------------------------
+
+test('an unreachable connector exits 1 — not an abort', async () => {
+  // Regression. The probe resolved on the socket's error event and the process
+  // exited while the handle was still closing; on Windows libuv asserted and the
+  // run ended with 127. 127 is not one of this tool's codes, and a deployment
+  // gate reading the exit status cannot act on it.
+  const dir = tmpdir()
+  writeConfig(dir, {
+    ...HEALTHY,
+    connectors: [{ type: 'postgres', name: 'maindb', config: { url: 'postgresql://u:p@127.0.0.1:1/db' } }],
+  })
+  const { status, out } = runDoctor(dir, { args: [], env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.ok(!/Assertion failed/.test(out), 'the process aborted instead of exiting cleanly')
+  assert.strictEqual(status, 1, `unreachable connector must exit 1, got ${status}`)
+  assert.ok(/Reachability/.test(out), 'the failure must be named')
+})
+
 // --- run ----------------------------------------------------------------------
 
 for (const { name, fn } of tests) {

@@ -86,11 +86,19 @@ function tcpProbe(host, port, timeoutMs = 4000) {
   return new Promise((done) => {
     const sock = new net.Socket()
     let settled = false
+    // Resolve only once the socket is fully closed. Resolving on the error
+    // event and exiting immediately used to abort the process on Windows —
+    // libuv asserts when the handle is still closing (UV_HANDLE_CLOSING) —
+    // and the run ended with 127 instead of the documented 0/1/2.
     const finish = (r) => {
       if (settled) return
       settled = true
+      if (sock.destroyed) {
+        done(r)
+        return
+      }
+      sock.once('close', () => done(r))
       sock.destroy()
-      done(r)
     }
     sock.setTimeout(timeoutMs)
     sock.once('connect', () => finish({ reachable: true }))
@@ -477,4 +485,7 @@ console.log(`${results.length} checks · ${fails} failed · ${warns} warning(s)`
 if (fails === 0 && warns === 0) console.log('This install is ready.')
 if (fails > 0) console.log('Fix the FAIL lines above; the gateway will not govern correctly until you do.')
 console.log('')
-process.exit(fails > 0 ? 1 : 0)
+// Set the code and let the loop drain. process.exit() here raced the closing
+// probe sockets and aborted the process on Windows, which surfaced as 127 —
+// a code this tool does not define, and one a deployment gate cannot read.
+process.exitCode = fails > 0 ? 1 : 0
