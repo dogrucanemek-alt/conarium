@@ -110,9 +110,28 @@ type OtsDetached = {
 
 function loadOts(): OtsModule {
   // createRequire — avoids Vite/vitest resolving the CJS package via import-analysis.
-  let mod = require('javascript-opentimestamps') as OtsModule & { default?: OtsModule }
-  if (mod && mod.default) mod = mod.default
-  return mod
+  //
+  // OPSİYONEL BAĞIMLILIK (2026-08-12). `javascript-opentimestamps` kendi bağımlılık
+  // ağacında düzeltmesi OLMAYAN kritik açıklar taşıyor: `request` (SSRF, paket 2020'de
+  // terk edildi), `web3` (güvensiz kimlik saklama), `crypto-js` (zayıf PBKDF2).
+  // Çıpalama isteğe bağlı bir ek — çekirdek vaat (politika + maskeleme + makbuz) ona
+  // ihtiyaç duymuyor. Zorunlu bağımlılık bırakmak, çıpalama kullanmayan HERKESE o
+  // açıkları kurdurmak demekti. Artık yalnızca çıpalamayı açan kurar.
+  try {
+    let mod = require('javascript-opentimestamps') as OtsModule & { default?: OtsModule }
+    if (mod && mod.default) mod = mod.default
+    return mod
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException
+    if (e?.code === 'MODULE_NOT_FOUND') {
+      throw new Error(
+        'Çıpalama için `javascript-opentimestamps` gerekiyor ama kurulu değil. ' +
+        'Kurmak için: npm install javascript-opentimestamps — ya da CONARIUM_ANCHOR_SINK=none bırakın. ' +
+        '(Opsiyonel tutuluyor: bu paketin bağımlılık ağacında düzeltilmemiş kritik açıklar var.)'
+      )
+    }
+    throw err
+  }
 }
 
 /** Real OpenTimestamps calendar stamp. Only the 32-byte hash is sent. */
