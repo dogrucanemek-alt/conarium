@@ -339,7 +339,10 @@ Conarium speaks MCP over **stdio**, so your AI assistant launches it as a comman
 ```json
 {
   "mcpServers": {
-    "conarium": { "command": "node", "args": ["dist/index.js"] }
+    "conarium": {
+      "command": "npx",
+      "args": ["-y", "--package=@conarium-ai/core", "conarium", "--config", "/path/to/your/conarium.config.json"]
+    }
   }
 }
 ```

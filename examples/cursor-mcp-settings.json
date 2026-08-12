@@ -3,7 +3,7 @@
   "mcpServers": {
     "conarium": {
       "command": "npx",
-      "args": ["-y", "@conarium-ai/core", "--config", "/path/to/your/conarium.config.json"],
+      "args": ["-y", "--package=@conarium-ai/core", "conarium", "--config", "/path/to/your/conarium.config.json"],
       "description": "Conarium — company-aware AI context"
     }
   }
