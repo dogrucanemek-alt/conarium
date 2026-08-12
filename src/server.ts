@@ -192,11 +192,23 @@ export function buildServer(
           },
         },
       },
-    ],
+    ].filter(t => governance.allowsTool(t.name)),
+    // Politikayla kapatılan araç listede de görünmez. Aksi hâlde model aracı
+    // görür, çağırır, reddedilir — kapalı olduğunu keşfetmenin tek yolu denemek
+    // olurdu ve her deneme denetim kaydına gürültü yazardı.
   }))
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params
+
+    // Araç izni her şeyden ÖNCE: reddedilen araç connector'a, sorguya ya da ağa
+    // hiç ulaşmasın. Denetim satırı yine düşer — reddedilen erişim de bir erişim
+    // girişimidir ve makbuzun onu görmemesi, tam olarak bu ürünün kaçındığı
+    // sessizlik olurdu.
+    if (!governance.allowsTool(name)) {
+      kaydet({ tool: name, args: args as Record<string, unknown>, denied: true, reason: 'policy' })
+      throw new PolicyError(`Tool '${name}' is not permitted by policy.`)
+    }
 
     const getConnector = (preferredName?: string, need?: keyof ConnectorCapabilities): Connector => {
       if (!connectors.length) throw new Error('No connectors available. Check your conarium.config.json.')

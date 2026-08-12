@@ -274,6 +274,30 @@ export class Governance {
   }
 
   /**
+   * Araç izni — `allowTools` / `denyTools`.
+   *
+   * 🔴 2026-08-12: bu alanlar KONSOLDA düzenlenebiliyor, `types.ts`'te belgeli ve
+   * testi vardı, ama kontrol yalnızca hiçbir yerden çağrılmayan `ApiGovernance`
+   * içinde duruyordu — yani operatör "şu aracı kapattım" der, hiçbir şey kapanmazdı.
+   * Delik değildi (yazma işlemleri connector'da zaten reddediliyor, okuma
+   * `allowsTable`'dan geçiyor), ama YANLIŞ BEYANDI: arayüz bir söz veriyor, motor
+   * tutmuyordu. Bu ürünün tek iddiası "söylediğini gerçekten yapmak" olduğu için
+   * ölü bir politika alanı, çalışan bir açıktan daha pahalıdır.
+   *
+   * ⚠️ Bilerek fail-OPEN — `allowsTable`/`allowsConnector`'ın aksine. `allowTools`
+   * tanımsızsa her araç geçer, çünkü asıl kapı zaten tablo politikası ve o
+   * fail-closed. Burayı da fail-closed yapmak, `allowTools` yazmamış her mevcut
+   * kurulumu sessizce kırardı; bu, kapatmaya çalıştığımız hatanın aynısı olurdu.
+   * Bu alan koruma katmanı değil, DARALTMA katmanıdır.
+   */
+  allowsTool(toolName: string): boolean {
+    const { allowTools, denyTools } = this.policy
+    if (denyTools?.some(p => match(p, toolName))) return false
+    if (allowTools && allowTools.length > 0) return allowTools.some(p => match(p, toolName))
+    return true
+  }
+
+  /**
    * Fail-closed, like `allowsTable`. Previously an unset `allowConnectors`
    * meant "every connector is reachable", while an unset `allowTables` meant
    * "no table is readable" — two opposite defaults in the same policy object.
