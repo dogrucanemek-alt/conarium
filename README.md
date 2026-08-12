@@ -51,8 +51,10 @@ silinmediğini, yeniden sıralanmadığını ve geriye dönük tarihlenmediğini
 kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
 
 ```bash
-# Generate an Ed25519 keypair (private PEM + .pub.pem + .keyid sidecars)
-node -e "import('./dist/keys.js').then(k=>console.log(JSON.stringify(k.writeKeyPairFiles('audit-ed25519','cnr-2026-07'),null,2)))"
+# Generate an Ed25519 keypair (private PEM + .pub.pem + .keyid sidecars).
+# The .keyid sidecars are not optional: without them the verifier answers 13
+# for every receipt, which reads like tampering and is not.
+npx conarium-init
 
 export CONARIUM_AUDIT_SIGNING_KEY=./audit-ed25519.pem
 
@@ -274,27 +276,41 @@ graph LR
 
 ## 🚀 Quick Start
 
-Conarium runs from source today. `@conarium-ai/core` is **not on the npm
-registry yet** — do not expect `npx @conarium-ai/core` to work until it is
-published. The commands below are what works now.
-
 ```bash
-# 1. Clone & install
-git clone https://github.com/dogrucanemek-alt/conarium.git
-cd conarium
-npm install && npm run build
+# 1. Install
+npm i @conarium-ai/core
 
 # 2. Write a fail-closed skeleton (config + Ed25519 pair + .keyid sidecars)
-node bin/conarium-init.mjs
+npx conarium-init
 export CONARIUM_AUDIT_SIGNING_KEY="$PWD/audit-ed25519.pem"
 
 # 3. Check the install before trusting it
-node bin/conarium-doctor.mjs --no-net
+npx conarium-doctor
 
 # 4. Point the generated conarium.config.json at your read-only DSN,
 #    fill policy.allowTables, then run the governed MCP gateway
+npx conarium
+```
+
+Step 3 is not decoration. A missing config file does **not** stop the gateway —
+it starts with zero connectors and governs nothing — and a connector that fails
+to connect is logged, not raised. `conarium-doctor` names both, exits `1` when
+something is wrong so it can gate a deployment, and never prints a secret, so
+its output is safe to paste into an issue.
+
+<details>
+<summary>From source instead</summary>
+
+```bash
+git clone https://github.com/dogrucanemek-alt/conarium.git
+cd conarium
+npm install && npm run build
+node bin/conarium-init.mjs
+node bin/conarium-doctor.mjs --no-net
 npm start
 ```
+
+</details>
 
 `conarium-init` refuses to overwrite existing files unless you pass `--force`.
 It never prints the private key — only its path.
