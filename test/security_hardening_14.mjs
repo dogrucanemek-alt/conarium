@@ -179,19 +179,35 @@ await check('3 chat proxy requires caller auth, env key, HTTPS upstream, and rat
   }
 })
 
-await check('3b chat public mode (no token) allows anonymous; origin allowlist enforced when set', async () => {
+await check('3b chat proxy is CLOSED when unconfigured; anonymous only with explicit CONARIUM_CHAT_PUBLIC=1', async () => {
   const oldEnv = { ...process.env }
   const oldFetch = global.fetch
   try {
     delete process.env.CONARIUM_CHAT_AUTH_TOKEN
+    delete process.env.CONARIUM_CHAT_PUBLIC
     delete process.env.CONARIUM_CHAT_ALLOWED_ORIGINS
     process.env.CONARIUM_PROXY_KEY = 'rotated-upstream-key'
     process.env.CONARIUM_CHAT_UPSTREAM_URL = 'https://example.com/chat'
-    global.fetch = async () => ({ ok: true, json: async () => ({ reply: 'ok' }) })
+    let upstreamCalls = 0
+    global.fetch = async () => { upstreamCalls++; return { ok: true, json: async () => ({ reply: 'ok' }) } }
 
-    // public mode: no token configured, no auth header -> allowed
+    // 2026-08-12 DAVRANIS DEGISIKLIGI. Eskiden token tanimli degilse herkes
+    // cagirabiliyordu ve bu "public mode" diye belgelenmisti. Ama yapilandirmanin
+    // EKSIK olmasi, ucun acik olmasina KARAR verilmis olmasi demek degil: birincisi
+    // kaza, ikincisi tercih. Kazayla acik kalan uc, upstream model anahtarini
+    // yabancilar adina yakar. Artik yapilandirilmamis uc KAPALI.
     chatTest.rateBuckets.clear()
     let res = mockRes()
+    await chatHandler({ method: 'POST', headers: {}, body: {} }, res)
+    assert.equal(res.statusCode, 503)
+    // Asil olcum: upstream'e HIC gidilmemis olmali. 503 donup yine de cagirmak,
+    // maliyeti yakmaya devam ederken kapali gorunmek olurdu.
+    assert.equal(upstreamCalls, 0)
+
+    // Acik mod ancak ACIKCA istenirse calisir.
+    process.env.CONARIUM_CHAT_PUBLIC = '1'
+    chatTest.rateBuckets.clear()
+    res = mockRes()
     await chatHandler({ method: 'POST', headers: {}, body: {} }, res)
     assert.equal(res.statusCode, 200)
 
@@ -226,6 +242,9 @@ await check('3c rate-limit bucket key cannot be dodged via client-controlled x-f
   try {
     delete process.env.CONARIUM_CHAT_AUTH_TOKEN
     delete process.env.CONARIUM_CHAT_ALLOWED_ORIGINS
+    // Bu testin konusu hiz siniri, kimlik degil — ucu bilerek acik moda alip
+    // olcmek istedigimiz seyi yalniz birakiyoruz (bkz 3b).
+    process.env.CONARIUM_CHAT_PUBLIC = '1'
     process.env.CONARIUM_PROXY_KEY = 'rotated-upstream-key'
     process.env.CONARIUM_CHAT_UPSTREAM_URL = 'https://example.com/chat'
     global.fetch = async () => ({ ok: true, json: async () => ({ reply: 'ok' }) })

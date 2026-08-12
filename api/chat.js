@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 30;
 const rateBuckets = new Map();
@@ -18,12 +20,39 @@ function getCallerAuthToken() {
   return value && value.trim() ? value : null;
 }
 
+/** Ucun herkese acik olmasina BILEREK karar verildi mi? */
+function isPublicModeExplicit() {
+  const v = process.env.CONARIUM_CHAT_PUBLIC;
+  return v === '1' || v === 'true';
+}
+
+/** Sabit zamanli karsilastirma — iki tarafi da sha256'la, uzunluklar esitlensin. */
+function tokenEquals(supplied, expected) {
+  if (typeof supplied !== 'string' || !supplied) return false;
+  const a = crypto.createHash('sha256').update(supplied).digest();
+  const b = crypto.createHash('sha256').update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 function requireCallerAuth(req) {
   const expected = getCallerAuthToken();
-  if (!expected) return; // public mode: no token configured, anyone may call (rate-limited)
+  if (!expected) {
+    // Eskiden burada sessiz bir `return` vardi: token tanimli degilse herkes
+    // cagirabiliyordu. Ama YAPILANDIRMANIN EKSIK olmasi ile ucun acik olmasina
+    // KARAR VERILMIS olmasi ayni sey degil — ilki kaza, ikincisi tercih. Kazayla
+    // acik kalan bir uc, upstream model anahtarini yabancilar adina yakar.
+    // Artik acik mod ancak acikca istenirse calisir.
+    if (isPublicModeExplicit()) return;
+    const err = new Error(
+      'Chat proxy yapilandirilmamis: CONARIUM_CHAT_AUTH_TOKEN tanimlayin, ya da ucun ' +
+      'bilerek herkese acik olmasini istiyorsaniz CONARIUM_CHAT_PUBLIC=1 verin.'
+    );
+    err.statusCode = 503;
+    throw err;
+  }
   const auth = getHeader(req, 'authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : getHeader(req, 'x-conarium-client-key');
-  if (token !== expected) {
+  if (!tokenEquals(token, expected)) {
     const err = new Error('Unauthorized');
     err.statusCode = 401;
     throw err;
@@ -136,4 +165,4 @@ export default async function handler(req, res) {
   }
 }
 
-export const __test = { getUpstreamUrl, requireCallerAuth, enforceRateLimit, enforceOrigin, getCallerAuthToken, getAllowedOrigins, rateBuckets };
+export const __test = { getUpstreamUrl, requireCallerAuth, enforceRateLimit, enforceOrigin, getCallerAuthToken, getAllowedOrigins, isPublicModeExplicit, rateBuckets };
