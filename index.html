@@ -447,17 +447,17 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
     <div class="txt reveal">
       <div class="eyebrow">The problem</div>
       <div class="h2">AI sees everything.<br>So does <span class="risk">the risk.</span></div>
-      <p class="lead">Point Cursor or Copilot at a production database and it drinks the raw stream — SSNs, cards, salaries, live keys. One prompt can expose your most sensitive tables. Security teams simply can't allow that.</p>
+      <p class="lead">Point Cursor or Copilot at a production database and it drinks the raw stream — national IDs, IBANs, balances, live keys. One prompt can expose your most sensitive tables. Security teams simply can't allow that.</p>
     </div>
     <div class="term reveal">
       <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--rose)">⚠ ungoverned</span></div>
       <div class="body">
-        <div class="lbl">USER PROMPT</div><div class="q">Show me recent customer records</div>
+        <div class="lbl">USER PROMPT</div><div class="q">Show me recent account holders</div>
         <div class="lbl" style="color:var(--rose)">AI — WITHOUT GOVERNANCE</div>
         <table>
-          <tr><td class="k">1</td><td>John Doe</td><td>john.doe@acme.com</td><td>123-45-6789</td><td>4242 4242 4242</td><td>$152,000</td></tr>
-          <tr><td class="k">2</td><td>Jane Smith</td><td>jane.s@acme.com</td><td>987-65-4321</td><td>5555 5555 4444</td><td>$123,000</td></tr>
-          <tr><td class="k">3</td><td>Alex Lee</td><td>alex.lee@acme.com</td><td>111-22-3333</td><td>4111 1111 1111</td><td>$165,000</td></tr>
+          <tr><td class="k">1</td><td>Ayşe Demir</td><td>TR00 0000 0000 0000 0000 0001</td><td>12345678901</td><td>+90 5xx xxx 00 01</td><td>₺482,900</td></tr>
+          <tr><td class="k">2</td><td>Mehmet Yılmaz</td><td>TR00 0000 0000 0000 0000 0002</td><td>12345678902</td><td>+90 5xx xxx 00 02</td><td>₺1,204,350</td></tr>
+          <tr><td class="k">3</td><td>Zeynep Kaya</td><td>TR00 0000 0000 0000 0000 0003</td><td>12345678903</td><td>+90 5xx xxx 00 03</td><td>₺76,120</td></tr>
         </table>
         <div class="res">RESULT: MASSIVE BREACH WAITING TO HAPPEN.</div>
       </div>
@@ -487,7 +487,7 @@ footer{border-top:1px solid var(--line);padding:40px 48px;display:flex;justify-c
     </div>
     <div class="main">
       <div class="pgbar" style="display:flex;gap:8px;margin-bottom:13px">
-        <input id="pq" spellcheck="false" value="SELECT * FROM customers" style="flex:1;min-width:0;background:#0b0f16;border:1px solid #1d2735;border-radius:8px;padding:11px 13px;color:#e6e9ef;font-family:var(--mono);font-size:13px;outline:none">
+        <input id="pq" spellcheck="false" value="SELECT name, iban, tckn FROM accounts LIMIT 3" style="flex:1;min-width:0;background:#0b0f16;border:1px solid #1d2735;border-radius:8px;padding:11px 13px;color:#e6e9ef;font-family:var(--mono);font-size:13px;outline:none">
         <button id="prun" style="background:var(--gold);color:#0a0d12;border:none;border-radius:8px;padding:0 15px;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Run through Conarium →</button>
       </div>
       <div class="console">
@@ -817,9 +817,9 @@ npm run build</pre>
       <div style="padding: 32px; flex: 1.5; min-width: 300px; background: #02040a; display: flex; align-items: center;">
         <pre style="font-family: var(--mono); font-size: 13px; color: var(--ink); line-height: 1.8;">
 <span style="color: var(--cyan);">{</span>
-  <span style="color: var(--blue-lt);">"allowTables"</span>: [<span style="color: var(--gold);">"public.users"</span>],
-  <span style="color: var(--blue-lt);">"denyTables"</span>: [<span style="color: var(--gold);">"public.secrets"</span>],
-  <span style="color: var(--blue-lt);">"maskColumns"</span>: [<span style="color: var(--gold);">"users.email"</span>, <span style="color: var(--gold);">"users.ssn"</span>],
+  <span style="color: var(--blue-lt);">"allowTables"</span>: [<span style="color: var(--gold);">"public.accounts"</span>],
+  <span style="color: var(--blue-lt);">"denyTables"</span>: [<span style="color: var(--gold);">"public.card_vault"</span>],
+  <span style="color: var(--blue-lt);">"maskColumns"</span>: [<span style="color: var(--gold);">"accounts.iban"</span>, <span style="color: var(--gold);">"accounts.tckn"</span>],
   <span style="color: var(--blue-lt);">"maxRows"</span>: <span style="color: var(--rose);">50</span>
 <span style="color: var(--cyan);">}</span></pre>
       </div>
@@ -1165,18 +1165,18 @@ npm run build</pre>
 
 /* ===== demo ===== */
 const S=[
- {q:`<span class="kw">SELECT</span> id, name, email, ssn<br><span class="kw">FROM</span> customers <span class="kw">LIMIT</span> 3`,
-  out:`<table><tr><th>name</th><th>email</th><th>ssn</th></tr>
-   <tr><td>John Doe</td><td><span class="mask">[MASKED]</span></td><td><span class="mask">[MASKED]</span></td></tr>
-   <tr><td>Jane Smith</td><td><span class="mask">[MASKED]</span></td><td><span class="mask">[MASKED]</span></td></tr>
-   <tr><td>Alex Lee</td><td><span class="mask">[MASKED]</span></td><td><span class="mask">[MASKED]</span></td></tr></table>`,
-  aud:`{<br>&nbsp;"<span class="nw">ts</span>":"2026-06-28T10:15Z",<br>&nbsp;"<span class="nw">actor</span>":"Claude_Code",<br>&nbsp;"<span class="nw">action</span>":"select",<br>&nbsp;"<span class="nw">resource</span>":"customers",<br>&nbsp;"<span class="nw">rows</span>":3,<br>&nbsp;"<span class="nw">pii_masked</span>":["email","ssn"],<br>&nbsp;"<span class="nw">decision</span>":"allow"<br>}`},
- {q:`<span class="kw">SELECT</span> * <span class="kw">FROM</span> payroll`,
-  out:`<div style="color:var(--faint);padding:6px 0">// 9,412 rows requested</div><div style="padding:6px 0">[ … <span class="mask">capped at 100</span> … ]</div><div style="color:var(--gold);padding:6px 0">salary fields masked</div>`,
-  aud:`{<br>&nbsp;"<span class="nw">ts</span>":"2026-06-28T10:15Z",<br>&nbsp;"<span class="nw">actor</span>":"Cursor",<br>&nbsp;"<span class="nw">action</span>":"select",<br>&nbsp;"<span class="nw">resource</span>":"payroll",<br>&nbsp;"<span class="nw">rows</span>":100,<br>&nbsp;"<span class="nw">capped</span>":true,<br>&nbsp;"<span class="nw">decision</span>":"allow"<br>}`},
- {q:`<span class="kw">SELECT</span> * <span class="kw">FROM</span> secrets`,
-  out:`<div class="deny">⛔<br>PolicyError:<br>table "secrets" is forbidden</div>`,
-  aud:`{<br>&nbsp;"<span class="nw">ts</span>":"2026-06-28T10:15Z",<br>&nbsp;"<span class="nw">actor</span>":"Copilot",<br>&nbsp;"<span class="nw">action</span>":"select",<br>&nbsp;"<span class="nw">resource</span>":"secrets",<br>&nbsp;"<span class="nw">rows</span>":0,<br>&nbsp;"<span class="nw">decision</span>":"<span style="color:var(--rose)">deny</span>"<br>}`},
+ {q:`<span class="kw">SELECT</span> id, name, iban, tckn<br><span class="kw">FROM</span> accounts <span class="kw">LIMIT</span> 3`,
+  out:`<table><tr><th>name</th><th>iban</th><th>tckn</th></tr>
+   <tr><td>Ayşe Demir</td><td><span class="mask">[MASKED]</span></td><td><span class="mask">[MASKED]</span></td></tr>
+   <tr><td>Mehmet Yılmaz</td><td><span class="mask">[MASKED]</span></td><td><span class="mask">[MASKED]</span></td></tr>
+   <tr><td>Zeynep Kaya</td><td><span class="mask">[MASKED]</span></td><td><span class="mask">[MASKED]</span></td></tr></table>`,
+  aud:`{<br>&nbsp;"<span class="nw">ts</span>":"2026-06-28T10:15Z",<br>&nbsp;"<span class="nw">actor</span>":"Claude_Code",<br>&nbsp;"<span class="nw">action</span>":"select",<br>&nbsp;"<span class="nw">resource</span>":"accounts",<br>&nbsp;"<span class="nw">rows</span>":3,<br>&nbsp;"<span class="nw">pii_masked</span>":["iban","tckn"],<br>&nbsp;"<span class="nw">decision</span>":"allow"<br>}`},
+ {q:`<span class="kw">SELECT</span> * <span class="kw">FROM</span> transactions`,
+  out:`<div style="color:var(--faint);padding:6px 0">// 9,412 rows requested</div><div style="padding:6px 0">[ … <span class="mask">capped at 100</span> … ]</div><div style="color:var(--gold);padding:6px 0">balance and counterparty IBAN masked</div>`,
+  aud:`{<br>&nbsp;"<span class="nw">ts</span>":"2026-06-28T10:15Z",<br>&nbsp;"<span class="nw">actor</span>":"Cursor",<br>&nbsp;"<span class="nw">action</span>":"select",<br>&nbsp;"<span class="nw">resource</span>":"transactions",<br>&nbsp;"<span class="nw">rows</span>":100,<br>&nbsp;"<span class="nw">capped</span>":true,<br>&nbsp;"<span class="nw">decision</span>":"allow"<br>}`},
+ {q:`<span class="kw">SELECT</span> * <span class="kw">FROM</span> card_vault`,
+  out:`<div class="deny">⛔<br>PolicyError:<br>table "card_vault" is forbidden</div>`,
+  aud:`{<br>&nbsp;"<span class="nw">ts</span>":"2026-06-28T10:15Z",<br>&nbsp;"<span class="nw">actor</span>":"Copilot",<br>&nbsp;"<span class="nw">action</span>":"select",<br>&nbsp;"<span class="nw">resource</span>":"card_vault",<br>&nbsp;"<span class="nw">rows</span>":0,<br>&nbsp;"<span class="nw">decision</span>":"<span style="color:var(--rose)">deny</span>"<br>}`},
 ];
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function hlsql(s){return esc(s).replace(/\b(SELECT|FROM|WHERE|LIMIT|JOIN|ON|AND|OR|ORDER|BY|GROUP|INSERT|INTO|UPDATE|SET|DELETE|DROP|TRUNCATE|ALTER)\b/gi,m=>`<span class="kw">${m}</span>`);}
@@ -1187,11 +1187,11 @@ function govern(sql){
   const fm=q.match(/from\s+([a-z_][\w.]*)/);
   const table=fm?fm[1]:'query';
   const write=/\b(insert|update|delete|drop|truncate|alter)\b/.test(q);
-  const denied=['secret','api_key','apikey','password','passwd','credential','token','private_key'].some(d=>q.includes(d));
-  const piiAll=['email','ssn','tckn','tc_no','card','iban','salary','maas','phone','telefon','adres','address'];
+  const denied=['secret','api_key','apikey','password','passwd','credential','token','private_key','card_vault','cvv','pan'].some(d=>q.includes(d));
+  const piiAll=['email','ssn','tckn','tc_no','card','iban','balance','bakiye','salary','maas','phone','telefon','adres','address'];
   let pii=piiAll.filter(c=>q.includes(c));
   const star=/select\s+\*/.test(q);
-  if(star&&!pii.length)pii=['email','ssn'];
+  if(star&&!pii.length)pii=['iban','tckn'];
   const ts=nowts();let out,aud;
   if(write){
     out=`<div class="deny">⛔<br>PolicyError:<br>only read-only queries permitted</div>`;
@@ -1200,7 +1200,7 @@ function govern(sql){
     out=`<div class="deny">⛔<br>PolicyError:<br>table "${table}" is forbidden</div>`;
     aud=`{<br>&nbsp;"<span class="nw">ts</span>":"${ts}",<br>&nbsp;"<span class="nw">resource</span>":"${table}",<br>&nbsp;"<span class="nw">rows</span>":0,<br>&nbsp;"<span class="nw">decision</span>":"<span style="color:var(--rose)">deny</span>"<br>}`;
   }else{
-    const names=['Ada Lovelace','Alan Turing','Grace Hopper'];let rows=`<table>`;
+    const names=['Ayşe Demir','Mehmet Yılmaz','Zeynep Kaya'];let rows=`<table>`;
     names.forEach(n=>{rows+=`<tr><td>${n}</td>`+pii.slice(0,2).map(()=>`<td><span class="mask">[MASKED]</span></td>`).join('')+`</tr>`;});
     rows+=`</table>`;if(star)rows+=`<div style="color:var(--gold);padding:6px 0;font-size:12px">▸ capped at 100 rows</div>`;
     out=rows;const piiStr=pii.map(p=>`"${p}"`).join(',');
@@ -1210,12 +1210,15 @@ function govern(sql){
   document.getElementById('dout').innerHTML=out;
   document.getElementById('daud').innerHTML=aud;
 }
-const PRE=['SELECT * FROM customers','SELECT * FROM payroll','SELECT * FROM secrets'];
+// Uc sekme UC FARKLI kurali gostermeli. Birinci sorgu bilerek `*` DEGIL: `*`
+// oldugunda satir sinirlama kurali da devreye giriyordu ve "PII Masking" sekmesi
+// ile "Row Caps" sekmesi ayni ciktiyi uretiyordu — iki kural, tek gorunum.
+const PRE=['SELECT name, iban, tckn FROM accounts LIMIT 3','SELECT * FROM transactions','SELECT * FROM card_vault'];
 let demoTimer=null,started=false,ai=0;
 function setTab(k){for(let j=0;j<3;j++){const t=document.getElementById('tab'+j);if(t)t.className='tab'+(j===k?' on':'');}}
 for(let i=0;i<3;i++){const tb=document.getElementById('tab'+i);if(tb){tb.style.cursor='pointer';tb.addEventListener('click',()=>{started=true;clearInterval(demoTimer);const p=document.getElementById('pq');if(p)p.value=PRE[i];setTab(i);govern(PRE[i]);});}}
 const pqEl=document.getElementById('pq'),prunEl=document.getElementById('prun');
-function runUser(){started=true;clearInterval(demoTimer);setTab(-1);govern((pqEl&&pqEl.value)||'SELECT * FROM customers');}
+function runUser(){started=true;clearInterval(demoTimer);setTab(-1);govern((pqEl&&pqEl.value)||'SELECT * FROM accounts');}
 if(prunEl)prunEl.addEventListener('click',runUser);
 if(pqEl)pqEl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runUser();}});
 setTab(0);govern(PRE[0]);
