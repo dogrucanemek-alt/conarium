@@ -285,9 +285,27 @@ npm install
 # 2. Point it at your data (and write a policy — see Configuration)
 export CONARIUM_DB_URL="postgresql://user:password@localhost:5432/mydb"
 
-# 3. Run the governed MCP gateway
+# 3. Check the install before trusting it
+node bin/conarium-doctor.mjs
+
+# 4. Run the governed MCP gateway
 npm run dev          # or: npm run build && npm start
 ```
+
+### Before you file a bug: run the doctor
+
+`conarium-doctor` checks the things that fail quietly. Two of them matter most:
+a **missing config file does not stop the gateway** — it starts with zero
+connectors and governs nothing — and a **connector that cannot connect is logged,
+not raised**, so the process looks healthy while serving nothing. The doctor also
+catches the missing `<pubkey>.keyid` sidecar, which makes every receipt verify as
+`13` (reads like tampering, isn't).
+
+It exits `0` when clean and `1` when something is wrong, so it can gate a
+deployment. **It never prints a secret** — passwords, tokens and key material are
+reported as shape only (`postgresql://appuser@db.internal:5432/prod (password
+set, not shown)`), which means the output is safe to paste into an issue or an
+email.
 
 Conarium speaks MCP over **stdio**, so your AI assistant launches it as a command. Add this to your MCP client config (e.g. Cursor):
 

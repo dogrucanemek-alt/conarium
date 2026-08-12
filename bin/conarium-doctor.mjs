@@ -1,0 +1,377 @@
+#!/usr/bin/env node
+/**
+ * conarium-doctor — pre-flight diagnosis for a Conarium install.
+ *
+ * WHY THIS EXISTS
+ * Conarium is meant to be installed once, by the operator, without us in the
+ * loop. Every misconfiguration that produces a vague stack trace — or worse, a
+ * process that starts happily and governs nothing — becomes a support email
+ * from a timezone we cannot answer quickly. This tool converts those into a
+ * checklist the operator can act on alone.
+ *
+ * TWO SILENT FAILURES IT EXISTS FOR (both real, both in the current code):
+ *   1. `loadConfig()` returns an EMPTY config when the config file is missing
+ *      (src/server.ts). A typo in the path yields a server that runs, logs one
+ *      stderr line, and enforces nothing. Nothing crashes.
+ *   2. Connector `connect()` failures are caught and logged, not thrown
+ *      (src/server.ts). The gateway stays up with zero connectors.
+ *
+ * DESIGN RULES
+ * - NO imports from src/ or dist/. The doctor must run when the build is
+ *   broken, because that is exactly when it is needed. Node builtins only.
+ * - NEVER print a secret. Operators paste this output into support email and
+ *   CI logs. Passwords, tokens and key material are reported as shape only
+ *   (set / not set, length, host — never the value).
+ * - Exit codes stay OUT of the receipt exit-code namespace (10..50, see
+ *   docs/RECEIPT-SPEC.md). The doctor is not part of the receipt protocol:
+ *     0 = no failures (warnings allowed)
+ *     1 = at least one failure
+ *     2 = the doctor itself could not run
+ */
+import { existsSync, readFileSync, statSync, accessSync, constants } from 'node:fs'
+import { resolve, dirname, join } from 'node:path'
+import net from 'node:net'
+import { createPublicKey, createPrivateKey } from 'node:crypto'
+
+const ARGS = process.argv.slice(2)
+const has = (f) => ARGS.includes(f)
+const valueOf = (f, fallback) => {
+  const i = ARGS.indexOf(f)
+  return i >= 0 && ARGS[i + 1] ? ARGS[i + 1] : fallback
+}
+
+if (has('--help') || has('-h')) {
+  console.log(`conarium-doctor — check a Conarium install before it goes wrong
+
+  --config <path>   config file (default: conarium.config.json in cwd)
+  --no-net          skip the TCP reachability probe
+  --help            this text
+
+Exit: 0 clean · 1 problems found · 2 doctor could not run
+Secrets are never printed — values are reported as shape only.`)
+  process.exit(0)
+}
+
+const CONFIG_PATH = resolve(process.cwd(), valueOf('--config', 'conarium.config.json'))
+const SKIP_NET = has('--no-net')
+
+const results = []
+const ok = (label, detail) => results.push({ level: 'ok', label, detail })
+const warn = (label, detail, fix) => results.push({ level: 'warn', label, detail, fix })
+const fail = (label, detail, fix) => results.push({ level: 'fail', label, detail, fix })
+
+/* ---------------------------------------------------------------- helpers */
+
+/** A DSN carries a password. Report only its shape. */
+function describeDsn(raw) {
+  try {
+    const u = new URL(raw)
+    const db = u.pathname.replace(/^\//, '') || '(none)'
+    return {
+      scheme: u.protocol.replace(':', ''),
+      host: u.hostname,
+      port: u.port || (u.protocol === 'postgres:' || u.protocol === 'postgresql:' ? '5432' : ''),
+      user: u.username || '(none)',
+      hasPassword: Boolean(u.password),
+      db,
+      text: `${u.protocol}//${u.username || '(no user)'}@${u.hostname}${u.port ? ':' + u.port : ''}/${db}`,
+    }
+  } catch {
+    return null
+  }
+}
+
+function tcpProbe(host, port, timeoutMs = 4000) {
+  return new Promise((done) => {
+    const sock = new net.Socket()
+    let settled = false
+    const finish = (r) => {
+      if (settled) return
+      settled = true
+      sock.destroy()
+      done(r)
+    }
+    sock.setTimeout(timeoutMs)
+    sock.once('connect', () => finish({ reachable: true }))
+    sock.once('timeout', () => finish({ reachable: false, why: `no answer in ${timeoutMs}ms` }))
+    sock.once('error', (e) => finish({ reachable: false, why: e.code || e.message }))
+    sock.connect(Number(port), host)
+  })
+}
+
+function envSet(name) {
+  const v = process.env[name]
+  return typeof v === 'string' && v.trim() !== '' ? v : null
+}
+
+/* ------------------------------------------------------------- the checks */
+
+// 1. Runtime
+{
+  const major = Number(process.versions.node.split('.')[0])
+  if (Number.isNaN(major)) warn('Node runtime', `unrecognised version ${process.version}`, 'Conarium expects Node >= 18.')
+  else if (major < 18) fail('Node runtime', `${process.version} is below the supported floor`, 'Install Node 18 or newer.')
+  else ok('Node runtime', process.version)
+}
+
+// 2. Config file — the silent one
+let config = null
+if (!existsSync(CONFIG_PATH)) {
+  fail(
+    'Config file',
+    `not found at ${CONFIG_PATH}`,
+    'Conarium does NOT fail on a missing config — it starts with zero connectors and governs nothing. ' +
+      'Create the file, or pass --config <path> to both the doctor and the gateway.',
+  )
+} else {
+  let raw
+  try {
+    raw = readFileSync(CONFIG_PATH, 'utf-8')
+  } catch (e) {
+    fail('Config file', `cannot read ${CONFIG_PATH}: ${e.code || e.message}`, 'Check file permissions.')
+  }
+  if (raw !== undefined) {
+    try {
+      config = JSON.parse(raw)
+      ok('Config file', CONFIG_PATH)
+    } catch (e) {
+      fail('Config file', `invalid JSON: ${e.message}`, 'Fix the syntax; the gateway will refuse to start until you do.')
+    }
+  }
+}
+
+// 3. Connectors + the fail-closed allow list
+if (config) {
+  const connectors = Array.isArray(config.connectors) ? config.connectors : []
+  const allow = config.policy?.allowConnectors
+  if (connectors.length === 0) {
+    warn('Connectors', 'none configured', 'The gateway will start and expose no data. Add at least one connector.')
+  } else {
+    ok('Connectors', connectors.map((c) => `${c.name} (${c.type})`).join(', '))
+    if (!Array.isArray(allow) || allow.length === 0) {
+      fail(
+        'policy.allowConnectors',
+        `${connectors.length} connector(s) configured but the allow list is empty`,
+        `Connectors are fail-closed: an empty list permits nothing. Add policy.allowConnectors: ${JSON.stringify(connectors.map((c) => c.name))}.`,
+      )
+    } else {
+      const unknown = allow.filter((n) => !connectors.some((c) => c.name === n))
+      const uncovered = connectors.filter((c) => !allow.includes(c.name)).map((c) => c.name)
+      if (unknown.length) warn('policy.allowConnectors', `names with no connector: ${unknown.join(', ')}`, 'Typo, or a connector was removed.')
+      if (uncovered.length) warn('policy.allowConnectors', `configured but not permitted: ${uncovered.join(', ')}`, 'These connectors will be refused at runtime.')
+      if (!unknown.length && !uncovered.length) ok('policy.allowConnectors', allow.join(', '))
+    }
+  }
+
+  // 4. Is anything actually being protected?
+  const pol = config.policy || {}
+  const hasMask = Array.isArray(pol.maskColumns) && pol.maskColumns.length > 0
+  const hasDeny = Array.isArray(pol.denyTables) && pol.denyTables.length > 0
+  const hasAllowTables = Array.isArray(pol.allowTables) && pol.allowTables.length > 0
+  if (!hasMask && !hasDeny && !hasAllowTables) {
+    warn(
+      'Policy surface',
+      'no maskColumns, no denyTables, no allowTables',
+      'Content detectors (email / national id / card / secrets) still run, but no column or table rule is set. ' +
+        'That is a valid choice — make sure it is a choice.',
+    )
+  } else {
+    ok('Policy surface', [hasAllowTables && 'allowTables', hasDeny && 'denyTables', hasMask && 'maskColumns'].filter(Boolean).join(' + '))
+  }
+
+  // 5. Per-person profiles need per-user credentials
+  const profiles = pol.profiles || pol.actorProfiles
+  if (profiles && Object.keys(profiles).length > 0) {
+    if (envSet('CONARIUM_MCP_TOKEN')) {
+      warn(
+        'Masking profiles',
+        'profiles are configured while a shared token is in use',
+        'A profile only applies to a per-user credential. With a shared token every caller falls back to the base policy — ' +
+          'the profiles are silently ignored.',
+      )
+    } else {
+      ok('Masking profiles', `${Object.keys(profiles).length} profile(s)`)
+    }
+  }
+
+  // 6. Receipts need an Ed25519 key
+  const receiptSink = config.audit?.receiptSink
+  const signingKeyPath = envSet('CONARIUM_AUDIT_SIGNING_KEY')
+  if (receiptSink && !signingKeyPath) {
+    fail(
+      'Receipt signing key',
+      'audit.receiptSink is configured but CONARIUM_AUDIT_SIGNING_KEY is not set',
+      'Receipts require Ed25519 (HMAC is not sufficient). Set the key, or remove receiptSink.',
+    )
+  }
+
+  // 7. Audit sink writability
+  const sink = config.audit?.sink
+  if (sink) {
+    const sinkPath = resolve(process.cwd(), sink)
+    const dir = dirname(sinkPath)
+    if (!existsSync(dir)) {
+      fail('Audit sink', `directory does not exist: ${dir}`, 'Create it, or point audit.sink somewhere that exists.')
+    } else {
+      try {
+        accessSync(dir, constants.W_OK)
+        ok('Audit sink', sinkPath + (existsSync(sinkPath) ? ` (${statSync(sinkPath).size} bytes)` : ' (will be created)'))
+      } catch {
+        fail('Audit sink', `directory is not writable: ${dir}`, 'The gateway is fail-closed on audit: it will refuse to serve.')
+      }
+    }
+  }
+}
+
+// 8. Signing key material — never printed, only described
+{
+  const keyPath = envSet('CONARIUM_AUDIT_SIGNING_KEY')
+  const hmac = envSet('CONARIUM_AUDIT_HMAC_KEY')
+  const unsigned = envSet('CONARIUM_AUDIT_UNSIGNED')
+  if (!keyPath && !hmac && !unsigned) {
+    warn(
+      'Audit signing',
+      'no CONARIUM_AUDIT_SIGNING_KEY, no CONARIUM_AUDIT_HMAC_KEY, no CONARIUM_AUDIT_UNSIGNED',
+      'The audit writer refuses to write unsigned entries. Set one of the three before first use.',
+    )
+  }
+  if (keyPath) {
+    const resolved = resolve(process.cwd(), keyPath)
+    if (!existsSync(resolved)) {
+      fail('Signing key', `CONARIUM_AUDIT_SIGNING_KEY points at a missing file: ${resolved}`, 'Check the path. The value is read as a FILE path, not as key material.')
+    } else {
+      try {
+        const pem = readFileSync(resolved, 'utf-8')
+        const key = createPrivateKey(pem)
+        if (key.asymmetricKeyType !== 'ed25519') {
+          fail('Signing key', `expected Ed25519, found ${key.asymmetricKeyType}`, 'Generate an Ed25519 key pair.')
+        } else {
+          ok('Signing key', `Ed25519 private key at ${resolved}`)
+        }
+      } catch (e) {
+        fail('Signing key', `unreadable or not a private key: ${e.message}`, 'The file must be a PEM-encoded Ed25519 private key.')
+      }
+    }
+  }
+}
+
+// 9. Public keys used for verification need their .keyid sidecar.
+//    Without it the verifier returns 13 for EVERY receipt — and the operator
+//    blames the receipts, not the missing file.
+{
+  const trust = envSet('CONARIUM_AUDIT_TRUST_PUBKEYS')
+  if (trust) {
+    for (const p of trust.split(',').map((s) => s.trim()).filter(Boolean)) {
+      const pubPath = resolve(process.cwd(), p)
+      if (!existsSync(pubPath)) {
+        fail('Trusted public key', `missing file: ${pubPath}`, 'Check CONARIUM_AUDIT_TRUST_PUBKEYS.')
+        continue
+      }
+      try {
+        const k = createPublicKey(readFileSync(pubPath, 'utf-8'))
+        if (k.asymmetricKeyType !== 'ed25519') {
+          fail('Trusted public key', `expected Ed25519 at ${pubPath}, got ${k.asymmetricKeyType}`, 'Use the matching Ed25519 public key.')
+          continue
+        }
+      } catch (e) {
+        fail('Trusted public key', `invalid PEM at ${pubPath}: ${e.message}`, 'Re-export the public key.')
+        continue
+      }
+      const sidecar = `${pubPath}.keyid`
+      if (!existsSync(sidecar)) {
+        fail(
+          'keyId sidecar',
+          `missing: ${sidecar}`,
+          'The verifier requires <pubkey>.keyid next to every trusted public key. Without it EVERY receipt fails with exit 13, ' +
+            'which reads like tampering and is not.',
+        )
+      } else if (readFileSync(sidecar, 'utf-8').trim() === '') {
+        fail('keyId sidecar', `empty: ${sidecar}`, 'It must contain the key id used when the receipts were signed.')
+      } else {
+        ok('Trusted public key', `${pubPath} (+ keyid sidecar)`)
+      }
+    }
+  }
+}
+
+// 10. Anchoring is an optional peer dependency since 0.1.0.
+{
+  const anchoring = Boolean(envSet('CONARIUM_ANCHOR_BASE_URL') || envSet('CONARIUM_ANCHOR_STORE') || config?.audit?.anchor)
+  if (anchoring) {
+    let present = false
+    try {
+      await import('javascript-opentimestamps')
+      present = true
+    } catch {
+      present = false
+    }
+    if (present) ok('Anchoring', 'configured, javascript-opentimestamps present')
+    else
+      fail(
+        'Anchoring',
+        'configured, but javascript-opentimestamps is not installed',
+        'It is an OPTIONAL peer dependency (its transitive tree carried known vulnerabilities, so it is not installed by default). ' +
+          'Run: npm install javascript-opentimestamps — or turn anchoring off. Until then the verifier reports exit 15 (could not check).',
+      )
+  }
+}
+
+// 11. Connector endpoints — described always, probed only when networking is on.
+//     `--no-net` must silence the network, not the diagnosis: an operator on an
+//     air-gapped box still needs to see which endpoint the config points at.
+if (config) {
+  const targets = []
+  for (const c of Array.isArray(config.connectors) ? config.connectors : []) {
+    const url = c?.config?.url
+    if (typeof url !== 'string') continue
+    const raw = url.startsWith('env:') ? process.env[url.slice(4)] : url
+    if (!raw) {
+      fail('Connector DSN', `${c.name}: config points at env ${url.slice(4)} which is not set`, 'Export the variable before starting the gateway.')
+      continue
+    }
+    const d = describeDsn(raw)
+    if (!d) {
+      fail('Connector DSN', `${c.name}: value is not a parseable URL`, 'Expected e.g. postgresql://user:pass@host:5432/db')
+      continue
+    }
+    // Always show WHICH endpoint was checked — an operator debugging a wrong
+    // environment needs to see it, and it is the only line where a DSN is
+    // rendered at all, so the redaction is exercised on every run (and by the
+    // test suite) instead of only in the no-password branch.
+    if (!d.hasPassword && d.user !== '(none)') {
+      warn('Connector DSN', `${c.name}: ${d.text} — no password in the DSN`, 'Fine if you authenticate another way; surprising otherwise.')
+    } else {
+      ok('Connector DSN', `${c.name}: ${d.text}${d.hasPassword ? ' (password set, not shown)' : ''}`)
+    }
+    if (d.host && d.port) targets.push({ name: c.name, ...d })
+  }
+  for (const t of SKIP_NET ? [] : targets) {
+    const r = await tcpProbe(t.host, t.port)
+    if (r.reachable) ok('Reachability', `${t.name}: ${t.host}:${t.port} answers`)
+    else
+      fail(
+        'Reachability',
+        `${t.name}: ${t.host}:${t.port} unreachable (${r.why})`,
+        'The gateway logs connector failures and keeps running with zero connectors — it will look healthy and serve nothing.',
+      )
+  }
+}
+
+/* ------------------------------------------------------------------ report */
+
+const ICON = { ok: '  ok  ', warn: ' warn ', fail: ' FAIL ' }
+console.log('')
+console.log('conarium doctor')
+console.log('─'.repeat(66))
+for (const r of results) {
+  console.log(`[${ICON[r.level]}] ${r.label}: ${r.detail}`)
+  if (r.fix && r.level !== 'ok') console.log(`          → ${r.fix}`)
+}
+const fails = results.filter((r) => r.level === 'fail').length
+const warns = results.filter((r) => r.level === 'warn').length
+console.log('─'.repeat(66))
+console.log(`${results.length} checks · ${fails} failed · ${warns} warning(s)`)
+if (fails === 0 && warns === 0) console.log('This install is ready.')
+if (fails > 0) console.log('Fix the FAIL lines above; the gateway will not govern correctly until you do.')
+console.log('')
+process.exit(fails > 0 ? 1 : 0)
