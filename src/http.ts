@@ -13,9 +13,18 @@
  *
  * Session model: canonical SDK pattern — an initialize POST opens a session (own Server+transport),
  * subsequent requests route by Mcp-Session-Id header; DELETE closes the session.
+ *
+ * A session is bound to the credential that OPENED it. Carrying a valid token is not
+ * enough to speak into an existing session — it must be the SAME token. Without that
+ * binding, anyone holding any valid token could take over a session opened with a
+ * per-user credential by presenting its session id, and every receipt written from
+ * that point on would name the wrong person. The session id travels in a plain header
+ * and lands in proxy logs, so it is routing information, not a secret, and must never
+ * be the only thing standing between two identities.
  */
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto'
+import { pathToFileURL } from 'node:url'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { loadConfig, bootDeps, buildServer } from './server.js'
@@ -37,6 +46,26 @@ function tokenOk(supplied: string): boolean {
   return timingSafeEqual(a, b)
 }
 
+/** Oturumun sahibi = onu açan kimlik bilgisinin karması. Ham token asla saklanmaz. */
+export function ownerKey(supplied: string): Buffer {
+  return createHash('sha256').update(supplied).digest()
+}
+
+/** Sabit zamanlı karşılaştırma — iki taraf da sha256, uzunluklar eşit. */
+export function sessionOwnerMatches(owner: Buffer, supplied: string): boolean {
+  return timingSafeEqual(owner, ownerKey(supplied))
+}
+
+/**
+ * Transport + onu açan kimlik. Kimliği transport'la BİRLİKTE tutuyoruz, çünkü
+ * `buildServer(deps, kisi)` oturum başına bir kez çağrılır: o andan sonra gelen
+ * her istek, o Server'ın kimliğiyle çalışır ve makbuzu o ad altında yazar.
+ */
+export interface SessionEntry {
+  transport: StreamableHTTPServerTransport
+  owner: Buffer
+}
+
 function readBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolvePromise, reject) => {
     const chunks: Buffer[] = []
@@ -55,20 +84,17 @@ function readBody(req: IncomingMessage): Promise<unknown> {
   })
 }
 
-async function main() {
-  if (!TOKEN || TOKEN.length < 24) {
-    console.error('[conarium-http] CONARIUM_MCP_TOKEN eksik ya da <24 karakter — fail-closed, başlamıyorum.')
-    process.exit(1)
-  }
-
-  const config = loadConfig()
-  const deps = await bootDeps(config)
-  const transports = new Map<string, StreamableHTTPServerTransport>()
-  const limiter = new RateLimiter({ perWindow: RATE_PER_MIN })
-  const sweepTimer = setInterval(() => limiter.sweep(), 5 * 60_000)
-  sweepTimer.unref()
-
-  const httpServer = createHttpServer(async (req: IncomingMessage, res: ServerResponse) => {
+/**
+ * İstek işleyicisi — main()'den ayrı tutuluyor çünkü oturum sahipliği kuralının
+ * test edilebilir olması gerekiyor: bir devralma denemesi düzeltmeden önce
+ * kırmızı yanmadan "kapatıldı" denemez.
+ */
+export function createHandler(
+  deps: Awaited<ReturnType<typeof bootDeps>>,
+  transports: Map<string, SessionEntry>,
+  limiter: RateLimiter,
+) {
+  return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
       const url = new URL(req.url || '/', 'http://localhost')
 
@@ -109,8 +135,17 @@ async function main() {
       const existing = sessionId ? transports.get(sessionId) : undefined
 
       if (existing) {
+        // Kapının kendisi: oturum, onu açan kimlik bilgisine aittir. Geçerli bir
+        // token taşımak konuşma hakkı vermez — AYNI token olmalı. Bu kontrol
+        // olmadan, kişisel token'la açılmış bir oturumun id'sini ele geçiren
+        // paylaşılan-token sahibi, o kişinin profil/maskeleme bağlamıyla çalışır
+        // ve o andan sonraki her makbuz yanlış kişiyi adlandırır.
+        if (!sessionOwnerMatches(existing.owner, supplied)) {
+          res.writeHead(403, { 'content-type': 'text/plain' }).end('session owner mismatch')
+          return
+        }
         const body = req.method === 'POST' ? await readBody(req) : undefined
-        await existing.handleRequest(req, res, body)
+        await existing.transport.handleRequest(req, res, body)
         return
       }
 
@@ -124,9 +159,10 @@ async function main() {
         res.writeHead(400, { 'content-type': 'text/plain' }).end('expected initialize')
         return
       }
+      const owner = ownerKey(supplied)
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (id: string) => { transports.set(id, transport) },
+        onsessioninitialized: (id: string) => { transports.set(id, { transport, owner }) },
       })
       transport.onclose = () => {
         if (transport.sessionId) transports.delete(transport.sessionId)
@@ -138,7 +174,23 @@ async function main() {
       console.error('[conarium-http] istek hatası:', (err as Error).message)
       try { if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' }).end('internal error') } catch { /* */ }
     }
-  })
+  }
+}
+
+async function main() {
+  if (!TOKEN || TOKEN.length < 24) {
+    console.error('[conarium-http] CONARIUM_MCP_TOKEN eksik ya da <24 karakter — fail-closed, başlamıyorum.')
+    process.exit(1)
+  }
+
+  const config = loadConfig()
+  const deps = await bootDeps(config)
+  const transports = new Map<string, SessionEntry>()
+  const limiter = new RateLimiter({ perWindow: RATE_PER_MIN })
+  const sweepTimer = setInterval(() => limiter.sweep(), 5 * 60_000)
+  sweepTimer.unref()
+
+  const httpServer = createHttpServer(createHandler(deps, transports, limiter))
 
   httpServer.listen(PORT, HOST, () => {
     const rate = limiter.enabled ? `${RATE_PER_MIN}/dk` : 'KAPALI'
@@ -148,13 +200,34 @@ async function main() {
   })
 
   process.on('SIGINT', async () => {
-    for (const t of transports.values()) await t.close().catch(() => {})
+    for (const t of transports.values()) await t.transport.close().catch(() => {})
     for (const conn of deps.connectors) await conn.disconnect().catch(() => {})
     process.exit(0)
   })
 }
 
-main().catch(err => {
-  console.error('[conarium-http] Fatal:', err)
-  process.exit(1)
-})
+/**
+ * main() yalnızca dosya DOĞRUDAN çalıştırıldığında koşar.
+ *
+ * Modül seviyesinde koşulduğu sürece bu dosyayı içe aktarmak sunucuyu ayağa
+ * kaldırır ya da config bulamayıp `process.exit(1)` ile çağıranı öldürür —
+ * yani oturum sahipliği gibi bir kuralın testi hiç yazılamazdı. Test edilemeyen
+ * güvenlik kuralı, olmayan güvenlik kuralıdır.
+ *
+ * Tespit başarısız olursa ESKİ davranışa düşeriz (çalıştır): bir sunucunun
+ * sessizce başlamaması, bir testin gürültülü patlamasından pahalıdır.
+ */
+const dogrudanCalistirildi = (() => {
+  try {
+    return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href
+  } catch {
+    return true
+  }
+})()
+
+if (dogrudanCalistirildi) {
+  main().catch(err => {
+    console.error('[conarium-http] Fatal:', err)
+    process.exit(1)
+  })
+}
