@@ -6,7 +6,9 @@ title = "Conarium gitleaks config"
 [extend]
 useDefault = true
 
-[allowlist]
+# [allowlist] (tekil) artik kullanilamiyor: gitleaks 8.30 onu [[allowlists]] ile
+# ayni dosyada reddediyor. Icerik birebir ayni, yalnizca bicim yeni.
+[[allowlists]]
 description = "Intentional example / demo / test values — not real credentials"
 paths = [
   '''(^|/)index\.html$''',
@@ -28,3 +30,51 @@ regexes = [
   '''SuperSecret123''',
   '''sk_live_ABCDEFGHIJKLMNOP''',
 ]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GEÇMİŞ TARAMASI — 2026-08-12
+#
+# `gitleaks dir .` yalnızca çalışma ağacını görür. Commit geçmişi ilk kez bugün
+# tarandı (`gitleaks git .`): 65 commit, 7 bulgu, hepsi TEK commit'te —
+# e84f8ba, "Conarium v0.1.0 — initial public release".
+#
+# Hiçbiri canlı kimlik bilgisi değil, ikisi de aşağıda DAR kapsamla muaf:
+#  • demo.ts — `sk_live_123456789`: maskeleme demosunun sahte girdisi. Zaten
+#    fark edilip `sk_live_example_not_a_real_key` ile değiştirilmişti.
+#  • site/.next/** — Next.js'in HER `next build`'de yeniden ürettiği preview ve
+#    server-action anahtarları. Build çıktısı yanlışlıkla commit edilmişti;
+#    klasör sonradan repodan çıkarıldı (bugün doğrulandı: 0 takipli dosya).
+#    O tarihten beri site defalarca yeniden dağıtıldı — değerler ölü.
+#
+# Geçmiş YENİDEN YAZILMADI. filter-repo/BFG + force push, halka açık bir reponun
+# her klonunu ve çatalını bozar; karşılığında ölü birkaç anahtar temizlenir.
+# Bedeli faydasından büyük. Bu bir karar, kaza değil — gerekçesi SECURITY.md'de
+# yazılı, sessizce allowlist'e atılmadı.
+#
+# ⚠️ Muafiyetler bilerek DAR: commit + yol birlikte (condition AND). Aynı
+# commit'te başka bir sızıntı olsaydı yine yakalanırdı.
+# Yerel artiklar: ikisi de .gitignore'da ve git'e HIC girmedi (dogrulandi:
+# `git ls-files` bos, `git log --all` bos). CI checkout'unda zaten yoklar, ama
+# `gitleaks dir .` calisma dizinini tarar ve .gitignore'a bakmaz — yerelde kosan
+# gelistiriciyi bos yere kirmizi yakmasin diye muaf. Dar tutuldu: tek log dosyasi
+# ve adinda SECRET-TEST-ONLY gecen test anahtari.
+[[allowlists]]
+description = "Yerel artiklar — .gitignore'da, git'e hic girmedi"
+paths = [
+  '''^console-run\.log$''',
+  '''SECRET-TEST-ONLY\.pem$''',
+]
+
+[[allowlists]]
+description = "e84f8ba: Next.js build ciktisi — her build'de yenilenen olu anahtarlar"
+condition = "AND"
+commits = ["e84f8ba2407583e01b45b475b17257df145b19d0"]
+paths = ['''^site/\.next/''']
+
+[[allowlists]]
+description = "e84f8ba: demo.ts maskeleme demosunun sahte girdisi (sk_live_<rakam>)"
+condition = "AND"
+commits = ["e84f8ba2407583e01b45b475b17257df145b19d0"]
+paths = ['''(^|/)demo\.ts$''']
+regexTarget = "line"
+regexes = ['''sk_live_\d+''']

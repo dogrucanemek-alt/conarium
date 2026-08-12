@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gecmis taramasi icin sart — sig klon "temiz" yalani soyler
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -28,6 +30,17 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:checks
+      # Bagimlilik kapisi. 2026-08-12'de uretim agacinda 6 KRITIK acik vardi ve
+      # hicbir test bunu gormedi — testler kodu olcer, bagimlilik agacini olcmez.
+      # Hepsi tek kaynaktan geliyordu: javascript-opentimestamps -> request (SSRF,
+      # paket terk edilmis, duzeltme yok) / web3 / crypto-js. Cipalama opsiyonel bir
+      # ek oldugu icin paket opsiyonel peer'a tasindi; cekirdegi kuran artik o
+      # agaci hic indirmiyor. Bu kapi, ayni seyin sessizce geri gelmesini engeller.
+      #
+      # --omit=dev bilerek: dev araclarinin (vitest/vite) acigi musteriye kurulmaz.
+      # Kapsam dogru olsun diye daraltildi, sonuc guzellesmesi icin degil.
+      - name: npm audit (production tree, high+ blocks)
+        run: npm audit --omit=dev --audit-level=high
       # Gitleaks runs HERE, not as its own job. As a third parallel job it never
       # got a runner — queued indefinitely on two separate runs, then cancelled,
       # with no steps ever created. Two jobs start reliably; a third did not.
@@ -45,6 +58,40 @@ jobs:
       # value it found into a public build log.
       - name: Gitleaks (secret scan, whole tree)
         run: ./gitleaks dir . -c .gitleaks.toml --redact --no-banner
+      # Calisma agaci != gecmis. `dir` yalnizca BUGUNKU dosyalari gorur; bir sir
+      # eklenip sonraki commit'te silinseydi agac temiz gorunur, gecmiste durmaya
+      # devam ederdi — ve halka acik bir repoda silinmis sey silinmis degildir.
+      # Gecmis ilk kez 2026-08-12'de tarandi (65 commit): bulunan 7 sey de olu
+      # cikti, gerekcesi .gitleaks.toml ve SECURITY.md'de. Bu adim, bir dahakini
+      # eklendigi gun yakalar.
+      - name: Gitleaks (full git history)
+        run: ./gitleaks git . -c .gitleaks.toml --redact --no-banner
+      # fetch-depth: 0 olmadan checkout tek commit alir ve gecmis taramasi
+      # bos bir agaci "temiz" ilan ederdi — olcumun kendi arizasina kor olmasi.
+
+  # CodeQL: Semgrep desen esler, CodeQL veri akisi izler. Farkli seyler bulurlar —
+  # "kullanicidan gelen deger su hassas cagriya ULASIYOR mu" sorusunu yalnizca ikincisi
+  # cevaplayabilir. Public repoda ucretsiz; bulgular Security sekmesinde durur, yani
+  # disaridan bakan biri sonucu bizim beyanimiza guvenmeden kendisi gorebilir.
+  codeql:
+    name: CodeQL (dataflow analysis)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: github/codeql-action/analyze@v3
 
   semgrep:
     name: Semgrep (static security)
