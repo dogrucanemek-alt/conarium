@@ -156,6 +156,14 @@ protected is the token itself, and a limit placed after auth would never count t
 failed attempts. Same library, opposite order, different reason. Test: case `4b` in
 `test/security_hardening_14.mjs`, which sends deliberately wrong tokens.
 
+One honest wrinkle: **CodeQL still flags these four after the fix.** The analysis
+re-ran on the fixed commit and the alerts moved to the new line numbers but stayed
+open, because the query looks for a recognised middleware and ours is hand-written —
+exactly the situation as the `anchor-service` alerts below. They are dismissed with
+that stated on each one. If you are auditing this, do not read "12 dismissed" as
+"12 non-issues": one of them was real, and the fix is in `270ac54` with a test that
+fails without it.
+
 **False positive — `js/xss-through-dom` in `index.html` (2 alerts).** User input from
 the demo's SQL box does reach `innerHTML`, but through `hlsql()`, which passes it
 through `esc()` first (`&`, `<`, `>` are encoded). The interpolated `table` value
