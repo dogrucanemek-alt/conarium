@@ -6,6 +6,5 @@ dist
 *.log
 *.test.ts
 docs.html
-index.html
 telegram_dump.json
 *.md

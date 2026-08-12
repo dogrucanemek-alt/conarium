@@ -6,7 +6,6 @@ test/
 *.test.ts
 *.test.mjs
 *.mjs
-index.html
 docs.html
 privacy.html
 terms.html

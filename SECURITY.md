@@ -164,11 +164,10 @@ that stated on each one. If you are auditing this, do not read "12 dismissed" as
 "12 non-issues": one of them was real, and the fix is in `270ac54` with a test that
 fails without it.
 
-**False positive — `js/xss-through-dom` in `index.html` (2 alerts).** User input from
-the demo's SQL box does reach `innerHTML`, but through `hlsql()`, which passes it
-through `esc()` first (`&`, `<`, `>` are encoded). The interpolated `table` value
-comes from `/from\s+([a-z_][\w.]*)/`; that character class cannot carry an HTML
-metacharacter. CodeQL sees the path and not the two filters on it.
+**False positive — `js/xss-through-dom` (2 alerts, dismissed 2026-08-12).** Those
+alerts pointed at a marketing `index.html` that no longer lives in this
+repository. The site is `conarium.dev` (private `nexus` repo). The demo SQL box
+there still goes through `hlsql()` → `esc()` before `innerHTML`.
 
 **False positive — `js/missing-rate-limiting` in `src/anchor-service.ts` (2 alerts).**
 The service does rate limit, per owner, returning 429 (`src/anchor-service.ts:135-188`).

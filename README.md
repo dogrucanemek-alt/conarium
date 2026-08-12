@@ -5,13 +5,15 @@
   
   <p>
     <a href="https://conarium.dev"><img src="https://img.shields.io/badge/Website-conarium.dev-5a8cff?style=for-the-badge" alt="Website" /></a>
-    <a href="https://github.com/dogrucanemek-alt/conarium/releases"><img src="https://img.shields.io/github/v/release/dogrucanemek-alt/conarium?style=for-the-badge&color=6fe0e0" alt="Release" /></a>
+    <a href="https://github.com/dogrucanemek-alt/conarium/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-f2d79a?style=for-the-badge" alt="License" /></a>
     <a href="https://github.com/dogrucanemek-alt/conarium/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-f2d79a?style=for-the-badge" alt="License" /></a>
     <img src="https://img.shields.io/badge/Status-Early%20Access-ff6f80?style=for-the-badge" alt="Early Access" />
   </p>
 </div>
 
 <br/>
+
+The site lives at [conarium.dev](https://conarium.dev); this repository is the product.
 
 ## 👁️ The Problem
 
@@ -28,12 +30,12 @@ The AI gets the context it needs to write code, but never sees your secrets.
 - **Inline PII Masking:** Emails, IDs, cards, and secrets are redacted in the response stream (`[MASKED]`) before the model sees a single character.
 - **Allow / Deny Lists:** Whitelist what AI can access. Your `secrets` and `financials` tables stay invisible.
 - **Row Caps:** Hard per-query limits. Prevent the silent exfiltration of millions of rows. 
-- **Immutable Audit Ledger:** Every access is logged (who, what, when, rows, decision). SOC2 & GDPR-ready, with no raw PII ever written to the logs.
+- **Immutable Audit Ledger:** Every access is logged (who, what, when, rows, decision). Hash-chained and PII-safe — no raw PII ever written to the logs.
 - **Verifiable Receipts (v0.1):** Ed25519-signed, independently verifiable receipts — see below.
 - **Per-person masking profiles:** what to mask for an AI agent is not what to mask for the data controller. A named profile relaxes masking for one identified person, and the receipt records which profile applied — see below.
 - **Coverage & Reconciliation:** a signed coverage declaration over the receipt chain (`conarium-coverage`), plus two-sided reconciliation against the database's own query counters (`conarium-reconcile`) — DB-recorded activity that no receipt covers is surfaced instead of staying invisible.
 - **100% Self-Hosted:** Runs entirely on your infrastructure. Your data never crosses your perimeter. 
-- **MCP-Native:** Works out of the box with **Cursor**, **GitHub Copilot**, **Claude Code**, and **Windsurf**.
+- **MCP-Native:** Works out of the box with **Cursor**, **GitHub Copilot**, **Claude Code**, and **Codex**.
 
 ### Verifiable Receipts
 
@@ -277,7 +279,7 @@ Conarium runs from source today. _(A one-command `npx conarium` CLI is on the [R
 ```bash
 # 1. Clone & install
 git clone https://github.com/dogrucanemek-alt/conarium.git
-cd nexus
+cd conarium
 npm install
 
 # 2. Point it at your data (and write a policy — see Configuration)
