@@ -1,6 +1,20 @@
 {
   "name": "@conarium-ai/core",
   "version": "0.1.0",
+  "//files": "Pakete NE gireceginin izin listesi. Liste olmadan npm her seyi gonderiyordu: 296 dosya / 1.5 MB — CI workflowlari, gitleaks ayari, 137 KB pazarlama gorseli, sitenin api/chat.js dosyasi. Bir bankanin guvenlik ekibi tarball'i acip bunlari gorur. scripts/ BILEREK var: conarium-reconcile calisirken scripts/pg-snapshot.sql'e atif yapiyor, olmazsa kullanici destek maili yazar.",
+  "files": [
+    "dist",
+    "bin",
+    "scripts",
+    "docs",
+    "examples",
+    "test-vectors",
+    "conarium.config.json",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CHANGELOG.md"
+  ],
   "description": "Governed MCP gateway for AI data access: policy enforcement and PII masking, an Ed25519-signed receipt per access that a third party verifies offline, coverage reconciliation against the database's own query counters to surface access that bypassed the gateway, and conformance vectors so the receipt format can be implemented without us. Self-hosted, MIT.",
   "keywords": [
     "mcp",
