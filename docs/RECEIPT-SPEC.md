@@ -81,6 +81,7 @@ conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [
 | 12 | `seq` gap / non-increasing — missing or reordered |
 | 13 | Signature invalid / pubkey missing (fail-closed) |
 | 14 | Anchor missing/invalid under `--anchor-check` |
+| 15 | Anchor **could not be checked** — calendar unreachable, or the OpenTimestamps verifier is not installed. Deliberately distinct from 14: "I could not verify this" is not "this is invalid". The digest comparison is performed offline and still holds; only the timestamp attestation is unconfirmed. A verifier that collapsed the two would be asserting something it did not measure. |
 | 20 | Schema invalid |
 
 Fail-closed: if the verifier is unsure, it does not exit 0.

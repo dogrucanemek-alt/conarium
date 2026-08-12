@@ -16,6 +16,8 @@
  *  12  seq gap or non-increasing
  *  13  signature invalid / no pubkey
  *  14  anchor proof failed / missing under --anchor-check
+ *  15  anchor COULD NOT BE CHECKED (calendar unreachable, verifier not installed)
+ *      — deliberately distinct from 14: "I could not verify" is not "this is invalid"
  *  20  schema invalid
  */
 import { createHash, createPublicKey, verify as cryptoVerify } from 'crypto'
@@ -159,13 +161,36 @@ function findAnchorRecord(rows, ref) {
   return null
 }
 
+/**
+ * "Kontrol edemedim" ile "kanıt geçersiz" ayrımı.
+ *
+ * Yalnızca KESİN ulaşılamama durumları buraya girer. Tanımadığımız bir hata
+ * `unknown` sayılmaz, 14 (kanıt başarısız) tarafında kalır: belirsizliği
+ * "sorun yok" yönüne yuvarlamak, bu ayrımı yapmanın amacını yok ederdi.
+ */
+const AG_HATA_KODLARI = new Set([
+  'ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND',
+  'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH', 'ECONNABORTED', 'EPIPE',
+])
+const AG_HATA_DESENI = /socket hang up|socket timed? ?out|network (is )?unreachable|getaddrinfo|request-promise|ESOCKETTIMEDOUT|ETIMEDOUT|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN/i
+
+function ulasilamadiMi(err) {
+  if (!err) return false
+  if (err.code && AG_HATA_KODLARI.has(String(err.code))) return true
+  if (err.cause && err.cause.code && AG_HATA_KODLARI.has(String(err.cause.code))) return true
+  return AG_HATA_DESENI.test(String(err.message || err))
+}
+
 async function verifyOtsProof(otsBase64, hash) {
   let OpenTimestamps
   try {
     OpenTimestamps = require('javascript-opentimestamps')
     if (OpenTimestamps && OpenTimestamps.default) OpenTimestamps = OpenTimestamps.default
   } catch {
-    return { ok: false, pending: false, detail: 'javascript-opentimestamps not installed' }
+    // "Kontrol edemedim", "kanıt geçersiz" DEĞİL. Paket 2026-08-12'den beri
+    // opsiyonel bir bağımlılık (bagimlilik agacindaki kritik aciklar nedeniyle),
+    // dolayısıyla bu durum artık istisna değil, sıradan bir kurulum hâli.
+    return { unknown: true, detail: 'javascript-opentimestamps not installed — anchor not checked' }
   }
   try {
     const hashBuf = hashPrefixToBuffer(hash)
@@ -190,6 +215,14 @@ async function verifyOtsProof(otsBase64, hash) {
     }
     return { ok: true, pending: !verified.bitcoin }
   } catch (err) {
+    // Takvime/blok gezginine ulaşılamaması bir KANIT BAŞARISIZLIĞI değildir.
+    // Bu projenin bütün iddiası "kaydedilmedi ≠ olmadı" ayrımını yapmak; kendi
+    // doğrulayıcısı içeride bu ayrımı yapmazsa iddia kendi kodunda çürür.
+    // Dijest karşılaştırması zaten yukarıda ÇEVRİMDIŞI yapıldı, yani yerel
+    // gerçek kaybolmuyor — kaybolan yalnızca zaman kanıtının teyidi.
+    if (ulasilamadiMi(err)) {
+      return { unknown: true, detail: `anchor calendar unreachable: ${err.message || String(err)}` }
+    }
     return { ok: false, pending: false, detail: err.message || String(err) }
   }
 }
@@ -504,6 +537,18 @@ async function main(argv = process.argv.slice(2)) {
         })
       }
       const otsResult = await verifyOtsProof(row.ots, receipt.chain.hash)
+      // 15 ÖNCE gelir: "kontrol edemedim" ile "kanıt tutmuyor" farklı cevaplardır
+      // ve ikincisi birincisini yutarsa doğrulayıcı bilmediği bir şeyi iddia eder.
+      // Sessizce 0 dönmek de aynı ölçüde yanlış olurdu — çağıran, çıpanın
+      // doğrulanmadığını BİLMELİ, sadece doğrulanamadığını.
+      if (otsResult.unknown) {
+        fail(
+          15,
+          `anchor could not be checked at ${where}: ${otsResult.detail}`,
+          opts.json,
+          { index: i, file },
+        )
+      }
       if (!otsResult.ok) {
         fail(
           14,
