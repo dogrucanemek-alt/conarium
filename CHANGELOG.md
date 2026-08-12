@@ -6,9 +6,26 @@ Nothing yet — 0.1.0 is the current cut.
 
 ## 0.1.0 — 2026-08-13
 
-First product cut. The npm package is **not published yet**; this describes
-what the git tree and `npm pack` tarball contain. Do not read "npx works"
-into this entry.
+First product cut, published to npm as `@conarium-ai/core@0.1.0`.
+
+### Fixed before it shipped — `bin` entries were being stripped
+
+The first publish attempt failed on 2FA, and the failure was lucky. Its output
+carried this, once per command:
+
+```
+npm warn publish "bin[conarium-doctor]" ... was invalid and removed
+```
+
+npm was dropping **all eight** command entries, because the values began with
+`./`. Published that way, `npx conarium-doctor` would not have existed — the
+whole point of a one-download install. `npm pack` was never affected, so the
+tarball looked correct the entire time; what npm rewrote was the metadata sent
+to the registry. Fixed with npm's own `npm pkg fix` (`./bin/x.mjs` → `bin/x.mjs`)
+and verified against the published package: eight bins present.
+
+**Lesson worth keeping: a correct `npm pack` does not mean a correct
+`npm publish`. Read the `warn` lines in `npm publish --dry-run`.**
 
 ### Added — install without us in the loop
 
