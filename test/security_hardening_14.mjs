@@ -318,6 +318,44 @@ await check('4 console is loopback by default, authenticated, CSRF-protected, va
   }
 })
 
+await check('4b console rate-limits BEFORE auth, so a token brute force is actually slowed', async () => {
+  // CodeQL (js/missing-rate-limiting) bunu 2026-08-12'de yakaladi. Konsol
+  // varsayilan olarak 127.0.0.1'e baglandigi ve token+CSRF istedigi icin saldiri
+  // yuzeyi dardi — ama CONARIUM_CONSOLE_HOST ile disari acilabiliyor ve o durumda
+  // token denemelerini yavaslatacak hicbir sey yoktu.
+  //
+  // Olculen sey limitin VARLIGI degil, SIRASI: limit auth'tan sonra kossaydi
+  // basarisiz denemeler hic sayilmaz ve kaba kuvvet sinirsiz kalirdi. Bu yuzden
+  // test BILEREK yanlis token gonderiyor.
+  const oldEnv = { ...process.env }
+  const dir = tempDir()
+  process.env.CONARIUM_AUDIT_HMAC_KEY = 'example-not-a-real-key'
+  process.env.CONARIUM_CONSOLE_RATE_PER_MIN = '5'
+  const app = createConsoleApp({
+    configFile: path.join(dir, 'console.json'),
+    auditFile: path.join(dir, 'audit.jsonl'),
+  })
+  process.env.CONARIUM_CONSOLE_TOKEN = 'console-token'
+  const server = app.listen(0, '127.0.0.1')
+  try {
+    await new Promise(resolve => server.once('listening', resolve))
+    const port = server.address().port
+    const wrong = { authorization: 'Bearer kesinlikle-yanlis-token' }
+
+    for (let i = 0; i < 5; i++) {
+      assert.equal((await httpRequest(port, 'GET', '/api/config', wrong)).status, 401)
+    }
+    // Butce bitti: alti girisim artik kimlik kontrolune bile ulasmiyor.
+    assert.equal((await httpRequest(port, 'GET', '/api/config', wrong)).status, 429)
+
+    // Dogru token da ayni butceye tabi — limit kimlige gore degil istemciye gore.
+    assert.equal((await httpRequest(port, 'GET', '/api/config', { authorization: 'Bearer console-token' })).status, 429)
+  } finally {
+    await new Promise(resolve => server.close(resolve))
+    process.env = oldEnv
+  }
+})
+
 await check('7 OpenAPI connector blocks SSRF and ignores remote servers by default', async () => {
   const blocked = new OpenApiConnector({
     type: 'openapi',

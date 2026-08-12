@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'crypto'
 import { z } from 'zod'
 import { Governance } from './governance.js'
 import { Audit } from './audit.js'
+import { RateLimiter, clientKey } from './rate_limit.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -103,6 +104,10 @@ export function createPlaygroundAudit(auditFile: string): Audit {
 
 export function createConsoleApp(opts: { configFile?: string; auditFile?: string } = {}) {
   const app = express()
+  // Limiter app basina: testler birbirinin sayacini kirletmesin.
+  const limiter = new RateLimiter({ perWindow: Number(process.env.CONARIUM_CONSOLE_RATE_PER_MIN ?? 60) })
+  const sweepTimer = setInterval(() => limiter.sweep(), 5 * 60_000)
+  sweepTimer.unref()   // acik bir zamanlayici sureci canli tutmasin
   app.use(express.json({ limit: '64kb' }))
 
   const publicDir = path.join(__dirname, '../public')
@@ -111,6 +116,24 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
   const audit = createPlaygroundAudit(auditFile)
 
   app.use(express.static(publicDir))
+  // Hiz siniri KIMLIK KONTROLUNDEN ONCE.
+  //
+  // http.ts'te limit bilerek auth'tan SONRA kosuyor: orada amac, yetkisiz bir selin
+  // gercek bir istemcinin butcesini yakmasini onlemek. Burada tehdit tam tersi —
+  // konsol tek bir operator icindir ve korunmasi gereken sey TOKEN'IN KENDISI.
+  // Limit auth'tan sonra kossaydi basarisiz denemeler hic sayilmaz, yani kaba
+  // kuvvet denemesi sinirsiz kalirdi. Ayni kutuphane, ters sira, farkli gerekce.
+  //
+  // Varsayilan 60/dk: mesru bir operator konsolu bu hizda kullanmaz, kaba kuvvet
+  // ise bu hizda ise yaramaz. CONARIUM_CONSOLE_RATE_PER_MIN=0 kapatir.
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    const client = clientKey(req.headers as Record<string, unknown>, req.socket.remoteAddress ?? undefined)
+    if (!limiter.take(client)) {
+      res.status(429).set('retry-after', String(limiter.retryAfter(client))).json({ error: 'rate limit exceeded' })
+      return
+    }
+    next()
+  })
   app.use('/api', requireConsoleAuth)
 
   app.get('/api/config', (req, res) => {

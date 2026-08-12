@@ -139,6 +139,43 @@ advisories with no non-breaking fix. They are build-time only and never installe
 `npm install --omit=dev`. The CI audit gate is scoped to the production tree for
 this reason — the scope was narrowed to be correct, not to make the number smaller.
 
+## CodeQL findings, triaged
+
+CodeQL ran for the first time on 2026-08-12 and raised twelve alerts. Each was
+checked against the code rather than accepted or dismissed on sight. One was real
+and is fixed; the rest are false positives and are dismissed in the Security tab
+with the reasoning recorded there, not silently closed.
+
+**Fixed — `js/missing-rate-limiting` in `src/console.ts` (4 alerts).** The console
+had no rate limit. It binds to `127.0.0.1` and requires a token plus a CSRF header,
+so the exposure was narrow — but `CONARIUM_CONSOLE_HOST` can publish it, and in that
+configuration nothing slowed a token brute force. A limiter now runs **before**
+authentication, deliberately: in `src/http.ts` the limit runs *after* auth so an
+unauthorized flood cannot burn a real client's budget, whereas here the thing being
+protected is the token itself, and a limit placed after auth would never count the
+failed attempts. Same library, opposite order, different reason. Test: case `4b` in
+`test/security_hardening_14.mjs`, which sends deliberately wrong tokens.
+
+**False positive — `js/xss-through-dom` in `index.html` (2 alerts).** User input from
+the demo's SQL box does reach `innerHTML`, but through `hlsql()`, which passes it
+through `esc()` first (`&`, `<`, `>` are encoded). The interpolated `table` value
+comes from `/from\s+([a-z_][\w.]*)/`; that character class cannot carry an HTML
+metacharacter. CodeQL sees the path and not the two filters on it.
+
+**False positive — `js/missing-rate-limiting` in `src/anchor-service.ts` (2 alerts).**
+The service does rate limit, per owner, returning 429 (`src/anchor-service.ts:135-188`).
+The limiter is hand-written rather than a recognised middleware, so the query does
+not match it.
+
+**False positive — `js/http-to-file-access` in `src/anchor-service.ts` (1 alert).**
+The write target is the fixed configured `storePath`; the record id is server-generated
+(`randomBytes(9)`), and `req.params.id` is only ever used to *search* stored records,
+never to build a path. There is no traversal.
+
+**False positive — `js/file-system-race` in `scripts/` and `bin/` (3 alerts).** These
+are developer and CLI tools. Exploiting the check-then-use window requires local write
+access to the same filesystem, at which point the tool is not the weakest link.
+
 ## Secrets in git history
 
 The full history was scanned for the first time on 2026-08-12 (`gitleaks git .`,
