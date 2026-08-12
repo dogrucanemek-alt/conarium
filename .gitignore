@@ -69,3 +69,6 @@ PROJECT_CONTEXT.md
 # kuralinda kaliyor ve BILEREK yayimlanmiyor — bkz test-vectors/README.md.)
 !test-vectors/keys/*.pub.pem
 !test-vectors/keys/*.pub.pem.keyid
+
+# npm pack ciktisi — paketleme artefakti, repoya girmez
+*.tgz
