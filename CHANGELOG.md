@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+Nothing yet — 0.1.0 is the current cut.
+
+## 0.1.0 — 2026-08-13
+
+First product cut. The npm package is **not published yet**; this describes
+what the git tree and `npm pack` tarball contain. Do not read "npx works"
+into this entry.
+
+### Added — install without us in the loop
+
+- `conarium-init` (`bin/conarium-init.mjs`): writes a fail-closed
+  `conarium.config.json`, an Ed25519 key pair, and the `.keyid` sidecars the
+  verifier needs. Refuses to overwrite without `--force`. Never prints the
+  private key. Exit 0/1/2 (outside the receipt exit-code namespace).
+- `conarium-doctor` version section: prints the installed version from
+  `package.json`. With a network, GETs `registry.npmjs.org/@conarium-ai/core/latest`
+  (2s timeout, errors are warnings). `--no-net` makes **zero** requests.
+  Telemetry none — the request is a version number, nothing is sent.
+- Offline license verifier (`src/license.ts`): JCS + Ed25519, same construction
+  as receipts. Missing/invalid/expired → `community`. No feature gates, no
+  keygen, no payments.
+- `package.json` `files` allowlist: the tarball is `dist`, `bin`, `scripts`,
+  `docs`, `examples`, `test-vectors`, `deploy`, plus the license/readme files —
+  not CI workflows or the marketing site. `scripts/` is included because
+  `conarium-reconcile` references `scripts/pg-snapshot.sql`.
+- `deploy/anchor-service/`: systemd unit, pm2 ecosystem, `.env.example`, dry-run
+  script. **Deploy itself is not this release.**
+
 ### Added — conarium-reconcile v0.1: two-sided coverage (bypass detection)
 
 - New standalone CLI `bin/conarium-reconcile.mjs` (zero imports from `src/`):

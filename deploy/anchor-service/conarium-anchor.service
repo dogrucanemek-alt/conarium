@@ -1,0 +1,21 @@
+[Unit]
+Description=Conarium OpenTimestamps anchoring service
+Documentation=https://github.com/dogrucanemek-alt/conarium/blob/main/deploy/anchor-service/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=conarium
+Group=conarium
+WorkingDirectory=/opt/conarium
+EnvironmentFile=/opt/conarium/deploy/anchor-service/.env
+ExecStart=/usr/bin/node /opt/conarium/bin/conarium-anchor-service.mjs
+Restart=on-failure
+RestartSec=5
+# The process binds loopback. TLS belongs on the proxy in front.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

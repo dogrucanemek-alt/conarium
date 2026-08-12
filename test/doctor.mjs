@@ -13,6 +13,7 @@ import path from 'path'
 import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { generateKeyPairSync } from 'crypto'
+import http from 'http'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DOCTOR = path.join(__dirname, '..', 'bin', 'conarium-doctor.mjs')
@@ -182,6 +183,58 @@ test('masking profiles with a shared token warn, but do not fail', async () => {
   assert.strictEqual(status, 0, 'a warning must not fail the run')
   assert.ok(/silently ignored/.test(out), 'must say the profiles do nothing with a shared credential')
   assert.ok(!out.includes('shared-token-value'), 'token value leaked into doctor output')
+})
+
+// --- version check (G3) -------------------------------------------------------
+
+function listen(server) {
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve(server.address().port))
+  })
+}
+
+test('--no-net does not query the npm registry', async () => {
+  let hits = 0
+  const server = http.createServer((_req, res) => {
+    hits += 1
+    res.end(JSON.stringify({ version: '9.9.9' }))
+  })
+  const port = await listen(server)
+  try {
+    const dir = tmpdir()
+    writeConfig(dir, HEALTHY)
+    const { status, out } = runDoctor(dir, {
+      env: {
+        CONARIUM_AUDIT_UNSIGNED: '1',
+        CONARIUM_NPM_REGISTRY: `http://127.0.0.1:${port}/@conarium-ai/core/latest`,
+      },
+      args: ['--no-net'],
+    })
+    assert.strictEqual(status, 0, out)
+    assert.strictEqual(hits, 0, 'fetch must not run under --no-net')
+    assert.ok(/registry not queried/.test(out), 'must say the registry was skipped')
+  } finally {
+    server.close()
+  }
+})
+
+test('unreachable registry is a warning, doctor still exits 0', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, {
+    serverName: 'Conarium',
+    consumer: 'ai-assistant',
+    connectors: [{ type: 'docs', name: 'docs', description: 'local docs', config: { root: './docs' } }],
+    policy: { allowConnectors: ['docs'], maskColumns: ['*.email'] },
+  })
+  const { status, out } = runDoctor(dir, {
+    args: [],
+    env: {
+      CONARIUM_AUDIT_UNSIGNED: '1',
+      CONARIUM_NPM_REGISTRY: 'http://127.0.0.1:1/@conarium-ai/core/latest',
+    },
+  })
+  assert.strictEqual(status, 0, `registry down must not fail the doctor:\n${out}`)
+  assert.ok(/registry unreachable/.test(out), 'must warn, not stay silent')
 })
 
 // --- run ----------------------------------------------------------------------

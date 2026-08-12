@@ -274,23 +274,34 @@ graph LR
 
 ## 🚀 Quick Start
 
-Conarium runs from source today. _(A one-command `npx conarium` CLI is on the [Roadmap](#️-roadmap).)_
+Conarium runs from source today. `@conarium-ai/core` is **not on the npm
+registry yet** — do not expect `npx @conarium-ai/core` to work until it is
+published. The commands below are what works now.
 
 ```bash
 # 1. Clone & install
 git clone https://github.com/dogrucanemek-alt/conarium.git
 cd conarium
-npm install
+npm install && npm run build
 
-# 2. Point it at your data (and write a policy — see Configuration)
-export CONARIUM_DB_URL="postgresql://user:password@localhost:5432/mydb"
+# 2. Write a fail-closed skeleton (config + Ed25519 pair + .keyid sidecars)
+node bin/conarium-init.mjs
+export CONARIUM_AUDIT_SIGNING_KEY="$PWD/audit-ed25519.pem"
 
 # 3. Check the install before trusting it
-node bin/conarium-doctor.mjs
+node bin/conarium-doctor.mjs --no-net
 
-# 4. Run the governed MCP gateway
-npm run dev          # or: npm run build && npm start
+# 4. Point the generated conarium.config.json at your read-only DSN,
+#    fill policy.allowTables, then run the governed MCP gateway
+npm start
 ```
+
+`conarium-init` refuses to overwrite existing files unless you pass `--force`.
+It never prints the private key — only its path.
+
+When the package is on npm, the same binaries will ship in the tarball
+(`conarium-init`, `conarium-doctor`, `conarium-verify`). Until then, run them
+from this repository as above.
 
 ### Before you file a bug: run the doctor
 
@@ -349,11 +360,13 @@ profiles · immutable hash-chained audit ledger · Ed25519-signed receipt per ac
 with an offline verifier · signed coverage declarations · two-sided reconciliation
 against the database's own counters · OpenTimestamps anchoring and an optional
 anchoring service · conformance vectors · Postgres, Supabase, docs, OpenAPI, Jira
-and Slack connectors.
+and Slack connectors · `conarium-init` / `conarium-doctor` from source (npm
+publish is the remaining step before `npx` works).
 
 **Next:** consent binding ([spec published](docs/CONSENT-BINDING-SPEC.md), no code —
 patent review first) · a second independent implementation of the receipt format ·
-per-user identity bound to an identity provider rather than an operator token map.
+per-user identity bound to an identity provider rather than an operator token map ·
+publishing `@conarium-ai/core` to npm so `npx conarium-init` works without a clone.
 
 **Deliberately not planned**, so nobody waits for it:
 

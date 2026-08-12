@@ -30,6 +30,7 @@
  */
 import { existsSync, readFileSync, statSync, accessSync, constants } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import net from 'node:net'
 import { createPublicKey, createPrivateKey } from 'node:crypto'
 
@@ -44,7 +45,7 @@ if (has('--help') || has('-h')) {
   console.log(`conarium-doctor — check a Conarium install before it goes wrong
 
   --config <path>   config file (default: conarium.config.json in cwd)
-  --no-net          skip the TCP reachability probe
+  --no-net          skip the TCP reachability probe AND the npm version check
   --help            this text
 
 Exit: 0 clean · 1 problems found · 2 doctor could not run
@@ -104,6 +105,18 @@ function envSet(name) {
   return typeof v === 'string' && v.trim() !== '' ? v : null
 }
 
+function cmpSemver(a, b) {
+  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0)
+  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const da = pa[i] || 0
+    const db = pb[i] || 0
+    if (da > db) return 1
+    if (da < db) return -1
+  }
+  return 0
+}
+
 /* ------------------------------------------------------------- the checks */
 
 // 1. Runtime
@@ -112,6 +125,60 @@ function envSet(name) {
   if (Number.isNaN(major)) warn('Node runtime', `unrecognised version ${process.version}`, 'Conarium expects Node >= 18.')
   else if (major < 18) fail('Node runtime', `${process.version} is below the supported floor`, 'Install Node 18 or newer.')
   else ok('Node runtime', process.version)
+}
+
+// 1b. Installed version vs npm registry.
+//     Telemetry none: this is a GET for a version number. No install id, no
+//     hostname, no config, no license is sent. A bank reading this file should
+//     see that the only bytes leaving the box are an HTTP request for
+//     @conarium-ai/core's `latest` document. `--no-net` makes zero requests.
+{
+  const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json')
+  let installed = null
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+    if (typeof pkg.version === 'string' && pkg.version) installed = pkg.version
+  } catch {
+    installed = null
+  }
+  if (!installed) {
+    warn('Version', `could not read ${pkgPath}`, 'Reinstall the package so package.json sits next to bin/.')
+  } else if (SKIP_NET) {
+    ok('Version', `${installed} (registry not queried: --no-net)`)
+  } else {
+    const url = envSet('CONARIUM_NPM_REGISTRY') || 'https://registry.npmjs.org/@conarium-ai/core/latest'
+    try {
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), 2000)
+      let latest
+      try {
+        const res = await fetch(url, { signal: ac.signal, headers: { accept: 'application/json' } })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const body = await res.json()
+        latest = body && typeof body.version === 'string' ? body.version : null
+        if (!latest) throw new Error('no version field')
+      } finally {
+        clearTimeout(timer)
+      }
+      if (latest === installed) {
+        ok('Version', `${installed} (matches npm latest)`)
+      } else if (cmpSemver(latest, installed) > 0) {
+        warn(
+          'Version',
+          `${installed} installed; ${latest} is on npm`,
+          `npm i @conarium-ai/core@${latest}`,
+        )
+      } else {
+        ok('Version', `${installed} installed; npm latest is ${latest}`)
+      }
+    } catch (e) {
+      warn(
+        'Version',
+        `${installed} installed; registry unreachable (${e.name === 'AbortError' ? 'timeout' : e.message})`,
+        'Air-gapped is fine. Rerun without --no-net when you next have a network, or pin the version yourself.',
+      )
+    }
+  }
 }
 
 // 2. Config file — the silent one
@@ -354,6 +421,42 @@ if (config) {
         `${t.name}: ${t.host}:${t.port} unreachable (${r.why})`,
         'The gateway logs connector failures and keeps running with zero connectors — it will look healthy and serve nothing.',
       )
+  }
+}
+
+// 12. License pack — offline, never fail-closed. A broken license file must
+//     not lock the MIT core. Missing file = community.
+{
+  const licensePath = envSet('CONARIUM_LICENSE_FILE') || join(process.cwd(), 'conarium.license.json')
+  const pubPath = envSet('CONARIUM_LICENSE_PUBKEY')
+  if (!existsSync(licensePath)) {
+    ok('License', 'community (no license file)')
+  } else {
+    let verifier = null
+    try {
+      verifier = await import('../dist/license.js')
+    } catch {
+      verifier = null
+    }
+    if (!verifier?.verifyLicense) {
+      warn(
+        'License',
+        `file present at ${licensePath} but the verifier is not built`,
+        'Run npm run build, or ignore this — the MIT core stays community either way.',
+      )
+    } else if (!pubPath) {
+      warn(
+        'License',
+        `file present at ${licensePath} but CONARIUM_LICENSE_PUBKEY is not set — treating as community`,
+        'Set the pubkey path to verify offline. Until then the MIT core stays community.',
+      )
+    } else if (!existsSync(pubPath)) {
+      warn('License', `CONARIUM_LICENSE_PUBKEY points at a missing file — treating as community`, 'Check the path.')
+    } else {
+      const r = verifier.verifyLicense(readFileSync(licensePath, 'utf-8'), readFileSync(pubPath, 'utf-8'))
+      if (r.valid) ok('License', `${r.tier}${r.customer ? ` · ${r.customer}` : ''}${r.expiresAt ? ` · expires ${r.expiresAt}` : ''}`)
+      else ok('License', `community (${r.reason})`)
+    }
   }
 }
 
