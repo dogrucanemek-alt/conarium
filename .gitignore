@@ -5,6 +5,12 @@ dist/
 nexus.config.json
 *.local.json
 
+# Vercel proje baglantisi. Bu repo Vercel'e DEPLOY EDILMIYOR — conarium.dev
+# ayri bir repodan (nexus) yayinlaniyor. Buradaki .vercel/ ayni Vercel
+# projesine isaret ediyordu; bu dizinden calisan bir "vercel --prod" sitenin
+# ana sayfasini silerdi (bu repoda index.html yok). Baglanti bilerek kaldirildi.
+.vercel/
+
 # session debris / sensitive (güvenlik denetimi 2026-06-29)
 *_dump.json
 telegram_dump.json
