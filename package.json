@@ -1,6 +1,6 @@
 {
   "name": "@conarium-ai/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "//files": "Pakete NE gireceginin izin listesi. Liste olmadan npm her seyi gonderiyordu: 296 dosya / 1.5 MB — CI workflowlari, gitleaks ayari, 137 KB pazarlama gorseli, sitenin api/chat.js dosyasi. Bir bankanin guvenlik ekibi tarball'i acip bunlari gorur. scripts/ BILEREK var: conarium-reconcile calisirken scripts/pg-snapshot.sql'e atif yapiyor, olmazsa kullanici destek maili yazar.",
   "files": [
     "dist",

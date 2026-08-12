@@ -2,7 +2,34 @@
 
 ## Unreleased
 
-Nothing yet — 0.1.0 is the current cut.
+Nothing yet — 0.1.1 is the current cut.
+
+## 0.1.1 — 2026-08-13
+
+Patch. The shipped MCP examples told you to run a command that cannot run.
+
+### Fixed
+
+- **`examples/cursor-mcp-settings.json` and `examples/claude-desktop-config.json`
+  proposed `npx -y @conarium-ai/core`, which fails with `could not determine
+  executable to run`.** The package ships eight commands and none of them is
+  named `core`, so npx has nothing to pick. Anyone who pasted the example into
+  Cursor or Claude Desktop hit a wall on their first attempt — the worst possible
+  moment. The working form, measured rather than assumed:
+
+  ```json
+  { "command": "npx",
+    "args": ["-y", "--package=@conarium-ai/core", "conarium",
+             "--config", "/path/to/your/conarium.config.json"] }
+  ```
+
+- The README MCP client block said `"command": "node", "args": ["dist/index.js"]`
+  — the from-source path, wrong for anyone who installed the package.
+
+### Changed
+
+- README Quick Start leads with the npm install path now that the package is
+  published; the from-source route is kept, folded into a `<details>`.
 
 ## 0.1.0 — 2026-08-13
 
