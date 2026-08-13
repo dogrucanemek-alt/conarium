@@ -75,6 +75,12 @@ examples/per-user-identity/conarium.tokens.json
 # npm pack ciktisi — paketleme artefakti, repoya girmez
 *.tgz
 
+# Python bytecode: deploy/hetzner altindaki ops betiklerine `py_compile` ile
+# sozdizimi kontrolu yapinca uretiliyor. 08-13'te `git add deploy/hetzner`
+# bunlari da supurup commit'ledi — uretilmis dosya repoya girmez.
+__pycache__/
+*.pyc
+
 # Canli kurulumun (Hetzner /opt/conarium-mcp) calisma dizininde biriken dosyalar.
 # Bu dizin bir git checkout'u ve burasi PUBLIC repo. 2026-08-13'te olculdu:
 # .mcp_token hicbir desene girmiyordu — orada "git add ." diyen biri TOKEN'i
