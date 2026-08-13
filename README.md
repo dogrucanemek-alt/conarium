@@ -238,6 +238,18 @@ a real operating company's live ERP — 121,374 records, 121,366 identities
 masked, 485,496 fields masked, zero leaked to the model
 ([Governance Report 001](https://conarium.dev/report-001.html)).
 
+**What that number is, and what it is not.** It comes from a batch run against
+our own company's ERP, and what backs it is a **hash-chained audit file** of 123
+lines whose arithmetic you can re-add yourself and whose chain was re-verified 17
+days later. What does *not* back it is a **receipt chain**: that run emitted audit
+entries, not signed portable receipts, and its actor is a batch service identity,
+not a person. So if you ask "show me the receipts for those 485,496 fields", the
+honest answer is that they do not exist — the receipt chain is a separate and much
+smaller measurement. Scale and offline verifiability are two different claims here,
+and we would rather draw that line ourselves than have you find it. The mechanism
+is verifiable without trusting us; this particular figure is our own measurement,
+and [Governance Report 001](https://conarium.dev/report-001.html) lists its limits.
+
 That claim is hedged on purpose, and [`docs/PRIOR-ART.md`](docs/PRIOR-ART.md) is the
 evidence behind it: ten projects checked on 6 August 2026, what each one has, the
 closest academic prior art ([Sello / *Notarized Agents*](https://arxiv.org/html/2606.04193v1),
