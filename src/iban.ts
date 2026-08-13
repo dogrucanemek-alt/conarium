@@ -96,18 +96,80 @@ export function prepareIbanPass(text: string, opts: MaskIbanOpts = {}): IbanPass
   const checksum = opts.checksum !== false
   const holes: string[] = []
   let count = 0
-  const next = text.replace(IBAN_CANDIDATE, (m) => {
-    const valid = longestWhere(m, (n) => looksLikeIban(n) && (!checksum || ibanMod97Ok(n)))
+  // ⛔ String.replace ile TEK aday regex'i yetmiyor, olculdu (08-13):
+  // "IBAN1 ve IBAN2" tek eslesme oluyor (gruplama bosluklarina izin veren
+  // [\s-]* araya giren "ve"yi de alnum sayiyor), sonra {11,30} siniri
+  // eslesmeyi IKINCI IBAN'IN ORTASINDA kesiyor ("...841326 ve TR33 00").
+  // replace eslesmenin SONUNDAN devam ettigi icin ikinci IBAN'in kalani bir
+  // daha hicbir desene uymuyordu: iki IBAN'li her metinde count=1 ve ikinci
+  // IBAN TAMAMEN aciktaydi. Odeme metninde "X hesabindan Y hesabina" siradan
+  // bir cumle, yani bu kenar durum degil.
+  //
+  // Cozum: capa bul → oradan IBAN bicimli en uzun akisi topla (en fazla 34
+  // alnum) → checksum tutana kadar sondan kis → ve taramaya TUKETILEN parcanin
+  // hemen ardindan devam et. Boylece asiri acgozlu akis ikinci IBAN'i yutsa
+  // bile, imlec onun basina geri doner.
+  const ANCHOR = /\b[A-Za-z]{2}[\s-]*\d{2}/g
+  const isAlnum = (c: string) => /[A-Za-z0-9]/.test(c)
+  const isSep = (c: string) => /[\s-]/.test(c)
+
+  const runFrom = (s: string, start: number): string => {
+    let i = start
+    let alnum = 0
+    let end = start
+    while (i < s.length && alnum < 34) {
+      if (isAlnum(s[i])) {
+        alnum++
+        i++
+        end = i
+        continue
+      }
+      if (isSep(s[i])) {
+        let j = i
+        while (j < s.length && isSep(s[j])) j++
+        if (j < s.length && isAlnum(s[j]) && alnum < 34) {
+          i = j
+          continue
+        }
+      }
+      break
+    }
+    return s.slice(start, end)
+  }
+
+  let out = ''
+  let cursor = 0
+  ANCHOR.lastIndex = 0
+  let anchor: RegExpExecArray | null
+  while ((anchor = ANCHOR.exec(text)) !== null) {
+    if (anchor.index < cursor) {
+      ANCHOR.lastIndex = cursor
+      continue
+    }
+    const run = runFrom(text, anchor.index)
+    if (run.length < 15) {
+      ANCHOR.lastIndex = anchor.index + 1
+      continue
+    }
+    const valid = longestWhere(run, (n) => looksLikeIban(n) && (!checksum || ibanMod97Ok(n)))
+    const shape = valid ?? longestWhere(run, looksLikeIban)
+    if (!shape) {
+      ANCHOR.lastIndex = anchor.index + 1
+      continue
+    }
+    out += text.slice(cursor, anchor.index)
     if (valid) {
       count++
-      return IBAN_MASK + m.slice(valid.length)
+      out += IBAN_MASK
+    } else {
+      const id = holes.length
+      holes.push(shape)
+      out += `${SHIELD_OPEN}${id}${SHIELD_CLOSE}`
     }
-    const shape = longestWhere(m, looksLikeIban)
-    if (!shape) return m
-    const id = holes.length
-    holes.push(shape)
-    return `${SHIELD_OPEN}${id}${SHIELD_CLOSE}` + m.slice(shape.length)
-  })
+    cursor = anchor.index + shape.length
+    ANCHOR.lastIndex = cursor
+  }
+  const next = out + text.slice(cursor)
   return {
     text: next,
     count,

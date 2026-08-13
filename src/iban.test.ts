@@ -101,6 +101,29 @@ describe('IBAN content detector', () => {
     expect(String(r.masked)).not.toMatch(/^TR/)
   })
 
+  /**
+   * 08-13'te kapida yakalandi: bir alanda IKI IBAN varsa yalnizca ilki
+   * maskeleniyordu, ikincisi TAMAMEN acik geciyordu (count=1).
+   * Sebep tasarimdaydi: tek acgozlu aday regex ayraci ("... ve ...") yutup
+   * {11,30} sinirinda IKINCI IBAN'IN ORTASINDA kesiliyor, String.replace de
+   * eslesmenin sonundan devam ettigi icin kalan parca hicbir desene uymuyordu.
+   * "X hesabindan Y hesabina" bir odeme metninde kenar durum degildir.
+   */
+  it('ayni alandaki IKI IBAN da maskelenir (duz + gruplu, her sirada)', () => {
+    const grouped = TR.replace(/(.{4})/g, '$1 ').trim()
+    for (const metin of [
+      `${TR} ve ${grouped} ayni hesap.`,
+      `${grouped} ve ${TR} ayni hesap.`,
+      `${grouped} ve ${grouped} ayni.`,
+    ]) {
+      const r = gov.maskPII(metin)
+      const out = String(r.masked)
+      expect(out).not.toMatch(/TR\s?\d\d/)               // hicbir IBAN acik kalmadi
+      expect(out.match(/\[MASKED_PII\]/g)?.length).toBe(2) // ikisi de maskelendi
+      expect(out).toMatch(/ayni/)                          // cumlenin geri kalani duruyor
+    }
+  })
+
   it('profile cannot switch the detector off', () => {
     const policy: GovernancePolicy = {
       allowTables: ['public.notes'],

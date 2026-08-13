@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const demo = join(root, 'examples', 'demo-bank')
+const identity = join(root, 'examples', 'per-user-identity')
 const keysDir = join(demo, '_keys')
 const artefacts = [
   join(keysDir, 'audit-ed25519.pem'),
@@ -26,6 +27,9 @@ const artefacts = [
   join(keysDir, 'audit-ed25519.pub.pem.keyid'),
   join(demo, 'conarium-receipts.jsonl'),
   join(demo, 'conarium-audit.jsonl'),
+  // mint-token.mjs bunu uretiyor: operatorun token kaydi. gitignore'da var,
+  // npm'de YOKTU — 08-13'te olculdu, pakete giriyordu.
+  join(identity, 'conarium.tokens.json'),
 ]
 
 let failed = 0
@@ -79,11 +83,35 @@ try {
     fail(`vektor ACIK anahtari ve keyid yan dosyasi pakette olmali (bulunan: ${publicKey.length}) — yoksa dogrulayici her vektore 13 der`)
   } else pass('vektorlerin acik anahtari + keyid yan dosyasi yerinde')
 
-  const demoFiles = files.filter((f) => f.startsWith('examples/demo-bank/'))
-  const expected = ['conarium.config.json', 'docker-compose.yml', 'prove-mask.mjs', 'prove-receipt.mjs', 'README.md', 'seed.sql']
-  const missing = expected.filter((e) => !demoFiles.includes(`examples/demo-bank/${e}`))
-  if (missing.length) fail(`eleme fazla genis, demo dosyasi dusuruldu: ${missing.join(', ')}`)
-  else pass('demo paketinin 6 kaynak dosyasi tarball\'da duruyor')
+  // ⛔ KARA LISTE DEGIL, BEYAZ LISTE. Ayni sinif hata bugun UC kez cikti:
+  // examples/_keys (ozel anahtar) → kapatildi · test-vectors ozel anahtari →
+  // kapatildi · examples/per-user-identity/conarium.tokens.json (operatorun token
+  // kaydi) → yine girdi. Her seferinde .gitignore temiz gorunuyordu, cunku
+  // gitignore npm'i BAGLAMAZ. Desen eklemekle bitmiyor: burada examples/ altindan
+  // pakete girmesine IZIN VERILEN dosyalarin tam listesi duruyor. Yeni bir ornek
+  // dosyasi eklendiginde bu liste BILEREK guncellenecek; uretilmis hicbir dosya
+  // sessizce gecemeyecek.
+  const EXAMPLES_ALLOWLIST = [
+    'examples/claude-desktop-config.json',
+    'examples/cursor-mcp-settings.json',
+    'examples/demo-bank/README.md',
+    'examples/demo-bank/conarium.config.json',
+    'examples/demo-bank/docker-compose.yml',
+    'examples/demo-bank/prove-mask.mjs',
+    'examples/demo-bank/prove-receipt.mjs',
+    'examples/demo-bank/seed.sql',
+    'examples/per-user-identity/README.md',
+    'examples/per-user-identity/mint-token.mjs',
+    'examples/per-user-identity/policy.overlay.json',
+    'examples/per-user-identity/prove-identity.mjs',
+    'examples/per-user-identity/rollback.sh',
+  ].sort()
+  const packedExamples = files.filter((f) => f.startsWith('examples/')).sort()
+  const unexpected = packedExamples.filter((f) => !EXAMPLES_ALLOWLIST.includes(f))
+  const absent = EXAMPLES_ALLOWLIST.filter((f) => !packedExamples.includes(f))
+  if (unexpected.length) fail(`examples/ altindan IZINSIZ dosya paketlendi: ${unexpected.join(', ')}`)
+  else if (absent.length) fail(`beklenen ornek dosyasi pakete girmedi: ${absent.join(', ')}`)
+  else pass(`examples/ tam olarak izin verilen ${EXAMPLES_ALLOWLIST.length} dosyayi tasiyor`)
 
   const vectorReceipts = files.filter((f) => f.startsWith('test-vectors/') && f.endsWith('.jsonl'))
   const vectorKeys = files.filter((f) => f.startsWith('test-vectors/') && (f.endsWith('.pub.pem') || f.endsWith('.keyid')))
@@ -97,9 +125,10 @@ try {
 } catch (e) {
   fail(e.message)
 } finally {
+  // Listeden tek tek: yeni bir artefakt eklendiginde temizligi unutmak,
+  // repoda anahtar/token birakmak demek.
+  for (const p of artefacts) rmSync(p, { force: true })
   rmSync(keysDir, { recursive: true, force: true })
-  rmSync(join(demo, 'conarium-receipts.jsonl'), { force: true })
-  rmSync(join(demo, 'conarium-audit.jsonl'), { force: true })
   const left = artefacts.filter((p) => existsSync(p))
   if (left.length) fail(`temizlik eksik, artefakt kaldi: ${left.join(', ')}`)
 }
