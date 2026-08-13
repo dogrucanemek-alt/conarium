@@ -125,6 +125,55 @@ test('generated config + key makes conarium-doctor --no-net exit 0', () => {
   assert.strictEqual(status, 0, `doctor must accept init output:\n${out}`)
 })
 
+/**
+ * 0.2.0'da yayinlanan kusur: `--out <dir>` ile kurulunca init'in kendi yazdirdigi
+ * `conarium-doctor --no-net` komutu FAIL ediyordu — config <dir> altina yaziliyor,
+ * doctor cwd'ye bakiyordu. Asagidaki iki test "aracin soyledigi komut calisir" ve
+ * "yapistirilan MCP blogu gercekten yonetir" sartlarini kilitler.
+ */
+test('--out: init KENDI yazdirdigi doctor komutu basarili olmali', () => {
+  const dir = tmpdir()
+  const out = path.join(dir, '_keys')
+  const init = runInit(dir, { args: ['--out', '_keys'] })
+  assert.strictEqual(init.status, 0, init.out)
+
+  const configPath = path.join(out, 'conarium.config.json')
+  assert.ok(fs.existsSync(configPath), 'config --out dizinine yazilmadi')
+  assert.ok(
+    init.out.includes(`--config ${configPath}`),
+    `Next satiri --config tasimiyor; kullanici FAIL alir:\n${init.out}`,
+  )
+
+  // Yazdirilan komut cwd'den BAGIMSIZ calismali: config'in olmadigi bir dizinden kosuyoruz.
+  const elsewhere = tmpdir()
+  const doctor = runDoctor(elsewhere, {
+    args: ['--config', configPath, '--no-net'],
+    env: {
+      CONARIUM_AUDIT_SIGNING_KEY: path.join(out, 'audit-ed25519.pem'),
+      CONARIUM_AUDIT_TRUST_PUBKEYS: path.join(out, 'audit-ed25519.pub.pem'),
+    },
+  })
+  assert.strictEqual(doctor.status, 0, `init'in yazdirdigi komut FAIL etti:\n${doctor.out}`)
+})
+
+test('MCP blogu --config tasir (yoksa gecit sifir connector ile SESSIZCE acilir)', () => {
+  for (const args of [[], ['--out', '_keys']]) {
+    const dir = tmpdir()
+    const init = runInit(dir, { args })
+    assert.strictEqual(init.status, 0, init.out)
+    const configPath = path.join(args.length ? path.join(dir, '_keys') : dir, 'conarium.config.json')
+
+    const json = init.out.slice(init.out.indexOf('{'), init.out.lastIndexOf('}') + 1)
+    const block = JSON.parse(json)
+    const serverArgs = block.mcpServers.conarium.args
+    assert.ok(
+      serverArgs.includes('--config'),
+      `MCP blogu --config tasimiyor (args=${JSON.stringify(serverArgs)}); istemci sunucuyu KENDI cwd'sinde baslatir`,
+    )
+    assert.strictEqual(serverArgs[serverArgs.indexOf('--config') + 1], configPath, 'MCP blogundaki config yolu yanlis')
+  }
+})
+
 for (const { name, fn } of tests) {
   try {
     await fn()

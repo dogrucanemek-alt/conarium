@@ -166,14 +166,23 @@ if (!NO_KEYS) {
   console.log(`  export CONARIUM_AUDIT_SIGNING_KEY=${signingKeyPath}`)
   console.log(`  export CONARIUM_AUDIT_TRUST_PUBKEYS=${publicPath}`)
 }
-console.log('  conarium-doctor --no-net')
+// --config HER ZAMAN yazilir. Onceki hal 'conarium-doctor --no-net' diyordu ve
+// `--out <dir>` kullanildiginda o komut FAIL ediyordu: config <dir> altina yaziliyor,
+// doctor ise cwd'ye bakiyor. Aracin kendi yazdirdigi komutun basarisiz olmasi,
+// "kimse bize sormadan kurabilsin" sartinin dogrudan ihlali.
+console.log(`  conarium-doctor --config ${configPath} --no-net`)
 console.log('')
 console.log('MCP client block (Cursor / Claude Code) — paste into mcp.json:')
 console.log(JSON.stringify({
   mcpServers: {
     conarium: {
       command: 'node',
-      args: [gatewayJs],
+      // Config yolu ACIKCA veriliyor: MCP istemcisi sunucuyu KENDI calisma
+      // dizininde baslatir, kullanicinin kurulum dizininde degil. Yol yazilmazsa
+      // gecit config'i bulamaz ve HATA VERMEZ — sifir connector'la acilir, yani
+      // hicbir sey yonetilmez. Doctor'un "Config file: not found" uyarisi tam
+      // bunu anlatiyor; blogu uretirken ayni tuzaga dusmustuk.
+      args: [gatewayJs, '--config', configPath],
       env: NO_KEYS
         ? {}
         : { CONARIUM_AUDIT_SIGNING_KEY: signingKeyPath },

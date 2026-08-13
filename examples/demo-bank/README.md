@@ -25,6 +25,11 @@ npx conarium-doctor
 
 Expected: doctor EXIT 0, including Reachability to `127.0.0.1:54329`.
 
+`conarium-init` prints a `--config .../_keys/conarium.config.json` hint. Ignore it
+here: that is the scaffold it just wrote, with a placeholder DSN. The config this
+demo runs on is the one in this directory, which `conarium-doctor` picks up from
+the working directory. `--out ./_keys` exists precisely so init does not overwrite it.
+
 Then prove the product, in this order:
 
 ```bash
