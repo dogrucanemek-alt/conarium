@@ -51,6 +51,29 @@ export function mergeConsolePolicyPatch(
   return { ...existing, policy: prev }
 }
 
+/** Same-directory temp + rename: a crash mid-write cannot leave a half config. */
+export function writeConfigAtomic(configFile: string, contents: string): void {
+  const dir = path.dirname(configFile)
+  const tmp = path.join(dir, `.${path.basename(configFile)}.${process.pid}.tmp`)
+  try {
+    fs.writeFileSync(tmp, contents, { encoding: 'utf8', mode: 0o600 })
+    try {
+      fs.renameSync(tmp, configFile)
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (process.platform === 'win32' && (code === 'EPERM' || code === 'EEXIST')) {
+        fs.rmSync(configFile, { force: true })
+        fs.renameSync(tmp, configFile)
+      } else {
+        throw err
+      }
+    }
+  } catch (err) {
+    try { fs.rmSync(tmp, { force: true }) } catch { /* leftover tmp */ }
+    throw err
+  }
+}
+
 export function redactSecretFields(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(item => redactSecretFields(item))
   if (!value || typeof value !== 'object') return value
@@ -186,7 +209,7 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
         }
       }
       const next = mergeConsolePolicyPatch(existing, patch)
-      fs.writeFileSync(configFile, JSON.stringify(next, null, 2) + '\n')
+      writeConfigAtomic(configFile, JSON.stringify(next, null, 2) + '\n')
       const tables = (next.policy as { allowTables?: unknown } | undefined)?.allowTables
       const allowTablesEmpty = !Array.isArray(tables) || tables.length === 0
       res.json({ success: true, allowTablesEmpty })

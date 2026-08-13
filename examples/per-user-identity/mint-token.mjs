@@ -68,9 +68,10 @@ doc.tokens.push({ sha256, id })
 
 try {
   mkdirSync(dirname(file), { recursive: true })
-  writeFileSync(file, JSON.stringify(doc, null, 2) + '\n', { encoding: 'utf8' })
+  // Birth the file at 0600. chmod-after-write left a 0644 window (#16).
+  writeFileSync(file, JSON.stringify(doc, null, 2) + '\n', { encoding: 'utf8', mode: 0o600 })
   if (platform() !== 'win32') {
-    try { chmodSync(file, 0o600) } catch { /* doctor still accepts */ }
+    try { chmodSync(file, 0o600) } catch { /* existing file may have been wider */ }
   }
 } catch (e) {
   console.error(`cannot write ${file}: ${e.message}`)

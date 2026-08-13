@@ -2,7 +2,26 @@
 
 ## Unreleased
 
-Nothing yet — 0.2.6 is the current cut.
+Nothing yet — 0.2.7 is the current cut.
+
+## 0.2.7 — 2026-08-14
+
+CodeQL #16 was real. `mint-token.mjs` wrote the per-user token file at
+the process umask (usually 0644) and only then `chmod 0600`. The window
+is the product's identity store. The file is now born with `mode: 0o600`;
+`chmod` remains a backstop for an already-wide file. The same birth
+permission is applied to `writeKeyPairFiles` (private PEM) and
+`conarium-init`'s signing key.
+
+Console config saves go through a same-directory temp file + `rename`
+so a crash cannot leave a half-written policy.
+
+### Fixed
+
+- **Token / signing-key files no longer exist world-readable, even briefly.**
+- **Console `POST /api/config` is an atomic replace.**
+
+**Not published. Not deployed to Hetzner.**
 
 ## 0.2.6 — 2026-08-14
 

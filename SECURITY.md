@@ -168,47 +168,67 @@ this reason — the scope was narrowed to be correct, not to make the number sma
 
 ## CodeQL findings, triaged
 
-CodeQL ran for the first time on 2026-08-12 and raised twelve alerts. Each was
-checked against the code rather than accepted or dismissed on sight. One was real
-and is fixed; the rest are false positives and are dismissed in the Security tab
-with the reasoning recorded there, not silently closed.
+Measured **2026-08-14** against `main` (`76c20a4` at the time of the query):
+**5 open**, **12 dismissed**. The numbers below are that query, not a remembered
+total. A stale count is the same class of lie this product exists to refuse.
 
-**Fixed — `js/missing-rate-limiting` in `src/console.ts` (4 alerts).** The console
-had no rate limit. It binds to `127.0.0.1` and requires a token plus a CSRF header,
-so the exposure was narrow — but `CONARIUM_CONSOLE_HOST` can publish it, and in that
-configuration nothing slowed a token brute force. A limiter now runs **before**
-authentication, deliberately: in `src/http.ts` the limit runs *after* auth so an
-unauthorized flood cannot burn a real client's budget, whereas here the thing being
-protected is the token itself, and a limit placed after auth would never count the
-failed attempts. Same library, opposite order, different reason. Test: case `4b` in
-`test/security_hardening_14.mjs`, which sends deliberately wrong tokens.
+### Open today (5) — not all false positives
 
-One honest wrinkle: **CodeQL still flags these four after the fix.** The analysis
-re-ran on the fixed commit and the alerts moved to the new line numbers but stayed
-open, because the query looks for a recognised middleware and ours is hand-written —
-exactly the situation as the `anchor-service` alerts below. They are dismissed with
-that stated on each one. If you are auditing this, do not read "12 dismissed" as
-"12 non-issues": one of them was real, and the fix is in `270ac54` with a test that
-fails without it.
+**`#16` `js/file-system-race` in `examples/per-user-identity/mint-token.mjs` — real, fixed in 0.2.7.**
+The file was created at the process umask (usually 0644) and only then
+`chmod 0600`. Between those two calls, per-user identity tokens were readable
+by another local account. That file is the store behind "a shared credential
+does not name a person". It now births with `writeFileSync(..., { mode: 0o600 })`;
+`chmod` is a backstop, not the only defence. The same birth permission is on
+`src/keys.ts` (`writeKeyPairFiles` private PEM) and `bin/conarium-init.mjs`
+(signing key). Do not read the remaining open alerts as "none of them were real".
 
-**False positive — `js/xss-through-dom` (2 alerts, dismissed 2026-08-12).** Those
-alerts pointed at a marketing `index.html` that no longer lives in this
-repository. The site is `conarium.dev` (private `nexus` repo). The demo SQL box
-there still goes through `hlsql()` → `esc()` before `innerHTML`.
+**`#13`, `#14` `js/missing-rate-limiting` in `src/console.ts` (lines 178, 231).**
+False positive. A limiter runs **before** authentication, deliberately: in
+`src/http.ts` the limit runs *after* auth so an unauthorized flood cannot burn
+a real client's budget; here the thing being protected is the token itself
+(`test/security_hardening_14.mjs` case `4b`). The query looks for a recognised
+middleware; ours is hand-written. Dismiss is a GitHub Security-tab action, not
+a code change.
 
-**False positive — `js/missing-rate-limiting` in `src/anchor-service.ts` (2 alerts).**
-The service does rate limit, per owner, returning 429 (`src/anchor-service.ts:135-188`).
-The limiter is hand-written rather than a recognised middleware, so the query does
-not match it.
+**`#15` `js/file-system-race` in `src/console.ts` (config save).** Weak, local tool.
+0.2.7 still closed the practical hole: the save is now temp-file + `rename` in
+the same directory, so a crash cannot leave a half-written policy. The alert
+may stay open (the query flags check-then-use, not missing atomicity).
 
-**False positive — `js/http-to-file-access` in `src/anchor-service.ts` (1 alert).**
-The write target is the fixed configured `storePath`; the record id is server-generated
-(`randomBytes(9)`), and `req.params.id` is only ever used to *search* stored records,
-never to build a path. There is no traversal.
+**`#17` `js/file-system-race` in `bin/conarium-suggest-policy.mjs`.** New file,
+new alert — that is normal. The tool is read-only (`--sql`), wrapped in try/catch,
+and refuses to write config. Noise.
 
-**False positive — `js/file-system-race` in `scripts/` and `bin/` (3 alerts).** These
-are developer and CLI tools. Exploiting the check-then-use window requires local write
-access to the same filesystem, at which point the tool is not the weakest link.
+### Already dismissed (12)
+
+First CodeQL run was 2026-08-12 (twelve alerts). One of those (`js/missing-rate-limiting`
+on the console with **no** limiter) was real and was fixed in `270ac54`. The
+others were false positives and are dismissed in the Security tab with the
+reasoning recorded there:
+
+**`js/missing-rate-limiting` in `src/console.ts` (the original four, plus
+follow-ups).** Limiter exists; query does not see a hand-written one.
+
+**`js/xss-through-dom` (2, dismissed 2026-08-12).** Marketing `index.html` that
+no longer lives in this repository. The site is `conarium.dev` (private `nexus`
+repo). The demo SQL box there still goes through `hlsql()` → `esc()` before
+`innerHTML`.
+
+**`js/missing-rate-limiting` in `src/anchor-service.ts` (2).** The service does
+rate limit, per owner, returning 429. Hand-written limiter.
+
+**`js/http-to-file-access` in `src/anchor-service.ts` (1).** The write target is
+the fixed configured `storePath`; the record id is server-generated
+(`randomBytes(9)`), and `req.params.id` is only ever used to *search* stored
+records, never to build a path.
+
+**`js/file-system-race` in `scripts/` and `bin/` (3).** Developer and CLI tools.
+Exploiting the check-then-use window requires local write access to the same
+filesystem, at which point the tool is not the weakest link.
+
+If you are auditing this, do not read "12 dismissed" as "12 non-issues": one of
+the original set was real (`270ac54`), and **`#16` in this cut was real too**.
 
 ## Secrets in git history
 

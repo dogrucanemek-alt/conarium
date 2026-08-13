@@ -126,6 +126,9 @@ test('POST maskColumns does not drop connectors or audit', async () => {
     assert.deepStrictEqual(saved.policy.profiles, FULL.policy.profiles)
     assert.deepStrictEqual(saved.policy.maskColumns, ['*.tckn', '*.iban'])
     assert.strictEqual(saved.policy.maxRows, 50)
+    JSON.parse(fs.readFileSync(configFile, 'utf8'))
+    const leftovers = fs.readdirSync(dir).filter((n) => n.endsWith('.tmp'))
+    assert.deepStrictEqual(leftovers, [], 'atomic write must not leave a temp file')
   } finally {
     await new Promise((r) => server.close(r))
     process.env = oldEnv

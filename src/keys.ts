@@ -59,7 +59,7 @@ export function writeKeyPairFiles(
   const publicPath = `${dirBase}.pub.pem`
   const keyIdPath = `${privatePath}.keyid`
   const publicKeyIdPath = `${publicPath}.keyid`
-  writeFileSync(privatePath, pair.privatePem, { encoding: 'utf-8', flag: 'wx' })
+  writeFileSync(privatePath, pair.privatePem, { encoding: 'utf-8', flag: 'wx', mode: 0o600 })
   writeFileSync(publicPath, pair.publicPem, { encoding: 'utf-8', flag: 'wx' })
   writeFileSync(keyIdPath, keyId + '\n', { encoding: 'utf-8', flag: 'wx' })
   writeFileSync(publicKeyIdPath, keyId + '\n', { encoding: 'utf-8', flag: 'wx' })

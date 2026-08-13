@@ -123,6 +123,10 @@ test('generated config + key makes conarium-doctor --no-net exit 0', () => {
     },
   })
   assert.strictEqual(status, 0, `doctor must accept init output:\n${out}`)
+  if (process.platform !== 'win32') {
+    const mode = fs.statSync(priv).mode & 0o777
+    assert.strictEqual(mode, 0o600, `signing key expected 0600, got ${mode.toString(8)}`)
+  }
 })
 
 /**

@@ -127,7 +127,7 @@ if (!NO_KEYS) {
   const publicPem = pair.publicKey.export({ type: 'spki', format: 'pem' }).toString()
   keyId = keyIdFromPublicPem(publicPem)
   try {
-    writeFileSync(signingKeyPath, signingPem, writeOpts)
+    writeFileSync(signingKeyPath, signingPem, { ...writeOpts, mode: 0o600 })
     writeFileSync(publicPath, publicPem, writeOpts)
     writeFileSync(signingKeyIdPath, keyId + '\n', writeOpts)
     writeFileSync(publicKeyIdPath, keyId + '\n', writeOpts)
