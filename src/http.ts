@@ -90,6 +90,27 @@ function readBody(req: IncomingMessage): Promise<unknown> {
  * test edilebilir olması gerekiyor: bir devralma denemesi düzeltmeden önce
  * kırmızı yanmadan "kapatıldı" denemez.
  */
+/**
+ * Hata gövdeleri JSON-RPC olmak ZORUNDA.
+ *
+ * 2026-08-13'te canlıda yaşandı: geçit yeniden başlatıldı, istemci elindeki eski
+ * `Mcp-Session-Id` ile geldi, sunucu `400 expected initialize` + `text/plain`
+ * döndü. İstemci tarafındaki proxy bunu ayrıştıramadı ve kullanıcıya
+ * "Invalid content from server" dedi — yani gerçek sebep (oturum düştü, yeniden
+ * başlat) kullanıcıya HİÇ ulaşmadı. Düz metin hata, teşhis edilemeyen hata demek.
+ */
+function sendRpcError(
+  res: ServerResponse,
+  status: number,
+  code: number,
+  message: string,
+  headers: Record<string, string> = {},
+): void {
+  res
+    .writeHead(status, { 'content-type': 'application/json', ...headers })
+    .end(JSON.stringify({ jsonrpc: '2.0', error: { code, message }, id: null }))
+}
+
 export function createHandler(
   deps: Awaited<ReturnType<typeof bootDeps>>,
   transports: Map<string, SessionEntry>,
@@ -109,7 +130,7 @@ export function createHandler(
       const pathMatch = url.pathname.match(/^\/t\/([^/]+)\/mcp$/)
       const isPlainMcp = url.pathname === '/mcp'
       if (!pathMatch && !isPlainMcp) {
-        res.writeHead(404, { 'content-type': 'text/plain' }).end('not found')
+        sendRpcError(res, 404, -32600, 'not found — the MCP endpoint is /mcp')
         return
       }
       const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
@@ -119,16 +140,16 @@ export function createHandler(
       // kimin geçtiğini adlandırır. Eşleşmeyen token hâlâ kapıda kalır.
       const kisi = resolveActor(supplied, TOKEN_STORE, deps.config.consumer ?? 'unknown')
       if (!kisi.isUser && !tokenOk(supplied)) {
-        res.writeHead(401, { 'content-type': 'text/plain' }).end('unauthorized')
+        sendRpcError(res, 401, -32001, 'unauthorized')
         return
       }
 
       // Limit AFTER auth: an unauthorized flood must not burn a real client's budget.
       const client = clientKey(req.headers as Record<string, unknown>, req.socket.remoteAddress ?? undefined)
       if (!limiter.take(client)) {
-        res
-          .writeHead(429, { 'content-type': 'text/plain', 'retry-after': String(limiter.retryAfter(client)) })
-          .end('rate limited')
+        sendRpcError(res, 429, -32002, 'rate limited', {
+          'retry-after': String(limiter.retryAfter(client)),
+        })
         return
       }
 
@@ -142,7 +163,7 @@ export function createHandler(
         // paylaşılan-token sahibi, o kişinin profil/maskeleme bağlamıyla çalışır
         // ve o andan sonraki her makbuz yanlış kişiyi adlandırır.
         if (!sessionOwnerMatches(existing.owner, supplied)) {
-          res.writeHead(403, { 'content-type': 'text/plain' }).end('session owner mismatch')
+          sendRpcError(res, 403, -32003, 'session owner mismatch')
           return
         }
         const body = req.method === 'POST' ? await readBody(req) : undefined
@@ -150,14 +171,24 @@ export function createHandler(
         return
       }
 
+      // Oturum kimliği GELDİ ama sunucuda yok: yeniden başlatılmış geçit, ya da
+      // süresi dolmuş oturum. Spec bunun için 404 der — istemcinin yapması gereken
+      // yeni bir initialize açmaktır. 400 "isteğin bozuk" demektir; istemci bunu
+      // toparlanma sinyali saymaz ve bağlantı kalıcı olarak ölür. Canlıda tam olarak
+      // bu yaşandı: 03:38'deki yeniden başlatmadan sonra konnektör bir daha açılmadı.
+      if (sessionId) {
+        sendRpcError(res, 404, -32004, 'session not found — send a new initialize request')
+        return
+      }
+
       // Yeni oturum: yalnız initialize POST açar
       if (req.method !== 'POST') {
-        res.writeHead(400, { 'content-type': 'text/plain' }).end('no session')
+        sendRpcError(res, 400, -32600, 'no session — open one with an initialize POST')
         return
       }
       const body = await readBody(req)
       if (!isInitializeRequest(body)) {
-        res.writeHead(400, { 'content-type': 'text/plain' }).end('expected initialize')
+        sendRpcError(res, 400, -32600, 'expected initialize')
         return
       }
       const owner = ownerKey(supplied)
@@ -173,7 +204,7 @@ export function createHandler(
       await transport.handleRequest(req, res, body)
     } catch (err) {
       console.error('[conarium-http] istek hatası:', (err as Error).message)
-      try { if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' }).end('internal error') } catch { /* */ }
+      try { if (!res.headersSent) sendRpcError(res, 500, -32603, 'internal error') } catch { /* */ }
     }
   }
 }

@@ -55,10 +55,10 @@ function sahteIstek({ method = 'GET', token, sessionId }) {
 }
 
 function sahteYanit() {
-  const kayit = { status: 0, body: '', headersSent: false }
+  const kayit = { status: 0, body: '', headersSent: false, headers: {} }
   return {
     kayit,
-    writeHead(status) { kayit.status = status; kayit.headersSent = true; return this },
+    writeHead(status, headers) { kayit.status = status; kayit.headers = headers || {}; kayit.headersSent = true; return this },
     end(body) { kayit.body = String(body ?? '') },
     get headersSent() { return kayit.headersSent },
   }
@@ -120,6 +120,55 @@ describe('oturum, onu açan kimliğe bağlıdır', () => {
 
     expect(res.kayit.status).toBe(401)
     expect(izleme.cagrildi).toBe(false)
+  })
+
+  /**
+   * 2026-08-13 canlı arızası. Geçit 03:38'de yeniden başlatıldı; claude.ai elindeki
+   * ESKİ oturum id'siyle gelmeye devam etti. Sunucu `400 expected initialize` +
+   * text/plain dönüyordu: istemcinin proxy'si gövdeyi ayrıştıramayıp kullanıcıya
+   * "Invalid content from server" dedi. Yani "oturumun düştü, yeniden aç" bilgisi
+   * hiç ulaşmadı ve konnektör kalıcı olarak ölü kaldı — canlı demo 10 saat gitti.
+   */
+  it('bilinmeyen oturum id: 404 döner (400 DEĞİL) ve yeniden başlatmayı söyler', async () => {
+    const { transports, izleme } = ayseninOturumu()
+    const res = sahteYanit()
+
+    await createHandler(deps, transports, limiter)(
+      sahteIstek({ method: 'POST', token: PAYLASILAN, sessionId: 'restart-sonrasi-bayat-id' }),
+      res,
+    )
+
+    // 404 = "oturum yok, yenisini aç" (spec). 400 = "isteğin bozuk" → istemci toparlanmaz.
+    expect(res.kayit.status).toBe(404)
+    expect(izleme.cagrildi).toBe(false)
+    const govde = JSON.parse(res.kayit.body)
+    expect(govde.jsonrpc).toBe('2.0')
+    expect(govde.error.message).toMatch(/initialize/)
+  })
+
+  it('bilinmeyen oturum id GET ile de 404 verir', async () => {
+    const { transports } = ayseninOturumu()
+    const res = sahteYanit()
+    await createHandler(deps, transports, limiter)(
+      sahteIstek({ method: 'GET', token: PAYLASILAN, sessionId: 'yok-boyle-bir-oturum' }),
+      res,
+    )
+    expect(res.kayit.status).toBe(404)
+  })
+
+  it('hata gövdeleri JSON-RPC, düz metin değil — yoksa istemci sebebi göremez', async () => {
+    for (const [durum, istek] of [
+      [401, sahteIstek({ token: YABANCI })],
+      [403, sahteIstek({ token: PAYLASILAN, sessionId: 'oturum-ayse' })],
+    ]) {
+      const { transports } = ayseninOturumu()
+      const res = sahteYanit()
+      await createHandler(deps, transports, limiter)(istek, res)
+      expect(res.kayit.status).toBe(durum)
+      expect(res.kayit.headers['content-type']).toBe('application/json')
+      expect(() => JSON.parse(res.kayit.body)).not.toThrow()
+      expect(JSON.parse(res.kayit.body).jsonrpc).toBe('2.0')
+    }
   })
 
   it('sahiplik anahtarı ham token değil, karmasıdır', () => {
