@@ -2,14 +2,46 @@
 
 ## Unreleased
 
-- **HTTP gateway is now started as a real process in CI.** The session-owner
-  unit test still calls the handler with a fake `req`. A second test binds
-  port 0, speaks Streamable HTTP over `fetch`, parses SSE frames, and locks
-  the restart regression (unknown `Mcp-Session-Id` → 404 + JSON-RPC `-32004`,
-  not 400 + `text/plain`). **Not deployed to Hetzner.**
-- **`loadConfig()` accepted `policy.profiles` in the type and rejected it in
-  Zod.** A profiled config could not boot; unit tests constructed `Governance`
-  by hand. The schema now keeps `profiles` / `actorProfiles` / `maskLabelledNames`.
+Nothing yet — 0.2.3 is the current cut.
+
+## 0.2.3 — 2026-08-13
+
+The published 0.2.2 tarball rejected the `policy.profiles` config its own
+README documented. Same class of defect as 0.2.2 itself (the README said IBAN;
+the tarball did not).
+
+### Fixed
+
+- **`loadConfig()` rejected `policy.profiles` / `policy.actorProfiles`.**
+  `GovernancePolicySchema` was `.strict()` and those keys were not on it, so a
+  config copied from the README's "Per-person masking profiles" example threw
+  `Unrecognized key` and the gateway would not boot. The class honoured the
+  fields when constructed by hand; the loader did not. The schema now keeps
+  `profiles`, `actorProfiles` and `maskLabelledNames`. A profile may still
+  carry only `maskColumns`, `maxRows` and `maskLabelledNames`; an
+  `allowTables` key on a profile is still rejected — a profile cannot widen
+  reach.
+- **`types.ts` JSDoc said an empty allow-list meant "allow all".** The code has
+  been default-deny since 2026-07-06. The comments now match: missing or empty
+  `allowTables` / `allowConnectors` denies everything.
+- **Stale receipt wording.** README labelled receipts `(v0.1)` while the
+  schema string is `conarium-receipt/0.3`. RECEIPT-SPEC said a block-explorer
+  network error was exit 14; calendar unreachability is already exit 15, and
+  this repository has no separate explorer client. Exit codes were not
+  changed.
+
+### Added
+
+- **The remote HTTP gateway is started as a real process in CI**
+  (`test/http_gateway.e2e.mjs`). The session-owner unit test still calls the
+  handler with a fake `req`. The new test binds port 0, speaks Streamable HTTP
+  over `fetch`, parses SSE as frames, and locks the restart regression
+  (unknown `Mcp-Session-Id` → 404 + JSON-RPC `-32004`, not 400 +
+  `text/plain`). Happy path: initialize → session → `tools/list` → masked
+  `tools/call` → receipt file 0→1 → `conarium-verify` exit 0. Error bodies
+  for 401 / 403 / 404 / 429 / 400 / 500 are asserted `application/json`.
+  **Not deployed to Hetzner.** The test file is not in the npm tarball
+  (`test/` is outside the `files` allowlist).
 
 ## 0.2.2 — 2026-08-13
 
