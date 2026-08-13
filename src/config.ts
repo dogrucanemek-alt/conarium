@@ -3,15 +3,30 @@ import type { ConariumConfig } from './types.js'
 
 const stringArray = z.array(z.string().min(1)).default([])
 
+const MaskingProfileSchema = z.object({
+  // No .default([]): an omitted maskColumns must stay omitted so the overlay
+  // does not silently empty the base list.
+  maskColumns: z.array(z.string().min(1)).optional(),
+  maxRows: z.number().int().positive().max(10000).optional(),
+  maskLabelledNames: z.boolean().optional(),
+}).strict()
+
 export const GovernancePolicySchema = z.object({
   allowTables: stringArray.optional(),
   denyTables: stringArray.optional(),
   maskColumns: stringArray.optional(),
   maxRows: z.number().int().positive().max(10000).optional(),
+  maskLabelledNames: z.boolean().optional(),
   allowTools: stringArray.optional(),
   denyTools: stringArray.optional(),
   allowConnectors: stringArray.optional(),
   denyConnectors: stringArray.optional(),
+  // These exist on Governance and in README. Until they were on this schema,
+  // loadConfig() threw Unrecognized key and the gateway could not boot a
+  // profiled config — the feature worked only when tests constructed the
+  // class by hand.
+  profiles: z.record(MaskingProfileSchema).optional(),
+  actorProfiles: z.record(z.string().min(1)).optional(),
 }).strict()
 
 export const AuditConfigSchema = z.object({

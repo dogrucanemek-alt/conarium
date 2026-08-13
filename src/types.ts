@@ -11,7 +11,7 @@ export interface ConariumConfig {
 }
 
 export interface GovernancePolicy {
-  /** Allow-list of schema-qualified tables (glob: "billing.*", "*"). Empty = allow all not denied. */
+  /** Allow-list of schema-qualified tables (glob: "billing.*", "*"). Missing or empty = deny all (default-deny). */
   allowTables?: string[]
   /** Deny-list of schema-qualified tables; takes precedence over allow. */
   denyTables?: string[]
@@ -36,7 +36,7 @@ export interface GovernancePolicy {
   allowTools?: string[]
   /** Denied API tools. */
   denyTools?: string[]
-  /** Allowed connector names (glob). Empty = allow all not denied. */
+  /** Allowed connector names (glob). Missing or empty = deny all (fail-closed). */
   allowConnectors?: string[]
   /** Denied connector names (glob); takes precedence over allow. */
   denyConnectors?: string[]
@@ -48,9 +48,10 @@ export interface GovernancePolicy {
    * the name; the assistant summarising revenue does not. A global on/off switch
    * would answer that by disabling the product's only real guarantee.
    *
-   * Deliberately narrow: a profile may override `maskColumns` and `maxRows` and
-   * NOTHING else. Table, tool and connector permissions stay global, so a profile
-   * can never widen what is reachable — only what is legible within it.
+   * Deliberately narrow: a profile may override `maskColumns`, `maxRows` and
+   * `maskLabelledNames` — and NOTHING else. Table, tool and connector permissions
+   * stay global, so a profile can never widen what is reachable — only what is
+   * legible within it.
    */
   profiles?: Record<string, MaskingProfile>
   /**

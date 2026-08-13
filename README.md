@@ -27,11 +27,11 @@ The AI gets the context it needs to write code, but never sees your secrets.
 
 ### Key Features
 
-- **Inline PII Masking:** Emails, IDs, cards, and secrets are redacted in the response stream (`[MASKED]`) before the model sees a single character.
+- **Inline PII Masking:** Emails, IDs, cards, and secrets are redacted in the response stream (`[MASKED_PII]` / `[MASKED_SECRET]`) before the model sees a single character.
 - **Allow / Deny Lists:** Whitelist what AI can access. Your `secrets` and `financials` tables stay invisible.
 - **Row Caps:** Hard per-query limits. Prevent the silent exfiltration of millions of rows. 
 - **Immutable Audit Ledger:** Every access is logged (who, what, when, rows, decision). Hash-chained and PII-safe — no raw PII ever written to the logs.
-- **Verifiable Receipts (v0.1):** Ed25519-signed, independently verifiable receipts — see below.
+- **Verifiable Receipts:** Ed25519-signed, independently verifiable receipts — see below.
 - **Per-person masking profiles:** what to mask for an AI agent is not what to mask for the data controller. A named profile relaxes masking for one identified person, and the receipt records which profile applied — see below.
 - **Coverage & Reconciliation:** a signed coverage declaration over the receipt chain (`conarium-coverage`), plus two-sided reconciliation against the database's own query counters (`conarium-reconcile`) — DB-recorded activity that no receipt covers is surfaced instead of staying invisible.
 - **100% Self-Hosted:** Runs entirely on your infrastructure. Your data never crosses your perimeter. The gateway makes exactly one outbound request that is not yours: at startup it asks the public npm registry whether a newer version exists, and prints one line to stderr if so. It sends nothing about you — no identifier, no config, no counts — and a remote gateway nobody looks at for weeks is the reason it exists at all. Disable it with `CONARIUM_NO_UPDATE_CHECK=1`, or point it at your internal mirror with `CONARIUM_NPM_REGISTRY`. It has a 2-second timeout and never blocks or fails startup. We list it here because a governance product that makes an undisclosed outbound connection has already lost the argument.
@@ -378,7 +378,7 @@ Control access using a simple `conarium.json` policy file:
 }
 ```
 
-Anything not in `allowTables` is denied by default; matched `maskColumns` are redacted to `[MASKED]` before the data ever reaches the model.
+Anything not in `allowTables` is denied by default; matched `maskColumns` are redacted to `[MASKED_PII]` before the data ever reaches the model.
 
 > **Connectors are fail-closed.** `allowConnectors` is a strict allow-list:
 > if it is missing or empty, **no** connector is permitted (previously an empty

@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-Nothing yet — 0.2.2 is the current cut.
+- **HTTP gateway is now started as a real process in CI.** The session-owner
+  unit test still calls the handler with a fake `req`. A second test binds
+  port 0, speaks Streamable HTTP over `fetch`, parses SSE frames, and locks
+  the restart regression (unknown `Mcp-Session-Id` → 404 + JSON-RPC `-32004`,
+  not 400 + `text/plain`). **Not deployed to Hetzner.**
+- **`loadConfig()` accepted `policy.profiles` in the type and rejected it in
+  Zod.** A profiled config could not boot; unit tests constructed `Governance`
+  by hand. The schema now keeps `profiles` / `actorProfiles` / `maskLabelledNames`.
 
 ## 0.2.2 — 2026-08-13
 

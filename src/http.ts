@@ -225,9 +225,11 @@ async function main() {
   const httpServer = createHttpServer(createHandler(deps, transports, limiter))
 
   httpServer.listen(PORT, HOST, () => {
+    const addr = httpServer.address()
+    const bound = typeof addr === 'object' && addr !== null ? addr.port : PORT
     const rate = limiter.enabled ? `${RATE_PER_MIN}/dk` : 'KAPALI'
     console.error(
-      `[conarium-http] remote MCP hazır — http://${HOST}:${PORT} (token: SET, ${deps.connectors.length} connector, rate-limit: ${rate})`
+      `[conarium-http] remote MCP hazır — http://${HOST}:${bound} (token: SET, ${deps.connectors.length} connector, rate-limit: ${rate})`
     )
     // A remote gateway is the one nobody looks at for weeks. One stderr line at
     // start is the only place a stale build gets announced to its operator.

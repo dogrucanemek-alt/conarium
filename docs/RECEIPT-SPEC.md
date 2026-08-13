@@ -102,10 +102,13 @@ conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [
 
 Fail-closed: if the verifier is unsure, it does not exit 0.
 
-⚠️ Known deviation: under `--anchor-check`, a network error reaching a block
-explorer currently surfaces as exit 14 — the same code as a proof that does not
-hold. *Could not check* and *invalid* are not the same fact, and this document
-does not pretend otherwise. Tracked, not fixed.
+⚠️ Under `--anchor-check`, an OpenTimestamps **calendar** that cannot be
+reached is exit **15** (`anchor could not be checked`) — not 14. Digest
+comparison is offline and still holds. A `verify()` error that is *not*
+classified as unreachable still falls through to 14. There is no separate
+block-explorer client in this repository; `ignoreBitcoinNode: true` is set.
+Tracked remainder: unclassified network-shaped errors still share 14 with
+"proof does not hold".
 
 ## Conformance vectors
 
