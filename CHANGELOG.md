@@ -2,7 +2,48 @@
 
 ## Unreleased
 
-Nothing yet — 0.2.3 is the current cut.
+Nothing yet — 0.2.4 is the current cut.
+
+## 0.2.4 — 2026-08-13
+
+Two things 0.2.3 said it did, and did not. Found by attacking the published
+tarball, not by reading the docs.
+
+### Fixed
+
+- **`conarium-verify` could not see receipts deleted from the end of the
+  file.** A leftover prefix of a valid chain is still internally consistent, so
+  exit 0. Middle deletion was already exit 11. `SECURITY.md` said the verifier
+  detected "truncation"; `README.md` said receipts proved records had not been
+  "deleted". Both claims are narrowed: the hash chain is structurally blind to
+  a shorter tail. Catching that needs a pin from outside the file.
+- **Zero-width / look-alike characters split identifiers so the IBAN scanner
+  never fired**, then the digit scanner ate the tail and left
+  `TR33<ZWSP>000610051[MASKED_PII]` with `maskedCount: 1` — the audit record
+  claiming more protection than the model actually got. The scanner now
+  strips ZWSP/ZWNJ/ZWJ/BOM/soft hyphen and maps fullwidth digits / `＠` /
+  unicode dashes to ASCII *before* the detectors. A leftover country-code
+  prefix glued to a mask is collapsed so a partial mask cannot count as
+  masked. **The outgoing string is the normalised form even when nothing was
+  PII** — that is a conscious output change, not a silent one.
+- **Wrapped base64 / hex tokens inside a field** (`encoded: cGF0cm9u…`) were
+  not decoded. Whole-field base64 already was. In-field tokens are now masked
+  only when they decode to an existing detector hit; hashes and non-PII
+  payloads are left alone.
+- **Supabase REST `SELECT col AS alias` / PostgREST `col:alias`** skipped
+  column-name policy (`maskedFields` is empty on that path; a renamed key
+  does not match `customer_name`). Aliases are rejected with a reason.
+
+### Added
+
+- **Opt-in tail pins** `--expect-count N` and `--expect-last-hash sha256:…`.
+  A miss is exit **11** (same code as a `prevHash` break). Default
+  `conarium-verify <file>` is unchanged: a truncated tail still exits 0.
+  Empty-chain stderr now says that exit 0 is not a verification that nothing
+  was deleted. No new exit code. Schema string `conarium-receipt/0.3`
+  unchanged.
+
+**Not published. Not deployed to Hetzner.**
 
 ## 0.2.3 — 2026-08-13
 

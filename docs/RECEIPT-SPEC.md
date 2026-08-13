@@ -12,13 +12,19 @@ Design source: `docs/superpowers/specs/2026-07-29-conarium-receipt-design.md`.
 
 ## Official claim (do not widen)
 
-> A Conarium Receipt proves that records have **not been altered, deleted,
-> reordered, or backdated after they were created**. It does **not** prove they
-> were correct at the moment of creation.
+> A Conarium Receipt proves that the records **still in the file** have not been
+> altered, reordered, or backdated after they were created, and that none were
+> **removed from the middle** of the chain (`prevHash` / `seq`). It does **not**
+> prove they were correct at the moment of creation. It cannot, by itself, prove
+> that records were not **dropped from the end**: a shorter leftover chain is
+> still internally consistent. Catching tail truncation needs a pin from outside
+> the file (`--expect-count`, `--expect-last-hash`, an OpenTimestamps anchor, or
+> `conarium-reconcile`).
 
-*(TR)* Conarium Makbuzu, kayıtların **oluşturulduktan sonra değiştirilmediğini,
-silinmediğini, yeniden sıralanmadığını ve geriye dönük tarihlenmediğini**
-kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
+*(TR)* Conarium Makbuzu, dosyada **hâlâ duran** kayıtların oluşturulduktan sonra
+değiştirilmediğini, **ortadan** silinmediğini, yeniden sıralanmadığını ve geriye
+dönük tarihlenmediğini kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
+Sondan kesmeyi tek başına göremez.
 
 ## Media type
 
@@ -86,14 +92,20 @@ merely *who* it is, and the coverage declaration's rule that absence is reported
 ## Verifier
 
 ```
-conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [--expect-seq-from N] [--json]
+conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--json]
 ```
+
+`--expect-count` / `--expect-last-hash` are **opt-in tail pins**. Without them,
+a chain that had its last receipts deleted still exits 0 — the remainder is a
+valid shorter chain. With them, a count or last-hash miss is exit **11** (same
+code as a `prevHash` break: the chain as presented is not the chain you pinned).
+Default behaviour and the exit-code list are unchanged.
 
 | Exit | Meaning |
 |---|---|
 | 0 | Chain intact, signatures valid |
 | 10 | Hash mismatch — record altered |
-| 11 | `prevHash` break — deleted or inserted |
+| 11 | `prevHash` break — deleted or inserted; also `--expect-count` / `--expect-last-hash` mismatch |
 | 12 | `seq` gap / non-increasing — missing or reordered |
 | 13 | Signature invalid / pubkey missing (fail-closed) |
 | 14 | Anchor missing/invalid under `--anchor-check` |
@@ -250,6 +262,7 @@ revision history is itself timestamped.
 3. **Creation-time truth is not proven.** Without hardware attestation, an operator can still write false-but-well-formed receipts *before* anchoring.
 4. **In-file `sig` stripping + HMAC/`anchor` reduction.** Content `hash` is computed with `{hash, sig, anchor}` (and audit `signature`/`sig`) excluded, so an operator who controls the file can drop or thin those fields without invalidating the content hash itself. Contiguity and the trust store catch some boot-time cases, but full protection against in-file strip/reduce games is **not solvable in-file** (*in-file çözülemez*) — it needs an external transparency-log anchor and/or out-of-band key ceremony. **Mitigation available today, measured:** keep `CONARIUM_AUDIT_HMAC_KEY` enabled alongside Ed25519. HMAC is keyed, so an actor who strips `sig` and recomputes the unkeyed hashes still fails the HMAC check (`entry signature mismatch`). Verified by test: Ed25519 alone → strip-all passes the boot check; Ed25519 + HMAC → caught. `conarium-verify --pubkey` also catches it (exit 13, `missing sig`) because it is told to expect signatures. **Anchor is available** (`CONARIUM_ANCHOR_SINK=opentimestamps`) but starts as `pending` — Bitcoin finality is delayed (hours); see §Anchoring.
 5. **`argsHash` hurts debugging.** Support cases need the customer's own logs to correlate.
+6. **Tail truncation is invisible to `conarium-verify` unless pinned.** Deleting the last N receipts leaves a consistent leftover chain (exit 0). `--expect-count` / `--expect-last-hash` exist for operators who have an external length or last-hash; they are opt-in so a verifier that saw the same file yesterday still exits 0 today. Anchoring the head, or `conarium-reconcile` against the database's own counters, are the other pins.
 
 ## Anchoring (OpenTimestamps)
 

@@ -40,8 +40,12 @@ log, verification — is local to your infrastructure by construction.
 - An access happening without a record. Every tool call — allowed or denied —
   writes a signed, hash-chained, append-only audit entry.
 - The audit log being edited after the fact. Entries are Ed25519-signed and chained;
-  `conarium-verify` detects tampering, reordering, gaps and truncation, and it runs
-  with zero imports from `src/`, so it does not trust the code that wrote the log.
+  `conarium-verify` detects tampering, reordering, and **gaps in the middle** of
+  the chain. It does **not** detect records dropped from the **end** of the file
+  unless you pass `--expect-count` or `--expect-last-hash` (or check an external
+  anchor / reconcile). A leftover prefix of a valid chain still verifies — a hash
+  chain is structurally blind to a shorter tail. It runs with zero imports from
+  `src/`, so it does not trust the code that wrote the log.
 
 **Conarium does NOT protect against**
 

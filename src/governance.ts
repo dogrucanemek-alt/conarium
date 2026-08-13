@@ -1,6 +1,11 @@
 import type { GovernancePolicy, SchemaTable, QueryResult } from './types.js'
 import type { ActorAssurance } from './tokens.js'
 import { maskIbansInText, prepareIbanPass } from './iban.js'
+import {
+  collapsePartialIbanMask,
+  maskEmbeddedEncodedPii,
+  normalizePiiText,
+} from './pii_normalize.js'
 import { parse, toSql } from 'pgsql-ast-parser'
 import type {
   Expr,
@@ -479,7 +484,9 @@ export class Governance {
 
     if (typeof obj === 'string') {
       let count = 0;
-      let masked = obj;
+      // Normalise first (ZWSP/homoglyph/fullwidth/unicode dash). The outgoing
+      // string is this form even when nothing is PII — see pii_normalize.ts.
+      let masked = normalizePiiText(obj);
 
       // IBAN BEFORE digit detectors. The card/TCKN/phone regexes otherwise eat
       // the numeric tail and leave `TR00000000000[MASKED_PII]` — which looks
@@ -548,6 +555,20 @@ export class Governance {
       }
 
       masked = ibanPass.restore(masked)
+
+      // Backstop: a leftover country-code prefix glued to a mask is a partial
+      // IBAN. Collapse it to a full mask so maskedCount cannot claim protection
+      // while the prefix is still in the clear.
+      const collapsed = collapsePartialIbanMask(masked)
+      if (collapsed !== masked) {
+        masked = collapsed
+        if (count === 0) count++
+      }
+
+      const encoded = maskEmbeddedEncodedPii(masked, (s) => maskIbansInText(s).count > 0)
+      masked = encoded.text
+      count += encoded.count
+
       return { masked, count };
     }
 
@@ -1144,12 +1165,8 @@ export class ApiGovernance {
   }
 
   private applyRegexMasks(text: string): string {
-    const ibanPass = prepareIbanPass(text);
-    let masked = ibanPass.text;
-    masked = masked.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[MASKED_PII]');
-    masked = masked.replace(/\b[1-9][0-9]{10}\b/g, '[MASKED_PII]');
-    masked = masked.replace(/(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/g, '[MASKED_PII]');
-    masked = masked.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[MASKED_PII]');
-    return ibanPass.restore(masked);
+    // Same scanner as Governance.maskPII — a second regex list here used to
+    // skip normalisation and wrapped-token detection.
+    return new Governance(this.policy).maskPII(text).masked as string
   }
 }

@@ -138,6 +138,16 @@ export class SupabaseRestConnector implements Connector {
     if (!/^SELECT\b/i.test(norm)) throw new Error('Only SELECT is permitted on supabase-rest')
     if (norm.includes(';')) throw new Error('Multiple statements are not permitted')
 
+    // Alias check BEFORE the tight SELECT regex: PostgREST `col:alias` uses
+    // `:`, which the column class below does not include, so the regex would
+    // otherwise fail with a generic "only allows SELECT" and hide the reason.
+    const head = norm.match(/^SELECT\s+(.+?)\s+FROM\s+/i)
+    if (head && (/\bAS\b/i.test(head[1]) || head[1].includes(':'))) {
+      throw new Error(
+        'Column aliases (SQL AS or PostgREST col:alias) are not permitted on supabase-rest; policy matches real column names. Select the column itself.',
+      )
+    }
+
     const m = norm.match(
       /^SELECT\s+([\w\s*,.]+?)\s+FROM\s+([\w.]+)(?:\s+LIMIT\s+(\d+))?\s*$/i
     )

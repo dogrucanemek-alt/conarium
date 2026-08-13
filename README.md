@@ -42,13 +42,20 @@ The AI gets the context it needs to write code, but never sees your secrets.
 Conarium can emit portable **receipts** (Art. 12 / 19 shaped) that a third party
 verifies offline with a single file — no Conarium install required.
 
-**Official claim (do not widen):** A Conarium Receipt proves that records have
-**not been altered, deleted, reordered, or backdated after they were created**.
-It does **not** prove they were correct at the moment of creation.
+**Official claim (do not widen):** A Conarium Receipt proves that the records
+**still in the file** have not been altered, reordered, or backdated after they
+were created, and that none were **removed from the middle** of the chain
+(`prevHash` / `seq`). It does **not** prove they were correct at the moment of
+creation. It also cannot, by itself, prove that records were not **dropped from
+the end**: a shorter leftover chain is still internally consistent. Catching
+tail truncation needs a pin from outside the file — `--expect-count`,
+`--expect-last-hash`, an OpenTimestamps anchor, or `conarium-reconcile` against
+the database's own counters.
 
-*(TR)* Conarium Makbuzu, kayıtların **oluşturulduktan sonra değiştirilmediğini,
-silinmediğini, yeniden sıralanmadığını ve geriye dönük tarihlenmediğini**
-kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
+*(TR)* Conarium Makbuzu, dosyada **hâlâ duran** kayıtların oluşturulduktan sonra
+değiştirilmediğini, **ortadan** silinmediğini, yeniden sıralanmadığını ve geriye
+dönük tarihlenmediğini kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
+Sondan kesmeyi tek başına göremez: kalan zincir tutarlıdır, yalnızca kısadır.
 
 ```bash
 # Generate an Ed25519 keypair (private PEM + .pub.pem + .keyid sidecars).
@@ -58,8 +65,11 @@ npx conarium-init
 
 export CONARIUM_AUDIT_SIGNING_KEY=./audit-ed25519.pem
 
-# Verify a receipt chain (exit 0 = intact)
+# Verify a receipt chain (exit 0 = the records *in the file* are intact)
 npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem
+
+# Pin length / last hash if you need to catch records dropped from the end
+npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --expect-count 3
 
 # Optional: check OpenTimestamps sidecar (pending → exit 0 + warning; missing → 14)
 npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --anchor-check
@@ -137,8 +147,13 @@ buy that with a confidence threshold. Neither position dominates — this one is
 stated so an auditor knows which one they are holding.
 
 **Still not caught by content scanners:** street addresses, IP addresses, and
-passport numbers. IBAN used to be on that list; it is not, as of this cut, when
-the checksum holds. Column policy can still mask those other fields by name.
+passport numbers. Split identifiers (a TCKN broken across two fields) and
+JSON/HTML entity escapes (`&#64;`, `\u0040`) are also out. Zero-width
+characters, fullwidth digits / `＠`, and unicode dashes are stripped or mapped
+to ASCII *before* the detectors as of this cut — that pass is not a general
+encoding decoder; wrapped base64/hex *tokens* inside a field are masked only
+when they decode to an existing detector hit. Column policy can still mask
+those other fields by name.
 
 Carry-over ignores values under three characters (a two-character value matches
 everywhere and would shred the output) and matches on Unicode word boundaries, so

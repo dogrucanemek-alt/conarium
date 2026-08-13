@@ -7,12 +7,14 @@
  *
  * Usage:
  *   conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...]
- *                   [--anchor-check] [--expect-seq-from N] [--json]
+ *                   [--anchor-check] [--expect-seq-from N]
+ *                   [--expect-count N] [--expect-last-hash sha256:…] [--json]
  *
  * Exit codes (design §5):
  *   0  chain intact, signatures valid
  *  10  hash mismatch (tampered)
- *  11  prevHash break (deleted / inserted)
+ *  11  prevHash break (deleted / inserted) OR opt-in tail pin
+ *      (--expect-count / --expect-last-hash) missed
  *  12  seq gap or non-increasing
  *  13  signature invalid / no pubkey
  *  14  anchor proof failed / missing under --anchor-check
@@ -91,7 +93,7 @@ export { canonicalize, receiptHash }
 function usage(msg) {
   if (msg) console.error(msg)
   console.error(
-    'Usage: conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--anchor-check] [--anchors <path>] [--expect-seq-from N] [--json]',
+    'Usage: conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--anchor-check] [--anchors <path>] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--json]',
   )
 }
 
@@ -102,6 +104,8 @@ function parseArgs(argv) {
     anchorCheck: false,
     anchorsPath: null,
     expectSeqFrom: null,
+    expectCount: null,
+    expectLastHash: null,
     json: false,
   }
   const args = [...argv]
@@ -121,6 +125,16 @@ function parseArgs(argv) {
       const n = args.shift()
       if (n === undefined || !/^\d+$/.test(n)) throw new Error('--expect-seq-from requires an integer')
       out.expectSeqFrom = Number(n)
+    } else if (a === '--expect-count') {
+      const n = args.shift()
+      if (n === undefined || !/^\d+$/.test(n)) throw new Error('--expect-count requires an integer')
+      out.expectCount = Number(n)
+    } else if (a === '--expect-last-hash') {
+      const h = args.shift()
+      if (!h || !/^sha256:[0-9a-fA-F]{64}$/.test(h)) {
+        throw new Error('--expect-last-hash requires sha256:<64 hex chars>')
+      }
+      out.expectLastHash = h.toLowerCase()
     } else if (a === '--json') {
       out.json = true
     } else if (a === '--help' || a === '-h') {
@@ -431,7 +445,25 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   if (receipts.length === 0) {
-    console.error('warning: empty chain (0 receipts)')
+    if (opts.expectCount !== null) {
+      fail(
+        11,
+        `count mismatch: expected ${opts.expectCount} receipt(s), found 0`,
+        opts.json,
+        { expected: opts.expectCount, found: 0 },
+      )
+    }
+    if (opts.expectLastHash !== null) {
+      fail(
+        11,
+        `last-hash mismatch: expected ${opts.expectLastHash}, found (empty chain)`,
+        opts.json,
+        { expected: opts.expectLastHash, found: null },
+      )
+    }
+    console.error(
+      'warning: empty chain (0 receipts) — this is not a verification that nothing was deleted. A hash chain cannot see a tail that is no longer in the file. Pass --expect-count or --expect-last-hash to pin length.',
+    )
     if (opts.json) console.log(JSON.stringify({ ok: true, code: 0, warning: 'empty', count: 0 }))
     process.exit(0)
   }
@@ -569,6 +601,26 @@ async function main(argv = process.argv.slice(2)) {
 
     prevHash = receipt.chain.hash
     prevSeq = receipt.chain.seq
+  }
+
+  if (opts.expectCount !== null && receipts.length !== opts.expectCount) {
+    fail(
+      11,
+      `count mismatch: expected ${opts.expectCount} receipt(s), found ${receipts.length}`,
+      opts.json,
+      { expected: opts.expectCount, found: receipts.length },
+    )
+  }
+  if (opts.expectLastHash !== null) {
+    const lastHash = receipts[receipts.length - 1].receipt.chain.hash
+    if (String(lastHash).toLowerCase() !== opts.expectLastHash) {
+      fail(
+        11,
+        `last-hash mismatch: expected ${opts.expectLastHash}, got ${lastHash}`,
+        opts.json,
+        { expected: opts.expectLastHash, found: lastHash },
+      )
+    }
   }
 
   // Bildirilmemis meta BASARISIZLIK DEGILDIR — ama sessizce de gecmez. Denetci
