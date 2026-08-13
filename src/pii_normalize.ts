@@ -25,19 +25,26 @@ export function normalizePiiText(input: string): string {
 }
 
 /**
- * If a digit detector still left a country-code prefix glued to a mask
- * (`TR33000610051[MASKED_PII]`), that is a partial mask. Collapse it to a
- * full mask so the audit count cannot claim a field was protected while the
- * prefix remains. Prefer the IBAN pass firing first; this is the backstop.
+ * Backstop: any leftover alphanumeric prefix glued to a mask
+ * (`411[MASKED_PII]`, `TR33000610051[MASKED_PII]`) is a partial mask.
+ * Collapse it to a full mask so maskedCount cannot claim protection
+ * while the prefix is still in the clear. The detectors must not produce
+ * this; this exists so a future mid-run match still cannot lie.
  */
-export function collapsePartialIbanMask(text: string): string {
-  return text.replace(/[A-Z]{2}\d{2,12}\[MASKED_PII\]/g, '[MASKED_PII]')
+export function collapsePartialMask(text: string): string {
+  // The literal is required. Without this guard `[A-Za-z0-9]+` eats a
+  // 12k-digit field, fails to find `[MASKED_PII]`, and backtracks O(n²).
+  if (!text.includes('[MASKED_PII]')) return text
+  return text.replace(/[A-Za-z0-9]+\[MASKED_PII\]/g, '[MASKED_PII]')
 }
+
+/** @deprecated name — same function, kept so existing imports compile during the cut */
+export const collapsePartialIbanMask = collapsePartialMask
 
 export function decodedLooksLikePii(decoded: string): boolean {
   const n = normalizePiiText(decoded)
-  if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(n)) return true
-  if (/\b[1-9][0-9]{10}\b/.test(n)) return true
+  if (/[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,253}\.[a-zA-Z]{2,24}/.test(n)) return true
+  if (/^[1-9][0-9]{10}$/.test(n) || /\b[1-9][0-9]{10}\b/.test(n)) return true
   return false
 }
 
@@ -50,6 +57,11 @@ export function maskEmbeddedEncodedPii(
   text: string,
   ibanHit: (s: string) => boolean,
 ): { text: string; count: number } {
+  // A maximal digit run longer than a hex/b64 token cannot contain a
+  // bounded token with word boundaries on both sides. Skipping avoids
+  // `{24,80}` backtracking across 12k hex-looking digits.
+  if (text.length > 80 && /^\d+$/.test(text)) return { text, count: 0 }
+
   let count = 0
   let out = text
 

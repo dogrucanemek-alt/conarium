@@ -2,7 +2,44 @@
 
 ## Unreleased
 
-Nothing yet — 0.2.4 is the current cut.
+Nothing yet — 0.2.5 is the current cut.
+
+## 0.2.5 — 2026-08-14
+
+0.2.4 said a partial mask could no longer count as masked. On the card
+path it still could: `4111111111111111` became `411[MASKED_PII]` with
+`maskedCount: 1`. Same class as the second-IBAN bug closed in 0.2.2 —
+a detector matching from the middle of a longer run.
+
+### Fixed
+
+- **Numeric detectors no longer start inside a longer digit run.** Phone
+  had no leading boundary, so it ate 13 digits out of a 16-digit PAN and
+  left the prefix. A maximal run is now classified as a whole: 13–16
+  digits and Luhn-valid → card, fully masked; 11-digit TCKN-shaped →
+  masked; longer runs (20-digit order numbers) are not cards and are
+  left alone. `maskedCount` cannot claim a half-masked field.
+- **Content scanner O(n²) on long alphanumeric fields.** Profiled, not
+  guessed. Three quadratics: (1) email `local+@` with no `@` (~1 s on
+  40k digits); (2) this cut's own backstop, `collapsePartialMask`
+  `[A-Za-z0-9]+\[MASKED_PII\]`, backtracking when the literal is absent
+  (~50 ms on 12k digits); (3) concatenating a long digit run one char
+  at a time, then decoding it as unbounded whole-field base64.
+  Local/domain lengths are bounded; `@` absent → skip; collapse skips
+  when the mask token is absent; digit runs are counted then sliced
+  once; whole-field base64 decode is capped at 256 characters. Fields
+  longer than 16 384 characters are **masked whole** (fail-closed).
+  Skipping the scan is forbidden. TCKN **checksum is not added** —
+  existing vectors use `12345678901` (checksum fails); the hole was
+  mid-run matching, not a missing checksum.
+
+### Added
+
+- **HTML `&#64;` / `&#x40;` / `&commat;` emails** are masked when they
+  decode to an existing email detector hit. A non-email `&#64;` is left
+  unchanged. JSON `\u0040` is still out.
+
+**Not published. Not deployed to Hetzner.**
 
 ## 0.2.4 — 2026-08-13
 

@@ -148,7 +148,8 @@ stated so an auditor knows which one they are holding.
 
 **Still not caught by content scanners:** street addresses, IP addresses, and
 passport numbers. Split identifiers (a TCKN broken across two fields) and
-JSON/HTML entity escapes (`&#64;`, `\u0040`) are also out. Zero-width
+JSON `\u0040` escapes are also out. HTML `&#64;` is masked only when it sits
+inside an email-shaped token; a lone `5&#64; store` is left alone. Zero-width
 characters, fullwidth digits / `＠`, and unicode dashes are stripped or mapped
 to ASCII *before* the detectors as of this cut — that pass is not a general
 encoding decoder; wrapped base64/hex *tokens* inside a field are masked only

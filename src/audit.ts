@@ -13,10 +13,16 @@ import {
 import type { ActorAssurance } from './tokens.js'
 import { maskIbansInText, prepareIbanPass } from './iban.js'
 import {
-  collapsePartialIbanMask,
+  collapsePartialMask,
   maskEmbeddedEncodedPii,
   normalizePiiText,
 } from './pii_normalize.js'
+import {
+  PII_SCAN_CHAR_CAP,
+  maskEmails,
+  maskEntityEncodedEmails,
+  maskNumericPii,
+} from './digit_pii.js'
 import {
   buildReceipt,
   hashArgs,
@@ -280,13 +286,15 @@ export class Audit {
   private maskArgs(args: any): any {
     if (!args) return args
     const str = typeof args === 'string' ? args : JSON.stringify(args)
+    if (str.length > PII_SCAN_CHAR_CAP) {
+      return typeof args === 'string' ? '[MASKED_PII]' : { _audit: 'masked-oversize', length: str.length }
+    }
     let masked = normalizePiiText(str)
     const ibanPass = prepareIbanPass(masked)
     masked = ibanPass.text
-    masked = masked.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[MASKED_PII]')
-    masked = masked.replace(/\b[1-9][0-9]{10}\b/g, '[MASKED_PII]')
-    masked = masked.replace(/(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/g, '[MASKED_PII]')
-    masked = masked.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[MASKED_PII]')
+    masked = maskEmails(masked).text
+    masked = maskEntityEncodedEmails(masked).text
+    masked = maskNumericPii(masked).text
     // Credentials / secrets — not just PII. Keeps API keys, tokens, passwords
     // and connection-string credentials out of the audit log.
     masked = masked.replace(/\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g, '[MASKED_SECRET]')
@@ -294,7 +302,7 @@ export class Audit {
     masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, '$1[MASKED_SECRET]')
     masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, '$1[MASKED_SECRET]')
     masked = ibanPass.restore(masked)
-    masked = collapsePartialIbanMask(masked)
+    masked = collapsePartialMask(masked)
     masked = maskEmbeddedEncodedPii(masked, (s) => maskIbansInText(s).count > 0).text
 
     if (typeof args === 'string') return masked
