@@ -19,6 +19,7 @@ import type { GovernanceMetadata } from './governance.js'
 import { Audit } from './audit.js'
 import type { ResolvedActor } from './tokens.js'
 import { parseConariumConfig } from './config.js'
+import { installedVersion } from './update-check.js'
 import { capSearchResult, readGovernedSchemaResource, resolveGovernedSearchScope } from './search_policy.js'
 import { SupabaseRestConnector } from './connectors/supabase_rest.js'
 
@@ -133,7 +134,7 @@ export function buildServer(
   const server = new Server(
     {
       name: config.serverName || 'Conarium',
-      version: config.serverVersion || '0.1.0',
+      version: config.serverVersion || installedVersion() || 'unknown',
     },
     {
       capabilities: {

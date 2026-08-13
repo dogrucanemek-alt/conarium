@@ -13,17 +13,42 @@ const __dirname = path.dirname(__filename)
 
 export const DEFAULT_CONSOLE_HOST = '127.0.0.1'
 
-const ConsoleConfigSchema = z.object({
-  maxRows: z.number().int().positive().max(10000).default(100),
-  allowTools: z.array(z.string()).default(['*']),
-  denyTools: z.array(z.string()).default([]),
-  piiMasking: z.boolean().default(true),
+const ConsolePolicyPatchSchema = z.object({
+  maxRows: z.number().int().positive().max(10000).optional(),
+  allowTools: z.array(z.string()).optional(),
+  denyTools: z.array(z.string()).optional(),
+  allowTables: z.array(z.string()).optional(),
+  denyTables: z.array(z.string()).optional(),
+  maskColumns: z.array(z.string()).optional(),
+  // Accepted from older UI payloads. Not a config field — never written.
+  piiMasking: z.boolean().optional(),
 }).strict()
 
-type ConsoleConfig = z.infer<typeof ConsoleConfigSchema>
+export type ConsolePolicyPatch = z.infer<typeof ConsolePolicyPatchSchema>
 
-export function validateConsoleConfig(input: unknown): ConsoleConfig {
-  return ConsoleConfigSchema.parse(input)
+const POLICY_PATCH_KEYS = ['maxRows', 'allowTools', 'denyTools', 'allowTables', 'denyTables', 'maskColumns'] as const
+
+export function validateConsoleConfig(input: unknown): ConsolePolicyPatch {
+  return ConsolePolicyPatchSchema.parse(input)
+}
+
+/**
+ * Overlay only the governance fields the console edits. connectors, audit,
+ * profiles and actorProfiles stay as they were — dropping them would be a
+ * silent policy downgrade.
+ */
+export function mergeConsolePolicyPatch(
+  existing: Record<string, unknown>,
+  patch: ConsolePolicyPatch,
+): Record<string, unknown> {
+  const prev =
+    existing.policy && typeof existing.policy === 'object' && !Array.isArray(existing.policy)
+      ? { ...(existing.policy as Record<string, unknown>) }
+      : {}
+  for (const k of POLICY_PATCH_KEYS) {
+    if (patch[k] !== undefined) prev[k] = patch[k]
+  }
+  return { ...existing, policy: prev }
 }
 
 export function redactSecretFields(value: unknown): unknown {
@@ -142,7 +167,8 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
         const data = fs.readFileSync(configFile, 'utf8')
         res.json(redactSecretFields(JSON.parse(data)))
       } else {
-        res.json({ maxRows: 100, allowTools: ['*'], denyTools: ['delete*'], piiMasking: true })
+        // No invented defaults. An empty policy on screen is the truth.
+        res.json({ policy: {} })
       }
     } catch {
       res.status(500).json({ error: 'Could not read config' })
@@ -151,9 +177,19 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
 
   app.post('/api/config', (req, res) => {
     try {
-      const newConfig = validateConsoleConfig(req.body)
-      fs.writeFileSync(configFile, JSON.stringify(newConfig, null, 2))
-      res.json({ success: true })
+      const patch = validateConsoleConfig(req.body)
+      let existing: Record<string, unknown> = {}
+      if (fs.existsSync(configFile)) {
+        const parsed = JSON.parse(fs.readFileSync(configFile, 'utf8'))
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          existing = parsed as Record<string, unknown>
+        }
+      }
+      const next = mergeConsolePolicyPatch(existing, patch)
+      fs.writeFileSync(configFile, JSON.stringify(next, null, 2) + '\n')
+      const tables = (next.policy as { allowTables?: unknown } | undefined)?.allowTables
+      const allowTablesEmpty = !Array.isArray(tables) || tables.length === 0
+      res.json({ success: true, allowTablesEmpty })
     } catch (err) {
       res.status(400).json({ error: (err as Error).message })
     }
@@ -194,9 +230,18 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
 
   app.post('/api/playground', (req, res) => {
     const query = String(req.body?.query || '').trim()
-    let cfg: ConsoleConfig = { maxRows: 100, allowTools: ['*'], denyTools: [], piiMasking: true }
+    let cfg = {
+      maxRows: 100,
+      maskColumns: ['*.email', '*.ssn', '*.tckn', '*.card', '*.phone'] as string[],
+    }
     try {
-      if (fs.existsSync(configFile)) cfg = validateConsoleConfig(JSON.parse(fs.readFileSync(configFile, 'utf8')))
+      if (fs.existsSync(configFile)) {
+        const parsed = JSON.parse(fs.readFileSync(configFile, 'utf8'))
+        const pol =
+          parsed?.policy && typeof parsed.policy === 'object' ? parsed.policy : parsed
+        if (typeof pol?.maxRows === 'number') cfg.maxRows = pol.maxRows
+        if (Array.isArray(pol?.maskColumns)) cfg.maskColumns = pol.maskColumns
+      }
     } catch {}
 
     let decision = 'allow'
@@ -212,7 +257,7 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
       // (secrets yine denyTables ile reddedilir). Üretim yolu (index.ts) config.policy kullanır.
       allowTables: ['*'],
       denyTables: ['public.secrets'],
-      maskColumns: cfg.piiMasking !== false ? ['*.email', '*.ssn', '*.tckn', '*.card', '*.phone'] : [],
+      maskColumns: cfg.maskColumns,
     })
 
     try {

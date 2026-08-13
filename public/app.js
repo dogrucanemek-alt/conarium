@@ -17,54 +17,102 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    function authHeaders(extra) {
+        const params = new URLSearchParams(location.search)
+        let token = params.get('token') || sessionStorage.getItem('conarium-console-token') || ''
+        if (token) sessionStorage.setItem('conarium-console-token', token)
+        const headers = { ...(extra || {}) }
+        if (token) {
+            headers['Authorization'] = 'Bearer ' + token
+            headers['x-csrf-token'] = token
+        }
+        return headers
+    }
+
+    function policyOf(data) {
+        if (data && typeof data.policy === 'object' && data.policy) return data.policy
+        return data || {}
+    }
+
+    function parseList(raw) {
+        return String(raw || '')
+            .split(/[\n,]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
+    }
+
+    function fillList(id, arr) {
+        const el = document.getElementById(id)
+        el.value = Array.isArray(arr) ? arr.join('\n') : ''
+    }
+
+    function setAllowTablesWarn(empty) {
+        const w = document.getElementById('allowTables-warn')
+        if (!w) return
+        w.hidden = !empty
+    }
+
     // Load Config
     async function loadConfig() {
         try {
-            const res = await fetch('/api/config');
-            const data = await res.json();
-            
-            document.getElementById('maxRows').value = data.maxRows || 100;
-            document.getElementById('allowTools').value = (data.allowTools || []).join(', ');
-            document.getElementById('denyTools').value = (data.denyTools || []).join(', ');
-            document.getElementById('piiMasking').checked = data.piiMasking !== false;
+            const res = await fetch('/api/config', { headers: authHeaders() })
+            if (!res.ok) {
+                showToast('Could not load policy (' + res.status + '). Pass ?token=…')
+                return
+            }
+            const data = await res.json()
+            const pol = policyOf(data)
+            const maxEl = document.getElementById('maxRows')
+            maxEl.value = pol.maxRows == null ? '' : String(pol.maxRows)
+            fillList('allowTables', pol.allowTables)
+            fillList('denyTables', pol.denyTables)
+            fillList('maskColumns', pol.maskColumns)
+            document.getElementById('allowTools').value = Array.isArray(pol.allowTools) ? pol.allowTools.join(', ') : ''
+            document.getElementById('denyTools').value = Array.isArray(pol.denyTools) ? pol.denyTools.join(', ') : ''
+            setAllowTablesWarn(!Array.isArray(pol.allowTables) || pol.allowTables.length === 0)
         } catch (e) {
-            console.error('Failed to load config', e);
+            console.error('Failed to load config', e)
         }
     }
 
-    // Save Config
+    // Save Config — only the fields this form edits. connectors/audit/profiles stay on the server.
     document.getElementById('config-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const allowToolsVal = document.getElementById('allowTools').value;
-        const denyToolsVal = document.getElementById('denyTools').value;
+        e.preventDefault()
 
-        const newConfig = {
-            maxRows: parseInt(document.getElementById('maxRows').value),
-            allowTools: allowToolsVal ? allowToolsVal.split(',').map(s => s.trim()) : [],
-            denyTools: denyToolsVal ? denyToolsVal.split(',').map(s => s.trim()) : [],
-            piiMasking: document.getElementById('piiMasking').checked
-        };
+        const maxRaw = document.getElementById('maxRows').value
+        const body = {
+            allowTables: parseList(document.getElementById('allowTables').value),
+            denyTables: parseList(document.getElementById('denyTables').value),
+            maskColumns: parseList(document.getElementById('maskColumns').value),
+            allowTools: parseList(document.getElementById('allowTools').value),
+            denyTools: parseList(document.getElementById('denyTools').value),
+        }
+        if (maxRaw !== '') body.maxRows = parseInt(maxRaw, 10)
+
+        setAllowTablesWarn(body.allowTables.length === 0)
 
         try {
             const res = await fetch('/api/config', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newConfig)
-            });
-            
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body)
+            })
             if (res.ok) {
-                showToast('Governance Policy Saved');
+                const out = await res.json().catch(() => ({}))
+                if (out.allowTablesEmpty) setAllowTablesWarn(true)
+                showToast('Governance Policy Saved')
+            } else {
+                showToast('Save failed (' + res.status + ')')
             }
         } catch (e) {
-            console.error('Failed to save config', e);
+            console.error('Failed to save config', e)
         }
-    });
+    })
 
     // Load Audit Logs
     async function loadAudit() {
         try {
-            const res = await fetch('/api/audit');
+            const res = await fetch('/api/audit', { headers: authHeaders() });
             const data = await res.json();
             
             const tbody = document.getElementById('audit-body');
@@ -139,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load Connectors
     async function loadConnectors() {
         try {
-            const res = await fetch('/api/connectors');
+            const res = await fetch('/api/connectors', { headers: authHeaders() });
             const data = await res.json();
             
             const list = document.getElementById('connector-list');
@@ -191,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
         out.innerHTML = '<div class="loader">Running through Conarium…</div>';
         try {
             const res = await fetch('/api/playground', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ query })
             });
             const d = await res.json();

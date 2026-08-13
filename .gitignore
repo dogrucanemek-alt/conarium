@@ -48,7 +48,7 @@ conarium.config.c*.json
 AGENTS.md
 PROJECT_CONTEXT.md
 
-# Anahtar malzemesi — asla depoya girmesin.
+examples/demo-bank/_keys/
 # 2026-07-31'de yakalandi: bir ajan calisma sirasinda tmp-test/test-key.pem
 # (Ed25519 ozel anahtari) uretti ve burasi PUBLIC repo; hicbir desen onu
 # kapsamiyordu, "git add ." demek yeterdi. Uretilen anahtar test bile olsa

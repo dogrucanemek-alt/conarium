@@ -1,0 +1,26 @@
+{
+  "serverName": "Conarium",
+  "consumer": "demo-bank",
+  "connectors": [
+    {
+      "type": "postgres",
+      "name": "maindb",
+      "description": "Local demo Postgres from examples/demo-bank. Not a customer DSN.",
+      "config": {
+        "url": "postgresql://conarium:demo-not-a-secret@127.0.0.1:54329/conarium_demo"
+      }
+    }
+  ],
+  "policy": {
+    "allowConnectors": ["maindb"],
+    "allowTables": ["public.accounts", "public.transactions"],
+    "denyTables": ["public.card_vault"],
+    "maskColumns": ["*.tckn", "*.iban"],
+    "maxRows": 50
+  },
+  "audit": {
+    "sink": "conarium-audit.jsonl",
+    "failClosed": true,
+    "receiptSink": "conarium-receipts.jsonl"
+  }
+}

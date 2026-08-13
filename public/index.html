@@ -64,23 +64,29 @@
                     <h3>Governance Policy</h3>
                     <form id="config-form" class="config-form">
                         <div class="form-group">
-                            <label>Max Rows Limit</label>
-                            <input type="number" id="maxRows" name="maxRows" class="glass-input" required>
+                            <label for="maxRows">Max rows</label>
+                            <input type="number" id="maxRows" name="maxRows" class="glass-input" min="1" max="10000">
                         </div>
                         <div class="form-group">
-                            <label>Allow Tools (comma separated)</label>
+                            <label for="allowTables">Allow tables <span class="hint">schema-qualified, one per line or comma-separated — public.accounts</span></label>
+                            <textarea id="allowTables" name="allowTables" class="glass-input list-input" rows="4" placeholder="public.accounts&#10;public.transactions"></textarea>
+                            <p id="allowTables-warn" class="policy-warn" hidden>allowTables is empty — fail-closed: the gateway will deny every table. Add schema-qualified names if that is not what you meant.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="denyTables">Deny tables</label>
+                            <textarea id="denyTables" name="denyTables" class="glass-input list-input" rows="3" placeholder="public.card_vault"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="maskColumns">Mask columns <span class="hint">*.tckn, public.accounts.iban</span></label>
+                            <textarea id="maskColumns" name="maskColumns" class="glass-input list-input" rows="3" placeholder="*.tckn&#10;*.iban&#10;*.email"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="allowTools">Allow tools (optional)</label>
                             <input type="text" id="allowTools" name="allowTools" class="glass-input">
                         </div>
                         <div class="form-group">
-                            <label>Deny Tools (comma separated)</label>
+                            <label for="denyTools">Deny tools (optional)</label>
                             <input type="text" id="denyTools" name="denyTools" class="glass-input">
-                        </div>
-                        <div class="form-group flex-row">
-                            <label>Enable PII Masking</label>
-                            <label class="switch">
-                                <input type="checkbox" id="piiMasking" name="piiMasking">
-                                <span class="slider round"></span>
-                            </label>
                         </div>
                         <button type="submit" class="btn primary-btn">Save Policy</button>
                     </form>
