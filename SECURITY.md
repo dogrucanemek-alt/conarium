@@ -168,22 +168,30 @@ this reason — the scope was narrowed to be correct, not to make the number sma
 
 ## CodeQL findings, triaged
 
-Measured **2026-08-14** against `main` (`76c20a4` at the time of the query):
-**5 open**, **12 dismissed**. The numbers below are that query, not a remembered
+Measured **2026-08-14** against `main` (`4be8e82`, after the 0.2.7 fixes and a
+fresh CodeQL run): **0 open**, **17 dismissed**, every dismissal carrying its
+reasoning in the Security tab. The numbers are that query, not a remembered
 total. A stale count is the same class of lie this product exists to refuse.
 
-### Open today (5) — not all false positives
+⚠️ **Alert numbers are not stable.** A fix moves a line, CodeQL closes the old
+alert and opens a new one at the new position — during 0.2.7 the `mint-token`
+finding closed as `#16` and reopened as `#18`, and the new regression test
+raised `#19` of its own. Read the classes below, not the numbers.
 
-**`#16` `js/file-system-race` in `examples/per-user-identity/mint-token.mjs` — real, fixed in 0.2.7.**
+### What was actually found
+
+**`js/file-system-race` in `examples/per-user-identity/mint-token.mjs` — real, fixed in 0.2.7.**
 The file was created at the process umask (usually 0644) and only then
 `chmod 0600`. Between those two calls, per-user identity tokens were readable
 by another local account. That file is the store behind "a shared credential
 does not name a person". It now births with `writeFileSync(..., { mode: 0o600 })`;
 `chmod` is a backstop, not the only defence. The same birth permission is on
 `src/keys.ts` (`writeKeyPairFiles` private PEM) and `bin/conarium-init.mjs`
-(signing key). Do not read the remaining open alerts as "none of them were real".
+(signing key). Measured on ext4 with `umask 0022`: with `mode` present the file
+is born `600` even when `chmod` is disabled; with `mode` removed it is born
+`644`. Do not read "everything dismissed" as "nothing was real".
 
-**`#13`, `#14` `js/missing-rate-limiting` in `src/console.ts` (lines 178, 231).**
+**`js/missing-rate-limiting` in `src/console.ts`.**
 False positive. A limiter runs **before** authentication, deliberately: in
 `src/http.ts` the limit runs *after* auth so an unauthorized flood cannot burn
 a real client's budget; here the thing being protected is the token itself
@@ -191,16 +199,22 @@ a real client's budget; here the thing being protected is the token itself
 middleware; ours is hand-written. Dismiss is a GitHub Security-tab action, not
 a code change.
 
-**`#15` `js/file-system-race` in `src/console.ts` (config save).** Weak, local tool.
-0.2.7 still closed the practical hole: the save is now temp-file + `rename` in
-the same directory, so a crash cannot leave a half-written policy. The alert
-may stay open (the query flags check-then-use, not missing atomicity).
+**`js/file-system-race` in `src/console.ts` (config save).** Weak, local tool —
+but 0.2.7 closed the practical hole anyway: the save is now temp-file + `rename`
+in the same directory, so a crash cannot leave a half-written policy. This alert
+**closed on its own** after the fix; it is the one finding here that CodeQL
+agreed was resolved rather than dismissed.
 
-**`#17` `js/file-system-race` in `bin/conarium-suggest-policy.mjs`.** New file,
-new alert — that is normal. The tool is read-only (`--sql`), wrapped in try/catch,
-and refuses to write config. Noise.
+**`js/file-system-race` in `bin/conarium-suggest-policy.mjs`.** New file, new
+alert — that is normal. The tool is read-only (`--sql`), wrapped in try/catch,
+and refuses to write config. There is no privileged sink after the check, so the
+window has no consequence. Noise.
 
-### Already dismissed (12)
+**`js/file-system-race` in `test/mint_token_mode.mjs`.** The regression test for
+the finding above: it creates a file in a temp directory and stats it to assert
+the `0600` birth permission. Dismissed as *used in tests*.
+
+### Earlier rounds
 
 First CodeQL run was 2026-08-12 (twelve alerts). One of those (`js/missing-rate-limiting`
 on the console with **no** limiter) was real and was fixed in `270ac54`. The
@@ -227,8 +241,12 @@ records, never to build a path.
 Exploiting the check-then-use window requires local write access to the same
 filesystem, at which point the tool is not the weakest link.
 
-If you are auditing this, do not read "12 dismissed" as "12 non-issues": one of
-the original set was real (`270ac54`), and **`#16` in this cut was real too**.
+If you are auditing this, do not read "17 dismissed" as "17 non-issues". Two of
+them were real and were fixed, not argued away: the console with no rate limiter
+(`270ac54`), and the token file that was born world-readable and narrowed
+afterwards (0.2.7). Everything else is dismissed with its reasoning attached,
+and a dismissal in this repository means *"we looked and wrote down why"*, not
+*"we closed it"*.
 
 ## Secrets in git history
 
