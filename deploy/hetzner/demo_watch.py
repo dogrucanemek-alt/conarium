@@ -19,6 +19,15 @@ TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 
+def http_only(url: str) -> str:
+    """urllib opens file:// too. The scheme is allowlisted rather than
+    trusted, so a mangled token or base can never turn this into a reader
+    of local files."""
+    if not url.startswith(("https://", "http://127.0.0.1", "http://localhost")):
+        sys.exit(f"refusing non-http(s) URL: {url[:24]!r}")
+    return url
+
+
 def main() -> int:
     if not TOKEN or not CHAT:
         print("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required", file=sys.stderr)
@@ -36,10 +45,12 @@ def main() -> int:
     text = f"conarium demo audit: {added} new line(s) (total {n})"
     body = urllib.parse.urlencode({"chat_id": CHAT, "text": text}).encode()
     req = urllib.request.Request(
-        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+        http_only(f"https://api.telegram.org/bot{TOKEN}/sendMessage"),
         data=body,
         method="POST",
     )
+    # http_only() above is the brake; annotated with a reason, not silenced.
+    # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
     with urllib.request.urlopen(req, timeout=20) as res:
         json.loads(res.read().decode())
     STATE.write_text(str(n) + "\n", encoding="utf-8")

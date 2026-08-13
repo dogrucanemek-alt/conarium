@@ -14,6 +14,14 @@ URL = os.environ.get("CONARIUM_MCP_URL", "").rstrip("/")
 TOKEN = os.environ.get("CONARIUM_MCP_TOKEN", "")
 
 
+def http_only(url: str) -> str:
+    """urllib opens file:// too. The gateway endpoint comes from the
+    environment, so its scheme is allowlisted rather than trusted."""
+    if not url.startswith(("https://", "http://127.0.0.1", "http://localhost")):
+        sys.exit(f"refusing non-http(s) URL from the environment: {url[:24]!r}")
+    return url
+
+
 def rpc(method: str, params: dict, rid: int) -> dict:
     body = json.dumps({"jsonrpc": "2.0", "id": rid, "method": method, "params": params}).encode()
     headers = {
@@ -21,7 +29,9 @@ def rpc(method: str, params: dict, rid: int) -> dict:
         "Accept": "application/json, text/event-stream",
         "Authorization": f"Bearer {TOKEN}",
     }
-    req = urllib.request.Request(URL, data=body, headers=headers, method="POST")
+    req = urllib.request.Request(http_only(URL), data=body, headers=headers, method="POST")
+    # http_only() above is the brake; annotated with a reason, not silenced.
+    # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
     with urllib.request.urlopen(req, timeout=20) as res:
         raw = res.read().decode()
         if raw.startswith("event:"):
