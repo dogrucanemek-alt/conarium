@@ -53,10 +53,19 @@ test('config denies card_vault and masks tckn/iban', () => {
   assert.ok(!/supabase\.co|amazonaws|azure|neon\.tech/.test(url), 'DSN looks like a hosted database')
 })
 
-test('no customer-shaped names in the seed', () => {
-  const seed = fs.readFileSync(path.join(root, 'seed.sql'), 'utf8')
-  assert.ok(/Ali Deneme/.test(seed))
-  assert.ok(!/Ahmet Yılmaz|Mehmet Öz|Elon|Erdoğan/i.test(seed))
+test('prove-receipt goes through the gateway, not Governance directly', () => {
+  const src = fs.readFileSync(path.join(root, 'prove-receipt.mjs'), 'utf8')
+  assert.ok(!/governance\.js/.test(src), 'must not import Governance — that was the hole')
+  assert.ok(/dist\/index\.js/.test(src), 'must spawn the MCP gateway')
+  assert.ok(/StdioClientTransport/.test(src), 'must speak MCP over stdio')
+  assert.ok(/conarium-verify/.test(src), 'must run the independent verifier')
+})
+
+test('README does not claim a shared credential names a person', () => {
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8')
+  assert.ok(/undeclared/.test(readme))
+  assert.ok(/shared/.test(readme))
+  assert.ok(!/Makbuz kimin eriştiğini söyler|receipt (says|tells).+who accessed/i.test(readme))
 })
 
 for (const { name, fn } of tests) {

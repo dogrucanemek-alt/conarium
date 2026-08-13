@@ -8,7 +8,7 @@ zero-padded `TR00…`, names are "Ali Deneme" / "Ayşe Örnek". That is
 deliberate. Realistic-looking PII in a demo makes a banker trust the sample
 and distrust you.
 
-## Three commands
+## Four commands
 
 From this directory, with Docker running:
 
@@ -25,13 +25,25 @@ npx conarium-doctor
 
 Expected: doctor EXIT 0, including Reachability to `127.0.0.1:54329`.
 
-Then prove masking against the live database:
+Then prove the product, in this order:
 
 ```bash
-node prove-mask.mjs
+node prove-mask.mjs      # policy class vs the live DB (mask + deny)
+node prove-receipt.mjs   # the real MCP gateway: query → receipt → verify
 ```
 
-`tckn` and `iban` come back `[MASKED_PII]`. `public.card_vault` is denied.
+`prove-receipt.mjs` starts `dist/index.js` over stdio, calls `query`, and
+hands the resulting JSONL to `conarium-verify`. That is the meeting demo:
+masked rows, a signed receipt, and a verifier the other side can run without
+us. `prove-mask.mjs` does not go through the gateway; it is not the receipt
+proof.
+
+The receipt will say the model is **undeclared**. This demo uses a **shared**
+credential. The receipt states how identity was established; because a shared
+credential is in use, nobody is named. That is not a bug.
+
+`_keys/`, `conarium-audit.jsonl` and `conarium-receipts.jsonl` are local run
+artefacts. They are gitignored and not in the npm tarball.
 
 ## What is in the database
 
