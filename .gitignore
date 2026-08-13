@@ -73,3 +73,14 @@ examples/demo-bank/*.jsonl
 
 # npm pack ciktisi — paketleme artefakti, repoya girmez
 *.tgz
+
+# Canli kurulumun (Hetzner /opt/conarium-mcp) calisma dizininde biriken dosyalar.
+# Bu dizin bir git checkout'u ve burasi PUBLIC repo. 2026-08-13'te olculdu:
+# .mcp_token hicbir desene girmiyordu — orada "git add ." diyen biri TOKEN'i
+# public repoya sokardi. Ayni sinif olay 07-31'de ozel anahtarla yasandi.
+# audit/ makbuz ve denetim zinciri: musteri verisinin izini tasir, asla commit'lenmez.
+.mcp_token
+audit/
+DURUM.md
+.demo_keepalive_state
+.demo_watch_state
