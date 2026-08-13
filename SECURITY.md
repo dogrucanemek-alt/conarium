@@ -14,6 +14,21 @@ We will confirm receipt, and we will tell you what we did about it — including
 "nothing, here is why". There is no bounty programme; this is a small project and
 we would rather say so than imply one exists.
 
+## Outbound connections
+
+The gateway opens one connection you did not configure: at startup it asks
+`https://registry.npmjs.org/@conarium-ai/core/latest` whether a newer version
+exists, and writes a single stderr line if so. The request carries no identifier,
+no configuration, no usage counts — nothing but the version lookup itself. It has
+a 2-second timeout, never blocks startup, and never throws.
+
+- `CONARIUM_NO_UPDATE_CHECK=1` disables it.
+- `CONARIUM_NPM_REGISTRY=<url>` points it at an internal mirror.
+
+`conarium-doctor --no-net` makes the same guarantee for the doctor: with that flag
+it issues no network request at all. Everything else — connectors, receipts, audit
+log, verification — is local to your infrastructure by construction.
+
 ## Threat model
 
 **Conarium protects against**

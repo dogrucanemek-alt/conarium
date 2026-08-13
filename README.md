@@ -34,7 +34,7 @@ The AI gets the context it needs to write code, but never sees your secrets.
 - **Verifiable Receipts (v0.1):** Ed25519-signed, independently verifiable receipts — see below.
 - **Per-person masking profiles:** what to mask for an AI agent is not what to mask for the data controller. A named profile relaxes masking for one identified person, and the receipt records which profile applied — see below.
 - **Coverage & Reconciliation:** a signed coverage declaration over the receipt chain (`conarium-coverage`), plus two-sided reconciliation against the database's own query counters (`conarium-reconcile`) — DB-recorded activity that no receipt covers is surfaced instead of staying invisible.
-- **100% Self-Hosted:** Runs entirely on your infrastructure. Your data never crosses your perimeter. 
+- **100% Self-Hosted:** Runs entirely on your infrastructure. Your data never crosses your perimeter. The gateway makes exactly one outbound request that is not yours: at startup it asks the public npm registry whether a newer version exists, and prints one line to stderr if so. It sends nothing about you — no identifier, no config, no counts — and a remote gateway nobody looks at for weeks is the reason it exists at all. Disable it with `CONARIUM_NO_UPDATE_CHECK=1`, or point it at your internal mirror with `CONARIUM_NPM_REGISTRY`. It has a 2-second timeout and never blocks or fails startup. We list it here because a governance product that makes an undisclosed outbound connection has already lost the argument.
 - **MCP-Native:** Works out of the box with **Cursor**, **GitHub Copilot**, **Claude Code**, and **Codex**.
 
 ### Verifiable Receipts
