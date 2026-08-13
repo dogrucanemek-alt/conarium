@@ -5,6 +5,7 @@
  */
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { loadConfig, bootDeps, buildServer } from './server.js'
+import { announceUpdate } from './update-check.js'
 
 async function main() {
   const config = loadConfig()
@@ -14,6 +15,9 @@ async function main() {
   const transport = new StdioServerTransport()
   await server.connect(transport)
   console.error(`[conarium] MCP server running - ${deps.connectors.length} connector(s) active`)
+  // stderr only: stdout carries the MCP protocol. Never blocks the handshake —
+  // the notice arrives when the registry answers, or never.
+  announceUpdate()
 
   process.on('SIGINT', async () => {
     for (const conn of deps.connectors) await conn.disconnect().catch(() => {})

@@ -30,6 +30,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { loadConfig, bootDeps, buildServer } from './server.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
 import { loadTokenStore, resolveActor } from './tokens.js'
+import { announceUpdate } from './update-check.js'
 
 const PORT = Number(process.env.CONARIUM_MCP_PORT || 8791)
 const HOST = process.env.CONARIUM_MCP_HOST || '127.0.0.1'
@@ -197,6 +198,9 @@ async function main() {
     console.error(
       `[conarium-http] remote MCP hazır — http://${HOST}:${PORT} (token: SET, ${deps.connectors.length} connector, rate-limit: ${rate})`
     )
+    // A remote gateway is the one nobody looks at for weeks. One stderr line at
+    // start is the only place a stale build gets announced to its operator.
+    announceUpdate()
   })
 
   process.on('SIGINT', async () => {
