@@ -14,7 +14,7 @@ export interface GateAudit {
  * Kullanım (jarvis-web/lib/konnektor/llm.ts):
  *   export const claudeLlm = governLlm(rawClaudeLlm, policy, a => appendAudit(a));
  *
- * NOT (dürüst): maskPII regex'i email/TCKN/telefon/kart yakalar. AD/UNVAN gibi
+ * NOT (dürüst): maskPII regex'i email/TCKN/telefon/kart/IBAN (mod-97) yakalar. AD/UNVAN gibi
  * yapısal PII regex'e uymaz → onlar ctx üretim kaynağında pseudonymize edilmeli (Faz 2).
  */
 export function governLlm(

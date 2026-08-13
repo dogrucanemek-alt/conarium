@@ -17,6 +17,8 @@
     "!**/*.pem",
     "test-vectors/keys/vector-key.pub.pem",
     "deploy",
+    "!deploy/hetzner",
+    "!deploy/hetzner/**",
     "conarium.config.json",
     "README.md",
     "LICENSE",

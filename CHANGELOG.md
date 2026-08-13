@@ -2,7 +2,20 @@
 
 ## Unreleased
 
-Nothing yet — 0.2.1 is the current cut.
+- **IBAN content detector.** `maskColumns: ['*.iban']` only fired when the
+  column was named. Free text, and columns the operator forgot to list, sent
+  the IBAN to the model — sometimes half-masked by the digit detector, which
+  looks like protection. The scanner is deterministic (ISO 7064 mod-97-10);
+  a profile cannot switch it off. Street addresses, IPs and passport numbers
+  are still not detected. **Not deployed to Hetzner.**
+- **Per-user identity local pack** (`examples/per-user-identity/`). Token
+  mint (hash on disk), c2 policy overlay, same-row proof for two actors,
+  rollback. Does not touch the live box.
+- **Hetzner process scripts** copied into `deploy/hetzner/` (sanitized,
+  reconstructed — live files were not pulled). Excluded from the npm tarball.
+- **Receipt spec** aligned to canonical schema `conarium-receipt/0.3`; media
+  type `application/vnd.conarium.receipt+json` documented. Schema string
+  unchanged.
 
 ## 0.2.1 — 2026-08-13
 

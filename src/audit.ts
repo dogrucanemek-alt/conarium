@@ -11,6 +11,7 @@ import {
   type KeyId,
 } from './keys.js'
 import type { ActorAssurance } from './tokens.js'
+import { prepareIbanPass } from './iban.js'
 import {
   buildReceipt,
   hashArgs,
@@ -275,6 +276,8 @@ export class Audit {
     if (!args) return args
     const str = typeof args === 'string' ? args : JSON.stringify(args)
     let masked = str
+    const ibanPass = prepareIbanPass(masked)
+    masked = ibanPass.text
     masked = masked.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[MASKED_PII]')
     masked = masked.replace(/\b[1-9][0-9]{10}\b/g, '[MASKED_PII]')
     masked = masked.replace(/(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/g, '[MASKED_PII]')
@@ -285,6 +288,7 @@ export class Audit {
     masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, '$1[MASKED_SECRET]$2')
     masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, '$1[MASKED_SECRET]')
     masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, '$1[MASKED_SECRET]')
+    masked = ibanPass.restore(masked)
 
     if (typeof args === 'string') return masked
     try {

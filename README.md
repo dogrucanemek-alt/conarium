@@ -102,8 +102,9 @@ Deliberately narrow, because this is the one feature that can *loosen* protectio
 - **Fail-closed everywhere else:** no actor, unlisted actor, or a profile name that
   does not exist all fall back to the base policy, never to a wider one.
 - **The content scanners still run.** The email / national-ID / phone / card /
-  secret detectors are not overridable at all, so those stay masked in free text
-  no matter which profile applied. Name masking is the one detector a profile can
+  IBAN / secret detectors are not overridable at all, so those stay masked in free text
+  no matter which profile applied. IBAN is accepted only when ISO 7064 mod-97-10
+  holds — a random 26-character run is not an IBAN. Name masking is the one detector a profile can
   switch off (`maskLabelledNames: false`), because the controller reading their
   own customer list is the case this feature exists for.
 - **The receipt says which profile applied** — `policy.id` becomes
@@ -134,6 +135,10 @@ trust us. A probabilistic masker would also be a probabilistic *receipt*. Tools
 that do run NER (Presidio-based ones, for instance) cover more entity types; they
 buy that with a confidence threshold. Neither position dominates — this one is
 stated so an auditor knows which one they are holding.
+
+**Still not caught by content scanners:** street addresses, IP addresses, and
+passport numbers. IBAN used to be on that list; it is not, as of this cut, when
+the checksum holds. Column policy can still mask those other fields by name.
 
 Carry-over ignores values under three characters (a two-character value matches
 everywhere and would shred the output) and matches on Unicode word boundaries, so

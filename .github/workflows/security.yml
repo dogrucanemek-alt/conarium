@@ -19,10 +19,10 @@ jobs:
     name: Build, lint & test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0   # gecmis taramasi icin sart — sig klon "temiz" yalani soyler
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -88,12 +88,12 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
           queries: security-extended
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -107,7 +107,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: semgrep scan --config p/security-audit --config p/secrets --config p/javascript --config p/typescript --error
         # Hard-gates on any finding. .semgrepignore drops generated/marketing/test
         # noise; the product code (src/, api/) scans clean (verified: 0 findings).

@@ -50,6 +50,7 @@ PROJECT_CONTEXT.md
 
 examples/demo-bank/_keys/
 examples/demo-bank/*.jsonl
+examples/per-user-identity/conarium.tokens.json
 # 2026-07-31'de yakalandi: bir ajan calisma sirasinda tmp-test/test-key.pem
 # (Ed25519 ozel anahtari) uretti ve burasi PUBLIC repo; hicbir desen onu
 # kapsamiyordu, "git add ." demek yeterdi. Uretilen anahtar test bile olsa

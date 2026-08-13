@@ -1,8 +1,12 @@
-# Conarium Receipt Spec v0.1
+# Conarium Receipt Spec
 
-Public specification for **verifiable access receipts**. Implements the portable
-side of EU AI Act Articles 12 (logging) and 19 (content of logs) for Conarium's
-governed MCP gateway.
+Public specification for **verifiable access receipts**. Schema version
+**`conarium-receipt/0.3`** is canonical. The verifier also accepts `0.1` and
+`0.2` forever — published receipts keep their original `v` string; this document
+does not change it.
+
+Implements the portable side of EU AI Act Articles 12 (logging) and 19 (content
+of logs) for Conarium's governed MCP gateway.
 
 Design source: `docs/superpowers/specs/2026-07-29-conarium-receipt-design.md`.
 
@@ -15,6 +19,18 @@ Design source: `docs/superpowers/specs/2026-07-29-conarium-receipt-design.md`.
 *(TR)* Conarium Makbuzu, kayıtların **oluşturulduktan sonra değiştirilmediğini,
 silinmediğini, yeniden sıralanmadığını ve geriye dönük tarihlenmediğini**
 kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
+
+## Media type
+
+| | |
+|---|---|
+| Media type | `application/vnd.conarium.receipt+json` |
+| Single receipt | `.json` — one JSON object, schema `conarium-receipt/0.3` |
+| Chain (append-only) | `.jsonl` — one receipt object per line, same schema, `chain.seq` contiguous |
+
+The vendor tree is the stable identifier for tools that switch on type rather
+than filename. A `.jsonl` file is still `application/vnd.conarium.receipt+json`
+with an outer sequence; there is no separate chain media type.
 
 ## Schema
 
@@ -30,7 +46,7 @@ Version string: `conarium-receipt/0.3` (verifier also accepts `0.1` and `0.2` �
 | `flags` | triggered policy flags | strings |
 | `masking` | counts by class | never raw values |
 | `request.argsHash` | request fingerprint | `sha256:…` of args — not the query text |
-| `consentRef` | reserved | always `null` in v0.1 |
+| `consentRef` | reserved | always `null` in `conarium-receipt/0.3` (and in 0.1/0.2). The field exists so a later schema can fill it without renaming. |
 | `chain.seq` | coverage backbone | contiguous integer; required even before v0.2 coverage proofs |
 | `chain.prevHash` / `chain.hash` | integrity | JCS (RFC 8785 subset) → SHA-256 |
 | `sig` | Ed25519 over `chain.hash` | `{ alg, keyId, value }` |

@@ -90,6 +90,10 @@ try {
   if (!vectorReceipts.length) fail('test-vectors/*.jsonl tarball\'dan dustu — ucuncu taraf vektorleri kosturamaz')
   else if (!vectorKeys.length) fail('test-vectors acik anahtari/keyid dustu — dogrulayici her makbuza 13 der')
   else pass(`konformans vektorleri etkilenmedi (${vectorReceipts.length} jsonl, ${vectorKeys.length} anahtar dosyasi)`)
+
+  const hetzner = files.filter((f) => f.startsWith('deploy/hetzner/'))
+  if (hetzner.length) fail(`Hetzner ops scripts tarball'da (elemeli): ${hetzner.join(', ')}`)
+  else pass('Hetzner ops scripts tarball disinda')
 } catch (e) {
   fail(e.message)
 } finally {

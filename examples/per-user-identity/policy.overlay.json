@@ -1,0 +1,15 @@
+{
+  "_comment": "Overlay for a live conarium.config.c2.json. Merge under policy. Do not replace allowTables/denyTables/connectors. Base policy (AI) keeps names masked; the patron profile unmasks name columns only. Email/TCKN/IBAN scanners still run.",
+  "policy": {
+    "maskColumns": ["*.customer_name", "*.email", "*.phone", "*.tckn", "*.iban"],
+    "profiles": {
+      "patron": {
+        "maskColumns": ["*.email", "*.phone", "*.tckn", "*.iban"],
+        "maskLabelledNames": false
+      }
+    },
+    "actorProfiles": {
+      "emekcan": "patron"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import type { GovernancePolicy, SchemaTable, QueryResult } from './types.js'
 import type { ActorAssurance } from './tokens.js'
+import { maskIbansInText, prepareIbanPass } from './iban.js'
 import { parse, toSql } from 'pgsql-ast-parser'
 import type {
   Expr,
@@ -479,6 +480,14 @@ export class Governance {
     if (typeof obj === 'string') {
       let count = 0;
       let masked = obj;
+
+      // IBAN BEFORE digit detectors. The card/TCKN/phone regexes otherwise eat
+      // the numeric tail and leave `TR00000000000[MASKED_PII]` — which looks
+      // like protection and is the worse outcome. Checksum-fail lookalikes
+      // are shielded until after those regexes, then restored unmasked.
+      const ibanPass = prepareIbanPass(masked)
+      masked = ibanPass.text
+      count += ibanPass.count
       
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
       const tcknRegex = /\b[1-9][0-9]{10}\b/g;
@@ -531,13 +540,14 @@ export class Governance {
       if (/^[A-Za-z0-9+/]{12,}={0,2}$/.test(b64candidate)) {
         try {
           const decoded = Buffer.from(b64candidate, 'base64').toString('utf8');
-          if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(decoded) || /\b[1-9][0-9]{10}\b/.test(decoded)) {
+          if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(decoded) || /\b[1-9][0-9]{10}\b/.test(decoded) || maskIbansInText(decoded).count > 0) {
             count++;
             masked = '[MASKED_PII]';
           }
         } catch { /* base64 değil */ }
       }
 
+      masked = ibanPass.restore(masked)
       return { masked, count };
     }
 
@@ -557,7 +567,7 @@ export class Governance {
       for (const [k, v] of Object.entries(obj)) {
         if (typeof v === 'string') {
           const lowerKey = k.toLowerCase();
-          if (lowerKey.includes('email') || lowerKey.includes('phone') || lowerKey.includes('tckn') || lowerKey.includes('card')) {
+          if (lowerKey.includes('email') || lowerKey.includes('phone') || lowerKey.includes('tckn') || lowerKey.includes('card') || lowerKey.includes('iban')) {
             out[k] = '[MASKED_PII]';
             totalCount++;
           } else if (/secret|token|password|passwd|pwd|api[_-]?key|access[_-]?key|\bkey\b|credential/.test(lowerKey)) {
@@ -1119,7 +1129,7 @@ export class ApiGovernance {
       for (const [k, v] of Object.entries(obj)) {
         if (typeof v === 'string') {
           const lowerKey = k.toLowerCase();
-          if (lowerKey.includes('email') || lowerKey.includes('phone') || lowerKey.includes('tckn') || lowerKey.includes('card')) {
+          if (lowerKey.includes('email') || lowerKey.includes('phone') || lowerKey.includes('tckn') || lowerKey.includes('card') || lowerKey.includes('iban')) {
             out[k] = '[MASKED_PII]';
           } else {
             out[k] = this.applyRegexMasks(v);
@@ -1134,11 +1144,12 @@ export class ApiGovernance {
   }
 
   private applyRegexMasks(text: string): string {
-    let masked = text;
+    const ibanPass = prepareIbanPass(text);
+    let masked = ibanPass.text;
     masked = masked.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[MASKED_PII]');
     masked = masked.replace(/\b[1-9][0-9]{10}\b/g, '[MASKED_PII]');
     masked = masked.replace(/(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/g, '[MASKED_PII]');
     masked = masked.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[MASKED_PII]');
-    return masked;
+    return ibanPass.restore(masked);
   }
 }
