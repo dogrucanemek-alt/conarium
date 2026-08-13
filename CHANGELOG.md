@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+Nothing yet — 0.2.2 is the current cut.
+
+## 0.2.2 — 2026-08-13
+
+An identifier the column policy could not catch, and two things that were true
+in git but not in the tarball.
+
+### Added
+
 - **IBAN content detector.** `maskColumns: ['*.iban']` only fired when the
   column was named. Free text, and columns the operator forgot to list, sent
   the IBAN to the model — sometimes half-masked by the digit detector, which
@@ -16,6 +25,26 @@
 - **Receipt spec** aligned to canonical schema `conarium-receipt/0.3`; media
   type `application/vnd.conarium.receipt+json` documented. Schema string
   unchanged.
+
+### Fixed
+
+- **Only the first IBAN in a field was masked; the second passed through in
+  full.** Caught while reviewing the detector above, before it shipped. One
+  greedy candidate regex treated the separator between two IBANs as part of a
+  single match ("ve" is alphanumeric), then the length cap cut that match in the
+  middle of the second IBAN — and `String.replace` resumes after the match, so
+  the remainder never matched anything again. `IBAN1 ve IBAN2` produced one mask
+  and one untouched IBAN. "From account X to account Y" is an ordinary sentence
+  in payments, not an edge case. The scanner is now anchor-driven: find an
+  anchor, take the longest IBAN-shaped run, shrink until the checksum holds, and
+  resume scanning immediately after the part that was consumed.
+- **`examples/per-user-identity/conarium.tokens.json` entered the npm tarball.**
+  It is listed in `.gitignore`, so git looked clean — but a `files` allowlist
+  overrides `.gitignore`, which is the same mechanism that shipped a private key
+  in 0.2.0. That is three instances of one class in a day, so the fix is no
+  longer another pattern: `test/pack_artefakt.mjs` now holds the exact list of
+  files allowed to ship from `examples/`, and anything generated fails the test
+  by default. Adding an example is a deliberate edit to that list.
 
 ## 0.2.1 — 2026-08-13
 
