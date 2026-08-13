@@ -84,3 +84,6 @@ audit/
 DURUM.md
 .demo_keepalive_state
 .demo_watch_state
+# Elle alinmis config yedekleri: canli DSN/token tasiyabilir, kopya oldugu icin
+# kimse icerigini gozden gecirmez. (08-13'te iki tane duruyordu.)
+*.yedek-*
