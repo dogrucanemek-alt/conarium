@@ -2,7 +2,44 @@
 
 ## Unreleased
 
-Nothing yet — 0.1.2 is the current cut.
+Nothing yet — 0.2.0 is the current cut.
+
+## 0.2.0 — 2026-08-13
+
+The governance console was in the package and unreachable. Now it starts.
+
+### Added
+
+- **`conarium-console`** — starts the console over the policy file. It binds
+  `127.0.0.1`, refuses to run without `CONARIUM_CONSOLE_TOKEN`, and refuses a
+  non-loopback bind unless `CONARIUM_CONSOLE_PUBLIC=1` says you meant it. A
+  policy editor reachable from the network is a different threat model than a
+  policy editor on your own machine, and the difference should be a decision,
+  not a default.
+
+### Fixed
+
+- **The console shipped but nothing could start it.** No bin entry, and the
+  gateway never launched it. It has been listed on the pricing page since the
+  tiers were written; installed users had exactly one way to change what gets
+  masked — editing `conarium.config.json` by hand.
+- **It edited the wrong file.** `startConsole()` defaults to the config bundled
+  inside the package, which for an installed user is wrong twice: it is not the
+  file the gateway reads, and `npm i` overwrites it. The command now defaults to
+  `conarium.config.json` in the working directory — the same file the gateway
+  loads — and takes `--config`.
+- **The UI did not ship.** `public/` was missing from the `files` allowlist, so
+  the installed package served `404` at `/`. That was an omission in the 0.1.0
+  packaging change.
+
+### Known limits — read before believing the pricing page
+
+The console today edits **`allowTools`, `denyTools` and `maxRows`**. It does
+**not** edit `maskColumns`, `allowTables` or `denyTables`, and it has no UI for
+per-consumer profiles. Those remain hand-edited in `conarium.config.json`. The
+column and table rules are the ones that decide what an assistant can see, so
+this is the gap that matters; it is named here rather than left for a buyer to
+discover.
 
 ## 0.1.2 — 2026-08-13
 
