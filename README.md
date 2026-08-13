@@ -156,6 +156,12 @@ encoding decoder; wrapped base64/hex *tokens* inside a field are masked only
 when they decode to an existing detector hit. Column policy can still mask
 those other fields by name.
 
+**Scan length.** A single text field longer than 16 384 characters is replaced
+with `[MASKED_PII]` as a whole, even when it contains no identifier. The
+scanner is not skipped: skipping would mean a long note, JSON blob, or log
+line is the way past masking. `maskedCount` records that a decision was
+made. Fields at or under the cap are scanned as before.
+
 Carry-over ignores values under three characters (a two-character value matches
 everywhere and would shred the output) and matches on Unicode word boundaries, so
 `Ali` is masked in `Ali onayladı` but not inside `Kalite`.

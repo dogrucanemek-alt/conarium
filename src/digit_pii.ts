@@ -9,8 +9,12 @@
  *
  * Decision, on a *maximal* digit run (grouping spaces/hyphens allowed):
  *   - 13–16 digits and Luhn holds → card, mask the whole run
+ *   - 11 digits starting with 0 → TR national phone (0 + 10 digits:
+ *     cep 05xx, sabit 02/03/04xx, 08xx). TCKN never starts with 0.
+ *     The 2nd-digit 5-vs-2/3/4 split is numbering-plan identity, not a
+ *     masking decision — 08xx would fall through it.
  *   - 11 digits starting 1–9 → TCKN-shaped, mask the whole run
- *   - 10 digits → phone-shaped (compact local), mask the whole run
+ *   - 10 digits → phone-shaped (compact local, no trunk 0)
  *   - longer (20, 25, …) → not a card; the content scanner does not touch it
  * Formatted phones (`+90 555 123 4567`) are a separate pass that also
  * refuses to start or end next to a digit.
@@ -109,6 +113,7 @@ function collectDigits(s: string, start: number, end: number): string {
 function classifyDigitRun(s: string, start: number, end: number, n: number): boolean {
   if (n === 11) {
     const first = s[start]
+    if (first === '0') return true
     return first >= '1' && first <= '9'
   }
   if (n === 10) return true

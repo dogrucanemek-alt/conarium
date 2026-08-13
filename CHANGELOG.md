@@ -19,6 +19,14 @@ a detector matching from the middle of a longer run.
   digits and Luhn-valid → card, fully masked; 11-digit TCKN-shaped →
   masked; longer runs (20-digit order numbers) are not cards and are
   left alone. `maskedCount` cannot claim a half-masked field.
+- **TR national phone (`0` + 10 digits) was dropped while rewriting that
+  classifier, then restored.** `0532…` / `0232…` are 11 digits starting
+  with `0` — between "10-digit phone" and "11-digit TCKN starting 1–9".
+  0.2.4 masked them; the 0.2.5 candidate did not. Classification is
+  still on the maximal run (no mid-run prefix). Leading `0` is the
+  trunk prefix, not a 2nd-digit numbering-plan check: TCKN never starts
+  with `0`; 08xx would miss a 5-vs-2/3/4 split. Compact 10-digit and
+  `+90…` formatted numbers were already covered.
 - **Content scanner O(n²) on long alphanumeric fields.** Profiled, not
   guessed. Three quadratics: (1) email `local+@` with no `@` (~1 s on
   40k digits); (2) this cut's own backstop, `collapsePartialMask`
@@ -27,17 +35,27 @@ a detector matching from the middle of a longer run.
   at a time, then decoding it as unbounded whole-field base64.
   Local/domain lengths are bounded; `@` absent → skip; collapse skips
   when the mask token is absent; digit runs are counted then sliced
-  once; whole-field base64 decode is capped at 256 characters. Fields
-  longer than 16 384 characters are **masked whole** (fail-closed).
-  Skipping the scan is forbidden. TCKN **checksum is not added** —
-  existing vectors use `12345678901` (checksum fails); the hole was
-  mid-run matching, not a missing checksum.
+  once; whole-field base64 decode is capped at 256 characters. TCKN
+  **checksum is not added** — existing vectors use `12345678901`
+  (checksum fails); the hole was mid-run matching, not a missing checksum.
+
+### Behavior
+
+- **A field longer than 16 384 characters is replaced whole with
+  `[MASKED_PII]`, including text that contains no identifier.** The scan
+  is not skipped. Skipping would let a 20 KB note or JSON column past
+  the detectors. `maskedCount` is 1. Fields at or under the cap are
+  scanned as before.
 
 ### Added
 
 - **HTML `&#64;` / `&#x40;` / `&commat;` emails** are masked when they
   decode to an existing email detector hit. A non-email `&#64;` is left
   unchanged. JSON `\u0040` is still out.
+- **PII regression matrix** (`test/pii_regression_matrix.mjs`): one
+  canonical example per class (TR phone, TCKN, card, IBAN, email,
+  encoding evasions, labelled name) plus the things that must not be
+  touched. A dropped class turns the test red.
 
 **Not published. Not deployed to Hetzner.**
 

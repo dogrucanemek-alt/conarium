@@ -57,6 +57,26 @@ describe('numeric PII — no mid-run match', () => {
     expect(r.text).not.toMatch(/\d\[MASKED_PII\]/)
     expect(r.count).toBe(1)
   })
+
+  it('TR national phone 0+10 is fully masked (cep and sabit)', () => {
+    for (const n of ['05321234567', '02321234567']) {
+      const r = gov.maskPII(`tel ${n}`)
+      expect(r.masked, n).toBe('tel [MASKED_PII]')
+      expect(r.count, n).toBe(1)
+      expect(String(r.masked), n).not.toMatch(/\d/)
+    }
+    const bare = gov.maskPII('05321234567')
+    expect(bare.masked).toBe('[MASKED_PII]')
+    expect(bare.count).toBe(1)
+  })
+
+  it('KIRMA: dropping the leading-0 branch leaves TR phones in the clear', () => {
+    // classifyDigitRun: 11 digits starting 0 must be a phone, not a hole
+    // between "10-digit phone" and "11-digit TCKN starting 1-9".
+    const r = maskNumericPii('05321234567')
+    expect(r.text).toBe('[MASKED_PII]')
+    expect(r.count).toBe(1)
+  })
 })
 
 describe('scan cap — fail-closed', () => {
