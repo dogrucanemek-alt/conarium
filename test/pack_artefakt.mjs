@@ -64,6 +64,21 @@ try {
   if (leaked.length) fail(`uretilmis artefakt tarball'da: ${leaked.join(', ')}`)
   else pass('examples/ altindaki anahtar ve JSONL artefaktlari tarball disinda')
 
+  // Sinif kontrolu, ornek kontrolu DEGIL. 08-13'te examples/ altindaki sizinti
+  // kapatildi ama ayni delik test-vectors/ altinda duruyordu: git .gitignore ile
+  // ozel anahtari diskaridi tutuyor, npm ise `files` izin listesi yuzunden onu
+  // pakete koyuyordu. 0.2.0 YAYINLANDI ve icinde bir BEGIN PRIVATE KEY vardi —
+  // ustelik ayni pakette giden test-vectors/README.md "ozel yarisi yayinlanmadi
+  // ve yayinlanmayacak" diyordu. Paket kendi belgesini yalanlamayacak.
+  const privateKeys = files.filter((f) => f.endsWith('.pem') && !f.endsWith('.pub.pem'))
+  if (privateKeys.length) fail(`pakette OZEL ANAHTAR var: ${privateKeys.join(', ')}`)
+  else pass('pakette tek bir ozel anahtar yok (yalnizca *.pub.pem)')
+
+  const publicKey = files.filter((f) => f.endsWith('vector-key.pub.pem') || f.endsWith('vector-key.pub.pem.keyid'))
+  if (publicKey.length !== 2) {
+    fail(`vektor ACIK anahtari ve keyid yan dosyasi pakette olmali (bulunan: ${publicKey.length}) — yoksa dogrulayici her vektore 13 der`)
+  } else pass('vektorlerin acik anahtari + keyid yan dosyasi yerinde')
+
   const demoFiles = files.filter((f) => f.startsWith('examples/demo-bank/'))
   const expected = ['conarium.config.json', 'docker-compose.yml', 'prove-mask.mjs', 'prove-receipt.mjs', 'README.md', 'seed.sql']
   const missing = expected.filter((e) => !demoFiles.includes(`examples/demo-bank/${e}`))

@@ -11,6 +11,17 @@ a gateway that stopped governing without saying so.
 
 ### Fixed
 
+- **The published tarball contained a private key, and the README in the same
+  tarball said it did not.** `test-vectors/keys/vector-key.SECRET-TEST-ONLY.pem`
+  is a throwaway Ed25519 key with no authority over anything — it signs the
+  conformance vectors and nothing else. Git excludes it; npm did not, because a
+  `files` allowlist overrides `.gitignore`. So 0.2.0 shipped a `BEGIN PRIVATE
+  KEY` while `test-vectors/README.md` promised the private half is never
+  published. The security impact is nil and the honesty impact is not: verify
+  what you ship, not what you meant to ship. The package now excludes every
+  `*.pem` that is not a `*.pub.pem`, and a test asserts it on the real
+  `npm pack` output.
+
 - **`conarium-init --out <dir>` printed a next step that fails.** The config
   goes to `<dir>`, but the printed command was `conarium-doctor --no-net`, and
   the doctor looks in the working directory. First run ended in a red FAIL.
