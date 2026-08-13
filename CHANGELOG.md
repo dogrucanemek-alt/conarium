@@ -2,7 +2,32 @@
 
 ## Unreleased
 
-Nothing yet — 0.2.0 is the current cut.
+Nothing yet — 0.2.1 is the current cut.
+
+## 0.2.1 — 2026-08-13
+
+Two silent failures: a first run that told you to run a command that fails, and
+a gateway that stopped governing without saying so.
+
+### Fixed
+
+- **`conarium-init --out <dir>` printed a next step that fails.** The config
+  goes to `<dir>`, but the printed command was `conarium-doctor --no-net`, and
+  the doctor looks in the working directory. First run ended in a red FAIL.
+  Both the printed command and the MCP client block now carry `--config <path>`.
+- **The MCP client block started an ungoverned gateway.** It emitted
+  `args: [dist/index.js]` with no config path. An MCP client starts the server
+  in *its own* working directory, not your install directory; with no config
+  found, the gateway does not fail — it comes up with zero connectors and
+  governs nothing, quietly. This was true with or without `--out`.
+- **A restarted remote gateway lost its client permanently.** A client
+  returning with a session id from before the restart got
+  `400 expected initialize` as `text/plain`. MCP clients expect JSON-RPC, so the
+  reason never reached the user — one proxy reported only "Invalid content from
+  server". An unknown session is now `404` with a JSON-RPC body telling the
+  client to send a new initialize, and every error response
+  (401/403/404/429/400/500) is `application/json`. A plain-text error is an
+  undiagnosable error.
 
 ## 0.2.0 — 2026-08-13
 
