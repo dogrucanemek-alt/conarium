@@ -2,7 +2,38 @@
 
 ## Unreleased
 
-Nothing yet — 0.2.5 is the current cut.
+Nothing yet — 0.2.6 is the current cut.
+
+## 0.2.6 — 2026-08-14
+
+Detector coverage plus two operator knobs. Address and bare-name *content*
+detectors were not added: both need a dictionary or a model, which this
+product refuses. Those gaps stay documented. `conarium-suggest-policy`
+guesses `maskColumns` from column names and does not write config.
+
+### Added
+
+- **`policy.scanCharCap`** (default 16 384) and env `CONARIUM_SCAN_CHAR_CAP`.
+  Oversize fields are still replaced whole with `[MASKED_PII]`; they are
+  never skipped. Raising the cap grows scan cost quadratically. Ceiling
+  1 048 576.
+- **`policy.detectors`**: `ip` (default **false**), `mrz` (default **true**).
+  TCKN / card / IBAN / email are not keys; a config that tries to disable
+  them is rejected at load.
+- **IPv4 / IPv6** when `detectors.ip` is true. Octets 0–255, no leading
+  zeros. `1.2.3.4` is structurally IPv4 and is masked; dates and amounts
+  are not. Loopback and private ranges are masked too — leave `ip` off
+  if SOC needs them in the clear.
+- **Passport MRZ (TD3)** — 2×44, 7-3-1 check digits. Checksum miss → not
+  an MRZ. TD1/TD2 not implemented.
+- **JSON `\u0040` and `%40`** join HTML `&#64;` as scan-only encoded `@`.
+  Non-email encodings are left unchanged. `&amp;#64;` is not chased.
+- **Split TCKN** on similarly named fields of the same row when the
+  concatenation checksums. No combinatorial scan.
+- **`conarium-suggest-policy`** — `--sql` / `--json`. Prints a guess.
+  Refuses `--write`.
+
+**Not published. Not deployed to Hetzner.**
 
 ## 0.2.5 — 2026-08-14
 

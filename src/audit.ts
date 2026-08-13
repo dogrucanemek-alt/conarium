@@ -18,11 +18,13 @@ import {
   normalizePiiText,
 } from './pii_normalize.js'
 import {
-  PII_SCAN_CHAR_CAP,
+  resolveScanCharCap,
   maskEmails,
   maskEntityEncodedEmails,
   maskNumericPii,
 } from './digit_pii.js'
+import { maskIps } from './ip_detect.js'
+import { maskMrz } from './mrz.js'
 import {
   buildReceipt,
   hashArgs,
@@ -33,6 +35,7 @@ import {
   type ReceiptInput,
 } from './receipt.js'
 import type { GovernanceMetadata } from './governance.js'
+import type { DetectorToggles } from './types.js'
 
 export interface AuditEntry {
   timestamp: string
@@ -170,6 +173,8 @@ export class Audit {
   private receiptMeta?: ReceiptMeta
   private receiptLastHash = RECEIPT_GENESIS_HASH
   private receiptSeq = 0
+  private scanCharCap?: number
+  private detectors?: DetectorToggles
 
   constructor(opts: {
     sink?: string
@@ -177,9 +182,13 @@ export class Audit {
     failClosed?: boolean
     receiptSink?: string
     receiptMeta?: ReceiptMeta
+    scanCharCap?: number
+    detectors?: DetectorToggles
   } = {}) {
     this.sink = opts.sink
     this.consumer = opts.consumer || 'unknown'
+    this.scanCharCap = opts.scanCharCap
+    this.detectors = opts.detectors
     // Fail CLOSED by default: docs promise "every access is appended". A sink write
     // failure must stop the request, not silently drop the trail. Opt out explicitly
     // with failClosed: false for throwaway/demo setups.
@@ -286,7 +295,7 @@ export class Audit {
   private maskArgs(args: any): any {
     if (!args) return args
     const str = typeof args === 'string' ? args : JSON.stringify(args)
-    if (str.length > PII_SCAN_CHAR_CAP) {
+    if (str.length > resolveScanCharCap(this.scanCharCap)) {
       return typeof args === 'string' ? '[MASKED_PII]' : { _audit: 'masked-oversize', length: str.length }
     }
     let masked = normalizePiiText(str)
@@ -295,6 +304,8 @@ export class Audit {
     masked = maskEmails(masked).text
     masked = maskEntityEncodedEmails(masked).text
     masked = maskNumericPii(masked).text
+    if (this.detectors?.ip === true) masked = maskIps(masked).text
+    if (this.detectors?.mrz !== false) masked = maskMrz(masked).text
     // Credentials / secrets — not just PII. Keeps API keys, tokens, passwords
     // and connection-string credentials out of the audit log.
     masked = masked.replace(/\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g, '[MASKED_SECRET]')

@@ -111,10 +111,13 @@ Deliberately narrow, because this is the one feature that can *loosen* protectio
   the failure this product exists to prevent.
 - **Fail-closed everywhere else:** no actor, unlisted actor, or a profile name that
   does not exist all fall back to the base policy, never to a wider one.
-- **The content scanners still run.** The email / national-ID / phone / card /
-  IBAN / secret detectors are not overridable at all, so those stay masked in free text
-  no matter which profile applied. IBAN is accepted only when ISO 7064 mod-97-10
-  holds — a random 26-character run is not an IBAN. Name masking is the one detector a profile can
+- **The content scanners still run.** Email / national-ID / phone / card /
+  IBAN / secret detectors are not overridable at all, so those stay masked in free
+  text no matter which profile applied. IBAN is accepted only when ISO 7064
+  mod-97-10 holds. Passport MRZ (TD3, 7-3-1 check digits) is on by default and
+  likewise cannot be turned off by a profile — only `policy.detectors.mrz: false`
+  on the **base** policy opts it out. IP addresses are **off** until
+  `policy.detectors.ip: true`. Name masking is the one detector a profile can
   switch off (`maskLabelledNames: false`), because the controller reading their
   own customer list is the case this feature exists for.
 - **The receipt says which profile applied** — `policy.id` becomes
@@ -146,21 +149,44 @@ that do run NER (Presidio-based ones, for instance) cover more entity types; the
 buy that with a confidence threshold. Neither position dominates — this one is
 stated so an auditor knows which one they are holding.
 
-**Still not caught by content scanners:** street addresses, IP addresses, and
-passport numbers. Split identifiers (a TCKN broken across two fields) and
-JSON `\u0040` escapes are also out. HTML `&#64;` is masked only when it sits
-inside an email-shaped token; a lone `5&#64; store` is left alone. Zero-width
-characters, fullwidth digits / `＠`, and unicode dashes are stripped or mapped
-to ASCII *before* the detectors as of this cut — that pass is not a general
-encoding decoder; wrapped base64/hex *tokens* inside a field are masked only
-when they decode to an existing detector hit. Column policy can still mask
-those other fields by name.
+**Still not caught by content scanners — by design, not by omission:** street
+addresses and bare names. An address detector cannot tell "Atatürk Caddesi No:15"
+from "Atatürk Barajı" without a gazetteer. A name detector cannot tell Deniz /
+Güneş / Umut from the words. Both would need a dictionary or a model; this
+gateway's decisions are deterministic. Close those gaps with `maskColumns` (column
+names) and `conarium-suggest-policy` (a name-based *guess* that does not write
+your config).
 
-**Scan length.** A single text field longer than 16 384 characters is replaced
-with `[MASKED_PII]` as a whole, even when it contains no identifier. The
-scanner is not skipped: skipping would mean a long note, JSON blob, or log
-line is the way past masking. `maskedCount` records that a decision was
-made. Fields at or under the cap are scanned as before.
+IP addresses are caught **when you turn them on** (`policy.detectors.ip: true`).
+They are off by default: a server IP is not always personal data, and a mask you
+cannot disable breaks SOC work. `1.2.3.4` is structurally a valid IPv4 address;
+when the detector is on it is masked, even if you meant a version number. Dates
+(`13.08.2026`) and amounts (`1.250,00`) are not IPv4.
+
+Passport numbers in free text are not caught. **MRZ is:** two TD3 lines × 44
+characters, `P` in position 1, 7-3-1 check digits. A checksum miss is not an MRZ
+and is left alone. TD1/TD2 are not implemented.
+
+HTML `&#64;` / `&#x40;`, JSON `\u0040`, and `%40` are masked when they sit inside
+an email-shaped token. A lone `5&#64; store` or `C:\path\u0040abc` is left alone.
+One decode pass; `&amp;#64;` is not chased.
+
+A TCKN split across two similarly named fields on the same row (`tckn_1` /
+`tckn_2`) is masked when the concatenation checksums. Unrelated columns are not
+combined.
+
+Zero-width characters, fullwidth digits / `＠`, and unicode dashes are stripped
+or mapped to ASCII *before* the detectors — that pass is not a general encoding
+decoder; wrapped base64/hex *tokens* inside a field are masked only when they
+decode to an existing detector hit.
+
+**Scan length.** A single text field longer than `policy.scanCharCap` (default
+16 384; env `CONARIUM_SCAN_CHAR_CAP` overrides) is replaced with `[MASKED_PII]`
+as a whole, even when it contains no identifier. The scanner is not skipped:
+skipping would mean a long note, JSON blob, or log line is the way past masking.
+This is a **usability** setting. Raising it grows scan cost quadratically — a
+40 KB alphanumeric field was ~1 s on the unbounded email regex before that regex
+was bounded. `maskedCount` records that a decision was made.
 
 Carry-over ignores values under three characters (a two-character value matches
 everywhere and would shred the output) and matches on Unicode word boundaries, so
@@ -355,8 +381,8 @@ npm start
 It never prints the private key — only its path.
 
 When the package is on npm, the same binaries will ship in the tarball
-(`conarium-init`, `conarium-doctor`, `conarium-verify`). Until then, run them
-from this repository as above.
+(`conarium-init`, `conarium-doctor`, `conarium-verify`, `conarium-suggest-policy`).
+Until then, run them from this repository as above.
 
 ### Before you file a bug: run the doctor
 
@@ -407,6 +433,29 @@ Anything not in `allowTables` is denied by default; matched `maskColumns` are re
 > list meant "allow all"). If you configure connectors, you must list them here —
 > otherwise the server refuses to start and tells you exactly which field to add.
 > `denyConnectors` still takes precedence over `allowConnectors`.
+
+### `policy.detectors` and `policy.scanCharCap`
+
+Identity detectors — TCKN, card, IBAN, email — cannot be switched off. A config
+that tries (`detectors: { tckn: false }`) is rejected at load. That is the
+product: masking that a bank can disable from a JSON file is not masking.
+
+| Key | Default | Why |
+|---|---|---|
+| `detectors.ip` | `false` | A server IP is not always personal data. A mask with no off switch breaks SOC ("how many requests from this address?"). Opt in when the column really is a client address. |
+| `detectors.mrz` | `true` | A passport MRZ is identity and has check digits. Turn off on the base policy if you do not handle travel documents. |
+| `scanCharCap` | `16384` | Usability. Fields longer than this are replaced whole (`[MASKED_PII]`), never skipped. Env `CONARIUM_SCAN_CHAR_CAP` overrides. Raise it and scan cost grows quadratically. Ceiling 1 048 576. |
+
+```json
+{
+  "scanCharCap": 32768,
+  "detectors": { "ip": true }
+}
+```
+
+`conarium-suggest-policy --sql schema.sql` prints a `maskColumns` guess from
+column names (`*name*`, `*address*`, `*tckn*`, …). It does not write your
+config. The first line of the output says so.
 
 ## 🗺️ Roadmap
 

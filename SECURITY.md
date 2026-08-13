@@ -60,6 +60,14 @@ log, verification — is local to your infrastructure by construction.
 - Anything at the operating-system level: file permissions, process isolation,
   the security of the host running Conarium.
 
+**Content scanners — what we do not guess.** Street addresses and bare names
+have no deterministic shape. We do not ship a gazetteer or a name list; a
+half-working detector would turn the documented gap into a lie. Close those
+fields with `maskColumns` / `conarium-suggest-policy`. IP addresses are an
+opt-in detector (`policy.detectors.ip`) because a server IP is not always
+personal data. Passport MRZ is checksummed (TD3); a free-text "letter plus
+eight digits" pattern is not shipped.
+
 **We do not have** SOC 2, an external penetration test, or a formal security
 certification. We are one person. That is not a footnote we would rather you missed;
 it is the reason the code is MIT-licensed and runs entirely inside your own

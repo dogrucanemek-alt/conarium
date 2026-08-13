@@ -61,6 +61,28 @@ export interface GovernancePolicy {
    * property this product exists to prevent.
    */
   actorProfiles?: Record<string, string>
+  /**
+   * Fail-closed scan length. A field longer than this is replaced whole with
+   * `[MASKED_PII]` — it is never skipped. Default 16 384. Env
+   * `CONARIUM_SCAN_CHAR_CAP` overrides. This is a usability knob: raising it
+   * grows scan cost quadratically on the remaining detectors.
+   */
+  scanCharCap?: number
+  /**
+   * Optional content detectors. Identity detectors (TCKN, card, IBAN, email)
+   * are not keys here and cannot be turned off — a config that tries is
+   * rejected at load. `ip` defaults off (server IPs are not always personal
+   * data). `mrz` defaults on (a passport MRZ is identity and checksummed).
+   */
+  detectors?: DetectorToggles
+}
+
+/** See `GovernancePolicy.detectors`. */
+export interface DetectorToggles {
+  /** Opt-in. Default false. */
+  ip?: boolean
+  /** Passport TD3 MRZ. Default true. */
+  mrz?: boolean
 }
 
 /** Per-person overlay. See `GovernancePolicy.profiles`. */

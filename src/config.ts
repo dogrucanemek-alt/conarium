@@ -27,6 +27,15 @@ export const GovernancePolicySchema = z.object({
   // class by hand.
   profiles: z.record(MaskingProfileSchema).optional(),
   actorProfiles: z.record(z.string().min(1)).optional(),
+  scanCharCap: z.number().int().min(1).max(1_048_576).optional(),
+  // Identity detectors (TCKN, card, IBAN, email, phone, PAN) are intentionally
+  // absent. Turning them off from config would let a bank "solve" masking by
+  // disabling it — the product would contradict its own guarantee. .strict()
+  // rejects those keys (and any other unrecognised detector name).
+  detectors: z.object({
+    ip: z.boolean().optional(),
+    mrz: z.boolean().optional(),
+  }).strict().optional(),
 }).strict()
 
 export const AuditConfigSchema = z.object({

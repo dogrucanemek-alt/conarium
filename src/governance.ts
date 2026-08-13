@@ -7,11 +7,14 @@ import {
   normalizePiiText,
 } from './pii_normalize.js'
 import {
-  PII_SCAN_CHAR_CAP,
+  resolveScanCharCap,
   maskEmails,
   maskEntityEncodedEmails,
   maskNumericPii,
 } from './digit_pii.js'
+import { maskIps } from './ip_detect.js'
+import { maskMrz } from './mrz.js'
+import { maskSplitTcknFields } from './tckn.js'
 import { parse, toSql } from 'pgsql-ast-parser'
 import type {
   Expr,
@@ -432,6 +435,11 @@ export class Governance {
           }
         }
       }
+      const split = maskSplitTcknFields(out)
+      if (split.count > 0) {
+        maskedCount += split.count
+        for (const k of split.maskedKeys) maskedFields.add(k)
+      }
       return out
     })
 
@@ -494,7 +502,7 @@ export class Governance {
       // unbounded email regex and blocks the event loop. Skipping the scan
       // would be the attack ("send 100 KB, skip masking"). The whole field
       // is masked instead; maskedCount records that a decision was made.
-      if (obj.length > PII_SCAN_CHAR_CAP) {
+      if (obj.length > resolveScanCharCap(this.policy.scanCharCap)) {
         return { masked: '[MASKED_PII]', count: 1 }
       }
       // Normalise first (ZWSP/homoglyph/fullwidth/unicode dash). The outgoing
@@ -518,6 +526,17 @@ export class Governance {
       const numPass = maskNumericPii(masked)
       masked = numPass.text
       count += numPass.count
+
+      if (this.policy.detectors?.ip === true) {
+        const ipPass = maskIps(masked)
+        masked = ipPass.text
+        count += ipPass.count
+      }
+      if (this.policy.detectors?.mrz !== false) {
+        const mrzPass = maskMrz(masked)
+        masked = mrzPass.text
+        count += mrzPass.count
+      }
 
       // Sertleştirme (Codex denetimi 2026-07-06, P1): README "secrets are redacted in the
       // response stream" diyor ama yanıt yolu (maskPII) sadece PII yakalıyordu — API key /

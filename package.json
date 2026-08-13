@@ -1,6 +1,6 @@
 {
   "name": "@conarium-ai/core",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "//files-artefakt": "examples/ altindaki uretilmis dosyalar (ozel anahtar, makbuz/denetim JSONL) ELENIR. .gitignore npm'i baglamaz: izin listesinde 'examples' oldugu icin demoyu kosturmus bir makinede 'npm publish' _keys/audit-ed25519.pem'i (OZEL ANAHTAR) ve makbuzlari yayinliyordu. test/pack_artefakt.mjs bunu kilitler. Elemeler examples/ ile SINIRLI: test-vectors/ altindaki receipts.jsonl ve .pub.pem YAYINLANMAK ZORUNDA, yoksa ucuncu taraf konformans vektorlerini kosturamaz.",
   "//files": "Pakete NE gireceginin izin listesi. Liste olmadan npm her seyi gonderiyordu: 296 dosya / 1.5 MB — CI workflowlari, gitleaks ayari, 137 KB pazarlama gorseli, sitenin api/chat.js dosyasi. Bir bankanin guvenlik ekibi tarball'i acip bunlari gorur. scripts/ BILEREK var: conarium-reconcile calisirken scripts/pg-snapshot.sql'e atif yapiyor, olmazsa kullanici destek maili yazar.",
   "files": [
@@ -63,13 +63,14 @@
     "conarium-reconcile": "bin/conarium-reconcile.mjs",
     "conarium-stamp": "bin/conarium-stamp.mjs",
     "conarium-anchor-upgrade": "bin/conarium-anchor-upgrade.mjs",
-    "conarium-console": "bin/conarium-console.mjs"
+    "conarium-console": "bin/conarium-console.mjs",
+    "conarium-suggest-policy": "bin/conarium-suggest-policy.mjs"
   },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "test:anchor-verify": "npm run build && node test/anchor_verify.mjs",
-    "test:checks": "npm run build && node test/doctor.mjs && node test/console_cli.mjs && node test/console_policy.mjs && node test/init.mjs && node test/demo_bank_seed.mjs && node test/pack_artefakt.mjs && node test/connectors.mjs && node test/governance_lineage_adversarial.mjs && node test/governance_security_regression.mjs && node test/security_hardening_14.mjs && node test/anchor_verify.mjs && node test/spec_exitcode_drift.mjs && node test/encoding_evasion_mask.mjs && node test/verify_tail_pin.mjs && node test/partial_mask_root.mjs && node test/pii_regression_matrix.mjs && node test/scanner_perf.mjs && node test/vectors_run.mjs && node test/http_gateway.e2e.mjs",
+    "test:checks": "npm run build && node test/doctor.mjs && node test/console_cli.mjs && node test/console_policy.mjs && node test/init.mjs && node test/demo_bank_seed.mjs && node test/pack_artefakt.mjs && node test/connectors.mjs && node test/governance_lineage_adversarial.mjs && node test/governance_security_regression.mjs && node test/security_hardening_14.mjs && node test/anchor_verify.mjs && node test/spec_exitcode_drift.mjs && node test/encoding_evasion_mask.mjs && node test/verify_tail_pin.mjs && node test/partial_mask_root.mjs && node test/pii_regression_matrix.mjs && node test/scanner_perf.mjs && node test/vectors_run.mjs && node test/http_gateway.e2e.mjs && node test/suggest_policy.mjs",
     "test:all": "npm run lint && npm run test && npm run test:checks",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",

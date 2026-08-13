@@ -105,11 +105,13 @@ describe('collapsePartialMask — no quadratic when the mask is absent', () => {
   })
 })
 
-describe('HTML entity @ — scan copy only', () => {
-  it('entity-encoded email is masked; non-email entity is left', () => {
+describe('encoded @ — scan copy only', () => {
+  it('entity / json / percent emails are masked; non-email encodings are left', () => {
     const hit = maskEntityEncodedEmails('yaz patron&#64;sirket.com')
     expect(hit.text).toBe('yaz [MASKED_PII]')
     expect(hit.count).toBe(1)
+    expect(maskEntityEncodedEmails('yaz patron\\u0040sirket.com').text).toBe('yaz [MASKED_PII]')
+    expect(maskEntityEncodedEmails('yaz patron%40sirket.com').text).toBe('yaz [MASKED_PII]')
     const miss = maskEntityEncodedEmails('fiyat 5&#64; magaza')
     expect(miss.text).toBe('fiyat 5&#64; magaza')
     expect(miss.count).toBe(0)

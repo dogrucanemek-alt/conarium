@@ -20,6 +20,26 @@
  * refuses to start or end next to a digit.
  */
 export const PII_SCAN_CHAR_CAP = 16_384
+/** Hard ceiling so an unbounded cap cannot become a DoS. */
+export const PII_SCAN_CHAR_CAP_MAX = 1_048_576
+
+/**
+ * Env wins, then policy, then the compiled default. Invalid env falls back
+ * to default rather than disabling the cap.
+ */
+export function resolveScanCharCap(policyCap?: number): number {
+  const env = process.env.CONARIUM_SCAN_CHAR_CAP
+  if (env !== undefined && env !== '') {
+    if (!/^\d+$/.test(env)) return PII_SCAN_CHAR_CAP
+    const n = Number(env)
+    if (n < 1) return PII_SCAN_CHAR_CAP
+    return Math.min(n, PII_SCAN_CHAR_CAP_MAX)
+  }
+  if (typeof policyCap === 'number' && Number.isInteger(policyCap) && policyCap >= 1) {
+    return Math.min(policyCap, PII_SCAN_CHAR_CAP_MAX)
+  }
+  return PII_SCAN_CHAR_CAP
+}
 
 export function luhnOk(digits: string): boolean {
   let sum = 0
@@ -137,15 +157,21 @@ export function maskEmails(text: string): { text: string; count: number } {
 }
 
 /**
- * `contact&#64;x.com` is an email the `@` detector never sees. Decode is
- * *for the scan only*: if the entity is not part of an email, the original
- * bytes stay. A blanket `&#64;` → `@` rewrite would corrupt HTML.
+ * `contact&#64;x.com` / `\u0040` / `%40` is an email the `@` detector never
+ * sees. Matching is *for the scan only*: if the encoded `@` is not part of
+ * an email-shaped token, the original bytes stay. A blanket rewrite would
+ * corrupt HTML (`5&#64; magaza`) and Windows paths (`C:\path\u0040abc`).
+ * One pass only — `&amp;#64;` is not chased.
  */
-const ENTITY_EMAIL =
-  /[a-zA-Z0-9._%+-]{1,64}(?:&#64;|&#x0*40;|&commat;)[a-zA-Z0-9.-]{1,253}\.[a-zA-Z]{2,24}/gi
+const ENCODED_AT = String.raw`(?:&#64;|&#x0*40;|&commat;|\\u0040|%40)`
+const ENTITY_EMAIL = new RegExp(
+  `[a-zA-Z0-9._%+-]{1,64}${ENCODED_AT}[a-zA-Z0-9.-]{1,253}\\.[a-zA-Z]{2,24}`,
+  'gi',
+)
+const ENCODED_AT_HINT = /&#64;|&#x0*40;|&commat;|\\u0040|%40/i
 
 export function maskEntityEncodedEmails(text: string): { text: string; count: number } {
-  if (!/&#64;|&#x0*40;|&commat;/i.test(text)) return { text, count: 0 }
+  if (!ENCODED_AT_HINT.test(text)) return { text, count: 0 }
   let count = 0
   const next = text.replace(ENTITY_EMAIL, () => {
     count++

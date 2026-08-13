@@ -14,8 +14,10 @@ export interface GateAudit {
  * Kullanım (jarvis-web/lib/konnektor/llm.ts):
  *   export const claudeLlm = governLlm(rawClaudeLlm, policy, a => appendAudit(a));
  *
- * NOT (dürüst): maskPII regex'i email/TCKN/telefon/kart/IBAN (mod-97) yakalar. AD/UNVAN gibi
- * yapısal PII regex'e uymaz → onlar ctx üretim kaynağında pseudonymize edilmeli (Faz 2).
+ * NOT (dürüst): maskPII yakalar: email (ve &#64; / \\u0040 / %40 biçimleri),
+ * TCKN / telefon / kart, IBAN (mod-97), MRZ (TD3 checksum), sır desenleri.
+ * IP yalnız `policy.detectors.ip === true` iken. Sokak adresi ve çıplak ad
+ * yapısal değil — sütun politikası / conarium-suggest-policy.
  */
 export function governLlm(
   llm: LlmFn,
