@@ -44,7 +44,9 @@ Ed25519 uygulaması resmî denetimden geçmedi.
 ## Maskeleme maliyeti satırla değil, benzersiz değerle büyür
 
 Taşıma eşleştiricisi, politikanın maskelediği her benzersiz değer için
-bir tarama kurar. `maxRows` o kümeyi sınırlar. Varsayılan `maxRows` 100.
+bir tarama kurar. `maxRows` o kümeyi sınırlar. Politika boş bırakırsa kod 100'e
+düşer; pakette gelen `conarium.config.json` 50 yazar. Taze kurulum 50'de çalışır.
+Aşağıdaki ölçüm ihtiyatlı olsun diye 100 üzerinden.
 
 Ölçülmüş (aynı SELECT, aynı satır sayısı, Postgres 16.14, WSL2, bakınız
 [`docs/BENCHMARK.md`](docs/BENCHMARK.md)):

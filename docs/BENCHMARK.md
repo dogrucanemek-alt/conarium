@@ -37,7 +37,10 @@ No competitor numbers. n=15 cells have a thin tail (p95 = p99).
 | Dataset | 5 000 rows, distinct email per row |
 | When | 2026-08-14T13:46Z |
 
-`maxRows` default in code is **100**. Caps measured: 100 · 500 · 5 000.
+`maxRows` falls back to **100** in code when the policy leaves it unset; the
+`conarium.config.json` shipped with the package sets **50**. A fresh install
+therefore runs at 50. Measurements below use 100 as the conservative case —
+a fresh install is faster, not slower. Caps measured: 100 · 500 · 5 000.
 
 Two series, same user SQL both sides:
 
@@ -68,7 +71,8 @@ Deny must not hit Postgres. It did not.
 | 500 | 0.950 ms | 88.363 ms | **86.615 / 112.802 / 341.147** | 50 |
 | 5 000 | 4.828 ms | 21787 ms | **21770 / 25581 / 25581** | 15 |
 
-Default configuration (100 rows, masked): **about 5 ms added**.
+Conservative default (100 rows, masked): **about 5 ms added**. The shipped
+config caps at 50, so a fresh install stays below this figure.
 500 distinct emails: **about 87 ms**. 5 000: **about 22 s**.
 
 ### deny

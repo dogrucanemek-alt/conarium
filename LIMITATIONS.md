@@ -44,7 +44,9 @@ The Ed25519 implementation has not had a formal audit.
 ## Masking cost grows with distinct masked values
 
 Carry-over builds one matcher per unique value this policy already
-masked. `maxRows` bounds that set. Default `maxRows` is 100.
+masked. `maxRows` bounds that set. When the policy leaves it unset the code falls
+back to 100; the `conarium.config.json` shipped with the package sets 50, so a
+fresh install runs at 50. The figures below use 100 as the conservative case.
 
 Measured (same SELECT, same row count, Postgres 16.14, WSL2, see
 [`docs/BENCHMARK.md`](docs/BENCHMARK.md)):
