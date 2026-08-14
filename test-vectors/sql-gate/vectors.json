@@ -1,0 +1,187 @@
+{
+  "policy": {
+    "allowTables": ["public.customers"],
+    "denyTables": ["public.secrets"],
+    "maskColumns": ["*.email"],
+    "maxRows": 50
+  },
+  "secret": "gate-secret-email@example.com",
+  "vectors": [
+    {
+      "id": "deny-plain",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT id FROM public.secrets" }
+    },
+    {
+      "id": "deny-alias",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT s.id FROM public.secrets AS s" }
+    },
+    {
+      "id": "deny-join",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT c.id FROM public.customers c JOIN public.secrets s ON s.id = c.id" }
+    },
+    {
+      "id": "deny-subquery",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT id FROM (SELECT id FROM public.secrets) AS x" }
+    },
+    {
+      "id": "deny-cte",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "WITH x AS (SELECT id FROM public.secrets) SELECT * FROM x" }
+    },
+    {
+      "id": "deny-quoted-lower",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT id FROM public.\"secrets\"" }
+    },
+    {
+      "id": "deny-case-fold",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT id FROM PUBLIC.SECRETS" }
+    },
+    {
+      "id": "deny-schema-qualify",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT id FROM public.secrets" }
+    },
+    {
+      "id": "deny-comment-between",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT id FROM /* join */ public.secrets" }
+    },
+    {
+      "id": "deny-unqualified",
+      "class": "denied-table",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT id FROM secrets" }
+    },
+    {
+      "id": "write-insert",
+      "class": "read-only",
+      "expect": "deny",
+      "sql": { "postgres": "INSERT INTO public.customers (id) VALUES (1)" }
+    },
+    {
+      "id": "write-update",
+      "class": "read-only",
+      "expect": "deny",
+      "sql": { "postgres": "UPDATE public.customers SET id = 1" }
+    },
+    {
+      "id": "write-delete",
+      "class": "read-only",
+      "expect": "deny",
+      "sql": { "postgres": "DELETE FROM public.customers" }
+    },
+    {
+      "id": "write-drop",
+      "class": "read-only",
+      "expect": "deny",
+      "sql": { "postgres": "DROP TABLE public.customers" }
+    },
+    {
+      "id": "write-merge",
+      "class": "read-only",
+      "expect": "deny",
+      "sql": { "postgres": "MERGE INTO public.customers t USING public.customers s ON t.id = s.id WHEN MATCHED THEN UPDATE SET id = s.id" }
+    },
+    {
+      "id": "write-copy",
+      "class": "read-only",
+      "expect": "deny",
+      "sql": { "postgres": "COPY public.customers TO STDOUT" }
+    },
+    {
+      "id": "write-create",
+      "class": "read-only",
+      "expect": "deny",
+      "sql": { "postgres": "CREATE TABLE public.x (id int)" }
+    },
+    {
+      "id": "write-truncate",
+      "class": "read-only",
+      "expect": "deny",
+      "sql": { "postgres": "TRUNCATE public.customers" }
+    },
+    {
+      "id": "cap-raise-limit",
+      "class": "row-cap",
+      "expect": "cap",
+      "sql": { "postgres": "SELECT id FROM public.customers LIMIT 9999" }
+    },
+    {
+      "id": "cap-nested",
+      "class": "row-cap",
+      "expect": "cap",
+      "sql": { "postgres": "SELECT id FROM (SELECT id FROM public.customers LIMIT 9999) AS x" }
+    },
+    {
+      "id": "cap-union",
+      "class": "row-cap",
+      "expect": "cap",
+      "sql": { "postgres": "SELECT id FROM public.customers UNION ALL SELECT id FROM public.customers" }
+    },
+    {
+      "id": "mask-alias",
+      "class": "masked-column",
+      "expect": "mask",
+      "sql": { "postgres": "SELECT email AS contact FROM public.customers" },
+      "row": { "contact": "gate-secret-email@example.com" },
+      "rawField": "contact"
+    },
+    {
+      "id": "mask-concat",
+      "class": "masked-column",
+      "expect": "mask",
+      "sql": { "postgres": "SELECT email || '@x' AS glued FROM public.customers" },
+      "row": { "glued": "gate-secret-email@example.com@x" },
+      "rawField": "glued"
+    },
+    {
+      "id": "mask-case",
+      "class": "masked-column",
+      "expect": "mask",
+      "sql": { "postgres": "SELECT CASE WHEN true THEN email ELSE 'x' END AS picked FROM public.customers" },
+      "row": { "picked": "gate-secret-email@example.com" },
+      "rawField": "picked"
+    },
+    {
+      "id": "mask-subquery",
+      "class": "masked-column",
+      "expect": "mask",
+      "sql": { "postgres": "SELECT email FROM (SELECT email FROM public.customers) AS x" },
+      "row": { "email": "gate-secret-email@example.com" },
+      "rawField": "email"
+    },
+    {
+      "id": "fail-garbage",
+      "class": "fail-closed",
+      "expect": "deny",
+      "sql": { "postgres": "not sql at all !!!" }
+    },
+    {
+      "id": "fail-empty",
+      "class": "fail-closed",
+      "expect": "deny",
+      "sql": { "postgres": "   " }
+    },
+    {
+      "id": "fail-two-statements",
+      "class": "fail-closed",
+      "expect": "deny",
+      "sql": { "postgres": "SELECT id FROM public.customers; SELECT id FROM public.secrets" }
+    }
+  ]
+}
