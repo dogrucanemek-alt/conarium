@@ -44,9 +44,13 @@ if (has('--help') || has('-h')) {
                 the same file the gateway reads)
   --port <n>    default 3000 (or CONARIUM_CONSOLE_PORT)
   --host <ip>   default 127.0.0.1 (or CONARIUM_CONSOLE_HOST)
+  --install-shortcut    put a desktop / Applications / .desktop launcher
+  --uninstall-shortcut  remove the launcher this command created
+  --launch              start, wait until the port listens, open the browser
+                        (used by the shortcut; do not put a token in the URL)
   --help        this text
 
-Required:
+Required to start (not to install a shortcut):
   CONARIUM_CONSOLE_TOKEN        bearer token for every request
 Optional:
   CONARIUM_CONSOLE_CSRF_TOKEN   defaults to the console token
@@ -65,12 +69,47 @@ const die = (code, msg, fix) => {
 
 const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const consoleJs = join(pkgRoot, 'dist', 'console.js')
+const shortcutJs = join(pkgRoot, 'dist', 'console-shortcut.js')
+const thisBin = fileURLToPath(import.meta.url)
 if (!existsSync(consoleJs)) {
   die(
     2,
     `the compiled console is missing (${consoleJs})`,
     'Running from a source checkout? Build it first: npm run build',
   )
+}
+
+if (has('--install-shortcut') || has('--uninstall-shortcut')) {
+  const { installShortcut, uninstallShortcut } = await import(pathToFileURL(shortcutJs).href)
+  try {
+    if (has('--uninstall-shortcut')) {
+      const { removed } = uninstallShortcut()
+      console.error(removed ? `conarium-console: removed ${removed}` : 'conarium-console: no shortcut recorded')
+      process.exit(0)
+    }
+    const workdir = process.cwd()
+    const token = process.env.CONARIUM_CONSOLE_TOKEN?.trim() || ''
+    const out = installShortcut({
+      scriptPath: thisBin,
+      workdir,
+      token: token || undefined,
+    })
+    console.error(`conarium-console: shortcut at ${out.dest}${out.collided ? ' (name was taken, used -2)' : ''}`)
+    if (!token) {
+      console.error('conarium-console: CONARIUM_CONSOLE_TOKEN was not set; the shortcut will need it in the environment, or re-run install with the token exported')
+    }
+    process.exit(0)
+  } catch (e) {
+    die(2, `shortcut: ${e.message}`)
+  }
+}
+
+if (has('--launch')) {
+  const { loadLaunchToken, loadShortcutState } = await import(pathToFileURL(shortcutJs).href)
+  const persisted = loadLaunchToken()
+  if (persisted && !process.env.CONARIUM_CONSOLE_TOKEN?.trim()) {
+    process.env.CONARIUM_CONSOLE_TOKEN = persisted
+  }
 }
 
 if (!process.env.CONARIUM_CONSOLE_TOKEN?.trim()) {
@@ -121,7 +160,15 @@ if (!loopback && process.env.CONARIUM_CONSOLE_PUBLIC !== '1') {
 // inside the package, which for an installed user is the wrong file twice over:
 // it is not the one the gateway reads, and npm overwrites it on every install.
 // Default to the same path the gateway uses — conarium.config.json in cwd.
-const configFile = resolve(process.cwd(), valueOf('--config', 'conarium.config.json'))
+let workdir = process.cwd()
+if (has('--launch') && !has('--config')) {
+  const { loadShortcutState } = await import(pathToFileURL(shortcutJs).href)
+  const st = loadShortcutState()
+  if (st?.workdir && existsSync(join(st.workdir, 'conarium.config.json'))) {
+    workdir = st.workdir
+  }
+}
+const configFile = resolve(workdir, valueOf('--config', 'conarium.config.json'))
 if (!existsSync(configFile)) {
   die(
     2,
@@ -132,14 +179,49 @@ if (!existsSync(configFile)) {
 
 try {
   const { createConsoleApp } = await import(pathToFileURL(consoleJs).href)
-  const app = createConsoleApp({ configFile })
-  app.listen(port, host, () => {
+  const launch = has('--launch')
+  let handoff
+  let lastPresence = 0
+  if (launch) {
+    const { createHandoffStore } = await import(pathToFileURL(join(pkgRoot, 'dist', 'console-handoff.js')).href)
+    handoff = createHandoffStore()
+  }
+  const app = createConsoleApp({
+    configFile,
+    handoff,
+    onPresence: launch ? () => { lastPresence = Date.now() } : undefined,
+  })
+  const server = app.listen(port, host, async () => {
     console.error(`[conarium-console] http://${host}:${port} — editing ${configFile}`)
     console.error(
       loopback
         ? '[conarium-console] loopback only — tunnel in over SSH if you are not on this machine'
         : '[conarium-console] WARNING: bound to a non-loopback address on purpose (CONARIUM_CONSOLE_PUBLIC=1)',
     )
+    if (!launch) return
+    const { waitForListen } = await import(pathToFileURL(join(pkgRoot, 'dist', 'console-ready.js')).href)
+    const { openBrowser, notifyLaunchError } = await import(pathToFileURL(join(pkgRoot, 'dist', 'console-notify.js')).href)
+    try {
+      await waitForListen(host, port, { timeoutMs: 15_000 })
+      const nonce = handoff.issue()
+      openBrowser(`http://${host}:${port}/handoff?n=${encodeURIComponent(nonce)}`)
+      const started = Date.now()
+      const watch = setInterval(() => {
+        if (lastPresence && Date.now() - lastPresence > 8_000) {
+          clearInterval(watch)
+          server.close(() => process.exit(0))
+        }
+        if (!lastPresence && Date.now() - started > 30_000) {
+          clearInterval(watch)
+          notifyLaunchError('The console started but the browser never opened a session.')
+          server.close(() => process.exit(2))
+        }
+      }, 1000)
+      watch.unref()
+    } catch (err) {
+      notifyLaunchError(err.message)
+      server.close(() => process.exit(2))
+    }
   })
 } catch (e) {
   // Anything that goes wrong before we are listening is a start failure, not a

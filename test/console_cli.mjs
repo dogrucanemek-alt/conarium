@@ -9,6 +9,8 @@ import assert from 'assert'
 import path from 'path'
 import http from 'http'
 import { spawnSync, spawn } from 'child_process'
+import { mkdtempSync } from 'fs'
+import { tmpdir } from 'os'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -70,6 +72,22 @@ test('SECRET: the token value is never echoed', async () => {
   const secret = 'console-token-do-not-print-8811'
   const { out } = run(['--host', '0.0.0.0'], { CONARIUM_CONSOLE_TOKEN: secret, CONARIUM_AUDIT_UNSIGNED: '1' })
   assert.ok(!out.includes(secret), 'token leaked into output')
+})
+
+test('--help names the shortcut flags', async () => {
+  const { status, out } = run(['--help'])
+  assert.strictEqual(status, 0)
+  assert.ok(/--install-shortcut/.test(out))
+  assert.ok(/--uninstall-shortcut/.test(out))
+  assert.ok(/--launch/.test(out))
+})
+
+test('--install-shortcut does not require a token and does not start a server', async () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'cnr-cli-sc-'))
+  const { status, out } = run(['--install-shortcut'], { CONARIUM_CONSOLE_HOME: home })
+  assert.ok(!/CONARIUM_CONSOLE_TOKEN is not set/.test(out))
+  assert.strictEqual(status, 0, out)
+  assert.ok(/shortcut at/.test(out))
 })
 
 test('an invalid port is refused', async () => {

@@ -380,6 +380,34 @@ npm start
 `conarium-init` refuses to overwrite existing files unless you pass `--force`.
 It never prints the private key — only its path.
 
+### Desktop shortcut for the console
+
+The policy editor is `npx conarium-console`. It still binds `127.0.0.1` and
+still requires a token. These two commands only add a door on the desktop:
+
+```bash
+npx conarium-console --install-shortcut
+npx conarium-console --uninstall-shortcut
+```
+
+| | |
+|--|--|
+| Windows | `.lnk` on the desktop (console window minimized) |
+| macOS | `~/Applications/Conarium Console.app` |
+| Linux | `~/.local/share/applications/conarium-console.desktop` |
+
+Double-click starts the same console, waits until the port is listening, then
+opens your browser. The token is not put in the URL; a one-time nonce (≤30s)
+is exchanged for a session cookie. If a shortcut with that name already exists,
+a `-2` suffix is used instead of overwriting.
+
+Export `CONARIUM_CONSOLE_TOKEN` before `--install-shortcut` so the launcher
+can read it from `~/.conarium/console.token` (created `0600`). The shortcut
+file itself does not contain the token.
+
+No `.ico` / `.icns` / 512px PNG ships in this package yet, so the shortcut
+has no custom icon.
+
 When the package is on npm, the same binaries will ship in the tarball
 (`conarium-init`, `conarium-doctor`, `conarium-verify`, `conarium-suggest-policy`).
 Until then, run them from this repository as above.

@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-Nothing yet — 0.2.7 is the current cut.
+- **`conarium-console --install-shortcut` / `--uninstall-shortcut`.**
+  Desktop / Applications / XDG launcher for the existing loopback console.
+  Double-click waits until the port listens, then opens the browser with a
+  one-time `/handoff` nonce (≤30s). The long-lived token is not put in the
+  URL. Auth and CSRF are unchanged for Bearer clients.
 
 ## 0.2.7 — 2026-08-14
 

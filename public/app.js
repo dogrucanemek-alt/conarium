@@ -17,6 +17,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    function csrfFromCookie() {
+        const m = document.cookie.match(/(?:^|; )conarium_console_csrf=([^;]*)/)
+        return m ? decodeURIComponent(m[1]) : ''
+    }
+
     function authHeaders(extra) {
         const params = new URLSearchParams(location.search)
         let token = params.get('token') || sessionStorage.getItem('conarium-console-token') || ''
@@ -25,8 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (token) {
             headers['Authorization'] = 'Bearer ' + token
             headers['x-csrf-token'] = token
+        } else {
+            const csrf = csrfFromCookie()
+            if (csrf) headers['x-csrf-token'] = csrf
         }
         return headers
+    }
+
+    function apiFetch(url, init) {
+        return fetch(url, { credentials: 'same-origin', ...init, headers: { ...authHeaders(init && init.headers) } })
     }
 
     function policyOf(data) {
@@ -55,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load Config
     async function loadConfig() {
         try {
-            const res = await fetch('/api/config', { headers: authHeaders() })
+            const res = await apiFetch('/api/config')
             if (!res.ok) {
                 showToast('Could not load policy (' + res.status + '). Pass ?token=…')
                 return
@@ -92,9 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setAllowTablesWarn(body.allowTables.length === 0)
 
         try {
-            const res = await fetch('/api/config', {
+            const res = await apiFetch('/api/config', {
                 method: 'POST',
-                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             })
             if (res.ok) {
@@ -112,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load Audit Logs
     async function loadAudit() {
         try {
-            const res = await fetch('/api/audit', { headers: authHeaders() });
+            const res = await apiFetch('/api/audit');
             const data = await res.json();
             
             const tbody = document.getElementById('audit-body');
@@ -187,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load Connectors
     async function loadConnectors() {
         try {
-            const res = await fetch('/api/connectors', { headers: authHeaders() });
+            const res = await apiFetch('/api/connectors');
             const data = await res.json();
             
             const list = document.getElementById('connector-list');
@@ -238,8 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const out = document.getElementById('pg-result');
         out.innerHTML = '<div class="loader">Running through Conarium…</div>';
         try {
-            const res = await fetch('/api/playground', {
-                method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+            const res = await apiFetch('/api/playground', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query })
             });
             const d = await res.json();
@@ -286,4 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     loadAudit();
     loadConnectors();
+    setInterval(() => { apiFetch('/api/presence').catch(() => {}) }, 2000)
+    window.addEventListener('pagehide', () => { apiFetch('/api/presence').catch(() => {}) })
 });

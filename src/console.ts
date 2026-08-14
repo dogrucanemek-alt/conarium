@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { Governance } from './governance.js'
 import { Audit } from './audit.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
+import { createHandoffStore, createSessionStore } from './console-handoff.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -96,29 +97,57 @@ function constantTimeEqual(a: string, b: string): boolean {
   return timingSafeEqual(left, right)
 }
 
-function requireConsoleAuth(req: Request, res: Response, next: NextFunction): void {
-  const token = process.env.CONARIUM_CONSOLE_TOKEN
-  if (!token) {
-    res.status(503).json({ error: 'Console auth token is not configured' })
-    return
-  }
-
-  const auth = req.header('authorization') || ''
-  const supplied = auth.startsWith('Bearer ') ? auth.slice(7) : req.header('x-conarium-console-token') || ''
-  if (!constantTimeEqual(supplied, token)) {
-    res.status(401).json({ error: 'Unauthorized' })
-    return
-  }
-
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-    const csrf = process.env.CONARIUM_CONSOLE_CSRF_TOKEN || token
-    if (!constantTimeEqual(req.header('x-csrf-token') || '', csrf)) {
-      res.status(403).json({ error: 'CSRF token required' })
-      return
+function readCookie(req: Request, name: string): string {
+  const raw = req.headers.cookie || ''
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=')
+    if (i < 0) continue
+    if (part.slice(0, i).trim() === name) {
+      try { return decodeURIComponent(part.slice(i + 1).trim()) } catch { return '' }
     }
   }
+  return ''
+}
 
-  next()
+function requireConsoleAuth(
+  sessions: ReturnType<typeof createSessionStore>,
+): (req: Request, res: Response, next: NextFunction) => void {
+  return (req, res, next) => {
+    const token = process.env.CONARIUM_CONSOLE_TOKEN
+    if (!token) {
+      res.status(503).json({ error: 'Console auth token is not configured' })
+      return
+    }
+
+    const sess = sessions.get(readCookie(req, 'conarium_console_sess'))
+    if (sess) {
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        if (!constantTimeEqual(req.header('x-csrf-token') || '', sess.csrf)) {
+          res.status(403).json({ error: 'CSRF token required' })
+          return
+        }
+      }
+      next()
+      return
+    }
+
+    const auth = req.header('authorization') || ''
+    const supplied = auth.startsWith('Bearer ') ? auth.slice(7) : req.header('x-conarium-console-token') || ''
+    if (!constantTimeEqual(supplied, token)) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      const csrf = process.env.CONARIUM_CONSOLE_CSRF_TOKEN || token
+      if (!constantTimeEqual(req.header('x-csrf-token') || '', csrf)) {
+        res.status(403).json({ error: 'CSRF token required' })
+        return
+      }
+    }
+
+    next()
+  }
 }
 
 // A pre-chain playground file: first line parses as JSON but was written before
@@ -150,7 +179,13 @@ export function createPlaygroundAudit(auditFile: string): Audit {
   }
 }
 
-export function createConsoleApp(opts: { configFile?: string; auditFile?: string } = {}) {
+export function createConsoleApp(opts: {
+  configFile?: string
+  auditFile?: string
+  handoff?: ReturnType<typeof createHandoffStore>
+  sessions?: ReturnType<typeof createSessionStore>
+  onPresence?: () => void
+} = {}) {
   const app = express()
   // Limiter app basina: testler birbirinin sayacini kirletmesin.
   const limiter = new RateLimiter({ perWindow: Number(process.env.CONARIUM_CONSOLE_RATE_PER_MIN ?? 60) })
@@ -162,6 +197,22 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
   const configFile = opts.configFile || path.join(__dirname, '../conarium.config.json')
   const auditFile = opts.auditFile || path.join(__dirname, '../audit.log.jsonl')
   const audit = createPlaygroundAudit(auditFile)
+  const handoff = opts.handoff ?? createHandoffStore()
+  const sessions = opts.sessions ?? createSessionStore()
+
+  app.get('/handoff', (req, res) => {
+    const n = String(req.query.n || '')
+    if (!handoff.consume(n)) {
+      res.status(403).type('text/plain').send('handoff expired or already used')
+      return
+    }
+    const sess = sessions.create()
+    res.setHeader('Set-Cookie', [
+      `conarium_console_sess=${sess.id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`,
+      `conarium_console_csrf=${sess.csrf}; SameSite=Strict; Path=/; Max-Age=86400`,
+    ])
+    res.redirect(302, '/')
+  })
 
   app.use(express.static(publicDir))
   // Hiz siniri KIMLIK KONTROLUNDEN ONCE.
@@ -182,7 +233,12 @@ export function createConsoleApp(opts: { configFile?: string; auditFile?: string
     }
     next()
   })
-  app.use('/api', requireConsoleAuth)
+  app.use('/api', requireConsoleAuth(sessions))
+
+  app.get('/api/presence', (_req, res) => {
+    opts.onPresence?.()
+    res.status(204).end()
+  })
 
   app.get('/api/config', (req, res) => {
     try {
