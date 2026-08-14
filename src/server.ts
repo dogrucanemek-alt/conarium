@@ -252,6 +252,12 @@ export function buildServer(
       return allowed
     }
 
+    let accessRecorded = false
+    const recordAccess: typeof kaydet = (e) => {
+      accessRecorded = true
+      return kaydet(e)
+    }
+
     try {
       if (name === 'list_tables') {
         // Ad verilmediyse TUM izinli konnektorler listelenir — arac "all connectors" vaat ediyor,
@@ -275,7 +281,7 @@ export function buildServer(
         const listed: Array<{ connector: string; name: string; description: string; rowCount?: number }> = []
         for (const conn of targets) {
           const tables = governance.filterTables(await conn.listTables())
-          kaydet({ tool: 'list_tables', target: conn.name, rowsReturned: tables.length, denied: false })
+          recordAccess({ tool: 'list_tables', target: conn.name, rowsReturned: tables.length, denied: false })
           for (const t of tables) {
             listed.push({
               connector: conn.name,
@@ -294,7 +300,7 @@ export function buildServer(
         const a = args as { table: string; connector?: string }
         const conn = getConnector(a.connector, 'canDescribeTable')
         if (!governance.allowsTable(a.table)) {
-          kaydet({
+          recordAccess({
             tool: 'describe_table',
             target: a.table,
             args: a,
@@ -309,7 +315,7 @@ export function buildServer(
         } catch (err) {
           const real = (err as Error).message
           if (isMissingTableMessage(real)) {
-            kaydet({ tool: 'describe_table', target: a.table, args: a, denied: true, reason: real })
+            recordAccess({ tool: 'describe_table', target: a.table, args: a, denied: true, reason: real })
             throw tableUnavailableError(a.table)
           }
           throw err
@@ -317,7 +323,7 @@ export function buildServer(
         const responseJson = JSON.stringify(table, null, 2)
         if (Buffer.byteLength(responseJson, 'utf8') > MAX_SEARCH_PAYLOAD_BYTES) {
           const limitErr = new Error('Response payload exceeds 50KB limit. Aggregation or massive row detected.')
-          kaydet({
+          recordAccess({
             tool: 'describe_table',
             target: a.table,
             args: a,
@@ -326,7 +332,7 @@ export function buildServer(
           })
           throw limitErr
         }
-        kaydet({ tool: 'describe_table', target: a.table, args: a, denied: false })
+        recordAccess({ tool: 'describe_table', target: a.table, args: a, denied: false })
         return {
           content: [{ type: 'text', text: responseJson }],
         }
@@ -347,7 +353,7 @@ export function buildServer(
           try {
             parsed = conn.parseSimpleSelect(a.sql)
           } catch (err) {
-            kaydet({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message })
+            recordAccess({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message })
             throw err
           }
           // Sema konnektorun yapilandirmasindan gelir — sabit 'zion' varsayimi baska semali
@@ -355,7 +361,7 @@ export function buildServer(
           const schema = conn.schemaName
           const qualified = `${schema}.${parsed.table}`
           if (!governance.allowsTable(qualified)) {
-            kaydet({
+            recordAccess({
               tool: 'query',
               target: qualified,
               args: a,
@@ -384,7 +390,7 @@ export function buildServer(
           } catch (err) {
             const policyMetadata = err instanceof PolicyError ? err.metadata : undefined
             const real = (err as Error).message
-            kaydet({ tool: 'query', args: { sql: a.sql }, denied: true, reason: real, governance: policyMetadata })
+            recordAccess({ tool: 'query', args: { sql: a.sql }, denied: true, reason: real, governance: policyMetadata })
             const deniedTable = tableFromAccessDeny(real)
             if (deniedTable) throw tableUnavailableError(deniedTable)
             throw err
@@ -395,7 +401,7 @@ export function buildServer(
             const real = (err as Error).message
             if (isMissingTableMessage(real)) {
               const table = guardMetadata?.accessedTables?.[0] ?? 'unknown'
-              kaydet({
+              recordAccess({
                 tool: 'query',
                 target: conn.name,
                 args: { sql: a.sql },
@@ -423,7 +429,7 @@ export function buildServer(
 
         if (Buffer.byteLength(responseJson, 'utf8') > 50000) {
           const limitErr = new Error('Response payload exceeds 50KB limit. Aggregation or massive row detected.')
-          kaydet({
+          recordAccess({
             tool: 'query',
             target: conn.name,
             args: { sql: a.sql },
@@ -434,7 +440,7 @@ export function buildServer(
           throw limitErr
         }
 
-        kaydet({
+        recordAccess({
           tool: 'query',
           target: conn.name,
           args: { sql: a.sql },
@@ -457,7 +463,7 @@ export function buildServer(
         try {
           requested = await resolveGovernedSearchScope(conn, governance, a.query, a.tables)
         } catch (err) {
-          kaydet({ tool: 'search', target: conn.name, args: a, denied: true, reason: (err as Error).message })
+          recordAccess({ tool: 'search', target: conn.name, args: a, denied: true, reason: (err as Error).message })
           publicizeTableError(err, a.tables?.[0])
         }
 
@@ -471,7 +477,7 @@ export function buildServer(
         const searchGovernance = searchTables.length
           ? { ...result.governance, accessedTables: searchTables }
           : result.governance
-        kaydet({
+        recordAccess({
           tool: 'search',
           target: conn.name,
           args: a,
@@ -486,8 +492,18 @@ export function buildServer(
 
       throw new Error(`Unknown tool: ${name}`)
     } catch (err) {
+      const raw = (err as Error).message || String(err)
+      const masked = audit.maskText(raw)
+      if (!accessRecorded) {
+        recordAccess({
+          tool: name,
+          args: (args ?? {}) as Record<string, unknown>,
+          denied: true,
+          reason: masked,
+        })
+      }
       return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
+        content: [{ type: 'text', text: `Error: ${masked}` }],
         isError: true,
       }
     }

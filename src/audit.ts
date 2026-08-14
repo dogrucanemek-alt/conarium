@@ -11,20 +11,8 @@ import {
   type KeyId,
 } from './keys.js'
 import type { ActorAssurance } from './tokens.js'
-import { maskIbansInText, prepareIbanPass } from './iban.js'
-import {
-  collapsePartialMask,
-  maskEmbeddedEncodedPii,
-  normalizePiiText,
-} from './pii_normalize.js'
-import {
-  resolveScanCharCap,
-  maskEmails,
-  maskEntityEncodedEmails,
-  maskNumericPii,
-} from './digit_pii.js'
-import { maskIps } from './ip_detect.js'
-import { maskMrz } from './mrz.js'
+import { resolveScanCharCap } from './digit_pii.js'
+import { maskSensitiveText } from './mask-text.js'
 import {
   buildReceipt,
   hashArgs,
@@ -37,7 +25,6 @@ import {
 import type { GovernanceMetadata } from './governance.js'
 import type { CustomPiiPattern, DetectorToggles } from './types.js'
 import {
-  applyCustomPatterns,
   compileCustomPatterns,
   type CompiledCustomPattern,
 } from './custom_patterns.js'
@@ -308,33 +295,22 @@ export class Audit {
     this.receiptSeq = lastLine.chain.seq
   }
 
+  /** Same pipeline as audit args — used for client-facing error text (G13). */
+  maskText(value: string): string {
+    return maskSensitiveText(value, {
+      scanCharCap: this.scanCharCap,
+      detectors: this.detectors,
+      customPatterns: this.customPatterns,
+    })
+  }
+
   private maskArgs(args: any): any {
     if (!args) return args
     const str = typeof args === 'string' ? args : JSON.stringify(args)
     if (str.length > resolveScanCharCap(this.scanCharCap)) {
       return typeof args === 'string' ? '[MASKED_PII]' : { _audit: 'masked-oversize', length: str.length }
     }
-    let masked = normalizePiiText(str)
-    const ibanPass = prepareIbanPass(masked)
-    masked = ibanPass.text
-    masked = maskEmails(masked).text
-    masked = maskEntityEncodedEmails(masked).text
-    masked = maskNumericPii(masked).text
-    if (this.detectors?.ip === true) masked = maskIps(masked).text
-    if (this.detectors?.mrz !== false) masked = maskMrz(masked).text
-    // Credentials / secrets — not just PII. Keeps API keys, tokens, passwords
-    // and connection-string credentials out of the audit log.
-    masked = masked.replace(/\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g, '[MASKED_SECRET]')
-    masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, '$1[MASKED_SECRET]$2')
-    masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, '$1[MASKED_SECRET]')
-    masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, '$1[MASKED_SECRET]')
-    masked = ibanPass.restore(masked)
-    masked = collapsePartialMask(masked)
-    masked = maskEmbeddedEncodedPii(masked, (s) => maskIbansInText(s).count > 0).text
-    if (this.customPatterns.length > 0) {
-      masked = applyCustomPatterns(masked, this.customPatterns).text
-    }
-
+    const masked = this.maskText(str)
     if (typeof args === 'string') return masked
     try {
       return JSON.parse(masked)

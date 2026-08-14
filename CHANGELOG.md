@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Behavior change (G13):** Connector/DB error text is masked before it
+  reaches the model. Failed `query` / `search` / `describe_table` paths
+  that previously skipped the audit trail now write a `denied` line.
+  Already-logged denies (policy, missing table, 50KB) are not written twice.
+
 - **Table existence oracle closed.** Assistant `describe_table` / `search` /
   `query` errors no longer distinguish denied from missing. The audit log
   keeps the real reason. Denied tables still never reach the connector.
