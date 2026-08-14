@@ -8,6 +8,14 @@ import { Governance } from './governance.js'
 import { Audit } from './audit.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
 import { createHandoffStore, createSessionStore } from './console-handoff.js'
+import {
+  findReceipt,
+  loadReceiptsForConsole,
+  publicPemForPanel,
+  toListItems,
+  verifyCommandFor,
+} from './console-receipts.js'
+import { receiptToView, renderReceiptHtml } from './receipt-view.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -238,6 +246,67 @@ export function createConsoleApp(opts: {
   app.get('/api/presence', (_req, res) => {
     opts.onPresence?.()
     res.status(204).end()
+  })
+
+  app.get('/api/receipts', (_req, res) => {
+    const loaded = loadReceiptsForConsole(configFile)
+    res.json({
+      chain: loaded.chain,
+      items: toListItems(loaded.receipts),
+      empty: loaded.emptyMessage,
+    })
+  })
+
+  app.get('/api/receipts/:id/raw', (req, res) => {
+    const loaded = loadReceiptsForConsole(configFile)
+    const receipt = findReceipt(loaded.receipts, String(req.params.id))
+    if (!receipt) {
+      res.status(404).json({ error: 'receipt not found' })
+      return
+    }
+    res.setHeader('content-type', 'application/json; charset=utf-8')
+    res.setHeader('content-disposition', `attachment; filename="${receipt.id}.json"`)
+    res.send(JSON.stringify(receipt))
+  })
+
+  app.get('/api/receipts/:id/html', (req, res) => {
+    const loaded = loadReceiptsForConsole(configFile)
+    const receipt = findReceipt(loaded.receipts, String(req.params.id))
+    if (!receipt) {
+      res.status(404).type('text/plain').send('receipt not found')
+      return
+    }
+    const html = renderReceiptHtml(
+      receiptToView(receipt, {
+        publicKey: publicPemForPanel(),
+        verify: verifyCommandFor(loaded.sink),
+        entries: loaded.receipts.length,
+        chainIntegrity: loaded.chain,
+        jsonHref: `/api/receipts/${encodeURIComponent(receipt.id)}/raw`,
+      }),
+      { mode: 'fragment' },
+    )
+    res.type('html').send(html)
+  })
+
+  app.get('/api/receipts/:id', (req, res) => {
+    const loaded = loadReceiptsForConsole(configFile)
+    const receipt = findReceipt(loaded.receipts, String(req.params.id))
+    if (!receipt) {
+      res.status(404).json({ error: 'receipt not found' })
+      return
+    }
+    const html = renderReceiptHtml(
+      receiptToView(receipt, {
+        publicKey: publicPemForPanel(),
+        verify: verifyCommandFor(loaded.sink),
+        entries: loaded.receipts.length,
+        chainIntegrity: loaded.chain,
+        jsonHref: `/api/receipts/${encodeURIComponent(receipt.id)}/raw`,
+      }),
+      { mode: 'fragment' },
+    )
+    res.json({ receipt, html, chain: loaded.chain })
   })
 
   app.get('/api/config', (req, res) => {

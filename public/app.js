@@ -196,6 +196,103 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('refresh-audit').addEventListener('click', loadAudit);
 
+    async function loadReceipts() {
+        const chainEl = document.getElementById('receipt-chain')
+        const emptyEl = document.getElementById('receipt-empty')
+        const table = document.getElementById('receipt-table')
+        const tbody = document.getElementById('receipt-body')
+        const detail = document.getElementById('receipt-detail')
+        try {
+            const res = await apiFetch('/api/receipts')
+            if (!res.ok) {
+                emptyEl.hidden = false
+                emptyEl.textContent = 'Makbuz listesi alınamadı (' + res.status + ').'
+                chainEl.hidden = true
+                table.hidden = true
+                return
+            }
+            const data = await res.json()
+            tbody.textContent = ''
+            const items = Array.isArray(data.items) ? data.items : []
+            const chain = data.chain || {}
+            if (items.length === 0) {
+                chainEl.hidden = true
+                table.hidden = true
+                detail.hidden = true
+                emptyEl.hidden = false
+                emptyEl.textContent = data.empty || 'henüz makbuz yok'
+                return
+            }
+            emptyEl.hidden = true
+            table.hidden = false
+            if (chain.ok === false) {
+                chainEl.hidden = false
+                chainEl.className = 'receipt-chain broken'
+                chainEl.textContent = 'kırık (satır ' + chain.brokenAt + ')'
+            } else {
+                chainEl.hidden = false
+                chainEl.className = 'receipt-chain ok'
+                chainEl.textContent = 'zincir sağlam'
+            }
+            items.forEach(function (row) {
+                const tr = document.createElement('tr')
+                tr.className = 'receipt-table-row'
+                tr.dataset.id = row.id
+                function td(v) {
+                    const cell = document.createElement('td')
+                    cell.textContent = v == null ? '' : String(v)
+                    return cell
+                }
+                tr.appendChild(td(row.ts ? new Date(row.ts).toLocaleString() : ''))
+                tr.appendChild(td(row.actor || 'unknown'))
+                tr.appendChild(td(row.tool || ''))
+                const dec = document.createElement('td')
+                const badge = document.createElement('span')
+                badge.className = 'status-badge-sm ' + (row.decision === 'deny' ? 'status-rejected' : row.decision === 'partial' ? 'status-partial' : 'status-success')
+                badge.textContent = row.decision || ''
+                dec.appendChild(badge)
+                tr.appendChild(dec)
+                tr.appendChild(td(row.maskedCount == null ? '' : String(row.maskedCount)))
+                tr.appendChild(td(row.seq == null ? '' : String(row.seq)))
+                tr.addEventListener('click', function () { openReceipt(row.id, tr) })
+                tbody.appendChild(tr)
+            })
+        } catch (e) {
+            console.error('Failed to load receipts', e)
+        }
+    }
+
+    async function openReceipt(id, rowEl) {
+        const detail = document.getElementById('receipt-detail')
+        document.querySelectorAll('.receipt-table-row').forEach(function (r) { r.classList.remove('selected') })
+        if (rowEl) rowEl.classList.add('selected')
+        try {
+            const res = await apiFetch('/api/receipts/' + encodeURIComponent(id))
+            if (!res.ok) {
+                detail.hidden = false
+                detail.textContent = 'Makbuz okunamadı (' + res.status + ').'
+                return
+            }
+            const data = await res.json()
+            detail.hidden = false
+            detail.innerHTML = data.html || ''
+            if (data.html && /BEGIN PRIVATE KEY|BEGIN.*PRIVATE/.test(data.html)) {
+                detail.textContent = 'özel anahtar panele düştü — gösterilmedi'
+            }
+        } catch (e) {
+            detail.hidden = false
+            detail.textContent = 'Makbuz okunamadı.'
+        }
+    }
+
+    const refreshReceipts = document.getElementById('refresh-receipts')
+    if (refreshReceipts) refreshReceipts.addEventListener('click', loadReceipts)
+    document.querySelectorAll('.nav-item').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            if (tab.dataset.tab === 'receipts') loadReceipts()
+        })
+    })
+
     // Load Connectors
     async function loadConnectors() {
         try {
@@ -298,6 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     loadAudit();
     loadConnectors();
+    loadReceipts();
     setInterval(() => { apiFetch('/api/presence').catch(() => {}) }, 2000)
     window.addEventListener('pagehide', () => { apiFetch('/api/presence').catch(() => {}) })
 });

@@ -20,6 +20,7 @@
                 <a href="#" class="nav-item" data-tab="playground">Playground</a>
                 <a href="#" class="nav-item" data-tab="governance">Governance</a>
                 <a href="#" class="nav-item" data-tab="audit">Audit Logs</a>
+                <a href="#" class="nav-item" data-tab="receipts">Makbuzlar</a>
             </nav>
         </aside>
 
@@ -90,6 +91,33 @@
                         </div>
                         <button type="submit" class="btn primary-btn">Save Policy</button>
                     </form>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-receipts">
+                <div class="card glass-panel">
+                    <div class="card-header">
+                        <h3>Makbuzlar</h3>
+                        <button class="btn secondary-btn" id="refresh-receipts">Yenile</button>
+                    </div>
+                    <p id="receipt-chain" class="receipt-chain" hidden></p>
+                    <p id="receipt-empty" class="receipt-empty" hidden></p>
+                    <div class="table-container">
+                        <table class="audit-table" id="receipt-table" hidden>
+                            <thead>
+                                <tr>
+                                    <th>Zaman</th>
+                                    <th>Aktör</th>
+                                    <th>Araç</th>
+                                    <th>Karar</th>
+                                    <th>Maske</th>
+                                    <th>seq</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receipt-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="receipt-detail" class="receipt-detail" hidden></div>
                 </div>
             </div>
 

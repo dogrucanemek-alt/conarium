@@ -351,6 +351,7 @@ input:checked + .slider:before {
     font-weight: 600;
 }
 .status-success { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+.status-partial { background: rgba(230, 195, 92, 0.12); color: #e6c35c; }
 .status-rejected { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
 
 /* Connectors */
@@ -488,3 +489,18 @@ input:checked + .slider:before {
         margin: 0.5rem 0;
     }
 }
+
+.receipt-chain {
+    margin: 0 0 1rem;
+    font-weight: 650;
+}
+.receipt-chain.ok { color: var(--success); }
+.receipt-chain.broken { color: var(--danger); }
+.receipt-empty {
+    color: var(--text-secondary);
+    margin: 0 0 1rem;
+}
+.receipt-table-row { cursor: pointer; }
+.receipt-table-row:hover { background: rgba(255, 255, 255, 0.04); }
+.receipt-table-row.selected { background: rgba(59, 130, 246, 0.12); }
+.receipt-detail { margin-top: 1.5rem; }

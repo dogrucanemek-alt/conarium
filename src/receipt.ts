@@ -366,3 +366,46 @@ export function nextChainState(prev: Receipt | null): ChainState {
   }
   return { seq: prev.chain.seq + 1, prevHash: prev.chain.hash }
 }
+
+export type ReceiptChainCheck =
+  | { ok: true; entries: number }
+  | { ok: false; brokenAt: number; reason: string; entries: number }
+
+/**
+ * Hash + prevHash + seq, same rules as `conarium-verify` on a single file.
+ * `brokenAt` is 1-based index in the array (satır N). Does not hide a break.
+ */
+export function verifyReceiptChain(receipts: unknown[]): ReceiptChainCheck {
+  const entries = receipts.length
+  let prevHash = RECEIPT_GENESIS_HASH
+  let prevSeq: number | null = null
+  for (let i = 0; i < receipts.length; i++) {
+    const line = i + 1
+    const r = receipts[i]
+    if (!r || typeof r !== 'object') {
+      return { ok: false, brokenAt: line, reason: 'unreadable', entries }
+    }
+    const rec = r as Receipt
+    if (!rec.chain || typeof rec.chain.hash !== 'string' || typeof rec.chain.prevHash !== 'string') {
+      return { ok: false, brokenAt: line, reason: 'missing chain', entries }
+    }
+    let expected: string
+    try {
+      expected = receiptHash(rec)
+    } catch {
+      return { ok: false, brokenAt: line, reason: 'unreadable', entries }
+    }
+    if (rec.chain.hash !== expected) {
+      return { ok: false, brokenAt: line, reason: 'hash mismatch', entries }
+    }
+    if (rec.chain.prevHash !== prevHash) {
+      return { ok: false, brokenAt: line, reason: 'prevHash break', entries }
+    }
+    if (prevSeq !== null && rec.chain.seq !== prevSeq + 1) {
+      return { ok: false, brokenAt: line, reason: 'seq gap', entries }
+    }
+    prevHash = rec.chain.hash
+    prevSeq = rec.chain.seq
+  }
+  return { ok: true, entries }
+}

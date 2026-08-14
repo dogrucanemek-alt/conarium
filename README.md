@@ -408,6 +408,12 @@ file itself does not contain the token.
 No `.ico` / `.icns` / 512px PNG ships in this package yet, so the shortcut
 has no custom icon.
 
+The console **Makbuzlar** tab lists signed receipts from `audit.receiptSink`
+(newest first) and shows the same receipt HTML as `demo.conarium.dev/proof`.
+It verifies the hash chain and writes **zincir sağlam** or **kırık (satır N)**.
+If the sink is empty or unset, it says so — it does not invent a sample
+receipt. Audit Logs remain the unsigned playground trail; they are not receipts.
+
 When the package is on npm, the same binaries will ship in the tarball
 (`conarium-init`, `conarium-doctor`, `conarium-verify`, `conarium-suggest-policy`).
 Until then, run them from this repository as above.

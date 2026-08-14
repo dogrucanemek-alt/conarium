@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Console Makbuzlar tab.** Lists `audit.receiptSink` newest-first, opens the
+  same receipt HTML as `/proof`, and writes **zincir sağlam** / **kırık (satır N)**.
+  Renderer is `src/receipt-view.ts` — demo must not keep a second copy.
 - **`conarium-console --install-shortcut` / `--uninstall-shortcut`.**
   Desktop / Applications / XDG launcher for the existing loopback console.
   Double-click waits until the port listens, then opens the browser with a
