@@ -4,16 +4,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.nav-item');
     const contents = document.querySelectorAll('.tab-content');
 
+    function receiptUi() {
+        return {
+            chain: document.getElementById('receipt-chain'),
+            empty: document.getElementById('receipt-empty'),
+            table: document.getElementById('receipt-table'),
+            tbody: document.getElementById('receipt-body'),
+            detail: document.getElementById('receipt-detail'),
+        }
+    }
+
+    function activateTab(name) {
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name))
+        contents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + name))
+        const panel = document.getElementById('tab-' + name)
+        if (!panel) {
+            const empty = document.getElementById('receipt-empty')
+            if (empty && name === 'receipts') {
+                empty.hidden = false
+                empty.textContent = 'Makbuzlar alanı bulunamadı.'
+            }
+        }
+    }
+
     tabs.forEach(tab => {
         tab.addEventListener('click', (e) => {
             e.preventDefault();
-            const targetId = `tab-${tab.dataset.tab}`;
-            
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.classList.remove('active'));
-            
-            tab.classList.add('active');
-            document.getElementById(targetId).classList.add('active');
+            const name = tab.dataset.tab
+            activateTab(name)
+            if (name === 'receipts') {
+                ConariumReceiptsPanel.showLoading(receiptUi())
+                loadReceipts()
+            }
         });
     });
 
@@ -197,68 +219,25 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('refresh-audit').addEventListener('click', loadAudit);
 
     async function loadReceipts() {
-        const chainEl = document.getElementById('receipt-chain')
-        const emptyEl = document.getElementById('receipt-empty')
-        const table = document.getElementById('receipt-table')
-        const tbody = document.getElementById('receipt-body')
-        const detail = document.getElementById('receipt-detail')
+        const ui = receiptUi()
         try {
             const res = await apiFetch('/api/receipts')
             if (!res.ok) {
-                emptyEl.hidden = false
-                emptyEl.textContent = 'Makbuz listesi alınamadı (' + res.status + ').'
-                chainEl.hidden = true
-                table.hidden = true
+                ConariumReceiptsPanel.showError(ui, 'Makbuz listesi alınamadı (' + res.status + ').')
                 return
             }
             const data = await res.json()
-            tbody.textContent = ''
-            const items = Array.isArray(data.items) ? data.items : []
-            const chain = data.chain || {}
-            if (items.length === 0) {
-                chainEl.hidden = true
-                table.hidden = true
-                detail.hidden = true
-                emptyEl.hidden = false
-                emptyEl.textContent = data.empty || 'henüz makbuz yok'
-                return
-            }
-            emptyEl.hidden = true
-            table.hidden = false
-            if (chain.ok === false) {
-                chainEl.hidden = false
-                chainEl.className = 'receipt-chain broken'
-                chainEl.textContent = 'kırık (satır ' + chain.brokenAt + ')'
-            } else {
-                chainEl.hidden = false
-                chainEl.className = 'receipt-chain ok'
-                chainEl.textContent = 'zincir sağlam'
-            }
-            items.forEach(function (row) {
-                const tr = document.createElement('tr')
-                tr.className = 'receipt-table-row'
-                tr.dataset.id = row.id
-                function td(v) {
-                    const cell = document.createElement('td')
-                    cell.textContent = v == null ? '' : String(v)
-                    return cell
-                }
-                tr.appendChild(td(row.ts ? new Date(row.ts).toLocaleString() : ''))
-                tr.appendChild(td(row.actor || 'unknown'))
-                tr.appendChild(td(row.tool || ''))
-                const dec = document.createElement('td')
-                const badge = document.createElement('span')
-                badge.className = 'status-badge-sm ' + (row.decision === 'deny' ? 'status-rejected' : row.decision === 'partial' ? 'status-partial' : 'status-success')
-                badge.textContent = row.decision || ''
-                dec.appendChild(badge)
-                tr.appendChild(dec)
-                tr.appendChild(td(row.maskedCount == null ? '' : String(row.maskedCount)))
-                tr.appendChild(td(row.seq == null ? '' : String(row.seq)))
-                tr.addEventListener('click', function () { openReceipt(row.id, tr) })
-                tbody.appendChild(tr)
+            ConariumReceiptsPanel.render(ui, data, {
+                tr: function () { return document.createElement('tr') },
+                td: function () { return document.createElement('td') },
+                span: function () { return document.createElement('span') },
+                formatTime: function (ts) { return new Date(ts).toLocaleString() },
+                onRow: function (tr, row) {
+                    tr.addEventListener('click', function () { openReceipt(row.id, tr) })
+                },
             })
         } catch (e) {
-            console.error('Failed to load receipts', e)
+            ConariumReceiptsPanel.showError(ui, 'Makbuz listesi alınamadı.')
         }
     }
 
@@ -286,11 +265,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const refreshReceipts = document.getElementById('refresh-receipts')
-    if (refreshReceipts) refreshReceipts.addEventListener('click', loadReceipts)
-    document.querySelectorAll('.nav-item').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            if (tab.dataset.tab === 'receipts') loadReceipts()
-        })
+    if (refreshReceipts) refreshReceipts.addEventListener('click', function () {
+        ConariumReceiptsPanel.showLoading(receiptUi())
+        loadReceipts()
     })
 
     // Load Connectors

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Makbuzlar tab paints "Yükleniyor…" on the same click that switches the tab.**
+  The list was filled only after `await`; the first click left a blank card.
 - **Console Makbuzlar tab.** Lists `audit.receiptSink` newest-first, opens the
   same receipt HTML as `/proof`, and writes **zincir sağlam** / **kırık (satır N)**.
   Renderer is `src/receipt-view.ts` — demo must not keep a second copy.
