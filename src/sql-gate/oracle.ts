@@ -149,7 +149,7 @@ function policyAllows(policy: GovernancePolicy, qualified: string): boolean {
 
 function applyFetchCap(sql: string, cap: number): string {
   const core = sql.trim().replace(/;+\s*$/, '')
-  return `SELECT * FROM (${core}) _conarium_cap FETCH FIRST ${cap} ROWS ONLY`
+  return `SELECT * FROM (${core}) conarium_cap FETCH FIRST ${cap} ROWS ONLY`
 }
 
 export function guardOracleQuery(sql: string, policy: GovernancePolicy): OracleGuarded {

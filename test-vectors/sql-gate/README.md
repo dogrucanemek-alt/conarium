@@ -6,9 +6,9 @@ Not receipt conformance.
 (`src/sql-gate/vectors.test.ts`). A dialect with no `sql.<name>` is skipped,
 not marked supported.
 
-Postgres policy uses `public.*`. MSSQL overlay (`dialectPolicy.mssql`) uses
-`dbo.*`. Oracle SQL is present and the unit set is green; the live Docker
-check did not pass, so Oracle is not a supported dialect.
+Postgres policy uses `public.*`. MSSQL overlay uses `dbo.*`. Oracle overlay
+uses `app.*`. All three have a live engine run. Oracle synonyms and
+database links are not resolved — that is a documented limit, not a skip.
 
 `test/property_sql_gate.mjs` is the generated-attack leftover. A **real
 bypass** is written here as one JSON file and that check stays red.

@@ -10,12 +10,13 @@ SOC 2 yok. ISO yok. Bağımsız sızma testi yok. Yol haritasında.
 
 Sürüm 0.2.x. API kırılabilir.
 
-## SQL: Postgres ve Microsoft SQL Server
+## SQL: Postgres, Microsoft SQL Server ve Oracle
 
-Oracle ve MySQL yok.
-MSSQL: paylaşılan SQL-kapısı vektör seti T-SQL’de yeşil; ayrıştırılamayan girdi reddedilir. Canlı kontrol Docker `mcr.microsoft.com/mssql/server` ile yapıldı.
-Oracle vektörleri var; canlı örnek tutulamadı ve synonym hedefi çözülemez. Bu destek değildir.
-Bu bir konnektör değil, ikinci ayrıştırıcı katmanı. Postgres hâlâ `pgsql-ast-parser`. MSSQL `node-sql-parser` (transactsql) kullanır.
+MySQL yok.
+Bir lehçe ancak paylaşılan SQL-kapısı vektör seti o lehçede yeşilse, ayrıştırılamayan girdi reddediliyorsa ve canlı motorda satır tavanı uygulanıyorsa burada yazılır.
+Bu bir konnektör değil, ikinci ayrıştırıcı katmanı. Dağıtılan `query` aracı hâlâ Postgres kapısını çağırır (`Governance.guardQuery`). MSSQL ve Oracle kapıları o lehçenin fonksiyonu çağrılınca çalışır.
+Oracle synonym hedefini çözmez: allow-list’teki ad, parser’ın gördüğü addır, taban tablo değil. Veritabanı bağlantısı (`table@dblink`) reddedilir. `ROWNUM` reddedilir (satır tavanı değildir).
+Ayrıştırıcılar: Postgres `pgsql-ast-parser` · MSSQL `node-sql-parser` (transactsql) · Oracle `@guanmingchiu/sqlparser-ts`.
 
 ## Serbest metinde isim garantisi yok
 

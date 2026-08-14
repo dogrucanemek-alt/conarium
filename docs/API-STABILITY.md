@@ -32,7 +32,7 @@ No dates. Shipping 1.0 is a decision, not a document.
 - A JavaScript import surface. `package.json` has `main` pointing at the
   stdio gateway. There is no `exports` map. `import { Governance } from
   '@conarium-ai/core'` is not an API.
-- Oracle or MySQL. The SQL gate is Postgres and Microsoft SQL Server.
+- MySQL. The SQL gate is Postgres, Microsoft SQL Server, and Oracle. Oracle synonyms and database links are not resolved.
 - That an OpenTimestamps stamp is confirmed. `pending` is a valid
   outcome.
 - Console UI layout, playground sample data, or `/api/connectors`

@@ -10,12 +10,13 @@ No SOC 2. No ISO. No independent penetration test. On the roadmap.
 
 Version is 0.2.x. The API can break.
 
-## SQL is Postgres and Microsoft SQL Server
+## SQL is Postgres, Microsoft SQL Server, and Oracle
 
-Oracle and MySQL are not implemented.
-MSSQL means the shared SQL-gate vector set is green against T-SQL and unparseable input is denied. The live check used Docker `mcr.microsoft.com/mssql/server`.
-Oracle vectors exist; a live instance was not held, and synonym targets cannot be resolved. That is not support.
-This is a second parser layer, not a connector. Postgres still uses `pgsql-ast-parser`. MSSQL uses `node-sql-parser` (transactsql).
+MySQL is not implemented.
+A dialect is listed here only when the shared SQL-gate vector set is green against that dialect, unparseable input is denied, and a live engine run applied the row cap.
+This is a second parser layer, not a connector. The shipped `query` tool still calls the Postgres gate (`Governance.guardQuery`). MSSQL and Oracle guards run when that dialect's function is called.
+Oracle does not resolve synonyms: an allow-listed name is the name the parser sees, not the base table. Database links (`table@dblink`) are denied. `ROWNUM` is denied (it is not a row cap).
+Parsers: Postgres `pgsql-ast-parser` · MSSQL `node-sql-parser` (transactsql) · Oracle `@guanmingchiu/sqlparser-ts`.
 
 ## Names in free text are not guaranteed
 

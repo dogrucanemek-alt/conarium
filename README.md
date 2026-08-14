@@ -329,7 +329,7 @@ Conarium operates on a strict tripartite architecture, balancing power between t
 graph LR
     A([AI Assistant\nCursor / Copilot]) -- "MCP Query" --> B{The Gateway\nConarium Proxy};
     B -- "Intercept & Parse" --> C[The Engine\nGovernance & Regex];
-    C -- "Execute Query" --> D[(Your Database\nPostgres / SQL Server)];
+    C -- "Execute Query" --> D[(Your Database\nPostgres / SQL Server / Oracle)];
     D -- "Raw Data" --> C;
     C -- "Mask & Cap" --> B;
     B -- "Sanitized Data" --> A;
@@ -538,8 +538,8 @@ including labelled names in free text · allow/deny + row caps · per-person mas
 profiles · immutable hash-chained audit ledger · Ed25519-signed receipt per access
 with an offline verifier · signed coverage declarations · two-sided reconciliation
 against the database's own counters · OpenTimestamps anchoring and an optional
-anchoring service · conformance vectors · SQL gate: Postgres and Microsoft SQL Server
-(Oracle and MySQL are not implemented) · Postgres, Supabase, docs, OpenAPI, Jira
+anchoring service · conformance vectors · SQL gate: Postgres, Microsoft SQL Server, Oracle
+(MySQL is not implemented; Oracle synonyms and database links are not resolved — see LIMITATIONS) · Postgres, Supabase, docs, OpenAPI, Jira
 and Slack connectors · `conarium-init` / `conarium-doctor` via `npx` (`@conarium-ai/core`).
 
 **Next:** consent binding ([spec published](docs/CONSENT-BINDING-SPEC.md), no code —

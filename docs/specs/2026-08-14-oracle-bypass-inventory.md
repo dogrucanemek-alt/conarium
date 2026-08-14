@@ -21,7 +21,8 @@ Gerekçe: gerçek Oracle AST. Bakım: genç sarmalayıcı, upstream Apache sqlpa
 `format()` AST→SQL bu sürümde çalışmıyor; satır tavanı orijinal SQL’i `FETCH FIRST n` ile sarar.
 Bilmediği girdi **deny**. Synonym hedefi **kapanmaz**.
 
-## Canlı örnek (kabul 2)
+## Canlı örnek (kabul 2) — 2026-08-14 19:36
 
-`gvenzl/oracle-free:slim-faststart` çekildi ve ayağa kalktı. İlk init SIGTERM yedi (~40s, WSL). PDB `ORA-01109` / CDB mount tutarsızlığı. `APP_USER` oluşmadı. Oturum tutulamadı.
-C vektörleri 28/28 yeşil; ayrıştırılamayan deny. **Canlı kabul geçmedi → lehçe desteklenmiyor.**
+İlk tur: `--memory=2g` + init sırasında exec/stop. Log: `CONTAINER: shutdown request received` (SIGTERM). `OOMKilled=false`. Yarım init → `ORA-01109`.
+Bu tur: bellek tavanı yok, `--shm-size=1g`, named volume, init bitene kadar dokunulmadı. ~1 dk’da `DATABASE IS READY TO USE` + `APP_USER`. `PASS oracle-live`: 80→50, secrets dolu+deny, garbage deny.
+Emit: `_conarium_cap` Oracle’da yasadışı tanımlayıcı (`ORA-00911`); `conarium_cap` oldu.

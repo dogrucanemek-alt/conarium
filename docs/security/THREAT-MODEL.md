@@ -64,8 +64,9 @@ Supabase REST and docs connectors have their own read-only paths.
 - OpenAPI connector: DNS rebinding / TOCTOU between `enforceSafeRemoteUrl`
   and `fetch` is **accepted, not fixed** (`SECURITY.md`). Exploit requires an
   operator-authored `allowedBaseUrls` entry under attacker control.
-- SQL dialects are Postgres and Microsoft SQL Server. A query the parser
-  does not understand is denied. Oracle and MySQL are not implemented.
+- SQL dialects are Postgres, Microsoft SQL Server, and Oracle. A query
+  the parser does not understand is denied. MySQL is not implemented.
+  Oracle synonyms are not resolved; `table@dblink` is denied.
 
 ### 3. Console ↔ operator
 

@@ -4,8 +4,8 @@
  * Speaks to gvenzl/oracle-free through sqlplus in the container.
  * Local docker password only — not a product secret.
  *
- * 2026-08-14: this host sent SIGTERM during first init; PDB never stayed
- * open. Until that run prints PASS, Oracle is not a supported dialect.
+ * Wait is READY-log then sqlplus, up to 10 minutes. Alias must be a
+ * legal unquoted Oracle identifier (not _conarium_cap).
  */
 import { spawnSync } from 'node:child_process'
 import { guardOracleQuery } from '../src/sql-gate/oracle.ts'
@@ -45,13 +45,29 @@ function sqlplus(sql) {
 
 function waitReady() {
   wsl(['docker', 'start', container])
-  for (let i = 0; i < 60; i++) {
+  const deadline = Date.now() + 10 * 60 * 1000
+  let sawReady = false
+  while (Date.now() < deadline) {
     const logs = wsl(['docker', 'logs', container])
     const text = `${logs.stdout ?? ''}${logs.stderr ?? ''}`
-    if (/DATABASE IS READY TO USE/i.test(text)) return
-    spawnSync('wsl', ['-e', 'sleep', '5'], { encoding: 'utf8' })
+    if (/DATABASE IS READY TO USE/i.test(text)) sawReady = true
+    if (sawReady) {
+      const ping = spawnSync('wsl', [
+        '-e', 'docker', 'exec', '-i', container,
+        'sqlplus', '-s', `app/${password}@FREEPDB1`,
+      ], {
+        encoding: 'utf8',
+        windowsHide: true,
+        input: "SET HEADING OFF\nSET PAGESIZE 0\nSET FEEDBACK OFF\nSELECT 3*3*3 FROM dual;\nEXIT;\n",
+      })
+      const out = `${ping.stdout ?? ''}${ping.stderr ?? ''}`
+      if (!/ORA-01109|ORA-01034|ORA-01017/i.test(out) && /(?:^|\n)\s*27\s*(?:\n|$)/.test(out)) {
+        return
+      }
+    }
+    spawnSync('wsl', ['-e', 'sleep', '10'], { encoding: 'utf8' })
   }
-  throw new Error('Oracle container did not become ready')
+  throw new Error('Oracle container did not become ready within 10 minutes')
 }
 
 function assert(cond, msg) {
