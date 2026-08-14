@@ -21,7 +21,6 @@ import {
   mergeByClass,
   type CompiledCustomPattern,
 } from './custom_patterns.js'
-import { parse, toSql } from 'pgsql-ast-parser'
 import type {
   Expr,
   ExprCall,
@@ -34,6 +33,20 @@ import type {
   SelectedColumn,
   Statement,
 } from 'pgsql-ast-parser'
+import {
+  applyPostgresRowCap,
+  emitPostgresSql,
+  parsePostgresSql,
+  postgresLimitTarget,
+} from './sql-gate/postgres.js'
+import {
+  findWriteToken,
+  hasRowLockClause,
+  isBlockedDumpFunction,
+  isSafeBuiltinFunction,
+  isSelectOrWith,
+  normalizedSqlHead,
+} from './sql-gate/rules.js'
 
 export interface GovernanceMetadata {
   accessedTables: string[]
@@ -151,53 +164,6 @@ const LABELLED_NAME_RE = new RegExp(
   String.raw`(?<![\p{L}\p{N}])(müşteri|musteri|yetkili|kişi|kisi|temsilci|adı soyadı|adi soyadi|ad soyad|customer|contact|full name|name)\s*:\s*(${NAME_SHAPE})`,
   'giu',
 )
-
-const WRITE_TOKENS = [
-  'DROP ', 'TRUNCATE ', 'DELETE ', 'UPDATE ', 'INSERT ', 'ALTER ', 'CREATE ',
-  'GRANT ', 'REVOKE ', 'MERGE ', 'COPY ', 'CALL ', 'DO ', 'VACUUM ',
-]
-
-const SAFE_BUILTIN_FUNCTIONS = new Set([
-  'abs',
-  'avg',
-  'btrim',
-  'ceil',
-  'ceiling',
-  'char_length',
-  'coalesce',
-  'concat',
-  'concat_ws',
-  'convert_to',
-  'count',
-  'encode',
-  'floor',
-  'greatest',
-  'least',
-  'length',
-  'lower',
-  'ltrim',
-  'max',
-  'min',
-  'nullif',
-  'octet_length',
-  'regexp_replace',
-  'regexp_split_to_array',
-  'replace',
-  'round',
-  'rtrim',
-  'split_part',
-  'sum',
-  'trim',
-  'upper',
-])
-
-const BLOCKED_DUMP_FUNCTIONS = new Set([
-  'array_agg',
-  'json_agg',
-  'jsonb_agg',
-  'row_to_json',
-  'string_agg',
-])
 
 interface Source {
   kind: 'table' | 'derived'
@@ -341,25 +307,22 @@ export class Governance {
 
   guardQuery(sql: string): GuardedQuery {
     const emptyState = this.createAnalysisState()
-    const norm = ` ${sql.trim().toUpperCase().replace(/\s+/g, ' ')} `
-    const head = norm.trimStart()
-    if (!head.startsWith('SELECT') && !head.startsWith('WITH')) {
+    const norm = normalizedSqlHead(sql)
+    if (!isSelectOrWith(norm)) {
       this.deny(emptyState, 'Only read-only SELECT/WITH queries are permitted.')
     }
-    
-    for (const tok of WRITE_TOKENS) {
-      const regex = new RegExp(`\\b${tok.trim()}\\b`)
-      if (regex.test(norm)) this.deny(emptyState, `Blocked write operation: ${tok.trim()}`)
-    }
+
+    const writeTok = findWriteToken(norm)
+    if (writeTok) this.deny(emptyState, `Blocked write operation: ${writeTok}`)
 
     // Row-locking clauses acquire locks (a side effect) — refuse them on governed reads.
-    if (/\bFOR\s+(?:UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/.test(norm)) {
+    if (hasRowLockClause(norm)) {
       this.deny(emptyState, 'Row-locking clauses (FOR UPDATE/SHARE) are not permitted.')
     }
 
     let ast: Statement[]
     try {
-      ast = parse(sql)
+      ast = parsePostgresSql(sql)
     } catch (err) {
       this.deny(emptyState, `Failed to parse SQL: ${(err as Error).message}`)
     }
@@ -372,7 +335,7 @@ export class Governance {
     const output = this.analyzeRead(ast[0], state, new Set())
 
     this.applyRowCap(ast[0])
-    let rewrittenSql = toSql.statement(ast[0])
+    let rewrittenSql = emitPostgresSql(ast[0])
 
     // KÜME İŞLEMLERİ (UNION / UNION ALL / INTERSECT / EXCEPT) — satır sınırı boşluğu.
     // applyRowCap yalnızca 'select' ve 'with' düğümlerine LIMIT ekleyebiliyor;
@@ -1027,13 +990,12 @@ export class Governance {
     state.accessedFunctions.add(fn)
 
     const baseName = this.normalizeIdentifier(call.function.name)
-    if (BLOCKED_DUMP_FUNCTIONS.has(baseName)) {
+    if (isBlockedDumpFunction(baseName)) {
       this.deny(state, `High-risk aggregate/serialization function '${fn}' is not permitted by policy.`)
     }
 
     const schema = call.function.schema ? this.normalizeIdentifier(call.function.schema) : undefined
-    const isSafeBuiltin = SAFE_BUILTIN_FUNCTIONS.has(baseName) && (!schema || schema === 'pg_catalog')
-    if (!isSafeBuiltin) {
+    if (!isSafeBuiltinFunction(baseName, schema)) {
       this.deny(state, `Function '${fn}' is not permitted by policy.`)
     }
   }
@@ -1166,26 +1128,11 @@ export class Governance {
   }
 
   private applyRowCap(statement: Statement | SelectStatement): void {
-    const target = this.limitTarget(statement)
-    if (!target) return
-
-    const cap = this.maxRows()
-    const existing = target.limit?.limit as { type?: string; value?: number } | undefined
-    // Never RAISE a limit the caller already set below the cap — a request for
-    // 1 row must not become 50. Only clamp down; preserve any OFFSET.
-    if (existing && existing.type === 'integer' && typeof existing.value === 'number' && existing.value <= cap) {
-      return
-    }
-    target.limit = {
-      ...(target.limit ?? {}),
-      limit: { type: 'integer', value: cap },
-    }
+    applyPostgresRowCap(statement, this.maxRows())
   }
 
   private limitTarget(statement: Statement | SelectStatement): SelectFromStatement | undefined {
-    if (statement.type === 'select') return statement
-    if (statement.type === 'with' || statement.type === 'with recursive') return this.limitTarget(statement.in)
-    return undefined
+    return postgresLimitTarget(statement)
   }
 }
 
