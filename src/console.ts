@@ -266,9 +266,16 @@ export function createConsoleApp(opts: {
       res.status(404).json({ error: 'receipt not found' })
       return
     }
+    // Buffer, not a string: res.send(string) lets Express sniff a content type,
+    // and the receipt carries operator-supplied text. Bytes only.
+    const body = Buffer.from(JSON.stringify(receipt), 'utf8')
+    // receipt.id reaches a response header; anything outside [A-Za-z0-9._-]
+    // could break out of the quoted filename or inject a header.
+    const safeName = String(receipt.id).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 128) || 'receipt'
     res.setHeader('content-type', 'application/json; charset=utf-8')
-    res.setHeader('content-disposition', `attachment; filename="${receipt.id}.json"`)
-    res.send(JSON.stringify(receipt))
+    res.setHeader('content-disposition', `attachment; filename="${safeName}.json"`)
+    res.setHeader('content-length', String(body.length))
+    res.end(body)
   })
 
   app.get('/api/receipts/:id/html', (req, res) => {
