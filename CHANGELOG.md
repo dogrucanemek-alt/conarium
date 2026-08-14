@@ -6,6 +6,9 @@
   card or TR phone (`4111…x`, `0532…x`). A longer alphanumeric tail
   (`ghp_1234…abcd`) stays a token so the secret detector still fires.
 
+- **A2:** Dev-only `vitest` 2.1.9 → 4.1.10 (closes the vite/esbuild
+  Dependabot chain). Production dependencies unchanged.
+
 ## 0.2.13 — 2026-08-15
 
 Security hardening release. Two independent external reviews and one code
