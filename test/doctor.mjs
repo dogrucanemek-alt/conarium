@@ -14,6 +14,11 @@ import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { generateKeyPairSync } from 'crypto'
 import http from 'http'
+import {
+  dialectAgrees,
+  familyFromBanner,
+  resolveDoctorDialect,
+} from '../bin/doctor-sql.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DOCTOR = path.join(__dirname, '..', 'bin', 'conarium-doctor.mjs')
@@ -253,6 +258,97 @@ test('unreachable registry is a warning, doctor still exits 0', async () => {
   })
   assert.strictEqual(status, 0, `registry down must not fail the doctor:\n${out}`)
   assert.ok(/registry unreachable/.test(out), 'must warn, not stay silent')
+})
+
+// --- dialect / PII surface (must not stay silent) -----------------------------
+
+test('omitted dialect is written as default postgres, not left silent', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, HEALTHY)
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, out)
+  assert.ok(/SQL dialect/.test(out), 'must name the dialect check')
+  assert.ok(/postgres \(default/.test(out), 'must say the default is postgres')
+  assert.ok(/SQL gate/.test(out), 'must say whether the gate loads')
+  assert.ok(/policy\.maxRows/.test(out), 'maxRows must appear even when it does not warn')
+  assert.ok(/policy\.customPatterns/.test(out), 'customPatterns must appear even when empty')
+  assert.ok(/0 custom patterns/.test(out))
+})
+
+test('unknown dialect is FAIL — not a silent postgres fallback', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, { ...HEALTHY, policy: { ...HEALTHY.policy, dialect: 'mysql' } })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 1, out)
+  assert.ok(/SQL dialect/.test(out))
+  assert.ok(/mysql/.test(out))
+  assert.ok(/not allowed/.test(out))
+})
+
+test('oracle dialect + postgres DSN is FAIL (test pair)', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, {
+    ...HEALTHY,
+    policy: { ...HEALTHY.policy, dialect: 'oracle' },
+  })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 1, `mismatch must fail:\n${out}`)
+  assert.ok(/Engine identity/.test(out), 'must name the identity check')
+  assert.ok(/oracle/.test(out))
+  assert.ok(/postgres/.test(out))
+  assert.ok(/FAIL/.test(out))
+})
+
+test('unreachable engine is unseen, not a pass', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, {
+    ...HEALTHY,
+    connectors: [{ type: 'postgres', name: 'maindb', config: { url: 'postgresql://u:p@127.0.0.1:1/db' } }],
+  })
+  const { status, out } = runDoctor(dir, { args: [], env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 1, `reachability still fails:\n${out}`)
+  assert.ok(/unseen/.test(out), 'identity must be unseen, not ok')
+  assert.ok(/not checked \(host unreachable\)/.test(out))
+  assert.ok(!/matches policy\.dialect/.test(out), 'must not claim a match')
+})
+
+test('--no-net engine identity is unseen, not a pass', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, HEALTHY)
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, out)
+  assert.ok(/Engine identity/.test(out))
+  assert.ok(/not checked \(--no-net\)/.test(out))
+  assert.ok(/unseen/.test(out))
+  assert.ok(!/This install is ready/.test(out), 'unseen must not claim the install is ready')
+})
+
+test('custom pattern names appear; pattern text does not', async () => {
+  const dir = tmpdir()
+  const secretPattern = 'TR\\d{24}-DO-NOT-PRINT-PATTERN-9911'
+  writeConfig(dir, {
+    ...HEALTHY,
+    policy: {
+      ...HEALTHY.policy,
+      customPatterns: [{ name: 'acct-iban', pattern: secretPattern, label: '[MASKED_PII]' }],
+    },
+  })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.ok(status === 0 || status === 1, out)
+  assert.ok(/acct-iban/.test(out), 'rule name must be visible')
+  assert.ok(!out.includes(secretPattern), 'pattern text leaked')
+  assert.ok(!out.includes('DO-NOT-PRINT-PATTERN-9911'), 'pattern fragment leaked')
+})
+
+test('fake engine banner vs dialect: postgres banner is not oracle', () => {
+  assert.strictEqual(familyFromBanner('PostgreSQL 16.2 on x86_64-pc-linux-gnu'), 'postgres')
+  assert.strictEqual(familyFromBanner('Microsoft SQL Server 2022'), 'mssql')
+  assert.strictEqual(familyFromBanner('Oracle Database 23ai Free'), 'oracle')
+  assert.strictEqual(familyFromBanner('something else'), null)
+  assert.strictEqual(dialectAgrees('oracle', familyFromBanner('PostgreSQL 16.2')), false)
+  assert.strictEqual(dialectAgrees('postgres', familyFromBanner('PostgreSQL 16.2')), true)
+  assert.deepStrictEqual(resolveDoctorDialect(undefined), { dialect: 'postgres', source: 'default' })
+  assert.throws(() => resolveDoctorDialect('mysql'), /not allowed/)
 })
 
 // --- exit contract with the network probe on -----------------------------------

@@ -30,9 +30,16 @@
  */
 import { existsSync, readFileSync, statSync, accessSync, constants } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import net from 'node:net'
 import { createPublicKey, createPrivateKey } from 'node:crypto'
+import {
+  dialectAgrees,
+  dialectLine,
+  familyFromBanner,
+  familyFromScheme,
+  resolveDoctorDialect,
+} from './doctor-sql.mjs'
 
 const ARGS = process.argv.slice(2)
 const has = (f) => ARGS.includes(f)
@@ -60,6 +67,8 @@ const results = []
 const ok = (label, detail) => results.push({ level: 'ok', label, detail })
 const warn = (label, detail, fix) => results.push({ level: 'warn', label, detail, fix })
 const fail = (label, detail, fix) => results.push({ level: 'fail', label, detail, fix })
+/** Could not complete the check. Not a pass. Not a silent skip. */
+const unseen = (label, detail, fix) => results.push({ level: 'unseen', label, detail, fix })
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -106,6 +115,28 @@ function tcpProbe(host, port, timeoutMs = 4000) {
     sock.once('error', (e) => finish({ reachable: false, why: e.code || e.message }))
     sock.connect(Number(port), host)
   })
+}
+
+/** Ask a reachable engine who it is. Never log the DSN. */
+async function identifyEngine(t) {
+  const schemeFamily = familyFromScheme(t.scheme)
+  const looksPostgres = schemeFamily === 'postgres' || t.type === 'postgres' || t.type === 'supabase'
+  if (!looksPostgres) return null
+  try {
+    const postgres = (await import('postgres')).default
+    const sql = postgres(t.raw, { max: 1, connect_timeout: 3, idle_timeout: 1 })
+    try {
+      const rows = await sql`select version() as v`
+      const banner = String(rows?.[0]?.v || '')
+      const family = familyFromBanner(banner)
+      if (!family) return null
+      return { family, summary: banner.split(',')[0].replace(/\s+/g, ' ').slice(0, 72) }
+    } finally {
+      await sql.end({ timeout: 2 })
+    }
+  } catch {
+    return null
+  }
 }
 
 function envSet(name) {
@@ -272,6 +303,10 @@ if (config) {
       `maxRows is ${maxRows} (measured warning above ${warnAbove}). Masking cost grows with the number of distinct values this policy already masked, not with table size. The row cap bounds that set. The query is not rejected.`,
       'Leave the default if you do not need more rows. If you raise it, expect carry-over cost to grow with unique masked values.',
     )
+  } else if (typeof maxRows === 'number') {
+    ok('policy.maxRows', `maxRows is ${maxRows} (at or below the measured threshold ${warnAbove})`)
+  } else {
+    ok('policy.maxRows', `maxRows is 100 (default — policy.maxRows omitted; threshold ${warnAbove})`)
   }
   for (const [name, profile] of Object.entries(pol.profiles || {})) {
     const pMax = profile && typeof profile === 'object' ? profile.maxRows : undefined
@@ -281,6 +316,71 @@ if (config) {
         `profile maxRows is ${pMax} (measured warning above ${warnAbove}). Same cost: distinct masked values, not table size. Not rejected.`,
         'A profile can only raise the cap for one identified person. The cost still grows with unique masked values.',
       )
+    }
+  }
+
+  // D2 — which SQL gate the query tool will use. Silence here was the bug.
+  const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+  let dialectInfo = null
+  try {
+    dialectInfo = resolveDoctorDialect(pol.dialect)
+    ok('SQL dialect', dialectLine(dialectInfo.dialect, dialectInfo.source))
+  } catch (e) {
+    fail('SQL dialect', e.message, 'Set policy.dialect to postgres, mssql, or oracle. A typo does not become postgres.')
+  }
+  if (dialectInfo) {
+    if (dialectInfo.dialect === 'postgres') {
+      ok('SQL gate', 'postgres gate is built-in (Governance.guardQuery)')
+    } else {
+      const gateFile = join(pkgRoot, 'dist', 'sql-gate', `${dialectInfo.dialect}.js`)
+      if (!existsSync(gateFile)) {
+        fail(
+          'SQL gate',
+          `${dialectInfo.dialect} gate file is missing (dist/sql-gate/${dialectInfo.dialect}.js)`,
+          'Run npm run build in the install. The query tool cannot load this dialect without that file.',
+        )
+      } else {
+        try {
+          await import(pathToFileURL(gateFile).href)
+          ok('SQL gate', `${dialectInfo.dialect} gate loaded from dist/sql-gate/${dialectInfo.dialect}.js`)
+        } catch (e) {
+          fail(
+            'SQL gate',
+            `${dialectInfo.dialect} gate failed to load: ${e.name}`,
+            'Rebuild the package. The query tool will fail closed on this dialect until the gate loads.',
+          )
+        }
+      }
+    }
+  }
+
+  // D3 — custom PII: names only. Pattern text must never reach stdout.
+  const patterns = Array.isArray(pol.customPatterns) ? pol.customPatterns : []
+  const patternNames = patterns
+    .map((p) => (p && typeof p.name === 'string' ? p.name : null))
+    .filter(Boolean)
+  if (patterns.length === 0) {
+    ok('policy.customPatterns', '0 custom patterns')
+  } else {
+    const compilerPath = join(pkgRoot, 'dist', 'custom_patterns.js')
+    if (!existsSync(compilerPath)) {
+      unseen(
+        'policy.customPatterns',
+        `${patterns.length} named: ${patternNames.join(', ') || '(unnamed)'} — compile not checked (dist/custom_patterns.js missing)`,
+        'Run npm run build. The gateway rejects a broken pattern at load; the doctor could not confirm that here.',
+      )
+    } else {
+      try {
+        const { compileCustomPatterns } = await import(pathToFileURL(compilerPath).href)
+        compileCustomPatterns(patterns)
+        ok('policy.customPatterns', `${patterns.length} compiled: ${patternNames.join(', ')}`)
+      } catch (e) {
+        fail(
+          'policy.customPatterns',
+          `${patterns.length} named: ${patternNames.join(', ') || '(unnamed)'} — compile failed (${e.name})`,
+          'The gateway will refuse this config. Fix or remove the broken rule. Pattern text is not printed.',
+        )
+      }
     }
   }
 
@@ -444,17 +544,86 @@ if (config) {
     } else {
       ok('Connector DSN', `${c.name}: ${d.text}${d.hasPassword ? ' (password set, not shown)' : ''}`)
     }
-    if (d.host && d.port) targets.push({ name: c.name, ...d })
+    if (d.host && d.port) targets.push({ name: c.name, type: c.type, raw, ...d })
   }
+  const reachable = []
   for (const t of SKIP_NET ? [] : targets) {
     const r = await tcpProbe(t.host, t.port)
-    if (r.reachable) ok('Reachability', `${t.name}: ${t.host}:${t.port} answers`)
-    else
+    if (r.reachable) {
+      ok('Reachability', `${t.name}: ${t.host}:${t.port} answers`)
+      reachable.push(t)
+    } else
       fail(
         'Reachability',
         `${t.name}: ${t.host}:${t.port} unreachable (${r.why})`,
         'The gateway logs connector failures and keeps running with zero connectors — it will look healthy and serve nothing.',
       )
+  }
+
+  // D1 — declared dialect vs the engine that actually answers.
+  // Silence here meant Oracle rules on a Postgres DSN. Mismatch is FAIL.
+  // Cannot ask → unseen. Never "probably matches".
+  let dialectForEngine = null
+  try {
+    dialectForEngine = resolveDoctorDialect(config.policy?.dialect).dialect
+  } catch {
+    dialectForEngine = null
+  }
+  if (dialectForEngine) {
+    let schemeConflict = false
+    for (const t of targets) {
+      const fromScheme = familyFromScheme(t.scheme)
+      if (fromScheme && !dialectAgrees(dialectForEngine, fromScheme)) {
+        schemeConflict = true
+        fail(
+          'Engine identity',
+          `${t.name}: policy.dialect is ${dialectForEngine} but the DSN scheme is ${t.scheme} (${fromScheme})`,
+          'The query tool will parse with one grammar and send the SQL to another engine. Point the DSN at the declared dialect, or change policy.dialect.',
+        )
+      }
+    }
+    if (schemeConflict) {
+      // Already FAIL. Do not add a "not checked" line that reads like a second opinion.
+    } else if (SKIP_NET) {
+      unseen(
+        'Engine identity',
+        `not checked (--no-net). Declared dialect ${dialectForEngine} was not compared to a live engine.`,
+        'Rerun without --no-net when the database is reachable. Do not assume the dialect matches.',
+      )
+    } else if (targets.length === 0) {
+      unseen(
+        'Engine identity',
+        `not checked (no SQL DSN). Declared dialect ${dialectForEngine}.`,
+        'Add a postgres / SQL connector URL, or ignore this if this install has no SQL engine.',
+      )
+    } else if (reachable.length === 0) {
+      unseen(
+        'Engine identity',
+        `not checked (host unreachable). Declared dialect ${dialectForEngine}.`,
+        'Bring the engine up, then rerun. Unreachable is not a match.',
+      )
+    } else {
+      for (const t of reachable) {
+        const id = await identifyEngine(t)
+        if (!id) {
+          unseen(
+            'Engine identity',
+            `${t.name}: ${t.host}:${t.port} answers TCP but the engine family could not be read. Declared ${dialectForEngine}.`,
+            'Doctor asked the engine and got no version banner. Not a pass.',
+          )
+          continue
+        }
+        if (!dialectAgrees(dialectForEngine, id.family)) {
+          fail(
+            'Engine identity',
+            `${t.name}: policy.dialect is ${dialectForEngine} but the engine identified as ${id.family} (${id.summary})`,
+            'The query tool will enforce the wrong grammar against this engine. Fix policy.dialect or the DSN.',
+          )
+        } else {
+          ok('Engine identity', `${t.name}: engine is ${id.family} — matches policy.dialect ${dialectForEngine}`)
+        }
+      }
+    }
   }
 }
 
@@ -496,7 +665,7 @@ if (config) {
 
 /* ------------------------------------------------------------------ report */
 
-const ICON = { ok: '  ok  ', warn: ' warn ', fail: ' FAIL ' }
+const ICON = { ok: '  ok  ', warn: ' warn ', fail: ' FAIL ', unseen: 'unseen' }
 console.log('')
 console.log('conarium doctor')
 console.log('─'.repeat(66))
@@ -506,9 +675,11 @@ for (const r of results) {
 }
 const fails = results.filter((r) => r.level === 'fail').length
 const warns = results.filter((r) => r.level === 'warn').length
+const unseenN = results.filter((r) => r.level === 'unseen').length
 console.log('─'.repeat(66))
-console.log(`${results.length} checks · ${fails} failed · ${warns} warning(s)`)
-if (fails === 0 && warns === 0) console.log('This install is ready.')
+console.log(`${results.length} checks · ${fails} failed · ${warns} warning(s) · ${unseenN} unseen`)
+if (fails === 0 && warns === 0 && unseenN === 0) console.log('This install is ready.')
+if (fails === 0 && unseenN > 0) console.log('No failures. Unseen lines were not verified — not a pass.')
 if (fails > 0) console.log('Fix the FAIL lines above; the gateway will not govern correctly until you do.')
 console.log('')
 // Set the code and let the loop drain. process.exit() here raced the closing
