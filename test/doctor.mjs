@@ -68,6 +68,24 @@ test('connectors without an allow list are reported fail-closed', async () => {
   assert.ok(/fail-closed/.test(out), 'must explain that an empty list permits nothing')
 })
 
+test('maxRows above the measured threshold is a warning, not a failure', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, { ...HEALTHY, policy: { ...HEALTHY.policy, maxRows: 500 } })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, `warning must not fail the doctor:\n${out}`)
+  assert.ok(/maxRows/.test(out), 'must name maxRows')
+  assert.ok(/distinct/.test(out), 'must say cost grows with distinct masked values')
+  assert.ok(/not rejected/.test(out), 'must say the query is not rejected')
+})
+
+test('default maxRows does not warn', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, { ...HEALTHY, policy: { ...HEALTHY.policy, maxRows: 100 } })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, out)
+  assert.ok(!/measured warning above/.test(out), `default cap must stay silent:\n${out}`)
+})
+
 test('a healthy config exits 0', async () => {
   const dir = tmpdir()
   writeConfig(dir, HEALTHY)

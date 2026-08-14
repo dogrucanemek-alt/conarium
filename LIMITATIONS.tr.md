@@ -41,15 +41,22 @@ OpenTimestamps damgasının Bitcoin'de onaylanması saatler sürebilir. Makbuzda
 
 Ed25519 uygulaması resmî denetimden geçmedi.
 
-## Postgres'e göre ek yük ölçülmedi
+## Maskeleme maliyeti satırla değil, benzersiz değerle büyür
 
-Aynı sorgunun doğrudan Postgres ile Conarium üzerinden p50 / p95 / p99
-farkı bu depoda yok. `scripts/benchmark-overhead.mjs` son koşusunda
-yerel Postgres yoktu (koşulamadı).
+Taşıma eşleştiricisi, politikanın maskelediği her benzersiz değer için
+bir tarama kurar. `maxRows` o kümeyi sınırlar. Varsayılan `maxRows` 100.
 
-Veritabanı olmadan maskeleme: 1 000 ayrı e-posta p50 ≈ 205 ms. 100 000
-ayrı e-posta 6 dakikada bitmedi (taşıma eşleştiricisi her benzersiz
-maskeli değerde büyür). Tekrar: [`docs/BENCHMARK.md`](docs/BENCHMARK.md).
+Ölçülmüş (aynı SELECT, aynı satır sayısı, Postgres 16.14, WSL2, bakınız
+[`docs/BENCHMARK.md`](docs/BENCHMARK.md)):
+
+| maxRows | ek yük p50 (maskeli) |
+|---|---|
+| 100 (varsayılan) | 5,0 ms |
+| 500 | 87 ms |
+| 5 000 | 22 s |
+
+Tavanı yükseltmek serbest. 100'ün üstünde doctor ve boot uyarır.
+Sorgu reddedilmez.
 
 ## OpenTimestamps istemcisi
 

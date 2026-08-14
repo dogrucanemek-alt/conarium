@@ -41,7 +41,7 @@ Measures Conarium's added cost, not absolute speed.
   (b) guardQuery → that SELECT (rewritten) → redact
 
 Scenarios: allow (unmasked) · partial (email masked) · deny (query must not run).
-Row counts: 10 · 1 000 · 100 000.
+Caps: 100 (code default) · 500 · 5 000. Dataset is 5 000 rows.
 
 Needs CONARIUM_BENCH_DSN for (a) vs (b). Without it: koşulamadı.`)
   process.exit(0)
@@ -55,21 +55,24 @@ if (!existsSync(govJs)) {
 
 const { Governance, PolicyError } = await import(pathToFileURL(govJs).href)
 
-const SIZES = [10, 1000, 100_000]
+const DEFAULT_MAX_ROWS = 100
+const CAPS = [DEFAULT_MAX_ROWS, 500, 5_000]
+const DATASET_ROWS = 5_000
+const IN_PROCESS_SIZES = [50, 100, 500, 1_000, 5_000]
 const WARMUP_SMALL = 15
 const REPEAT_SMALL = 50
 const WARMUP_LARGE = 2
 const REPEAT_LARGE = 8
-const LARGE_AT = 100_000
-const QUERY =
-  'SELECT id, name, email, note FROM public.bench_customers WHERE id <= $n ORDER BY id'
-const DENY_QUERY = 'SELECT id, name, email, note FROM public.bench_secrets WHERE id <= $n ORDER BY id'
+const LARGE_AT = 5_000
+const QUERY = 'SELECT id, name, email, note FROM public.bench_customers ORDER BY id'
+const DENY_QUERY = 'SELECT id, name, email, note FROM public.bench_secrets ORDER BY id'
 const SECRET_EMAIL = 'bench-secret-user@example.com'
 
-function budget(n) {
-  return n >= LARGE_AT
-    ? { warmup: WARMUP_LARGE, repeats: REPEAT_LARGE }
-    : { warmup: WARMUP_SMALL, repeats: REPEAT_SMALL }
+function budget(n, series) {
+  if (series === 'same-sql' || n >= LARGE_AT) {
+    return { warmup: 5, repeats: 15 }
+  }
+  return { warmup: WARMUP_SMALL, repeats: REPEAT_SMALL }
 }
 
 function percentile(sorted, p) {
@@ -109,26 +112,22 @@ function stampName() {
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}Z`
 }
 
-function sqlFor(template, n) {
-  return template.replace('$n', String(n))
-}
-
-function policyFor(kind) {
+function policyFor(kind, maxRows = DEFAULT_MAX_ROWS) {
   if (kind === 'allow') {
-    return { allowTables: ['public.bench_customers'], maxRows: 100_000 }
+    return { allowTables: ['public.bench_customers'], maxRows }
   }
   if (kind === 'partial') {
     return {
       allowTables: ['public.bench_customers'],
       maskColumns: ['*.email'],
-      maxRows: 100_000,
+      maxRows,
     }
   }
   return {
     allowTables: ['public.bench_customers'],
     denyTables: ['public.bench_secrets'],
     maskColumns: ['*.email'],
-    maxRows: 100_000,
+    maxRows,
   }
 }
 
@@ -162,13 +161,17 @@ function timeSync(fn, warmup, repeats, label = '') {
   return samples
 }
 
-async function timeAsync(fn, warmup, repeats) {
+async function timeAsync(fn, warmup, repeats, label = '') {
+  if (label) process.stderr.write(`  ${label} warmup=${warmup} n=${repeats}\n`)
   for (let i = 0; i < warmup; i++) await fn()
   const samples = new Array(repeats)
   for (let i = 0; i < repeats; i++) {
     const t0 = performance.now()
     await fn()
     samples[i] = performance.now() - t0
+    if (label && (i === 0 || i === repeats - 1)) {
+      process.stderr.write(`  ${label} sample ${i + 1}/${repeats} ${samples[i].toFixed(1)}ms\n`)
+    }
   }
   return samples
 }
@@ -176,8 +179,8 @@ async function timeAsync(fn, warmup, repeats) {
 function runInProcess() {
   const out = { guard: {}, redact: {}, samples: { guard: {}, redact: {} } }
   for (const kind of ['allow', 'partial', 'deny']) {
-    const gov = new Governance(policyFor(kind))
-    const sql = kind === 'deny' ? sqlFor(DENY_QUERY, 10) : sqlFor(QUERY, 10)
+    const gov = new Governance(policyFor(kind, DEFAULT_MAX_ROWS))
+    const sql = kind === 'deny' ? DENY_QUERY : QUERY
     const { warmup, repeats } = budget(10)
     const samples = timeSync(() => {
       try {
@@ -191,9 +194,12 @@ function runInProcess() {
     out.guard[kind] = { ...summarize(samples), warmup, repeats, unit: 'ms' }
   }
 
-  for (const n of SIZES) {
-    const gov = new Governance(policyFor('partial'))
-    const guarded = gov.guardQuery(sqlFor(QUERY, n))
+  const sizes = process.env.CONARIUM_BENCH_DSN
+    ? IN_PROCESS_SIZES.filter((n) => n <= 500)
+    : IN_PROCESS_SIZES
+  for (const n of sizes) {
+    const gov = new Governance(policyFor('partial', Math.max(n, DEFAULT_MAX_ROWS)))
+    const guarded = gov.guardQuery(QUERY)
     const { warmup, repeats } = budget(n)
 
     const uniqueRows = syntheticRows(n, { uniqueEmails: true })
@@ -204,57 +210,17 @@ function runInProcess() {
       sql: guarded.sql,
     }
 
-    // Carry-over builds one regex per distinct masked value, then applies
-    // the set to every cell. 100k unique emails hung >6 min on the machine
-    // that wrote this script. Do not start that cell unless forced.
-    const forceUnique100k = process.env.CONARIUM_BENCH_UNIQUE_100K === '1'
-    if (n >= LARGE_AT && !forceUnique100k) {
-      out.samples.redact[String(n)] = []
-      out.redact[String(n)] = {
-        status: 'kosulanmadi',
-        reason:
-          '100k rows × distinct emails: carry-over matcher set. A prior run on this script did not finish in 6 minutes. Set CONARIUM_BENCH_UNIQUE_100K=1 to force.',
-        warmup: 0,
-        repeats: 0,
-        rows: n,
-        uniqueEmails: true,
-      }
-    } else {
-      const samples = timeSync(() => {
-        gov.redact(uniquePayload, guarded.aliases, guarded.metadata)
-      }, warmup, repeats, `redact ${n} unique-email`)
-      out.samples.redact[String(n)] = samples
-      out.redact[String(n)] = {
-        ...summarize(samples),
-        warmup,
-        repeats,
-        unit: 'ms',
-        rows: n,
-        uniqueEmails: true,
-      }
-    }
-
-    if (n >= LARGE_AT) {
-      const repeated = syntheticRows(n, { uniqueEmails: false })
-      const repeatedPayload = {
-        rows: repeated,
-        rowCount: n,
-        fields: ['id', 'name', 'email', 'note'],
-        sql: guarded.sql,
-      }
-      const repeatedSamples = timeSync(() => {
-        gov.redact(repeatedPayload, guarded.aliases, guarded.metadata)
-      }, warmup, repeats, `redact ${n} repeated-email`)
-      out.samples.redact[`${n}-repeated-email`] = repeatedSamples
-      out.redact[`${n}-repeated-email`] = {
-        ...summarize(repeatedSamples),
-        warmup,
-        repeats,
-        unit: 'ms',
-        rows: n,
-        uniqueEmails: false,
-        note: 'Same email on every row. Not a substitute for unique-email 100k.',
-      }
+    const samples = timeSync(() => {
+      gov.redact(uniquePayload, guarded.aliases, guarded.metadata)
+    }, warmup, repeats, `redact ${n} unique-email`)
+    out.samples.redact[String(n)] = samples
+    out.redact[String(n)] = {
+      ...summarize(samples),
+      warmup,
+      repeats,
+      unit: 'ms',
+      rows: n,
+      uniqueEmails: true,
     }
   }
   return out
@@ -278,12 +244,11 @@ async function ensureBenchTables(sql) {
     )
   `)
   const [{ n }] = await sql.unsafe('SELECT count(*)::int AS n FROM public.bench_customers')
-  if (n < 100_000) {
+  if (n < DATASET_ROWS) {
     await sql.unsafe('TRUNCATE public.bench_customers')
-    // Batches keep the script from building a 100k-row VALUES list in one go.
-    const batch = 5_000
-    for (let start = 1; start <= 100_000; start += batch) {
-      const end = Math.min(100_000, start + batch - 1)
+    const batch = 1_000
+    for (let start = 1; start <= DATASET_ROWS; start += batch) {
+      const end = Math.min(DATASET_ROWS, start + batch - 1)
       const values = []
       for (let i = start; i <= end; i++) {
         const email = i === 1 ? SECRET_EMAIL : `user-${i}@example.com`
@@ -318,93 +283,105 @@ async function runPostgresComparison(dsn) {
     const comparison = {}
     const samples = {}
 
-    for (const kind of ['allow', 'partial', 'deny']) {
-      comparison[kind] = {}
-      samples[kind] = {}
-      for (const n of SIZES) {
-        const gov = new Governance(policyFor(kind))
-        const text = sqlFor(kind === 'deny' ? DENY_QUERY : QUERY, n)
-        const { warmup, repeats } = budget(n)
+    for (const series of ['same-sql', 'same-limit']) {
+      comparison[series] = {}
+      samples[series] = {}
+      for (const kind of ['allow', 'partial', 'deny']) {
+        comparison[series][kind] = {}
+        samples[series][kind] = {}
+        for (const cap of CAPS) {
+          const gov = new Governance(policyFor(kind, cap))
+          const base = kind === 'deny' ? DENY_QUERY : QUERY
+          const text = series === 'same-limit' ? `${base} LIMIT ${cap}` : base
+          const { warmup, repeats } = budget(cap, series)
+          const cellLabel = `${series} ${kind} maxRows=${cap}`
 
-        if (kind === 'deny') {
-          const before = queryRuns
-          const denySamples = await timeAsync(async () => {
-            try {
-              gov.guardQuery(text)
-              throw new Error('deny scenario allowed the query — not measured as deny')
-            } catch (err) {
-              if (!(err instanceof PolicyError)) throw err
+          if (kind === 'deny') {
+            const before = queryRuns
+            const denySamples = await timeAsync(async () => {
+              try {
+                gov.guardQuery(text)
+                throw new Error('deny scenario allowed the query — not measured as deny')
+              } catch (err) {
+                if (!(err instanceof PolicyError)) throw err
+              }
+            }, warmup, repeats, cellLabel)
+            if (queryRuns !== before) {
+              throw new Error(`deny ran the query ${queryRuns - before} time(s) — gate failed`)
             }
-          }, warmup, repeats)
-          if (queryRuns !== before) {
-            throw new Error(`deny ran the query ${queryRuns - before} time(s) — gate failed`)
+            comparison[series][kind][String(cap)] = {
+              direct: null,
+              conarium: { ...summarize(denySamples), warmup, repeats, unit: 'ms' },
+              overhead: null,
+              note: 'deny must not hit Postgres; overhead vs direct is not defined',
+              queryRan: false,
+              maxRows: cap,
+            }
+            samples[series][kind][String(cap)] = { conarium: denySamples }
+            continue
           }
-          const stats = summarize(denySamples)
-          comparison[kind][String(n)] = {
-            direct: null,
-            conarium: { ...stats, warmup, repeats, unit: 'ms' },
-            overhead: null,
-            note: 'deny must not hit Postgres; overhead vs direct is not defined',
-            queryRan: false,
-          }
-          samples[kind][String(n)] = { conarium: denySamples }
-          continue
-        }
 
-        const directSamples = await timeAsync(async () => {
-          await tracked(text)
-        }, warmup, repeats)
+          const directSamples = await timeAsync(async () => {
+            await tracked(text)
+          }, warmup, repeats, `${cellLabel} direct`)
 
-        const conariumSamples = []
-        const deltas = []
-        for (let i = 0; i < warmup; i++) {
-          const guarded = gov.guardQuery(text)
-          const rows = await tracked(guarded.sql)
-          gov.redact(
-            { rows, rowCount: rows.length, fields: ['id', 'name', 'email', 'note'], sql: guarded.sql },
-            guarded.aliases,
-            guarded.metadata,
-          )
-        }
-        for (let i = 0; i < repeats; i++) {
-          const d0 = performance.now()
-          await tracked(text)
-          const directMs = performance.now() - d0
-
-          const c0 = performance.now()
-          const guarded = gov.guardQuery(text)
-          const rows = await tracked(guarded.sql)
-          const redacted = gov.redact(
-            { rows, rowCount: rows.length, fields: ['id', 'name', 'email', 'note'], sql: guarded.sql },
-            guarded.aliases,
-            guarded.metadata,
-          )
-          const conariumMs = performance.now() - c0
-          if (kind === 'partial') {
-            const leaked = redacted.rows.some((row) =>
-              Object.values(row).some((v) => typeof v === 'string' && v.includes(SECRET_EMAIL)),
+          const conariumSamples = []
+          const deltas = []
+          let lastDirectRows = 0
+          let lastConariumRows = 0
+          for (let i = 0; i < warmup; i++) {
+            const guarded = gov.guardQuery(text)
+            const rows = await tracked(guarded.sql)
+            gov.redact(
+              { rows, rowCount: rows.length, fields: ['id', 'name', 'email', 'note'], sql: guarded.sql },
+              guarded.aliases,
+              guarded.metadata,
             )
-            if (leaked) throw new Error('partial scenario leaked the secret email — numbers discarded')
           }
-          conariumSamples.push(conariumMs)
-          deltas.push(conariumMs - directMs)
-        }
+          for (let i = 0; i < repeats; i++) {
+            const d0 = performance.now()
+            const directRows = await tracked(text)
+            const directMs = performance.now() - d0
+            lastDirectRows = directRows.length
 
-        comparison[kind][String(n)] = {
-          direct: { ...summarize(directSamples), warmup, repeats, unit: 'ms' },
-          conarium: { ...summarize(conariumSamples), warmup, repeats, unit: 'ms' },
-          overhead: { ...summarize(deltas), warmup, repeats, unit: 'ms' },
-          queryRan: true,
-        }
-        samples[kind][String(n)] = {
-          direct: directSamples,
-          conarium: conariumSamples,
-          overhead: deltas,
+            const c0 = performance.now()
+            const guarded = gov.guardQuery(text)
+            const rows = await tracked(guarded.sql)
+            const redacted = gov.redact(
+              { rows, rowCount: rows.length, fields: ['id', 'name', 'email', 'note'], sql: guarded.sql },
+              guarded.aliases,
+              guarded.metadata,
+            )
+            const conariumMs = performance.now() - c0
+            lastConariumRows = redacted.rows.length
+            if (kind === 'partial') {
+              const leaked = redacted.rows.some((row) =>
+                Object.values(row).some((v) => typeof v === 'string' && v.includes(SECRET_EMAIL)),
+              )
+              if (leaked) throw new Error('partial scenario leaked the secret email — numbers discarded')
+            }
+            conariumSamples.push(conariumMs)
+            deltas.push(conariumMs - directMs)
+          }
+
+          comparison[series][kind][String(cap)] = {
+            direct: { ...summarize(directSamples), warmup, repeats, unit: 'ms', rows: lastDirectRows },
+            conarium: { ...summarize(conariumSamples), warmup, repeats, unit: 'ms', rows: lastConariumRows },
+            overhead: { ...summarize(deltas), warmup, repeats, unit: 'ms' },
+            queryRan: true,
+            maxRows: cap,
+            userSql: text,
+          }
+          samples[series][kind][String(cap)] = {
+            direct: directSamples,
+            conarium: conariumSamples,
+            overhead: deltas,
+          }
         }
       }
     }
 
-    return { status: 'ran', version, comparison, samples }
+    return { status: 'ran', version, datasetRows: DATASET_ROWS, caps: CAPS, comparison, samples }
   } finally {
     await sql.end({ timeout: 5 })
   }
@@ -431,22 +408,26 @@ const report = {
   measuredAt: new Date().toISOString(),
   hardware: hw,
   method: {
-    sizes: SIZES,
+    defaultMaxRows: DEFAULT_MAX_ROWS,
+    caps: CAPS,
+    datasetRows: DATASET_ROWS,
+    inProcessSizes: IN_PROCESS_SIZES,
     warmupSmall: WARMUP_SMALL,
     repeatsSmall: REPEAT_SMALL,
     warmupLarge: WARMUP_LARGE,
     repeatsLarge: REPEAT_LARGE,
-    largeAt: LARGE_AT,
     query: QUERY,
     denyQuery: DENY_QUERY,
     headline: 'p50 / p95 / p99 — mean is not reported',
     whatOverheadMeans:
-      'overhead = paired (guardQuery + Postgres + redact) minus the same SELECT sent straight to Postgres',
+      'overhead = paired (guardQuery + Postgres + redact) minus the same SELECT sent straight to Postgres. same-sql: user SQL has no LIMIT (Conarium adds maxRows). same-limit: user SQL already has LIMIT = maxRows (same row count).',
   },
   postgres: {
     status: postgresResult.status,
     reason: postgresResult.reason ?? null,
     version: postgresResult.version ?? null,
+    datasetRows: postgresResult.datasetRows ?? null,
+    caps: postgresResult.caps ?? null,
     comparison: postgresResult.comparison,
   },
   inProcess: {
@@ -478,13 +459,16 @@ console.log(`postgres  ${postgresResult.status}${postgresResult.reason ? ` — $
 if (postgresResult.version) console.log(`pg        ${postgresResult.version}`)
 console.log('')
 if (postgresResult.comparison) {
-  for (const kind of Object.keys(postgresResult.comparison)) {
-    for (const n of Object.keys(postgresResult.comparison[kind])) {
-      const cell = postgresResult.comparison[kind][n]
-      console.log(`[${kind} × ${n}]`)
-      console.log('  ' + line('direct   ', cell.direct))
-      console.log('  ' + line('conarium ', cell.conarium))
-      console.log('  ' + line('overhead ', cell.overhead))
+  for (const series of Object.keys(postgresResult.comparison)) {
+    for (const kind of Object.keys(postgresResult.comparison[series])) {
+      for (const cap of Object.keys(postgresResult.comparison[series][kind])) {
+        const cell = postgresResult.comparison[series][kind][cap]
+        const rows = cell.direct?.rows != null ? ` directRows=${cell.direct.rows} conariumRows=${cell.conarium?.rows}` : ''
+        console.log(`[${series} ${kind} maxRows=${cap}${rows}]`)
+        console.log('  ' + line('direct   ', cell.direct))
+        console.log('  ' + line('conarium ', cell.conarium))
+        console.log('  ' + line('overhead ', cell.overhead))
+      }
     }
   }
 } else {

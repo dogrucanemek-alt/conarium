@@ -7,106 +7,114 @@ Headline numbers are **p50 / p95 / p99**. Mean is not reported.
 Replay:
 
 ```
-npm run build
-CONARIUM_BENCH_DSN=postgres://… npm run bench:overhead
+# temporary Postgres (WSL Docker on this machine)
+docker run -d --name conarium-bench-pg \
+  -e POSTGRES_USER=conarium -e POSTGRES_PASSWORD=demo-not-a-secret \
+  -e POSTGRES_DB=conarium_bench -p 54329:5432 postgres:16-alpine
+
+CONARIUM_BENCH_DSN=postgres://conarium:demo-not-a-secret@127.0.0.1:54329/conarium_bench \
+  npm run bench:overhead
+
+docker rm -f conarium-bench-pg
 ```
 
-Without `CONARIUM_BENCH_DSN` the Postgres comparison is **koşulamadı**.
-The script still writes in-process gate timings. Those are not a
-substitute for (a) vs (b).
-
 Raw JSON: [`benchmarks/latest.json`](benchmarks/latest.json)
-(this run: [`benchmarks/overhead-20260814T1238Z-win32.json`](benchmarks/overhead-20260814T1238Z-win32.json)).
+(this run: [`benchmarks/overhead-20260814T1346Z-linux.json`](benchmarks/overhead-20260814T1346Z-linux.json)).
 
-No competitor numbers. One run is not a conclusion — see `n` on each
-row.
+No competitor numbers. n=15 cells have a thin tail (p95 = p99).
 
 ---
 
-## This machine
+## This run
 
 | | |
 |---|---|
 | CPU | Intel Core Ultra 9 275HX × 24 |
-| RAM | 34 GB |
-| OS | Windows 10.0.26200 (win32 x64) |
-| Node | v24.5.0 |
-| Postgres | **yok** — no `psql`, no Docker, no DSN |
-| When | 2026-08-14T12:38:23.890Z |
+| RAM visible | 16 GB (WSL2) |
+| OS | WSL2 Ubuntu, linux 6.18.33.2 |
+| Node | v18.19.1 |
+| Postgres | 16.14 (postgres:16-alpine) |
+| Dataset | 5 000 rows, distinct email per row |
+| When | 2026-08-14T13:46Z |
 
-Method: warmup 15 + 50 repeats for n ≤ 1 000; warmup 2 + 8 repeats
-for n = 100 000. Query:
+`maxRows` default in code is **100**. Caps measured: 100 · 500 · 5 000.
 
-`SELECT id, name, email, note FROM public.bench_customers WHERE id <= N`
+Two series, same user SQL both sides:
 
-Deny uses `public.bench_secrets` (must not hit the database).
+- **same-sql** — no `LIMIT` in the user query. Conarium adds `maxRows`. Direct
+  returns 5 000 rows. A negative delta is the cap, not a faster mask.
+- **same-limit** — user SQL already has `LIMIT = maxRows`. Same row count.
+  This is the gate tax.
 
----
-
-## (a) vs (b) — Postgres comparison
-
-**koşulamadı.**
-
-This machine has no local Postgres and no Docker. Inventing a delta
-would be a lie. On a host with Postgres:
-
-```
-CONARIUM_BENCH_DSN=postgres://user:pass@127.0.0.1:5432/db npm run bench:overhead
-```
-
-The script creates `public.bench_customers` (100 000 rows) and
-`public.bench_secrets`, then records paired samples:
-direct SELECT vs `guardQuery` + that SELECT + `redact`.
-Deny asserts the query counter did not move.
+Deny must not hit Postgres. It did not.
 
 ---
 
-## In-process (not vs Postgres)
+## same-limit (same row count) — the number to quote
 
-CPU of the gate only. No socket, no receipt, no MCP JSON-RPC.
+### allow (no mask)
 
-### `guardQuery`
-
-| Scenario | p50 | p95 | p99 | n |
+| maxRows | direct p50 | conarium p50 | overhead p50 / p95 / p99 | n |
 |---|---|---|---|---|
-| allow (unmasked) | 0.517 ms | 1.562 ms | 1.843 ms | 50 |
-| partial (email masked) | 0.694 ms | 1.180 ms | 1.774 ms | 50 |
-| deny | 0.359 ms | 0.880 ms | 1.507 ms | 50 |
+| 100 | 0.427 ms | 3.798 ms | **2.850 / 3.731 / 4.191** | 50 |
+| 500 | 1.069 ms | 9.257 ms | **7.973 / 11.117 / 11.545** | 50 |
+| 5 000 | 5.660 ms | 73.885 ms | **69.242 / 85.116 / 85.116** | 15 |
 
-Parse + policy is sub-millisecond to ~2 ms on this CPU. That is not
-the expensive part.
+### partial (email masked)
 
-### `redact` — distinct email per row
-
-| Rows | p50 | p95 | p99 | n |
+| maxRows | direct p50 | conarium p50 | overhead p50 / p95 / p99 | n |
 |---|---|---|---|---|
-| 10 | 0.158 ms | 0.366 ms | 1.106 ms | 50 |
-| 1 000 | 205.260 ms | 313.199 ms | 322.143 ms | 50 |
-| 100 000 | **koşulamadı** | — | — | 0 |
+| 100 | 0.577 ms | 5.968 ms | **5.006 / 6.730 / 7.099** | 50 |
+| 500 | 0.950 ms | 88.363 ms | **86.615 / 112.802 / 341.147** | 50 |
+| 5 000 | 4.828 ms | 21787 ms | **21770 / 25581 / 25581** | 15 |
 
-100 000 distinct emails: a previous attempt on this script did not
-finish in 6 minutes. The carry-over pass builds one regex per unique
-masked value and applies the set to every cell. Forced replay:
+Default configuration (100 rows, masked): **about 5 ms added**.
+500 distinct emails: **about 87 ms**. 5 000: **about 22 s**.
 
-`CONARIUM_BENCH_UNIQUE_100K=1 npm run bench:overhead`
+### deny
 
-### `redact` — same email on every row (100 000)
-
-Labeled so it cannot be read as the unique-email cell.
-
-| Rows | p50 | p95 | p99 | n |
-|---|---|---|---|---|
-| 100 000 (1 distinct email) | 653.160 ms | 840.667 ms | 840.667 ms | 8 |
-
-p99 equals p95 here because n = 8. That is a thin tail, not a
-smoothed one.
+| maxRows | conarium p50 | query ran |
+|---|---|---|
+| 100 | 0.432 ms | no |
+| 500 | 0.404 ms | no |
+| 5 000 | 0.396 ms | no |
 
 ---
 
-## What this does not say
+## same-sql (user query has no LIMIT)
 
-- It does not say how much a bank will see on their Postgres. That
-  cell is koşulamadı.
-- It does not include receipt signing, audit JSONL, or MCP framing.
-- 1 000 distinct emails already costing ~200 ms p50 is a real cost
-  of the carry-over matcher. It is also in LIMITATIONS.md.
+Direct always returns 5 000 rows. Conarium returns `maxRows`.
+
+| scenario | maxRows | direct p50 | conarium p50 | overhead p50 | rows in / out |
+|---|---|---|---|---|---|
+| allow | 100 | 4.023 | 3.444 | **−1.592** | 5000 → 100 |
+| allow | 500 | 4.411 | 9.147 | 3.943 | 5000 → 500 |
+| allow | 5 000 | 4.511 | 78.854 | 73.775 | 5000 → 5000 |
+| partial | 100 | 5.862 | 6.926 | 1.824 | 5000 → 100 |
+| partial | 500 | 6.177 | 90.215 | 84.854 | 5000 → 500 |
+| partial | 5 000 | 5.856 | 19301 | 19289 | 5000 → 5000 |
+
+The −1.6 ms cell is the row cap doing less I/O. It is not a claim that
+masking is free.
+
+---
+
+## In-process redact (WSL, unique email per row)
+
+Not a substitute for the table above. Shows the same cliff without a socket.
+
+| distinct emails | p50 | p95 | p99 | n |
+|---|---|---|---|---|
+| 50 | 1.137 ms | 2.018 | 3.066 | 50 |
+| 100 | 2.678 ms | 5.821 | 8.998 | 50 |
+| 500 | 76.381 ms | 113.928 | 123.534 | 50 |
+
+---
+
+## Warning threshold
+
+`docs/benchmarks/masking-cost-threshold.json` → **warn above 100**.
+
+100 is the last measured point still in the low-millisecond band
+(same-limit partial overhead p50 = 5.0 ms). 500 is already 87 ms.
+The doctor and `parseConariumConfig` warn. They do not reject the query.

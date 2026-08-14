@@ -41,16 +41,22 @@ An OpenTimestamps stamp can take hours to confirm on Bitcoin. Receipts already s
 
 The Ed25519 implementation has not had a formal audit.
 
-## Gateway overhead vs Postgres is unmeasured
+## Masking cost grows with distinct masked values
 
-No p50 / p95 / p99 of the same query through Conarium versus direct
-Postgres is in this repository. The last run of
-`scripts/benchmark-overhead.mjs` had no local Postgres (koşulamadı).
+Carry-over builds one matcher per unique value this policy already
+masked. `maxRows` bounds that set. Default `maxRows` is 100.
 
-In-process redact (no database) on that machine: 1 000 distinct emails
-p50 ≈ 205 ms. 100 000 distinct emails did not finish in 6 minutes
-(carry-over builds one matcher per unique masked value). Replay:
-[`docs/BENCHMARK.md`](docs/BENCHMARK.md).
+Measured (same SELECT, same row count, Postgres 16.14, WSL2, see
+[`docs/BENCHMARK.md`](docs/BENCHMARK.md)):
+
+| maxRows | overhead p50 (masked) |
+|---|---|
+| 100 (default) | 5.0 ms |
+| 500 | 87 ms |
+| 5 000 | 22 s |
+
+Raising the cap is allowed. The doctor and boot log warn above 100.
+The query is not rejected.
 
 ## OpenTimestamps client
 

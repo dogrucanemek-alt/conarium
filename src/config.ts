@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { ConariumConfig } from './types.js'
 import { compileCustomPatterns, CustomPatternError } from './custom_patterns.js'
+import { warnIfMaxRowsHigh } from './masking-cost.js'
 
 const stringArray = z.array(z.string().min(1)).default([])
 
@@ -93,6 +94,10 @@ export function parseConariumConfig(raw: unknown): ConariumConfig {
   } catch (err) {
     if (err instanceof CustomPatternError) throw err
     throw err
+  }
+  warnIfMaxRowsHigh(cfg.policy?.maxRows)
+  for (const profile of Object.values(cfg.policy?.profiles ?? {})) {
+    warnIfMaxRowsHigh(profile.maxRows)
   }
   return cfg
 }

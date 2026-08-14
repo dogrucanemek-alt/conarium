@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Postgres overhead measured.** Same SELECT, default `maxRows` 100: about
+  5 ms added when email is masked. 500 → ~87 ms. 5 000 → ~22 s. Cost
+  follows distinct masked values. Doctor and boot warn above 100; they
+  do not reject the query. See `docs/BENCHMARK.md`.
+- **Carry-over corpus lock.** `src/governance.carryover-diff.test.ts`.
+  A single-pass rewrite disagreed on sequential longest-first overlap
+  and was reverted.
+
 - **Overhead benchmark script.** `scripts/benchmark-overhead.mjs` measures
   the same SELECT direct vs through the gate (p50/p95/p99). Without a DSN
   the comparison is recorded as koşulamadı — no invented numbers.
