@@ -54,6 +54,13 @@
     "codex"
   ],
   "homepage": "https://github.com/dogrucanemek-alt/conarium",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dogrucanemek-alt/conarium.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dogrucanemek-alt/conarium/issues"
+  },
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
