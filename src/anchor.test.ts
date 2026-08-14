@@ -6,6 +6,7 @@ import {
   AnchorScheduler,
   MemoryAnchorSink,
   hashPrefixToBuffer,
+  classifyReceiptAnchor,
   createAnchorSinkFromEnv,
   appendAnchorSidecar,
   resultToSidecarRecord,
@@ -137,5 +138,20 @@ describe('A6 OpenTimestamps anchoring', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cnr-side-'))
     const side = join(dir, 'audit.jsonl.anchors.jsonl')
     appendAnchorSidecar(side, row)
+  })
+
+  it('G17: classifyReceiptAnchor never trusts a forged bitcoin state', () => {
+    const receipt = {
+      anchor: { log: 'opentimestamps', ref: 'sha256:' + 'ab'.repeat(32), state: 'bitcoin' as const },
+      chain: { hash: 'sha256:' + 'ab'.repeat(32) },
+    }
+    expect(classifyReceiptAnchor(receipt, null)).toBe('unverified')
+    expect(classifyReceiptAnchor({ ...receipt, anchor: null }, null)).toBe('none')
+    expect(
+      classifyReceiptAnchor(
+        { ...receipt, anchor: { ...receipt.anchor, state: 'pending' } },
+        null,
+      ),
+    ).toBe('pending')
   })
 })

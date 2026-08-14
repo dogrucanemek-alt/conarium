@@ -7,7 +7,7 @@
  *
  * Usage:
  *   conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...]
- *                   [--anchor-check] [--expect-seq-from N]
+ *                   [--anchor-check] [--require-head-anchor] [--expect-seq-from N]
  *                   [--expect-count N] [--expect-last-hash sha256:…] [--json]
  *
  * Exit codes (design §5):
@@ -17,7 +17,8 @@
  *      (--expect-count / --expect-last-hash) missed
  *  12  seq gap or non-increasing
  *  13  signature invalid / no pubkey
- *  14  anchor proof failed / missing under --anchor-check
+ *  14  claimed anchor proof failed under --anchor-check
+ *      (null anchors are skipped; --require-head-anchor fails if head is unanchored)
  *  15  anchor COULD NOT BE CHECKED (calendar unreachable, verifier not installed)
  *      — deliberately distinct from 14: "I could not verify" is not "this is invalid"
  *  20  schema invalid
@@ -90,7 +91,7 @@ export { canonicalize, receiptHash }
 function usage(msg) {
   if (msg) console.error(msg)
   console.error(
-    'Usage: conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--anchor-check] [--anchors <path>] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--json]',
+    'Usage: conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--anchor-check] [--require-head-anchor] [--anchors <path>] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--json]',
   )
 }
 
@@ -99,6 +100,7 @@ function parseArgs(argv) {
     target: null,
     pubkeys: [],
     anchorCheck: false,
+    requireHeadAnchor: false,
     anchorsPath: null,
     expectSeqFrom: null,
     expectCount: null,
@@ -113,6 +115,9 @@ function parseArgs(argv) {
       if (!p) throw new Error('--pubkey requires a path')
       out.pubkeys.push(p)
     } else if (a === '--anchor-check') {
+      out.anchorCheck = true
+    } else if (a === '--require-head-anchor') {
+      out.requireHeadAnchor = true
       out.anchorCheck = true
     } else if (a === '--anchors') {
       const p = args.shift()
@@ -415,6 +420,9 @@ async function main(argv = process.argv.slice(2)) {
     console.error(
       'warning: empty chain (0 receipts) — this is not a verification that nothing was deleted. A hash chain cannot see a tail that is no longer in the file. Pass --expect-count or --expect-last-hash to pin length.',
     )
+    if (opts.requireHeadAnchor) {
+      fail(14, 'head anchor required but chain is empty', opts.json, { count: 0 })
+    }
     if (opts.json) console.log(JSON.stringify({ ok: true, code: 0, warning: 'empty', count: 0 }))
     process.exit(0)
   }
@@ -425,6 +433,8 @@ async function main(argv = process.argv.slice(2)) {
   let prevHash = GENESIS
   let prevSeq = opts.expectSeqFrom !== null ? opts.expectSeqFrom - 1 : null
   let pendingAnchorWarned = false
+  let anchoredCount = 0
+  let headAnchored = false
 
   for (let i = 0; i < receipts.length; i++) {
     const { file, receipt } = receipts[i]
@@ -500,52 +510,55 @@ async function main(argv = process.argv.slice(2)) {
 
     if (opts.anchorCheck) {
       if (receipt.anchor === null || receipt.anchor === undefined) {
-        fail(14, `anchor missing at ${where} (--anchor-check)`, opts.json, { index: i, file })
-      }
-      if (typeof receipt.anchor !== 'object' || typeof receipt.anchor.log !== 'string') {
-        fail(14, `anchor proof invalid at ${where}`, opts.json, { index: i, file })
-      }
-      const ref = receipt.anchor.ref || receipt.chain.hash
-      const row = findAnchorRecord(anchorRows, ref)
-      if (!row) {
-        fail(14, `anchor sidecar record missing for ref ${ref} at ${where}`, opts.json, {
-          index: i,
-          file,
-        })
-      }
-      if (!row.ots) {
-        fail(14, `anchor ots missing in sidecar for ref ${ref} at ${where}`, opts.json, {
-          index: i,
-          file,
-        })
-      }
-      const otsResult = await verifyOtsProof(row.ots, receipt.chain.hash)
-      // 15 ÖNCE gelir: "kontrol edemedim" ile "kanıt tutmuyor" farklı cevaplardır
-      // ve ikincisi birincisini yutarsa doğrulayıcı bilmediği bir şeyi iddia eder.
-      // Sessizce 0 dönmek de aynı ölçüde yanlış olurdu — çağıran, çıpanın
-      // doğrulanmadığını BİLMELİ, sadece doğrulanamadığını.
-      if (otsResult.unknown) {
-        fail(
-          15,
-          `anchor could not be checked at ${where}: ${otsResult.detail}`,
-          opts.json,
-          { index: i, file },
-        )
-      }
-      if (!otsResult.ok) {
-        fail(
-          14,
-          `anchor proof failed at ${where}: ${otsResult.detail || 'verify failed'}`,
-          opts.json,
-          { index: i, file },
-        )
-      }
-      if (otsResult.pending || row.state === 'pending') {
-        if (!pendingAnchorWarned) {
-          console.error(
-            'warning: anchor pending (calendar only, not yet Bitcoin-attested)',
+        // Periodic anchoring leaves most receipts null — skip, do not fail.
+      } else {
+        if (typeof receipt.anchor !== 'object' || typeof receipt.anchor.log !== 'string') {
+          fail(14, `anchor proof invalid at ${where}`, opts.json, { index: i, file })
+        }
+        const ref = receipt.anchor.ref || receipt.chain.hash
+        const row = findAnchorRecord(anchorRows, ref)
+        if (!row) {
+          fail(14, `anchor sidecar record missing for ref ${ref} at ${where}`, opts.json, {
+            index: i,
+            file,
+          })
+        }
+        if (!row.ots) {
+          fail(14, `anchor ots missing in sidecar for ref ${ref} at ${where}`, opts.json, {
+            index: i,
+            file,
+          })
+        }
+        const otsResult = await verifyOtsProof(row.ots, receipt.chain.hash)
+        // 15 ÖNCE gelir: "kontrol edemedim" ile "kanıt tutmuyor" farklı cevaplardır
+        // ve ikincisi birincisini yutarsa doğrulayıcı bilmediği bir şeyi iddia eder.
+        // Sessizce 0 dönmek de aynı ölçüde yanlış olurdu — çağıran, çıpanın
+        // doğrulanmadığını BİLMELİ, sadece doğrulanamadığını.
+        if (otsResult.unknown) {
+          fail(
+            15,
+            `anchor could not be checked at ${where}: ${otsResult.detail}`,
+            opts.json,
+            { index: i, file },
           )
-          pendingAnchorWarned = true
+        }
+        if (!otsResult.ok) {
+          fail(
+            14,
+            `anchor proof failed at ${where}: ${otsResult.detail || 'verify failed'}`,
+            opts.json,
+            { index: i, file },
+          )
+        }
+        anchoredCount += 1
+        if (i === receipts.length - 1) headAnchored = true
+        if (otsResult.pending || row.state === 'pending') {
+          if (!pendingAnchorWarned) {
+            console.error(
+              'warning: anchor pending (calendar only, not yet Bitcoin-attested)',
+            )
+            pendingAnchorWarned = true
+          }
         }
       }
     }
@@ -585,6 +598,16 @@ async function main(argv = process.argv.slice(2)) {
   if (modelBildirilmemis) notlar.push(`${modelBildirilmemis} with undeclared model`)
   if (clientBildirilmemis) notlar.push(`${clientBildirilmemis} with undeclared client`)
 
+  if (opts.requireHeadAnchor && !headAnchored) {
+    fail(14, 'head anchor required but head is not anchored', opts.json, {
+      anchored: anchoredCount,
+      total: receipts.length,
+      headAnchored: false,
+    })
+  }
+
+  const summary = `${anchoredCount}/${receipts.length} anchored, head anchored: ${headAnchored ? 'yes' : 'no'}`
+
   if (opts.json) {
     console.log(JSON.stringify({
       ok: true,
@@ -592,10 +615,14 @@ async function main(argv = process.argv.slice(2)) {
       count: receipts.length,
       undeclaredModel: modelBildirilmemis,
       undeclaredClient: clientBildirilmemis,
+      anchored: anchoredCount,
+      headAnchored,
+      anchorSummary: opts.anchorCheck ? summary : undefined,
     }))
   } else {
     const ek = notlar.length ? ` (${notlar.join(', ')})` : ''
     console.log(`ok: ${receipts.length} receipt(s) verified${ek}`)
+    if (opts.anchorCheck) console.log(summary)
   }
   process.exit(0)
 }

@@ -271,11 +271,28 @@ describe('T5 verify scenarios', () => {
     expect(res.stderr).toMatch(/single-receipt/)
   })
 
-  it('T5.8 anchor null + --anchor-check → 14', () => {
+  it('T5.8 / G17: null anchors are skipped; summary is 0/N', () => {
     const path = writeChain(chainOf(2, key))
     const res = runVerify([path, '--pubkey', publicPath, '--anchor-check'])
+    expect(res.code).toBe(0)
+    expect(res.stdout).toMatch(/0\/2 anchored/)
+    expect(res.stdout).toMatch(/head anchored: no/)
+  })
+
+  it('G17: claimed bitcoin without sidecar → 14', () => {
+    const receipts = chainOf(2, key)
+    receipts[1].anchor = { log: 'opentimestamps', ref: receipts[1].chain.hash, state: 'bitcoin' }
+    const path = writeChain(receipts)
+    const res = runVerify([path, '--pubkey', publicPath, '--anchor-check'])
     expect(res.code).toBe(14)
-    expect(res.stderr).toMatch(/anchor missing/)
+    expect(res.stderr).toMatch(/anchor (proof |sidecar )?/)
+  })
+
+  it('G17: --require-head-anchor fails when head is unanchored', () => {
+    const path = writeChain(chainOf(2, key))
+    const res = runVerify([path, '--pubkey', publicPath, '--anchor-check', '--require-head-anchor'])
+    expect(res.code).not.toBe(0)
+    expect(res.stderr).toMatch(/head anchor/i)
   })
 
   it('T5.10 src/receipt.ts and bin/conarium-verify.mjs produce the same hash', async () => {

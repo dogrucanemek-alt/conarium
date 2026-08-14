@@ -92,7 +92,7 @@ merely *who* it is, and the coverage declaration's rule that absence is reported
 ## Verifier
 
 ```
-conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--json]
+conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [--require-head-anchor] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--json]
 ```
 
 `--expect-count` / `--expect-last-hash` are **opt-in tail pins**. Without them,
@@ -108,7 +108,7 @@ Default behaviour and the exit-code list are unchanged.
 | 11 | `prevHash` break — deleted or inserted; also `--expect-count` / `--expect-last-hash` mismatch |
 | 12 | `seq` gap / non-increasing — missing or reordered |
 | 13 | Signature invalid / pubkey missing (fail-closed) |
-| 14 | Anchor missing/invalid under `--anchor-check` |
+| 14 | Claimed anchor invalid under `--anchor-check`, or `--require-head-anchor` when the head is unanchored. `anchor:null` receipts are skipped (periodic anchoring). |
 | 15 | Anchor **could not be checked** — calendar unreachable, or the OpenTimestamps verifier is not installed. Deliberately distinct from 14: "I could not verify this" is not "this is invalid". The digest comparison is performed offline and still holds; only the timestamp attestation is unconfirmed. A verifier that collapsed the two would be asserting something it did not measure. |
 | 20 | Schema invalid |
 
@@ -286,8 +286,11 @@ chain, not hash calendars.
 implementation; institutional buyers may prefer it, but it requires trusting a TSA.
 
 **Honest latency:** “not backdated” becomes Bitcoin-hard only after upgrade. Pending
-is disclosed — `conarium-verify --anchor-check` exits 0 with a stderr warning while
-pending, and exits 14 if the proof is missing or does not match the hash.
+is disclosed — `conarium-verify --anchor-check` skips `anchor:null` (periodic
+anchoring), exits 0 with a stderr warning while pending, and exits 14 if a
+*claimed* anchor's proof is missing or does not match the hash. The run prints
+`N/M anchored, head anchored: yes/no`. `--require-head-anchor` exits 14 when
+the chain head is unanchored.
 
 **Manual dogfood — done 31 July 2026.** A real stamp was submitted, not simulated.
 The proof is committed at `docs/dogfood/2026-07-31-anchor.anchors.jsonl` so anyone can

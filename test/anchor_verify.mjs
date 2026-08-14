@@ -30,13 +30,14 @@ function main() {
   const matchingOtsB64 = readFileSync(join(FIX, 'pending-matching.ots')).toString('base64')
   const wrongOtsB64 = readFileSync(join(FIX, 'other-ffff.ots')).toString('base64')
 
-  // A6.5 — anchor stripped
+  // A6.5 — anchor stripped: null is skipped (periodic anchoring leaves most receipts null)
   const chainPath = join(dir, 'chain.jsonl')
   const anchorsPath = `${chainPath}.anchors.jsonl`
   writeFileSync(chainPath, JSON.stringify({ ...receipt, anchor: null }) + '\n')
   let res = runVerify([chainPath, '--pubkey', pub, '--anchor-check', '--anchors', anchorsPath])
-  assert.equal(res.code, 14, `A6.5 expected 14, got ${res.code}: ${res.stderr}`)
-  assert.match(res.stderr, /anchor missing/)
+  assert.equal(res.code, 0, `A6.5 expected 0 (null skipped), got ${res.code}: ${res.stderr}`)
+  assert.match(res.stdout, /0\/1 anchored/)
+  assert.match(res.stdout, /head anchored: no/)
 
   // A6.6 — real pending OTS matching chain.hash → 0 + warning
   // verify() may contact calendars for attestation status; digest already matches offline.

@@ -11,6 +11,8 @@
  */
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { stampHash, upgradeProof, verifyProof } from './ots/client.js'
+import { collectAttestations, deserializeDetached, fileDigest } from './ots/format.js'
+import type { AnchorDisplay } from './receipt-view.js'
 
 export interface AnchorPayload {
   hash: string
@@ -142,6 +144,31 @@ export function readAnchorSidecar(path: string): AnchorSidecarRecord[] {
   const raw = readFileSync(path, 'utf-8').trim()
   if (!raw) return []
   return raw.split('\n').filter(Boolean).map(line => JSON.parse(line) as AnchorSidecarRecord)
+}
+
+/**
+ * Offline sidecar classification for the receipt page.
+ * Never trusts receipt.anchor.state. Network is not used.
+ */
+export function classifyReceiptAnchor(
+  receipt: { anchor: ReceiptAnchorRef | null; chain: { hash: string } },
+  sidecarPath?: string | null,
+): 'none' | AnchorDisplay {
+  if (!receipt.anchor) return 'none'
+  if (!sidecarPath) {
+    return receipt.anchor.state === 'pending' ? 'pending' : 'unverified'
+  }
+  const row = findAnchorByRef(sidecarPath, receipt.anchor.ref || receipt.chain.hash)
+  if (!row?.ots) return 'unverified'
+  try {
+    const proof = deserializeDetached(Buffer.from(row.ots, 'base64'))
+    if (!fileDigest(proof).equals(hashPrefixToBuffer(receipt.chain.hash))) return 'unverified'
+    const atts = collectAttestations(proof.timestamp)
+    if (atts.some((x) => x.attestation.kind === 'bitcoin')) return 'verified'
+    return 'pending'
+  } catch {
+    return 'unverified'
+  }
 }
 
 export function findAnchorByRef(path: string, ref: string): AnchorSidecarRecord | null {

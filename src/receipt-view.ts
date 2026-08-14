@@ -24,10 +24,14 @@ export interface ReceiptViewOperation {
   reason?: string
 }
 
+export type AnchorDisplay = 'pending' | 'unverified' | 'verified'
+
 export interface ReceiptViewAnchor {
   log?: string
   state: 'pending' | 'bitcoin'
   ref?: string
+  /** What the page may print. Absent + claimed bitcoin → unverified. */
+  display?: AnchorDisplay
 }
 
 /** Presentation document. Not a receipt field and not a LiveProof schema. */
@@ -57,6 +61,8 @@ export interface ProofLike {
   publicKey: string | null
   signatureMeaning: boolean
   anchor: ReceiptViewAnchor | null
+  /** Set only after sidecar OTS verification. */
+  anchorVerified?: boolean
   verify: string
   claim: string
   limitations: string[]
@@ -93,7 +99,19 @@ export function presentKnownText(text: string): string {
   return text
 }
 
+export function resolveAnchorDisplay(
+  anchor: { state: string } | null | undefined,
+  opts: { verified?: boolean; display?: AnchorDisplay } = {},
+): AnchorDisplay | null {
+  if (!anchor) return null
+  if (opts.display) return opts.display
+  if (opts.verified === true) return anchor.state === 'bitcoin' ? 'verified' : 'pending'
+  if (anchor.state === 'pending') return 'pending'
+  return 'unverified'
+}
+
 export function proofToView(proof: ProofLike): ReceiptView {
+  const display = resolveAnchorDisplay(proof.anchor, { verified: proof.anchorVerified })
   return {
     title: `${proof.engine.name} ${proof.engine.version}`,
     generatedAt: proof.generatedAt,
@@ -107,7 +125,7 @@ export function proofToView(proof: ProofLike): ReceiptView {
     signatureAbsentNote: proof.signature ? undefined : proof.signatureMeaning ? undefined : 'Bu kipte imza anlamsız.',
     publicKey: proof.publicKey,
     verify: proof.verify,
-    anchor: proof.anchor,
+    anchor: proof.anchor ? { ...proof.anchor, display: display ?? 'unverified' } : null,
     jsonHref: '/proof?format=json',
   }
 }
@@ -120,6 +138,8 @@ export interface ReceiptToViewExtras {
   jsonHref?: string
   limitations?: string[]
   claim?: string
+  /** Sidecar OTS result. Absent = treat claimed bitcoin as unverified. */
+  anchorDisplay?: AnchorDisplay
 }
 
 export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}): ReceiptView {
@@ -127,9 +147,12 @@ export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}
   if (!extras.limitations) {
     if (receipt.model?.source === 'undeclared') limitations.push('model bildirmedi (undeclared).')
     if (receipt.client?.source === 'undeclared') limitations.push('istemci bildirmedi (undeclared).')
+    const display = resolveAnchorDisplay(receipt.anchor, { display: extras.anchorDisplay })
     if (!receipt.anchor) limitations.push('çıpa yok.')
-    else if (receipt.anchor.state === 'pending') {
+    else if (display === 'pending') {
       limitations.push('çıpa durumu: pending — Bitcoin tasdiki henüz yok. Saklanmıyor.')
+    } else if (display === 'unverified') {
+      limitations.push('çıpa doğrulanmadı — ham state güven sinyali değil.')
     }
     if (!receipt.sig) limitations.push('imza yok — bu satır tasdik değil.')
     for (const f of receipt.flags || []) limitations.push(f)
@@ -164,7 +187,12 @@ export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}
     signatureAbsentNote: receipt.sig ? undefined : 'üretilemedi',
     publicKey: extras.publicKey ?? null,
     verify: extras.verify ?? 'npx conarium-verify <receipts.jsonl> --pubkey <key.pub.pem>',
-    anchor: receipt.anchor,
+    anchor: receipt.anchor
+      ? {
+          ...receipt.anchor,
+          display: resolveAnchorDisplay(receipt.anchor, { display: extras.anchorDisplay }) ?? 'unverified',
+        }
+      : null,
     jsonHref: extras.jsonHref,
   }
 }
@@ -217,7 +245,8 @@ function chainIntegrityHtml(check?: ReceiptChainCheck): string {
 
 function innerHtml(view: ReceiptView, localId: string): string {
   const lims = (view.limitations || []).map((l) => `<li>${esc(presentKnownText(l))}</li>`).join('')
-  const pending = view.anchor?.state === 'pending'
+  const display = resolveAnchorDisplay(view.anchor, { display: view.anchor?.display })
+  const pending = display === 'pending'
   const head = view.chain?.head || ''
   const sig = view.signature
   const jsonLink = view.jsonHref
@@ -233,7 +262,8 @@ function innerHtml(view: ReceiptView, localId: string): string {
     <h2>Sınırlar</h2>
     <ul>${lims || '<li>sınır listesi boş — gizlenmedi, yazılmadı.</li>'}</ul>
     ${pending ? `<p class="pending">Çıpa durumu: <strong>pending</strong> — Bitcoin tasdiki henüz yok. Saklanmıyor.</p>` : ''}
-    ${view.anchor && view.anchor.state !== 'pending' ? `<p class="muted">Çıpa: ${esc(view.anchor.state)}${view.anchor.log ? ` (${esc(view.anchor.log)})` : ''}</p>` : ''}
+    ${display === 'unverified' ? `<p class="muted">Çıpa: doğrulanmadı${view.anchor?.log ? ` (${esc(view.anchor.log)})` : ''}</p>` : ''}
+    ${display === 'verified' ? `<p class="muted">Çıpa: bitcoin${view.anchor?.log ? ` (${esc(view.anchor.log)})` : ''}</p>` : ''}
     ${!view.anchor ? `<p class="muted">Çıpa yok.</p>` : ''}
   </section>
 

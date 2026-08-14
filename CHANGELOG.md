@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Behavior change (G17):** Receipt HTML never prints raw `anchor.state`
+  as a trust signal — forged `state: bitcoin` renders as `doğrulanmadı`
+  until the OTS sidecar verifies. `--anchor-check` skips `anchor:null`
+  (periodic anchoring) and fails only on a claimed-but-unverified
+  anchor; the run ends with `N/M anchored, head anchored: yes/no`.
+  `--require-head-anchor` exits 14 when the chain head is unanchored.
+
 - **G3:** `CONARIUM_AUDIT_REQUIRE_SIG=1` is opt-in strict boot — any
   unsigned line is rejected when a signing key is configured. Default
   unchanged (legacy unsigned chains still open).

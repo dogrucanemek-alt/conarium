@@ -152,6 +152,22 @@ describe('renderReceiptHtml', () => {
     expect(html).not.toContain('✓')
     expect(html).not.toContain('SOC 2')
   })
+
+  it('G17: forged state:bitcoin is not printed as a trust signal', () => {
+    const r = sampleReceipt(1, RECEIPT_GENESIS_HASH, 'allow')
+    r.anchor = { log: 'opentimestamps', ref: r.chain.hash, state: 'bitcoin' }
+    const html = renderReceiptHtml(receiptToView(r))
+    expect(html).toContain('doğrulanmadı')
+    expect(html).not.toMatch(/Çıpa:\s*bitcoin/)
+  })
+
+  it('G17: verified sidecar may print bitcoin', () => {
+    const r = sampleReceipt(1, RECEIPT_GENESIS_HASH, 'allow')
+    r.anchor = { log: 'opentimestamps', ref: r.chain.hash, state: 'bitcoin' }
+    const html = renderReceiptHtml(receiptToView(r, { anchorDisplay: 'verified' }))
+    expect(html).toMatch(/Çıpa:\s*bitcoin/)
+    expect(html).not.toContain('doğrulanmadı')
+  })
 })
 
 describe('verifyReceiptChain', () => {

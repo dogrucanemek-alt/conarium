@@ -17,6 +17,7 @@ import {
   verifyCommandFor,
 } from './console-receipts.js'
 import { receiptToView, renderReceiptHtml } from './receipt-view.js'
+import { anchorsPathForSink, classifyReceiptAnchor } from './anchor.js'
 import { maskSecretShapedValues } from './mask-text.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -294,6 +295,10 @@ export function createConsoleApp(opts: {
       res.status(404).type('text/plain').send('receipt not found')
       return
     }
+    const classified = classifyReceiptAnchor(
+      receipt,
+      loaded.sink ? anchorsPathForSink(loaded.sink) : null,
+    )
     const html = renderReceiptHtml(
       receiptToView(receipt, {
         publicKey: publicPemForPanel(),
@@ -301,6 +306,7 @@ export function createConsoleApp(opts: {
         entries: loaded.receipts.length,
         chainIntegrity: loaded.chain,
         jsonHref: `/api/receipts/${encodeURIComponent(receipt.id)}/raw`,
+        anchorDisplay: classified === 'none' ? undefined : classified,
       }),
       { mode: 'fragment' },
     )
@@ -314,6 +320,10 @@ export function createConsoleApp(opts: {
       res.status(404).json({ error: 'receipt not found' })
       return
     }
+    const classified = classifyReceiptAnchor(
+      receipt,
+      loaded.sink ? anchorsPathForSink(loaded.sink) : null,
+    )
     const html = renderReceiptHtml(
       receiptToView(receipt, {
         publicKey: publicPemForPanel(),
@@ -321,6 +331,7 @@ export function createConsoleApp(opts: {
         entries: loaded.receipts.length,
         chainIntegrity: loaded.chain,
         jsonHref: `/api/receipts/${encodeURIComponent(receipt.id)}/raw`,
+        anchorDisplay: classified === 'none' ? undefined : classified,
       }),
       { mode: 'fragment' },
     )
