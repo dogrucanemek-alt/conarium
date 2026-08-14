@@ -65,6 +65,34 @@ export interface ProofLike {
 export const RECEIPT_VIEW_CLAIM =
   'Bu kayıt sonradan değiştirilmediğini, silinmediğini, yeniden sıralanmadığını veya geriye tarih atılmadığını gösterir. Oluştuğu anda doğru olduğunu kanıtlamaz.'
 
+/**
+ * Exact-match presentation map. The receipt / LiveProof JSON is not rewritten.
+ * Unknown strings are returned unchanged — no guessed translation.
+ */
+const PRESENTATION_TR: Record<string, string> = {
+  'These records have not been altered, deleted, reordered or backdated after creation. This does NOT prove they were correct at creation time.':
+    'Bu kayıtlar oluşturulduktan sonra değiştirilmedi, silinmedi, yeniden sıralanmadı veya geriye tarih atılmadı. Oluşturuldukları anda doğru olduklarını kanıtlamaz.',
+  'Synthetic demo data, not real customer data.':
+    'Sentetik demo verisi, gerçek müşteri verisi değil.',
+  'actor is a service identity, not a natural person.':
+    'aktör bir hizmet kimliği, gerçek kişi değil.',
+  'Anchor may be pending — Bitcoin attestation takes hours.':
+    'Çıpa pending olabilir — Bitcoin tasdiki saatler sürer.',
+  'Signature is meaningless: ephemeral mode (CONARIUM_PROOF_ALLOW_EPHEMERAL=1); not a compliance attestation.':
+    'İmza anlamsız: ephemeral kip (CONARIUM_PROOF_ALLOW_EPHEMERAL=1); tasdik değil.',
+  'revenue by month': 'aylık ciro',
+  'customer list': 'müşteri listesi',
+  'closed table': 'kapalı tablo',
+  'not permitted by policy': 'politika izin vermiyor',
+}
+
+export function presentKnownText(text: string): string {
+  if (Object.prototype.hasOwnProperty.call(PRESENTATION_TR, text)) {
+    return PRESENTATION_TR[text]
+  }
+  return text
+}
+
 export function proofToView(proof: ProofLike): ReceiptView {
   return {
     title: `${proof.engine.name} ${proof.engine.version}`,
@@ -168,11 +196,11 @@ function opRows(ops: ReceiptViewOperation[]): string {
     .map((o) => {
       const extra = o.policy === 'deny' ? o.reason || '' : o.sample || ''
       return `<tr>
-        <td>${esc(o.request)}</td>
+        <td>${esc(presentKnownText(o.request))}</td>
         <td class="pol ${esc(o.policy)}">${esc(policyLabel(o.policy))}</td>
         <td>${o.rowsReturned == null ? '—' : esc(o.rowsReturned)}</td>
         <td>${o.maskedCount == null ? '—' : esc(o.maskedCount)}</td>
-        <td>${esc(extra)}</td>
+        <td>${esc(presentKnownText(extra))}</td>
       </tr>`
     })
     .join('')
@@ -188,7 +216,7 @@ function chainIntegrityHtml(check?: ReceiptChainCheck): string {
 }
 
 function innerHtml(view: ReceiptView, localId: string): string {
-  const lims = (view.limitations || []).map((l) => `<li>${esc(l)}</li>`).join('')
+  const lims = (view.limitations || []).map((l) => `<li>${esc(presentKnownText(l))}</li>`).join('')
   const pending = view.anchor?.state === 'pending'
   const head = view.chain?.head || ''
   const sig = view.signature
@@ -209,7 +237,7 @@ function innerHtml(view: ReceiptView, localId: string): string {
     ${!view.anchor ? `<p class="muted">Çıpa yok.</p>` : ''}
   </section>
 
-  ${view.claim ? `<p>${esc(view.claim)}</p>` : ''}
+  ${view.claim ? `<p>${esc(presentKnownText(view.claim))}</p>` : ''}
 
   <h2>İşlemler</h2>
   <table>

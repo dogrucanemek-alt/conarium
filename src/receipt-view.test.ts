@@ -6,6 +6,7 @@ import {
   renderReceiptHtml,
   wantsReceiptHtml,
   serializeReceiptJson,
+  presentKnownText,
   type ProofLike,
 } from './receipt-view.js'
 
@@ -53,8 +54,13 @@ function demoProof(overrides: Partial<ProofLike> = {}): ProofLike {
     signatureMeaning: false,
     anchor: { log: 'opentimestamps', state: 'pending', ref: 'sha256:aa' },
     verify: 'from source: node bin/conarium-verify.mjs <chain.jsonl> --pubkey <key.pem> --anchor-check',
-    claim: 'These records have not been altered.',
-    limitations: ['Synthetic demo data, not real customer data.', 'Anchor may be pending — Bitcoin attestation takes hours.'],
+    claim:
+      'These records have not been altered, deleted, reordered or backdated after creation. This does NOT prove they were correct at creation time.',
+    limitations: [
+      'Synthetic demo data, not real customer data.',
+      'actor is a service identity, not a natural person.',
+      'Anchor may be pending — Bitcoin attestation takes hours.',
+    ],
     ...overrides,
   }
 }
@@ -91,7 +97,25 @@ describe('renderReceiptHtml', () => {
     expect(html).toContain('class="pol deny"')
     expect(html.includes('fonts.googleapis.com')).toBe(false)
     expect(html.includes('cdn.')).toBe(false)
-    for (const lim of proof.limitations) expect(html).toContain(lim)
+    expect(html).toContain('Sentetik demo verisi, gerçek müşteri verisi değil.')
+    expect(html).toContain('aktör bir hizmet kimliği, gerçek kişi değil.')
+    expect(html).toContain('Çıpa pending olabilir')
+    expect(html).toContain('Bu kayıtlar oluşturulduktan sonra değiştirilmedi')
+    expect(html).toContain('aylık ciro')
+    expect(html).toContain('politika izin vermiyor')
+    for (const lim of proof.limitations) {
+      expect(JSON.stringify(proof)).toContain(lim)
+    }
+  })
+
+  it('unknown English is left as-is; JSON is not rewritten', () => {
+    expect(presentKnownText('a string that is not in the map')).toBe('a string that is not in the map')
+    const proof = demoProof({ limitations: ['a string that is not in the map'] })
+    const before = JSON.stringify(proof)
+    const html = renderReceiptHtml(proofToView(proof))
+    expect(html).toContain('a string that is not in the map')
+    expect(JSON.stringify(proof)).toBe(before)
+    expect(proof.limitations[0]).toBe('a string that is not in the map')
   })
 
   it('empty operations list does not invent a sample row', () => {

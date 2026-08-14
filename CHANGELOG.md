@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`/proof` HTML shows known English sentences in Turkish.** The JSON
+  bytes are unchanged; unknown strings are left as-is.
 - **Makbuzlar tab paints "Yükleniyor…" on the same click that switches the tab.**
   The list was filled only after `await`; the first click left a blank card.
 - **Console Makbuzlar tab.** Lists `audit.receiptSink` newest-first, opens the
