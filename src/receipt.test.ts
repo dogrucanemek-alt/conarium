@@ -112,7 +112,9 @@ describe('T1 keys', () => {
   it('rejects broken PEM with a meaningful error', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cnr-keys-bad-'))
     const bad = join(dir, 'bad.pem')
-    writeFileSync(bad, 'not-a-pem\n')
+    // 0600 or the POSIX mode check refuses the file before the PEM is ever
+    // parsed, and this case is about the parse error.
+    writeFileSync(bad, 'not-a-pem\n', { mode: 0o600 })
     writeFileSync(bad + '.keyid', 'x\n')
     process.env.CONARIUM_AUDIT_SIGNING_KEY = bad
     expect(() => loadSigningKey()).toThrow(/invalid Ed25519 private PEM/)
