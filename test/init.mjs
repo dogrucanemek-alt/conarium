@@ -23,7 +23,9 @@ const tests = []
 const test = (name, fn) => tests.push({ name, fn })
 
 function tmpdir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'conarium-init-'))
+  // macOS: os.tmpdir() is /var/folders/... → /private/var/folders/...
+  // The child process cwd is the realpath; compare against that, not the symlink.
+  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'conarium-init-')))
 }
 
 function runInit(cwd, { args = [], env = {} } = {}) {

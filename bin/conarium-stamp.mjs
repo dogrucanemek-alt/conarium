@@ -31,9 +31,18 @@ import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 const STAMP_TIMEOUT_MS = 30_000
 
+function otsAdvisory() {
+  return (
+    'OpenTimestamps pulls javascript-opentimestamps → web3, elliptic, crypto-js, request, lodash. ' +
+    'That tree has 7 critical and 3 high known advisories (measured 2026-08-14). ' +
+    'Default install does not include them.'
+  )
+}
+
 function usage(msg) {
   if (msg) console.error(msg)
   console.error('Usage: conarium-stamp <file> [--sidecar <path>] [--json]')
+  console.error(otsAdvisory())
 }
 
 function parseArgs(argv) {
@@ -61,6 +70,7 @@ function parseArgs(argv) {
 }
 
 function loadOts() {
+  console.warn(otsAdvisory())
   let mod = require('javascript-opentimestamps')
   if (mod && mod.default) mod = mod.default
   return mod

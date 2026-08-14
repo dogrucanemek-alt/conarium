@@ -29,6 +29,16 @@ a 2-second timeout, never blocks startup, and never throws.
 it issues no network request at all. Everything else — connectors, receipts, audit
 log, verification — is local to your infrastructure by construction.
 
+## Optional OpenTimestamps dependency tree
+
+The default install does not include `javascript-opentimestamps`.
+Enabling anchoring — `CONARIUM_ANCHOR_SINK=opentimestamps`, `conarium-stamp`,
+`conarium-anchor-upgrade`, or `npm install javascript-opentimestamps` — pulls
+in `web3`, `elliptic`, `crypto-js`, `request`, and `lodash`. That tree has
+**7 critical and 3 high** known advisories (measured 2026-08-14).
+A production `npm audit --omit=dev` on the default tree reports 0.
+A stamp path that does not pull this tree is not implemented.
+
 ## Threat model
 
 **Conarium protects against**

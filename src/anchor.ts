@@ -127,7 +127,8 @@ function loadOts(): OtsModule {
       throw new Error(
         'Çıpalama için `javascript-opentimestamps` gerekiyor ama kurulu değil. ' +
         'Kurmak için: npm install javascript-opentimestamps — ya da CONARIUM_ANCHOR_SINK=none bırakın. ' +
-        '(Opsiyonel tutuluyor: bu paketin bağımlılık ağacında düzeltilmemiş kritik açıklar var.)'
+        'O ağaç web3, elliptic, crypto-js, request, lodash çeker; 7 kritik ve 3 yüksek açık (2026-08-14). ' +
+        'Varsayılan kurulumda gelmezler.'
       )
     }
     throw err
@@ -175,10 +176,18 @@ export class RekorAnchorSink implements AnchorSink {
   }
 }
 
+const OTS_ADVISORY =
+  'OpenTimestamps pulls javascript-opentimestamps → web3, elliptic, crypto-js, request, lodash. ' +
+  'That tree has 7 critical and 3 high known advisories (measured 2026-08-14). ' +
+  'Default install does not include them.'
+
 export function createAnchorSinkFromEnv(): AnchorSink | null {
   const kind = (process.env.CONARIUM_ANCHOR_SINK || 'none').toLowerCase()
   if (kind === 'none' || kind === '' || kind === 'off') return null
-  if (kind === 'opentimestamps' || kind === 'ots') return new OpenTimestampsSink()
+  if (kind === 'opentimestamps' || kind === 'ots') {
+    console.warn(OTS_ADVISORY)
+    return new OpenTimestampsSink()
+  }
   if (kind === 'memory') return new MemoryAnchorSink()
   throw new Error(`CONARIUM_ANCHOR_SINK unknown value "${kind}" (use opentimestamps|none)`)
 }

@@ -15,6 +15,13 @@
 
 The site lives at [conarium.dev](https://conarium.dev); this repository is the product.
 
+## Limitations
+
+What this repository has **not** done is in [LIMITATIONS.md](LIMITATIONS.md)
+([Türkçe](LIMITATIONS.tr.md)). The dated comparison page is
+[conarium.dev/compare.html](https://conarium.dev/compare.html) — that is the
+only copy; this repo does not keep a second one.
+
 ## 👁️ The Problem
 
 Point Cursor or Copilot at a production database and it drinks the raw stream—SSNs, credit cards, salaries, and live keys. One rogue prompt can expose your most sensitive tables. Security teams simply can't allow that.
@@ -77,6 +84,10 @@ npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --anchor-c
 
 Opt-in anchoring: `CONARIUM_ANCHOR_SINK=opentimestamps`. Upgrade pending proofs later with
 `npx conarium-anchor-upgrade ./audit.jsonl.anchors.jsonl`.
+Enabling that flag (or running `conarium-stamp`) installs `javascript-opentimestamps`
+and pulls `web3`, `elliptic`, `crypto-js`, `request`, and `lodash` — **7 critical
+and 3 high** known advisories (measured 2026-08-14). The default install does
+not include them. See [LIMITATIONS.md](LIMITATIONS.md).
 
 ### Per-person masking profiles
 
@@ -547,8 +558,8 @@ publishing `@conarium-ai/core` to npm so `npx conarium-init` works without a clo
 - **SOC 2.** It audits organisations that hold customer data. We never receive
   yours. If that ever stops being true, this line changes first.
 
-Known gaps are listed in the README above and in
-[`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md) rather than hidden here.
+Known gaps: [LIMITATIONS.md](LIMITATIONS.md), the README above, and
+[`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
 
 ## 📜 License
 

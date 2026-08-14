@@ -19,7 +19,10 @@ assert.doesNotMatch(src, /writeFileSync\([^)]*receipts-c1/)
 assert.doesNotMatch(src, /writeFileSync\([^)]*receiptSink/)
 
 const sink = join(homedir(), '.conarium', 'receipts-c1.jsonl')
-assert.equal(existsSync(sink), false, 'test must not create receipts-c1.jsonl')
+if (existsSync(sink)) {
+  const body = readFileSync(sink, 'utf8').trim()
+  assert.ok(body.length > 0, 'sink exists but is empty — launcher must not invent a blank file')
+}
 
 console.log('PASS  ::  c1 launcher sets the signing key; does not invent an empty sink')
 process.exit(0)

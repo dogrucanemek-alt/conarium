@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **LIMITATIONS.md** (and `LIMITATIONS.tr.md`) lists what this repository has
+  not done. README links it in the body, not a footnote. Comparison stays on
+  the site only.
+- **`test:checks` runs every check even if one fails.** The old `&&` chain
+  went silent after the first failure. `test/init.mjs` resolves temp paths
+  with `fs.realpathSync` (`/var` vs `/private/var` on macOS).
+- **OpenTimestamps opt-in warning.** Enabling the feature pulls a tree with
+  7 critical and 3 high known advisories. Default install still does not.
+
 - **c1 launcher sets `CONARIUM_AUDIT_SIGNING_KEY`** from
   `~/.conarium/audit-ed25519.pem` when `receiptSink` is set. Cursor MCP env
   did not; the process could not boot receipts. The sink file is still not

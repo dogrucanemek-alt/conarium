@@ -25,6 +25,8 @@
     "README.md",
     "LICENSE",
     "SECURITY.md",
+    "LIMITATIONS.md",
+    "LIMITATIONS.tr.md",
     "CHANGELOG.md"
   ],
   "description": "Governed MCP gateway for AI data access: policy enforcement and PII masking, an Ed25519-signed receipt per access that a third party verifies offline, coverage reconciliation against the database's own query counters to surface access that bypassed the gateway, and conformance vectors so the receipt format can be implemented without us. Self-hosted, MIT.",
@@ -71,7 +73,7 @@
     "build": "tsc",
     "test": "vitest run",
     "test:anchor-verify": "npm run build && node test/anchor_verify.mjs",
-    "test:checks": "npm run build && node test/doctor.mjs && node test/console_cli.mjs && node test/console_policy.mjs && node test/console_handoff.mjs && node test/console_receipts.mjs && node test/console_receipts_tab.mjs && node test/mark_assets.mjs && node test/c1_receipt_sink.mjs && node test/init.mjs && node test/demo_bank_seed.mjs && node test/pack_artefakt.mjs && node test/connectors.mjs && node test/governance_lineage_adversarial.mjs && node test/governance_security_regression.mjs && node test/security_hardening_14.mjs && node test/anchor_verify.mjs && node test/spec_exitcode_drift.mjs && node test/encoding_evasion_mask.mjs && node test/verify_tail_pin.mjs && node test/partial_mask_root.mjs && node test/pii_regression_matrix.mjs && node test/scanner_perf.mjs && node test/vectors_run.mjs && node test/http_gateway.e2e.mjs && node test/suggest_policy.mjs && node test/mint_token_mode.mjs",
+    "test:checks": "npm run build && node test/run-checks.mjs",
     "test:all": "npm run lint && npm run test && npm run test:checks",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",

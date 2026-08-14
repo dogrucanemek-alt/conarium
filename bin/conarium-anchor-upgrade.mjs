@@ -47,6 +47,11 @@ async function main() {
     console.error('javascript-opentimestamps is required')
     process.exit(2)
   }
+  console.warn(
+    'OpenTimestamps pulls javascript-opentimestamps → web3, elliptic, crypto-js, request, lodash. ' +
+      'That tree has 7 critical and 3 high known advisories (measured 2026-08-14). ' +
+      'Default install does not include them.',
+  )
 
   const rows = loadRows(path)
   let changedAny = false

@@ -122,6 +122,10 @@ try {
   const hetzner = files.filter((f) => f.startsWith('deploy/hetzner/'))
   if (hetzner.length) fail(`Hetzner ops scripts tarball'da (elemeli): ${hetzner.join(', ')}`)
   else pass('Hetzner ops scripts tarball disinda')
+
+  const limitations = ['LIMITATIONS.md', 'LIMITATIONS.tr.md'].filter((f) => files.includes(f))
+  if (limitations.length !== 2) fail(`LIMITATIONS.md / LIMITATIONS.tr.md pakette yok (bulunan: ${limitations.join(', ') || 'hiç'})`)
+  else pass('LIMITATIONS.md ve LIMITATIONS.tr.md tarballda')
 } catch (e) {
   fail(e.message)
 } finally {
