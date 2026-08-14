@@ -1,6 +1,24 @@
 # Changelog
 
-## Unreleased
+## 0.2.13 — 2026-08-15
+
+Security hardening release. Two independent external reviews and one code
+audit produced the findings below; each was reproduced against running code
+before it was fixed. Several defaults change — the entries marked
+**Behavior change** are the ones to read before upgrading.
+
+- **Dialect scalar functions.** The function allow-list carries Postgres
+  names, so routing the MSSQL and Oracle gates through it denied ordinary
+  calls (`GETDATE`, `ISNULL`, `DATEADD`, `NVL`, `TO_CHAR`). Safe scalars are
+  now listed per dialect and consulted only for an unqualified name, so
+  `app.pkg.nvl` stays a user package. One dialect's list never applies to
+  another's gate, and row-collapsing, `DBMS_*` and `UTL_*` families remain
+  denied.
+
+- **npm Trusted Publishing (OIDC).** The publish workflow no longer expects a
+  long-lived `NPM_TOKEN`; npmjs.com recognises the repository and workflow as
+  the authorised publisher and provenance is attached to the release. No
+  publish token lives in the repository. See `docs/security/NPM-PROVENANCE.md`.
 
 - **G20:** Write-token scan ignores SQL string literals
   (`SELECT 'DELETE ' FROM t` is a read). OpenAPI fetch caps the body at
@@ -100,6 +118,11 @@
   reaches the model. Failed `query` / `search` / `describe_table` paths
   that previously skipped the audit trail now write a `denied` line.
   Already-logged denies (policy, missing table, 50KB) are not written twice.
+
+## 0.2.8 – 0.2.12 — 2026-08-14
+
+These shipped across 0.2.8, 0.2.9, 0.2.10, 0.2.11 and 0.2.12 and were kept in
+one list at the time; the tags are the authority on which release carries which.
 
 - **Table existence oracle closed.** Assistant `describe_table` / `search` /
   `query` errors no longer distinguish denied from missing. The audit log
