@@ -34,6 +34,7 @@ export const CHECKS = [
   'test/connectors.mjs',
   'test/governance_lineage_adversarial.mjs',
   'test/governance_security_regression.mjs',
+  'test/property_sql_gate.mjs',
   'test/security_hardening_14.mjs',
   'test/anchor_verify.mjs',
   'test/spec_exitcode_drift.mjs',

@@ -41,6 +41,16 @@ OpenTimestamps damgasının Bitcoin'de onaylanması saatler sürebilir. Makbuzda
 
 Ed25519 uygulaması resmî denetimden geçmedi.
 
+## Postgres'e göre ek yük ölçülmedi
+
+Aynı sorgunun doğrudan Postgres ile Conarium üzerinden p50 / p95 / p99
+farkı bu depoda yok. `scripts/benchmark-overhead.mjs` son koşusunda
+yerel Postgres yoktu (koşulamadı).
+
+Veritabanı olmadan maskeleme: 1 000 ayrı e-posta p50 ≈ 205 ms. 100 000
+ayrı e-posta 6 dakikada bitmedi (taşıma eşleştiricisi her benzersiz
+maskeli değerde büyür). Tekrar: [`docs/BENCHMARK.md`](docs/BENCHMARK.md).
+
 ## OpenTimestamps istemcisi
 
 Damgalama yerleşik takvim istemcisiyle yapılır (Node `crypto` + herkese açık takvimlere HTTPS).

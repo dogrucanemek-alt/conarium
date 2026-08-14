@@ -79,7 +79,8 @@
     "start": "node dist/index.js",
     "lint": "tsc --noEmit",
     "prepublishOnly": "npm run build",
-    "test:vectors": "node test/vectors_run.mjs"
+    "test:vectors": "node test/vectors_run.mjs",
+    "bench:overhead": "node scripts/benchmark-overhead.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

@@ -90,3 +90,6 @@ change the specification and the version string with it.
 
 The frozen hash of case 001 is asserted separately in `test/vectors_run.mjs`
 for exactly this reason.
+
+SQL-gate attack leftovers (not receipts) live in [`sql-gate/`](sql-gate/).
+They are produced only when `test/property_sql_gate.mjs` finds a bypass.

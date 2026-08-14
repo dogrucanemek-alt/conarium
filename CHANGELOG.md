@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Overhead benchmark script.** `scripts/benchmark-overhead.mjs` measures
+  the same SELECT direct vs through the gate (p50/p95/p99). Without a DSN
+  the comparison is recorded as koşulamadı — no invented numbers.
+  See `docs/BENCHMARK.md`.
+- **Generated SQL-gate attacks.** `test/property_sql_gate.mjs` (property +
+  fuzz). A real bypass stays red and is written under
+  `test-vectors/sql-gate/`.
+- **API stability inventory** (draft, not a 1.0): `docs/API-STABILITY.md`.
+
 - **Built-in OpenTimestamps client.** Stamp / upgrade / verify no longer
   load `javascript-opentimestamps`. The `web3` / `request` / `bitcore` tree
   is not installed. Old proofs still verify (pending fixture + dogfood
@@ -14,8 +23,6 @@
 - **`test:checks` runs every check even if one fails.** The old `&&` chain
   went silent after the first failure. `test/init.mjs` resolves temp paths
   with `fs.realpathSync` (`/var` vs `/private/var` on macOS).
-- **OpenTimestamps opt-in warning.** Enabling the feature pulls a tree with
-  7 critical and 3 high known advisories. Default install still does not.
 
 - **c1 launcher sets `CONARIUM_AUDIT_SIGNING_KEY`** from
   `~/.conarium/audit-ed25519.pem` when `receiptSink` is set. Cursor MCP env

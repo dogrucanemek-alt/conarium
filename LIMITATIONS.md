@@ -41,6 +41,17 @@ An OpenTimestamps stamp can take hours to confirm on Bitcoin. Receipts already s
 
 The Ed25519 implementation has not had a formal audit.
 
+## Gateway overhead vs Postgres is unmeasured
+
+No p50 / p95 / p99 of the same query through Conarium versus direct
+Postgres is in this repository. The last run of
+`scripts/benchmark-overhead.mjs` had no local Postgres (koşulamadı).
+
+In-process redact (no database) on that machine: 1 000 distinct emails
+p50 ≈ 205 ms. 100 000 distinct emails did not finish in 6 minutes
+(carry-over builds one matcher per unique masked value). Replay:
+[`docs/BENCHMARK.md`](docs/BENCHMARK.md).
+
 ## OpenTimestamps client
 
 Stamping uses a built-in calendar client (Node `crypto` + HTTPS to the public calendars).

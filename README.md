@@ -556,8 +556,10 @@ publishing `@conarium-ai/core` to npm so `npx conarium-init` works without a clo
 - **SOC 2.** It audits organisations that hold customer data. We never receive
   yours. If that ever stops being true, this line changes first.
 
-Known gaps: [LIMITATIONS.md](LIMITATIONS.md), the README above, and
-[`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
+Known gaps: [LIMITATIONS.md](LIMITATIONS.md), the README above,
+[`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md),
+[`docs/BENCHMARK.md`](docs/BENCHMARK.md), and
+[`docs/API-STABILITY.md`](docs/API-STABILITY.md).
 
 ## 📜 License
 
