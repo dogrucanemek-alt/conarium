@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **G20:** Write-token scan ignores SQL string literals
+  (`SELECT 'DELETE ' FROM t` is a read). OpenAPI fetch caps the body at
+  50KB before `JSON.parse`. Audit sink hash stays `JSON.stringify`
+  (JCS would break existing files — LIMITATIONS).
+
 - **G12:** `conarium-doctor` warns when HTTP is on and
   `CONARIUM_MCP_RATE_PER_MIN` is 0; a positive limit is an info line.
   The default remains 0 (production profile fills 60).

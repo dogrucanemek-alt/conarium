@@ -39,6 +39,13 @@ describe('sql-gate rules (lock — do not silently shrink)', () => {
     expect(hasRowLockClause(normalizedSqlHead('SELECT 1 FROM t FOR UPDATE'))).toBe(true)
   })
 
+  it('L7: a write word inside a string literal is not a write', () => {
+    expect(findWriteToken(normalizedSqlHead("SELECT 'DELETE ' FROM t"))).toBeUndefined()
+    expect(findWriteToken(normalizedSqlHead('SELECT "UPDATE " FROM t'))).toBeUndefined()
+    expect(findWriteToken(normalizedSqlHead('DELETE FROM t'))).toBe('DELETE')
+    expect(findWriteToken(normalizedSqlHead("DELETE FROM t WHERE note = 'ok'"))).toBe('DELETE')
+  })
+
   it('postgres inspect is fail-closed on garbage', () => {
     const bad = postgresAdapter.inspect('not sql at all !!!')
     expect(bad.parseFailed).toBe(true)

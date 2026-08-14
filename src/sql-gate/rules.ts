@@ -60,10 +60,18 @@ export function isSelectOrWith(norm: string): boolean {
   return head.startsWith('SELECT') || head.startsWith('WITH')
 }
 
+/** Drop quoted literals so `SELECT 'DELETE ' FROM t` is not a write. */
+export function stripSqlStringLiterals(sql: string): string {
+  return sql
+    .replace(/'(?:''|[^'])*'/g, "''")
+    .replace(/"(?:""|[^"])*"/g, '""')
+}
+
 export function findWriteToken(norm: string): string | undefined {
+  const scan = stripSqlStringLiterals(norm)
   for (const tok of WRITE_TOKENS) {
     const regex = new RegExp(`\\b${tok.trim()}\\b`)
-    if (regex.test(norm)) return tok.trim()
+    if (regex.test(scan)) return tok.trim()
   }
   return undefined
 }

@@ -65,6 +65,14 @@ outside Conarium that ignores the lock file.
 any audit line is unsigned. The default still accepts a fully unsigned
 legacy chain when an HMAC key is later added (08-05 compatibility).
 
+## Audit sink hash is not JCS
+
+Receipts hash with RFC 8785 JCS (`canonicalize`). The audit JSONL hasher
+(`src/audit-hash.ts`) uses `JSON.stringify` of insertion order. The two
+disagree when keys are unsorted (`{"b":1,"a":2}` vs `{"a":2,"b":1}`).
+Switching the sink to JCS would invalidate every existing audit file.
+Independent re-hash of an old sink must use `JSON.stringify`, not JCS.
+
 ## Cryptography is not independently audited
 
 The Ed25519 implementation has not had a formal audit.

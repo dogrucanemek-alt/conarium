@@ -64,7 +64,7 @@ export class OpenApiConnector implements Connector {
         if (!res.ok) {
           throw new Error(`${this.name}: Failed to fetch OpenAPI spec from ${url}: ${res.statusText}`)
         }
-        doc = await res.json()
+        doc = await this.readJsonCapped(res, 'OpenAPI spec')
       } finally {
         clearTimeout(timeoutId)
       }
@@ -311,7 +311,7 @@ export class OpenApiConnector implements Connector {
       throw new Error(`API Request to ${urlToFetch} failed: ${res.status} ${res.statusText}`)
     }
 
-    const resJson = await res.json()
+    const resJson = await this.readJsonCapped(res, 'OpenAPI request')
     let rows: Record<string, unknown>[] = []
     if (Array.isArray(resJson)) {
       rows = resJson.map(item => typeof item === 'object' && item !== null ? item as Record<string, unknown> : { value: item })
@@ -441,6 +441,20 @@ export class OpenApiConnector implements Connector {
   }
 
   static readonly MAX_REDIRECTS = 5
+  /** Same ceiling as the query payload cap (`MAX_SEARCH_PAYLOAD_BYTES`). */
+  static readonly MAX_BODY_BYTES = 50 * 1024
+
+  async readJsonCapped(res: Response, purpose: string): Promise<unknown> {
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (buf.length > OpenApiConnector.MAX_BODY_BYTES) {
+      throw new Error(`${this.name}: ${purpose} body exceeds 50KB limit (${buf.length} bytes)`)
+    }
+    try {
+      return JSON.parse(buf.toString('utf8'))
+    } catch {
+      throw new Error(`${this.name}: ${purpose} body is not JSON`)
+    }
+  }
 
   /**
    * HTTPS + allow-list + private-IP check, then fetch with redirect:manual
