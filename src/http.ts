@@ -30,6 +30,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { loadConfig, bootDeps, buildServer } from './server.js'
 import { resolveHttpRatePerMin } from './config.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
+import { existsSync, statSync } from 'node:fs'
 import { loadTokenStore, resolveActor } from './tokens.js'
 import { announceUpdate } from './update-check.js'
 
@@ -37,7 +38,41 @@ const PORT = Number(process.env.CONARIUM_MCP_PORT || 8791)
 const HOST = process.env.CONARIUM_MCP_HOST || '127.0.0.1'
 const TOKEN = process.env.CONARIUM_MCP_TOKEN || ''
 // Bir kez yuklenir; dosya yoksa null = kisi bazli kimlik kapali (davranis birebir eski).
-const TOKEN_STORE = loadTokenStore()
+const TOKEN_STORE_REF: { store: ReturnType<typeof loadTokenStore>; mtimeMs: number; path: string } = {
+  store: loadTokenStore(),
+  mtimeMs: 0,
+  path: process.env.CONARIUM_TOKENS_FILE || 'conarium.tokens.json',
+}
+try {
+  if (existsSync(TOKEN_STORE_REF.path)) TOKEN_STORE_REF.mtimeMs = statSync(TOKEN_STORE_REF.path).mtimeMs
+} catch { /* first load already happened */ }
+
+export function currentTokenStore(): ReturnType<typeof loadTokenStore> {
+  const path = process.env.CONARIUM_TOKENS_FILE || TOKEN_STORE_REF.path
+  try {
+    if (!existsSync(path)) {
+      TOKEN_STORE_REF.store = null
+      TOKEN_STORE_REF.mtimeMs = 0
+      TOKEN_STORE_REF.path = path
+      return null
+    }
+    const mtimeMs = statSync(path).mtimeMs
+    if (path === TOKEN_STORE_REF.path && mtimeMs === TOKEN_STORE_REF.mtimeMs) {
+      return TOKEN_STORE_REF.store
+    }
+    const next = loadTokenStore(path)
+    TOKEN_STORE_REF.store = next
+    TOKEN_STORE_REF.mtimeMs = mtimeMs
+    TOKEN_STORE_REF.path = path
+    return next
+  } catch (err) {
+    console.error(
+      '[conarium-http] token store reload failed; keeping previous store:',
+      err instanceof Error ? err.message : err,
+    )
+    return TOKEN_STORE_REF.store
+  }
+}
 
 function tokenOk(supplied: string): boolean {
   if (!supplied) return false
@@ -65,6 +100,27 @@ export function sessionOwnerMatches(owner: Buffer, supplied: string): boolean {
 export interface SessionEntry {
   transport: StreamableHTTPServerTransport
   owner: Buffer
+  lastActive?: number
+}
+
+export interface HttpHandlerOpts {
+  now?: () => number
+  idleMs?: number
+  maxSessions?: number
+}
+
+export function resolveSessionIdleMs(): number {
+  const raw = process.env.CONARIUM_SESSION_IDLE_MS
+  if (raw === undefined || raw === '') return 30 * 60_000
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 ? n : 30 * 60_000
+}
+
+export function resolveMaxSessions(): number {
+  const raw = process.env.CONARIUM_MAX_SESSIONS
+  if (raw === undefined || raw === '') return 100
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 ? n : 100
 }
 
 function readBody(req: IncomingMessage): Promise<unknown> {
@@ -115,6 +171,7 @@ export function createHandler(
   deps: Awaited<ReturnType<typeof bootDeps>>,
   transports: Map<string, SessionEntry>,
   limiter: RateLimiter,
+  opts: HttpHandlerOpts = {},
 ) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
@@ -148,7 +205,7 @@ export function createHandler(
       // Kimlik: kişiye özel token eşleşirse o kişi, yoksa paylaşılan token.
       // İkisi de tutmuyorsa 401 — kişi bazlı kimlik yetkiyi GENİŞLETMEZ, sadece
       // kimin geçtiğini adlandırır. Eşleşmeyen token hâlâ kapıda kalır.
-      const kisi = resolveActor(supplied, TOKEN_STORE, deps.config.consumer ?? 'unknown')
+      const kisi = resolveActor(supplied, currentTokenStore(), deps.config.consumer ?? 'unknown')
       if (!kisi.isUser && !tokenOk(supplied)) {
         sendRpcError(res, 401, -32001, 'unauthorized')
         return
@@ -176,6 +233,14 @@ export function createHandler(
           sendRpcError(res, 403, -32003, 'session owner mismatch')
           return
         }
+        const now = opts.now?.() ?? Date.now()
+        const idleMs = opts.idleMs ?? resolveSessionIdleMs()
+        if (idleMs > 0 && existing.lastActive != null && now - existing.lastActive > idleMs) {
+          transports.delete(sessionId)
+          sendRpcError(res, 404, -32004, 'session not found — send a new initialize request')
+          return
+        }
+        existing.lastActive = now
         const body = req.method === 'POST' ? await readBody(req) : undefined
         await existing.transport.handleRequest(req, res, body)
         return
@@ -196,15 +261,23 @@ export function createHandler(
         sendRpcError(res, 400, -32600, 'no session — open one with an initialize POST')
         return
       }
+      const maxSessions = opts.maxSessions ?? resolveMaxSessions()
+      if (maxSessions > 0 && transports.size >= maxSessions) {
+        sendRpcError(res, 429, -32005, 'too many sessions')
+        return
+      }
       const body = await readBody(req)
       if (!isInitializeRequest(body)) {
         sendRpcError(res, 400, -32600, 'expected initialize')
         return
       }
       const owner = ownerKey(supplied)
+      const openedAt = opts.now?.() ?? Date.now()
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (id: string) => { transports.set(id, { transport, owner }) },
+        onsessioninitialized: (id: string) => {
+          transports.set(id, { transport, owner, lastActive: openedAt })
+        },
       })
       transport.onclose = () => {
         if (transport.sessionId) transports.delete(transport.sessionId)
@@ -230,8 +303,21 @@ async function main() {
   const deps = await bootDeps(config)
   const transports = new Map<string, SessionEntry>()
   const limiter = new RateLimiter({ perWindow: ratePerMin })
+  const idleMs = resolveSessionIdleMs()
   const sweepTimer = setInterval(() => limiter.sweep(), 5 * 60_000)
   sweepTimer.unref()
+  if (idleMs > 0) {
+    const idleSweep = setInterval(() => {
+      const now = Date.now()
+      for (const [id, entry] of transports) {
+        if (entry.lastActive != null && now - entry.lastActive > idleMs) {
+          transports.delete(id)
+          void entry.transport.close().catch(() => {})
+        }
+      }
+    }, Math.min(idleMs, 60_000))
+    idleSweep.unref()
+  }
 
   const httpServer = createHttpServer(createHandler(deps, transports, limiter))
 

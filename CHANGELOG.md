@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Behavior change (G6):** HTTP sessions idle out after
+  `CONARIUM_SESSION_IDLE_MS` (default 30 minutes; 0 = off). Owner-binding
+  is unchanged. Sweeper uses `unref()`.
+
+- **Behavior change (G7):** `CONARIUM_MAX_SESSIONS` defaults to 100
+  (0 = unlimited). A new initialize at the cap is JSON-RPC rejected.
+
+- **G8:** Token file reloads on mtime change. Broken JSON keeps the
+  previous store and logs; it does not fall back to an empty map.
+
 - **G5:** Audit sink takes an advisory `<sink>.lock` (`wx`, PID + start).
   A second OS process is rejected; a stale lock (dead PID) is stolen.
   Same-process re-entry stays allowed (console / validateChain boot).
