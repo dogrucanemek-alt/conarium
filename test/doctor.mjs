@@ -369,6 +369,36 @@ test('an unreachable connector exits 1 — not an abort', async () => {
   assert.ok(/Reachability/.test(out), 'the failure must be named')
 })
 
+test('custom-sql is named and dialect omission is FAIL', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, {
+    serverName: 'Conarium',
+    consumer: 'ai-assistant',
+    connectors: [{ type: 'custom-sql', name: 'memory', description: 'op', config: { module: './x.mjs' } }],
+    policy: { allowConnectors: ['memory'], allowTables: ['public.customers'] },
+  })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 1, out)
+  assert.ok(/custom-sql/.test(out), 'must name the executor check')
+  assert.ok(/operator executor/.test(out))
+  assert.ok(/custom-sql dialect/.test(out))
+  assert.ok(/omitted/.test(out))
+})
+
+test('custom-sql with declared dialect is visible and not a fail on that line', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, {
+    serverName: 'Conarium',
+    consumer: 'ai-assistant',
+    connectors: [{ type: 'custom-sql', name: 'memory', description: 'op', config: { module: './x.mjs' } }],
+    policy: { dialect: 'oracle', allowConnectors: ['memory'], allowTables: ['app.customers'] },
+  })
+  const { out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.ok(/custom-sql/.test(out), out)
+  assert.ok(/declared oracle/.test(out), out)
+  assert.ok(!/FAIL\s+custom-sql dialect/.test(out), out)
+})
+
 // --- run ----------------------------------------------------------------------
 
 for (const { name, fn } of tests) {

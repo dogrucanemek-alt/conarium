@@ -1,0 +1,38 @@
+{
+  "when": "2026-08-14T18:19:21.122Z",
+  "hardware": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "cores": 24,
+    "ramBytes": 33752997888,
+    "os": "win32 10.0.26200",
+    "node": "v24.5.0"
+  },
+  "n": 50,
+  "wallMs": 98,
+  "latencyMs": {
+    "p50": 45.5191,
+    "p95": 48.5808,
+    "p99": 61.335,
+    "min": 41.8328,
+    "max": 61.335
+  },
+  "errorRate": 0,
+  "chain": {
+    "entries": 50,
+    "prevHashBreaks": []
+  },
+  "twoInstanceRace": {
+    "entries": 2,
+    "prevHashBreaks": []
+  },
+  "heap": {
+    "heapUsed0": 25426680,
+    "heapUsed1": 35596152,
+    "delta": 10169472
+  },
+  "hugeSql": {
+    "isError": false,
+    "preview": "{\n  \"rowCount\": 1,\n  \"fields\": [\n    \"id\",\n    \"email\"\n  ],\n  \"rows\": [\n    {\n      \"id\": 1,\n      \"email\": \"[MASKED_PII"
+  },
+  "elapsedNs": 121576800
+}

@@ -122,3 +122,23 @@ Not a substitute for the table above. Shows the same cliff without a socket.
 100 is the last measured point still in the low-millisecond band
 (same-limit partial overhead p50 = 5.0 ms). 500 is already 87 ms.
 The doctor and `parseConariumConfig` warn. They do not reject the query.
+
+---
+
+## Concurrency (in-process, not Hetzner)
+
+Replay: `node scripts/benchmark-concurrency.mjs` (needs `npm run build`).
+Raw: [`benchmarks/concurrency-20260814.json`](benchmarks/concurrency-20260814.json).
+
+| | |
+|---|---|
+| CPU | Intel Core Ultra 9 275HX × 24 |
+| RAM | 32 GB |
+| OS | win32 10.0.26200 |
+| Node | v24.5.0 |
+| N | 50 concurrent MCP `query` (mock connector) |
+| When | 2026-08-14T18:19Z |
+
+p50 **45.5 ms** · p95 **48.6 ms** · p99 **61.3 ms** · wall **98 ms** · error rate **0**.
+Single `Audit` instance: 50 entries, **0** `prevHash` breaks (`log()` is synchronous).
+This is not a leak hunt and not a two-process sink race.

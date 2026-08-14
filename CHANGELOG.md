@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Operator is inside the boundary.** Threat model and LIMITATIONS state
+  it in the open: importing the library can skip the gate the same way
+  opening the database with the operator's credential can. Not a vulnerability.
+- **HMAC compare uses `timingSafeEqual`.** Audit-sink HMAC was `!==` on the
+  hex digest. Ed25519 verify stays on Node `crypto.verify`.
+- **Doctor names `custom-sql`** and fails when that connector is present
+  without a declared `policy.dialect`. `list_tables` on an executor-only
+  install says schema discovery is not implemented (not a silent empty list).
+
 - **Operator SQL executor (`custom-sql`).** No MSSQL/Oracle driver is
   shipped. The operator registers a function or a local `config.module`;
   it receives only gated SQL. `policy.dialect` is required on that path.

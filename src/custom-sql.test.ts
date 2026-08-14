@@ -71,13 +71,16 @@ async function kur(opts: {
   return {
     conn,
     calls,
-    async query(sql: string) {
+    async call(name: string, args: Record<string, unknown> = {}) {
       const h = handlers.get(CallToolRequestSchema.shape.method.value)
       if (!h) throw new Error('CallTool handler missing')
-      return h({ method: 'tools/call', params: { name: 'query', arguments: { sql } } }) as Promise<{
+      return h({ method: 'tools/call', params: { name, arguments: args } }) as Promise<{
         isError?: boolean
         content?: { type: string; text: string }[]
       }>
+    },
+    async query(sql: string) {
+      return this.call('query', { sql })
     },
   }
 }
@@ -212,5 +215,20 @@ describe('custom-sql — the gate cannot be skipped', () => {
     const body = payload(out)
     expect(body.rows).toHaveLength(50)
     expect(body.rows.every((r) => r.email === '[MASKED_PII]')).toBe(true)
+  })
+
+  it('list_tables says schema discovery is not implemented — not a silent empty list', async () => {
+    const s = await kur({ execute: () => ({ rows: [], fields: [] }) })
+    const out = await s.call('list_tables')
+    expect(out.isError).toBe(true)
+    expect(out.content?.[0]?.text ?? '').toMatch(/does not list schema/)
+    expect(out.content?.[0]?.text ?? '').not.toMatch(/\[\s*\]/)
+  })
+
+  it('describe_table on custom-sql is an explicit error, not an empty schema', async () => {
+    const s = await kur({ execute: () => ({ rows: [], fields: [] }) })
+    const out = await s.call('describe_table', { table: 'public.customers' })
+    expect(out.isError).toBe(true)
+    expect(out.content?.[0]?.text ?? '').toMatch(/does not describe tables/)
   })
 })

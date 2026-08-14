@@ -354,6 +354,24 @@ if (config) {
     }
   }
 
+  // K6 — operator executor is not a silent empty schema.
+  const customSql = connectors.filter((c) => c && c.type === 'custom-sql')
+  if (customSql.length) {
+    ok(
+      'custom-sql',
+      `${customSql.length} operator executor(s): ${customSql.map((c) => c.name).join(', ')}. Schema discovery is not implemented.`,
+    )
+    if (!pol.dialect) {
+      fail(
+        'custom-sql dialect',
+        'custom-sql is configured but policy.dialect is omitted',
+        'Declare policy.dialect (postgres, mssql, or oracle). The omitted-dialect postgres default does not apply.',
+      )
+    } else {
+      ok('custom-sql dialect', `declared ${String(pol.dialect)}`)
+    }
+  }
+
   // D3 — custom PII: names only. Pattern text must never reach stdout.
   const patterns = Array.isArray(pol.customPatterns) ? pol.customPatterns : []
   const patternNames = patterns

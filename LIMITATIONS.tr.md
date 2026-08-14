@@ -39,6 +39,12 @@ Bus factor 1.
 
 OpenTimestamps damgasının Bitcoin'de onaylanması saatler sürebilir. Makbuzda `pending` zaten görünür.
 
+## Operatör sınırın içindedir
+
+Ürün asistan ↔ kapı yolunu korur. Kütüphaneyi import eden kod kapıyı,
+operatörün kimlik bilgisiyle veritabanına bağlanmakla aynı yetkiyle
+atlayabilir. Operatörün kendi süreci bu kapının denetim konusu değildir.
+
 ## Denetlenmemiş kriptografi
 
 Ed25519 uygulaması resmî denetimden geçmedi.

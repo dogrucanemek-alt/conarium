@@ -39,6 +39,13 @@ Bus factor 1.
 
 An OpenTimestamps stamp can take hours to confirm on Bitcoin. Receipts already show `pending`.
 
+## The operator is inside the boundary
+
+The product defends the assistant-to-gateway path. Code that imports the
+library can skip the gate the same way it can open the database with the
+operator's credential. The operator's own process is not an audit subject
+of this gateway.
+
 ## Cryptography is not independently audited
 
 The Ed25519 implementation has not had a formal audit.

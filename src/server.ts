@@ -254,7 +254,17 @@ export function buildServer(
         const targets = preferred
           ? [getConnector(preferred)]
           : connectors.filter(c => governance.allowsConnector(c.name) && c.capabilities.canListSchema)
-        if (!targets.length) throw new PolicyError('No connector is permitted by policy.')
+        if (!targets.length) {
+          const custom = connectors.filter(
+            (c) => c instanceof CustomSqlConnector && governance.allowsConnector(c.name),
+          )
+          if (custom.length) {
+            throw new Error(
+              'custom-sql does not list schema. Schema discovery is not implemented on the operator executor.',
+            )
+          }
+          throw new PolicyError('No connector is permitted by policy.')
+        }
 
         const listed: Array<{ connector: string; name: string; description: string; rowCount?: number }> = []
         for (const conn of targets) {

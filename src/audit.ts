@@ -1,5 +1,5 @@
 import { appendFileSync, readFileSync, existsSync, statSync } from 'fs'
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { computeEntryHash, GENESIS_HASH } from './audit-hash.js'
 import {
   loadSigningKey,
@@ -149,6 +149,14 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
     },
     outcome: { status: entry.denied ? 'denied' : 'complete', denied: entry.denied },
   }
+}
+
+/** HMAC hex compare. `!==` on the digest leaks via timing; Node's primitive does not. */
+function hmacDigestEqual(presented: string, expected: string): boolean {
+  const a = Buffer.from(presented, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
 }
 
 let unsignedWarned = false
@@ -476,13 +484,14 @@ export class Audit {
       //   imza YOK  + henüz imzalı satır görülmedi → eski kayıt, kabul
       //   imza YOK  + daha önce imzalı satır var   → strip girişimi, reddet
       //   imza VAR  ama eşleşmiyor                 → kurcalama, her zaman reddet
-      const hasSignature = typeof entry.signature === 'string' && entry.signature.length > 0
+      const presentedSig = typeof entry.signature === 'string' ? entry.signature : ''
+      const hasSignature = presentedSig.length > 0
       if (hasSignature) {
         // Doğrulama yalnızca anahtar varken yapılabilir; anahtarsızken imzanın VARLIĞI
         // yine de bitişiklik için sayılır, yoksa "anahtarı kaldır + imzaları sil" açık kalırdı.
         if (this.hmacKey) {
           const expectedSignature = createHmac('sha256', this.hmacKey).update(entry.hash).digest('hex')
-          if (entry.signature !== expectedSignature) {
+          if (!hmacDigestEqual(presentedSig, expectedSignature)) {
             throw new Error('Audit sink is corrupt: entry signature mismatch.')
           }
         }

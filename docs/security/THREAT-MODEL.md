@@ -101,6 +101,20 @@ Pending OpenTimestamps is disclosed as `pending`. Bitcoin upgrade is hours later
 - Anchor calendars and `blockstream.info` are third parties. Unreachable →
   exit 15 ("could not check"), not exit 0.
 
+## Out of scope — the operator
+
+Conarium's trust boundary is **assistant ↔ gateway**. The operator is inside it.
+
+Code that imports this library can call `CustomSqlConnector.runGoverned`, or
+open the database with the same credential. That is the same authority as
+connecting to the database directly. It is not a bypass of a defence that was
+meant to stop the operator.
+
+The operator's own code does not appear in the audit log. A bank closes that
+with their code review, not with this gateway.
+
+This is the product's scope. It is not a vulnerability.
+
 ## Out of scope (stated so nobody bills hours here)
 
 - The database's own authentication, authorization, encryption, backups.

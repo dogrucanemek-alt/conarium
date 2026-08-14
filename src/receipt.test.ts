@@ -141,6 +141,21 @@ describe('T2 receipt canonicalize + hash', () => {
     expect(receiptHash(r1)).toBe(r1.chain.hash)
   })
 
+  it('K3: sig covers the body; sig and anchor are hash-exterior', () => {
+    const pair = generateKeyPair('cnr-cov')
+    const key = { keyId: 'cnr-cov', privateKey: createPrivateKey(pair.privatePem) }
+    const r = buildReceipt(
+      sampleInput({ id: '01FIXEDCOVER00000000000000', ts: '2026-07-29T08:00:00.000Z' }),
+      nextChainState(null),
+      key,
+    )
+    expect(receiptHash({ ...r, ts: '1999-01-01T00:00:00.000Z' })).not.toBe(r.chain.hash)
+    expect(receiptHash({ ...r, actor: { ...r.actor, id: 'other' } })).not.toBe(r.chain.hash)
+    expect(receiptHash({ ...r, masking: { ...r.masking, maskedCount: 99 } })).not.toBe(r.chain.hash)
+    expect(receiptHash({ ...r, anchor: { log: 'x', ref: 'y', state: 'pending' } })).toBe(r.chain.hash)
+    expect(receiptHash({ ...r, sig: { alg: 'Ed25519', keyId: r.sig!.keyId, value: 'AAAA' } })).toBe(r.chain.hash)
+  })
+
   it('actor.type is always service; consentRef always null', () => {
     const pair = generateKeyPair('cnr-act')
     const key = { keyId: 'cnr-act', privateKey: createPrivateKey(pair.privatePem) }
