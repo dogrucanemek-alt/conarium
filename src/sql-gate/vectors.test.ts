@@ -3,6 +3,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { Governance, PolicyError } from '../governance.js'
+import { guardMssqlQuery } from './mssql.js'
+import type { GovernancePolicy } from '../types.js'
 
 type Dialect = 'postgres' | 'mssql' | 'oracle'
 
@@ -16,12 +18,8 @@ interface Vector {
 }
 
 interface Bundle {
-  policy: {
-    allowTables: string[]
-    denyTables: string[]
-    maskColumns: string[]
-    maxRows: number
-  }
+  policy: GovernancePolicy
+  dialectPolicy?: Partial<Record<Dialect, Partial<GovernancePolicy>>>
   secret: string
   vectors: Vector[]
 }
@@ -33,8 +31,24 @@ const bundle: Bundle = JSON.parse(
   ),
 )
 
+function policyFor(dialect: Dialect): GovernancePolicy {
+  return { ...bundle.policy, ...(bundle.dialectPolicy?.[dialect] ?? {}) }
+}
+
+function guard(dialect: Dialect, sql: string, policy: GovernancePolicy) {
+  if (dialect === 'mssql') return guardMssqlQuery(sql, policy)
+  if (dialect === 'postgres') return new Governance(policy).guardQuery(sql)
+  throw new Error(`${dialect} is not supported in this runner`)
+}
+
+function capPattern(dialect: Dialect): RegExp {
+  if (dialect === 'mssql') return /top\s+50\b/i
+  return /limit\s+\(?50\)?/i
+}
+
 function runDialect(dialect: Dialect) {
-  const gov = new Governance(bundle.policy)
+  const policy = policyFor(dialect)
+  const gov = new Governance(policy)
   const cases = bundle.vectors.filter(v => typeof v.sql[dialect] === 'string')
 
   describe(`sql-gate vectors · ${dialect} (${cases.length})`, () => {
@@ -42,19 +56,19 @@ function runDialect(dialect: Dialect) {
       it(`${v.class}/${v.id}`, () => {
         const sql = v.sql[dialect] as string
         if (v.expect === 'deny') {
-          expect(() => gov.guardQuery(sql)).toThrow(PolicyError)
+          expect(() => guard(dialect, sql, policy)).toThrow(PolicyError)
           return
         }
 
         let guarded
         try {
-          guarded = gov.guardQuery(sql)
+          guarded = guard(dialect, sql, policy)
         } catch (err) {
           throw new Error(`${v.id}: expected ${v.expect}, gate denied: ${(err as Error).message}`)
         }
 
         if (v.expect === 'cap') {
-          expect(guarded.sql, v.id).toMatch(/limit\s+\(?50\)?/i)
+          expect(guarded.sql, v.id).toMatch(capPattern(dialect))
           expect(guarded.metadata.appliedRowCap).toBe(bundle.policy.maxRows)
           return
         }
@@ -77,3 +91,4 @@ function runDialect(dialect: Dialect) {
 }
 
 runDialect('postgres')
+runDialect('mssql')

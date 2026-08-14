@@ -6,7 +6,7 @@
  * the C vector set is green against that dialect. This file is the contract.
  */
 
-export type SqlDialectId = 'postgres'
+export type SqlDialectId = 'postgres' | 'mssql'
 
 export interface DialectQuestions {
   /** 0 when parse failed. */
