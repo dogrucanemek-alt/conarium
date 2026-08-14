@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Behavior change (A1):** A single trailing letter no longer hides a
+  card or TR phone (`4111…x`, `0532…x`). A longer alphanumeric tail
+  (`ghp_1234…abcd`) stays a token so the secret detector still fires.
+
 ## 0.2.13 — 2026-08-15
 
 Security hardening release. Two independent external reviews and one code

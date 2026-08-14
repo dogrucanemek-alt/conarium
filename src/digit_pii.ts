@@ -64,9 +64,16 @@ const isWord = (c: string) => /[A-Za-z0-9_]/.test(c)
 function isolatedSpan(s: string, start: number, end: number): boolean {
   const left = start === 0 ? '' : s[start - 1]
   const right = end >= s.length ? '' : s[end]
-  // Left: a letter/`_` prefix must not hide the run (`x4111…`, `ref_0532…`).
-  // Right: still a token boundary — `ghp_1234567890abcd` is a secret, not a phone.
-  return !isDigit(left) && !isWord(right)
+  // A digit neighbour means this is a slice of a longer run — refuse.
+  if (isDigit(left) || isDigit(right)) return false
+  // Prefix letter/`_` never hides (`x4111…`, `ref_0532…`).
+  // Suffix: one trailing letter is the G15 twin (`4111…x`). More word
+  // characters after that (`ghp_1234567890abcd`) stay a token, not a phone.
+  if (right && /[A-Za-z_]/.test(right)) {
+    const after = end + 1 < s.length ? s[end + 1] : ''
+    if (after && isWord(after)) return false
+  }
+  return true
 }
 
 /** `11.22.33.44.55` / `1.2.3.4` — dotted 1–3 digit groups, not a PAN/phone. */

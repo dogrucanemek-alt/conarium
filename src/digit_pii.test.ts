@@ -141,6 +141,29 @@ describe('G15 — content-detector bypasses', () => {
   })
 })
 
+describe('A1 — trailing letter must not hide PAN/phone', () => {
+  it('single-letter suffix does not hide a PAN', () => {
+    const r = gov.maskPII('4111111111111111x')
+    expect(String(r.masked)).not.toContain('4111111111111111')
+    expect(String(r.masked)).toMatch(/MASKED/)
+  })
+
+  it('single-letter suffix does not hide a TR phone', () => {
+    const r = gov.maskPII('05321234567x')
+    expect(String(r.masked)).not.toContain('05321234567')
+    expect(String(r.masked)).toMatch(/MASKED/)
+  })
+
+  it('prefix cases stay masked (G15 lock)', () => {
+    expect(String(gov.maskPII('x4111111111111111').masked)).toMatch(/MASKED/)
+    expect(String(gov.maskPII('ref_05321234567').masked)).toMatch(/MASKED/)
+  })
+
+  it('a longer tail inside a GitHub token stays a secret, not a phone', () => {
+    expect(String(gov.maskPII('ghp_1234567890abcdefghijABCDEFG').masked)).toContain('[MASKED_SECRET]')
+  })
+})
+
 describe('encoded @ — scan copy only', () => {
   it('entity / json / percent emails are masked; non-email encodings are left', () => {
     const hit = maskEntityEncodedEmails('yaz patron&#64;sirket.com')
