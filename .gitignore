@@ -26,6 +26,8 @@ redteam/last-report.md
 telegram_dump.json
 ZION_NOTES.md
 *.log.jsonl
+# Audit sink advisory lock: runtime state (pid + start), never committed.
+*.jsonl.lock
 temp_*.py
 test_ast*.ts
 conarium-i18n-*.js
