@@ -28,6 +28,7 @@ import { pathToFileURL } from 'node:url'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { loadConfig, bootDeps, buildServer } from './server.js'
+import { resolveHttpRatePerMin } from './config.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
 import { loadTokenStore, resolveActor } from './tokens.js'
 import { announceUpdate } from './update-check.js'
@@ -35,7 +36,6 @@ import { announceUpdate } from './update-check.js'
 const PORT = Number(process.env.CONARIUM_MCP_PORT || 8791)
 const HOST = process.env.CONARIUM_MCP_HOST || '127.0.0.1'
 const TOKEN = process.env.CONARIUM_MCP_TOKEN || ''
-const RATE_PER_MIN = Number(process.env.CONARIUM_MCP_RATE_PER_MIN || 0)
 // Bir kez yuklenir; dosya yoksa null = kisi bazli kimlik kapali (davranis birebir eski).
 const TOKEN_STORE = loadTokenStore()
 
@@ -226,9 +226,10 @@ async function main() {
   }
 
   const config = loadConfig()
+  const ratePerMin = resolveHttpRatePerMin(config)
   const deps = await bootDeps(config)
   const transports = new Map<string, SessionEntry>()
-  const limiter = new RateLimiter({ perWindow: RATE_PER_MIN })
+  const limiter = new RateLimiter({ perWindow: ratePerMin })
   const sweepTimer = setInterval(() => limiter.sweep(), 5 * 60_000)
   sweepTimer.unref()
 
@@ -237,7 +238,7 @@ async function main() {
   httpServer.listen(PORT, HOST, () => {
     const addr = httpServer.address()
     const bound = typeof addr === 'object' && addr !== null ? addr.port : PORT
-    const rate = limiter.enabled ? `${RATE_PER_MIN}/dk` : 'KAPALI'
+    const rate = limiter.enabled ? `${ratePerMin}/dk` : 'KAPALI'
     console.error(
       `[conarium-http] remote MCP hazır — http://${HOST}:${bound} (token: SET, ${deps.connectors.length} connector, rate-limit: ${rate})`
     )

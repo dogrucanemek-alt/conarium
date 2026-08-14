@@ -8,6 +8,12 @@ export interface ConariumConfig {
   policy?: GovernancePolicy
   /** Audit configuration. */
   audit?: AuditConfig
+  /**
+   * Proof profile. `production` requires Ed25519 AND HMAC, turns G3 strict
+   * signatures and anchoring on, and defaults HTTP rate-limit to 60/min
+   * unless CONARIUM_MCP_RATE_PER_MIN is explicitly 0.
+   */
+  profile?: 'production'
 }
 
 export interface GovernancePolicy {

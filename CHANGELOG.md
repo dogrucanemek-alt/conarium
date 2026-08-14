@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **G4:** `profile: "production"` (or `CONARIUM_PROFILE=production`) refuses
+  boot without Ed25519 AND HMAC, turns G3 strict signatures and OpenTimestamps
+  anchoring on, and defaults HTTP rate-limit to 60/min unless explicitly 0.
+  `conarium-doctor` reports the profile as one block.
+
 - **Behavior change (G21):** `conarium-coverage --receipts` re-verifies each
   receipt Ed25519 signature; a broken sig is not COMPLETE and names the
   receipt. The declaration carries `windowStartPinned` — an unpinned

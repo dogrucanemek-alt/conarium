@@ -18,7 +18,7 @@ import { Governance, PolicyError } from './governance.js'
 import type { GovernanceMetadata } from './governance.js'
 import { Audit } from './audit.js'
 import type { ResolvedActor } from './tokens.js'
-import { assertCustomSqlDialect, parseConariumConfig } from './config.js'
+import { assertCustomSqlDialect, enforceProductionProfile, parseConariumConfig } from './config.js'
 import { loadSqlGate, resolveSqlDialect } from './sql-gate/dispatch.js'
 import { installedVersion } from './update-check.js'
 import { capSearchResult, MAX_SEARCH_PAYLOAD_BYTES, readGovernedSchemaResource, resolveGovernedSearchScope } from './search_policy.js'
@@ -57,6 +57,7 @@ export function loadConfig(): ConariumConfig {
 
 /** Connect all configured connectors once (shared across sessions in HTTP mode). */
 export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
+  enforceProductionProfile(config)
   // `allowsConnector` is fail-closed. Without this guard the symptom
   // would be a server that starts fine and answers every request with "not
   // permitted" — the operator would blame their policy, not a changed default.

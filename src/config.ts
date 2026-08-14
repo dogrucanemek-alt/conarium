@@ -78,7 +78,41 @@ export const ConariumConfigSchema = z.object({
   consumer: z.string().min(1).optional(),
   policy: GovernancePolicySchema.optional(),
   audit: AuditConfigSchema.optional(),
+  profile: z.literal('production').optional(),
 }).strict()
+
+export function isProductionProfile(cfg?: { profile?: string } | null): boolean {
+  if ((process.env.CONARIUM_PROFILE || '').toLowerCase() === 'production') return true
+  return cfg?.profile === 'production'
+}
+
+/** Fail-closed production proof profile. Missing keys refuse boot. */
+export function enforceProductionProfile(cfg?: { profile?: string } | null): void {
+  if (!isProductionProfile(cfg)) return
+  const missing: string[] = []
+  if (!process.env.CONARIUM_AUDIT_SIGNING_KEY?.trim()) missing.push('CONARIUM_AUDIT_SIGNING_KEY (Ed25519)')
+  if (!process.env.CONARIUM_AUDIT_HMAC_KEY?.trim()) missing.push('CONARIUM_AUDIT_HMAC_KEY')
+  if (missing.length) {
+    throw new Error(`production profile refuses boot: missing ${missing.join(' and ')}`)
+  }
+  if (process.env.CONARIUM_AUDIT_REQUIRE_SIG !== '1') {
+    process.env.CONARIUM_AUDIT_REQUIRE_SIG = '1'
+  }
+  const sink = (process.env.CONARIUM_ANCHOR_SINK || 'none').toLowerCase()
+  if (sink === 'none' || sink === '' || sink === 'off') {
+    process.env.CONARIUM_ANCHOR_SINK = 'opentimestamps'
+  }
+}
+
+/** Default 0 (unchanged). Production profile: 60 unless explicitly 0. */
+export function resolveHttpRatePerMin(cfg?: { profile?: string } | null): number {
+  const raw = process.env.CONARIUM_MCP_RATE_PER_MIN
+  if (raw !== undefined && raw !== '') {
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : 0
+  }
+  return isProductionProfile(cfg) ? 60 : 0
+}
 
 export function parseConariumConfig(raw: unknown): ConariumConfig {
   let cfg: ConariumConfig

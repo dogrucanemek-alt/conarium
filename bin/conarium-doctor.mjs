@@ -446,6 +446,32 @@ if (config) {
   }
 }
 
+// 7b. Production proof profile — one block
+{
+  const production =
+    (process.env.CONARIUM_PROFILE || '').toLowerCase() === 'production' ||
+    config?.profile === 'production'
+  if (production) {
+    const missing = []
+    if (!envSet('CONARIUM_AUDIT_SIGNING_KEY')) missing.push('Ed25519 (CONARIUM_AUDIT_SIGNING_KEY)')
+    if (!envSet('CONARIUM_AUDIT_HMAC_KEY')) missing.push('HMAC (CONARIUM_AUDIT_HMAC_KEY)')
+    const rateRaw = process.env.CONARIUM_MCP_RATE_PER_MIN
+    const rate = rateRaw === undefined || rateRaw === '' ? 60 : Number(rateRaw)
+    if (missing.length) {
+      fail(
+        'Production profile',
+        `refuses boot without ${missing.join(' and ')}`,
+        'Production requires Ed25519 AND HMAC, G3 strict signatures, and an anchor sink. Rate limit defaults to 60/min unless CONARIUM_MCP_RATE_PER_MIN=0.',
+      )
+    } else {
+      ok(
+        'Production profile',
+        `Ed25519 + HMAC required; G3 on; anchor on; rate ${Number.isFinite(rate) ? rate : 60}/min`,
+      )
+    }
+  }
+}
+
 // 8. Signing key material — never printed, only described
 {
   const keyPath = envSet('CONARIUM_AUDIT_SIGNING_KEY')

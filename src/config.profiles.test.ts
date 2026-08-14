@@ -6,8 +6,15 @@
  * conarium.config.json could not boot the gateway. The feature existed only
  * in unit tests.
  */
-import { describe, it, expect } from 'vitest'
-import { parseConariumConfig } from './config.js'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { parseConariumConfig, enforceProductionProfile, resolveHttpRatePerMin } from './config.js'
+
+const DOCTOR = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'conarium-doctor.mjs')
 
 const BASE = {
   connectors: [
@@ -56,5 +63,87 @@ describe('parseConariumConfig — profiles survive loadConfig', () => {
         },
       }),
     ).toThrow(/Unrecognized key/)
+  })
+})
+
+describe('G4 production proof profile', () => {
+  const prev: Record<string, string | undefined> = {}
+  const KEYS = [
+    'CONARIUM_PROFILE',
+    'CONARIUM_AUDIT_SIGNING_KEY',
+    'CONARIUM_AUDIT_HMAC_KEY',
+    'CONARIUM_AUDIT_REQUIRE_SIG',
+    'CONARIUM_ANCHOR_SINK',
+    'CONARIUM_MCP_RATE_PER_MIN',
+  ]
+
+  beforeEach(() => {
+    for (const k of KEYS) {
+      prev[k] = process.env[k]
+      delete process.env[k]
+    }
+  })
+  afterEach(() => {
+    for (const k of KEYS) {
+      if (prev[k] === undefined) delete process.env[k]
+      else process.env[k] = prev[k]
+    }
+  })
+
+  it('refuses boot when Ed25519 or HMAC is missing', () => {
+    process.env.CONARIUM_PROFILE = 'production'
+    expect(() => enforceProductionProfile({})).toThrow(/CONARIUM_AUDIT_SIGNING_KEY/)
+    process.env.CONARIUM_AUDIT_SIGNING_KEY = 'x.pem'
+    expect(() => enforceProductionProfile({})).toThrow(/CONARIUM_AUDIT_HMAC_KEY/)
+  })
+
+  it('opens when both keys are set and turns G3 + anchor on', () => {
+    process.env.CONARIUM_AUDIT_SIGNING_KEY = 'x.pem'
+    process.env.CONARIUM_AUDIT_HMAC_KEY = 'hmac-secret'
+    enforceProductionProfile({ profile: 'production' })
+    expect(process.env.CONARIUM_AUDIT_REQUIRE_SIG).toBe('1')
+    expect(process.env.CONARIUM_ANCHOR_SINK).toBe('opentimestamps')
+  })
+
+  it('parseConariumConfig accepts profile production', () => {
+    const cfg = parseConariumConfig({ ...BASE, profile: 'production' })
+    expect(cfg.profile).toBe('production')
+  })
+
+  it('rate limit is 60 unless explicitly 0', () => {
+    expect(resolveHttpRatePerMin({ profile: 'production' })).toBe(60)
+    process.env.CONARIUM_MCP_RATE_PER_MIN = '0'
+    expect(resolveHttpRatePerMin({ profile: 'production' })).toBe(0)
+    delete process.env.CONARIUM_MCP_RATE_PER_MIN
+    expect(resolveHttpRatePerMin({})).toBe(0)
+  })
+
+  it('doctor reports production profile as one FAIL block when keys are missing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cnr-g4-'))
+    writeFileSync(
+      join(dir, 'conarium.config.json'),
+      JSON.stringify({
+        ...BASE,
+        profile: 'production',
+        policy: { allowConnectors: ['docs'] },
+      }),
+    )
+    const r = spawnSync(process.execPath, [DOCTOR, '--no-net'], {
+      cwd: dir,
+      encoding: 'utf-8',
+      env: {
+        ...process.env,
+        CONARIUM_AUDIT_SIGNING_KEY: '',
+        CONARIUM_AUDIT_HMAC_KEY: '',
+        CONARIUM_AUDIT_TRUST_PUBKEYS: '',
+        CONARIUM_MCP_TOKEN: '',
+        CONARIUM_PROFILE: '',
+      },
+    })
+    const out = `${r.stdout || ''}${r.stderr || ''}`
+    expect(r.status).toBe(1)
+    expect(out).toMatch(/Production profile/)
+    expect(out).toMatch(/Ed25519/)
+    expect(out).toMatch(/HMAC/)
   })
 })
