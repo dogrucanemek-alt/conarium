@@ -30,6 +30,22 @@ Cron (not installed by git):
 `CONARIUM_DEMO_MCP_URL` (and `CONARIUM_DEMO_TOKEN` if the URL is not
 already the capability token). Do not paste the token into the file.
 
+## Caddy — `/.well-known/*` must 404
+
+`Caddyfile.demo.snippet` is the matcher to insert **before** the
+catch-all `redir https://conarium.dev/#trylive`. Without it, Claude's
+connector treats the 302 HTML as OAuth metadata and fails registration.
+
+After reload, all three must be **404** (not 302):
+
+```
+curl -s -o /dev/null -w "%{http_code}\n" https://demo.conarium.dev/.well-known/oauth-protected-resource
+curl -s -o /dev/null -w "%{http_code}\n" https://demo.conarium.dev/.well-known/oauth-authorization-server
+curl -s -o /dev/null -w "%{http_code}\n" https://demo.conarium.dev/.well-known/oauth-protected-resource/t/conarium-public-demo-tryit-2026/mcp
+```
+
+`POST /t/conarium-public-demo-tryit-2026/mcp` must stay 200.
+
 ## Rollback
 
 ```bash

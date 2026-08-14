@@ -10,6 +10,10 @@
   Double-click waits until the port listens, then opens the browser with a
   one-time `/handoff` nonce (≤30s). The long-lived token is not put in the
   URL. Auth and CSRF are unchanged for Bearer clients.
+- **HTTP gateway returns 404 (plain text) for `/.well-known/*`.** Public
+  demo has no OAuth. A 302+HTML catch-all made MCP clients treat the
+  redirect body as authorization-server metadata. Caddy must still 404
+  these paths before its catch-all; this is defense in depth.
 
 ## 0.2.7 — 2026-08-14
 

@@ -1,0 +1,28 @@
+# FRAGMENT — do not replace the whole demo.conarium.dev site with this.
+# Existing handles (/t/*, /proof, /healthz) stay. Insert ONLY the
+# @wellknown handle immediately ABOVE the catch-all redir.
+# First matching `handle` wins.
+#
+# Why: MCP clients (Claude) probe RFC 9728 / RFC 8414 paths when adding
+# a connector. They expect 404 on a public unauthenticated demo. The
+# catch-all 302+HTML is parsed as OAuth metadata, Dynamic Client
+# Registration runs, and the connector dies with
+# "Couldn't register with ...'s sign-in service".
+# Do NOT serve fake OAuth metadata. 404 is the honest answer.
+#
+# Apply (patron / Claude — Hetzner write):
+#   1. Edit the live Caddyfile (usually /etc/caddy/Caddyfile)
+#   2. caddy validate --config /etc/caddy/Caddyfile
+#   3. systemctl reload caddy
+# This repo copy does not reload Caddy.
+
+	@wellknown path /.well-known /.well-known/*
+	handle @wellknown {
+		header Content-Type "text/plain; charset=utf-8"
+		respond "not found" 404
+	}
+
+	# existing catch-all — keep below the matcher above
+	# handle {
+	# 	redir https://conarium.dev/#trylive
+	# }

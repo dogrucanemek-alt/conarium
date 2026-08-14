@@ -126,6 +126,16 @@ export function createHandler(
         return
       }
 
+      // Public demo has no OAuth. MCP clients probe RFC 9728 / RFC 8414
+      // paths and treat 302+HTML as metadata, then fall into Dynamic Client
+      // Registration and die. 404 is the honest answer. Caddy must also
+      // 404 these before its catch-all redir — this is defense in depth
+      // if the proxy ever forwards /.well-known/* here.
+      if (url.pathname === '/.well-known' || url.pathname.startsWith('/.well-known/')) {
+        res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('not found')
+        return
+      }
+
       // Yol: /t/<token>/mcp (capability URL) ya da /mcp + Authorization: Bearer
       const pathMatch = url.pathname.match(/^\/t\/([^/]+)\/mcp$/)
       const isPlainMcp = url.pathname === '/mcp'

@@ -176,4 +176,23 @@ describe('oturum, onu açan kimliğe bağlıdır', () => {
     expect(key.toString('hex')).toBe(sha256hex(AYSE))
     expect(key.toString('utf8')).not.toContain(AYSE)
   })
+
+  it('/.well-known/* is 404 text, not JSON-RPC and not a redirect', async () => {
+    const paths = [
+      '/.well-known/oauth-protected-resource',
+      '/.well-known/oauth-authorization-server',
+      '/.well-known/oauth-protected-resource/t/conarium-public-demo-tryit-2026/mcp',
+    ]
+    for (const pathname of paths) {
+      const res = sahteYanit()
+      await createHandler(deps, new Map(), limiter)(
+        { url: pathname, method: 'GET', headers: {}, socket: { remoteAddress: '127.0.0.1' } },
+        res,
+      )
+      expect(res.kayit.status).toBe(404)
+      expect(res.kayit.headers['content-type']).toMatch(/^text\/plain/)
+      expect(res.kayit.body).toBe('not found')
+      expect(res.kayit.headers.location).toBeUndefined()
+    }
+  })
 })
