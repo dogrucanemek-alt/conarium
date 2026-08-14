@@ -236,7 +236,7 @@ export function createHandler(
         const now = opts.now?.() ?? Date.now()
         const idleMs = opts.idleMs ?? resolveSessionIdleMs()
         if (idleMs > 0 && existing.lastActive != null && now - existing.lastActive > idleMs) {
-          transports.delete(sessionId)
+          if (sessionId) transports.delete(sessionId)
           sendRpcError(res, 404, -32004, 'session not found — send a new initialize request')
           return
         }

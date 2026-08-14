@@ -9,6 +9,9 @@ import type {
 import fs from 'fs/promises'
 import dns from 'dns/promises'
 import net from 'net'
+import { createRequire } from 'module'
+
+const nodeRequire = createRequire(import.meta.url)
 
 interface EndpointInfo {
   method: string
@@ -57,7 +60,7 @@ export class OpenApiConnector implements Connector {
       const timeoutId = setTimeout(() => controller.abort(), 10000)
 
       try {
-        const res = await fetch(url, { signal: controller.signal })
+        const res = await this.safeFetch(url, { signal: controller.signal }, 'OpenAPI spec')
         if (!res.ok) {
           throw new Error(`${this.name}: Failed to fetch OpenAPI spec from ${url}: ${res.statusText}`)
         }
@@ -299,8 +302,7 @@ export class OpenApiConnector implements Connector {
 
     let res
     try {
-      await this.enforceSafeRemoteUrl(urlToFetch, 'OpenAPI request')
-      res = await fetch(urlToFetch, { headers, signal: controller.signal })
+      res = await this.safeFetch(urlToFetch, { headers, signal: controller.signal }, 'OpenAPI request')
     } finally {
       clearTimeout(timeoutId)
     }
@@ -438,7 +440,65 @@ export class OpenApiConnector implements Connector {
     })
   }
 
-  private async enforceSafeRemoteUrl(rawUrl: string, purpose: string): Promise<void> {
+  static readonly MAX_REDIRECTS = 5
+
+  /**
+   * HTTPS + allow-list + private-IP check, then fetch with redirect:manual
+   * and DNS pinned to the approved address (undici Agent lookup).
+   * TLS SNI stays the original hostname.
+   */
+  async safeFetch(url: string, init: RequestInit, purpose: string): Promise<Response> {
+    let current = url
+    for (let hop = 0; hop <= OpenApiConnector.MAX_REDIRECTS; hop++) {
+      const addresses = await this.enforceSafeRemoteUrl(current, purpose)
+      const address = addresses[0]
+      const hostname = new URL(current).hostname
+      const res = await this.doFetch(current, {
+        ...init,
+        redirect: 'manual',
+        dispatcher: this.pinnedDispatcher(hostname, address),
+      } as RequestInit)
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get('location')
+        if (!loc) throw new Error(`${this.name}: ${purpose} redirect without Location`)
+        current = new URL(loc, current).href
+        purpose = `${purpose} redirect`
+        continue
+      }
+      return res
+    }
+    throw new Error(`${this.name}: too many redirects (max ${OpenApiConnector.MAX_REDIRECTS})`)
+  }
+
+  private pinnedDispatcher(hostname: string, address: string): unknown {
+    try {
+      // undici ships with Node — not a package.json dependency.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Agent } = nodeRequire('undici') as { Agent: new (opts: object) => unknown }
+      return new Agent({
+        connect: {
+          servername: hostname,
+          lookup: (_host: string, _opts: unknown, cb: (err: Error | null, addr: string, family: number) => void) => {
+            cb(null, address, net.isIP(address) === 6 ? 6 : 4)
+          },
+        },
+      })
+    } catch {
+      return undefined
+    }
+  }
+
+  private async doFetch(url: string, init: RequestInit): Promise<Response> {
+    try {
+      const undici = nodeRequire('undici') as { fetch: (u: string, i: RequestInit) => Promise<Response> }
+      return await undici.fetch(url, init)
+    } catch {
+      return fetch(url, { ...init, redirect: 'manual' })
+    }
+  }
+
+  /** Returns resolved public addresses. */
+  async enforceSafeRemoteUrl(rawUrl: string, purpose: string): Promise<string[]> {
     const parsed = new URL(rawUrl)
     if (parsed.protocol !== 'https:') {
       throw new Error(`${this.name}: ${purpose} must use HTTPS.`)
@@ -453,6 +513,7 @@ export class OpenApiConnector implements Connector {
         throw new Error(`${this.name}: ${purpose} resolves to blocked private/reserved address ${address}.`)
       }
     }
+    return addresses
   }
 
   private async resolveHost(hostname: string): Promise<string[]> {

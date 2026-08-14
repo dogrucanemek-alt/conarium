@@ -94,12 +94,12 @@ export function computeChain(
     throw new Error('coverage: no receipts to declare coverage over (refusing silent pass)')
   }
   const seqs = receipts.map((r) => r.chain.seq).sort((a, b) => a - b)
-  const firstSeq = seqs[0]
-  const lastSeq = seqs[seqs.length - 1]
+  const firstSeq = seqs[0]!
+  const lastSeq = seqs[seqs.length - 1]!
   const gaps: CoverageGap[] = []
   const pinned = opts.seqFrom != null
   if (pinned && firstSeq !== opts.seqFrom) {
-    gaps.push({ expectedSeq: opts.seqFrom, foundSeq: firstSeq })
+    gaps.push({ expectedSeq: opts.seqFrom as number, foundSeq: firstSeq })
   }
   for (let expected = firstSeq; expected < lastSeq; expected++) {
     if (!seqs.includes(expected)) {
@@ -116,7 +116,7 @@ export function computeChain(
     contiguous: gaps.length === 0,
     gaps,
     windowStartPinned: pinned,
-    expectedFirstSeq: pinned ? opts.seqFrom : null,
+    expectedFirstSeq: pinned ? opts.seqFrom ?? null : null,
   }
 }
 

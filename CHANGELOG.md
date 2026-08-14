@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Behavior change (G10):** OpenAPI fetch uses `redirect: manual` and
+  re-checks every hop (max 5). The approved DNS address is pinned via
+  an undici Agent lookup; TLS SNI stays the original hostname. undici
+  is not added to package.json.
+
 - **Behavior change (G9):** Private key files that are not 0600 fail
   boot. Escape hatch `CONARIUM_ALLOW_LOOSE_KEY_PERMS=1` restores the
   old warning. win32 skips the check (POSIX mode is meaningless).
