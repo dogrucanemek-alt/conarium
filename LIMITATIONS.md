@@ -55,8 +55,9 @@ of this gateway.
 ## Two processes, one audit file
 
 `Audit.log()` is synchronous. One process can write many concurrent queries
-without breaking `prevHash`. Two OS processes appending the same sink have
-no lock. That install is unsupported until a lock is an explicit decision.
+without breaking `prevHash`. A second OS process that opens the same sink
+is rejected (`<sink>.lock`, advisory `wx`). The lock does not stop a writer
+outside Conarium that ignores the lock file.
 
 ## Strict signature mode is opt-in
 

@@ -1,4 +1,5 @@
-import { appendFileSync, readFileSync, existsSync, statSync } from 'fs'
+import { appendFileSync, readFileSync, existsSync, statSync, writeFileSync, unlinkSync } from 'fs'
+import { dirname } from 'path'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { computeEntryHash, GENESIS_HASH } from './audit-hash.js'
 import {
@@ -156,6 +157,76 @@ function warnUnsignedOnce(): void {
   )
 }
 
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const heldLocks = new Map<string, number>()
+let exitHookInstalled = false
+
+function ensureLockExitHook(): void {
+  if (exitHookInstalled) return
+  exitHookInstalled = true
+  process.once('exit', () => {
+    for (const p of heldLocks.keys()) {
+      try { unlinkSync(p) } catch { /* advisory */ }
+    }
+  })
+}
+
+function acquireSinkLock(sink: string): string | undefined {
+  if (!existsSync(dirname(sink))) return undefined
+  const lockPath = `${sink}.lock`
+  const already = heldLocks.get(lockPath) ?? 0
+  if (already > 0) {
+    heldLocks.set(lockPath, already + 1)
+    return lockPath
+  }
+  ensureLockExitHook()
+  const body = `${JSON.stringify({ pid: process.pid, startedAt: Date.now() })}\n`
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      writeFileSync(lockPath, body, { flag: 'wx' })
+      heldLocks.set(lockPath, 1)
+      return lockPath
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'EEXIST') throw err
+      let otherPid: number | null = null
+      try {
+        const parsed = JSON.parse(readFileSync(lockPath, 'utf8')) as { pid?: number }
+        otherPid = typeof parsed.pid === 'number' ? parsed.pid : null
+      } catch {
+        otherPid = null
+      }
+      if (otherPid === process.pid) {
+        heldLocks.set(lockPath, 1)
+        return lockPath
+      }
+      if (otherPid != null && pidAlive(otherPid)) {
+        throw new Error(`another process holds the audit sink lock (pid ${otherPid})`)
+      }
+      try { unlinkSync(lockPath) } catch { /* stale steal */ }
+    }
+  }
+  throw new Error('another process holds the audit sink lock (pid unknown)')
+}
+
+function releaseSinkLock(lockPath: string): void {
+  const n = heldLocks.get(lockPath) ?? 0
+  if (n <= 1) {
+    heldLocks.delete(lockPath)
+    try { unlinkSync(lockPath) } catch { /* already gone */ }
+    return
+  }
+  heldLocks.set(lockPath, n - 1)
+}
+
 export class Audit {
   private sink?: string
   private consumer: string
@@ -176,6 +247,7 @@ export class Audit {
   private scanCharCap?: number
   private detectors?: DetectorToggles
   private customPatterns: CompiledCustomPattern[] = []
+  private lockPath?: string
 
   constructor(opts: {
     sink?: string
@@ -188,6 +260,7 @@ export class Audit {
     customPatterns?: CustomPiiPattern[]
   } = {}) {
     this.sink = opts.sink
+    if (this.sink) this.lockPath = acquireSinkLock(this.sink)
     this.consumer = opts.consumer || 'unknown'
     this.scanCharCap = opts.scanCharCap
     this.detectors = opts.detectors
@@ -238,6 +311,12 @@ export class Audit {
       // ⚠️ Ed25519 zorunluluğu (yukarıda) GEVŞETİLMEDİ: imzasız makbuz makbuz değildir.
       this.loadReceiptChainState()
     }
+  }
+
+  close(): void {
+    if (!this.lockPath) return
+    releaseSinkLock(this.lockPath)
+    this.lockPath = undefined
   }
 
   private requireSigningCapability(): void {

@@ -53,8 +53,8 @@ atlayabilir. Operatörün kendi süreci bu kapının denetim konusu değildir.
 ## İki süreç, tek denetim dosyası
 
 `Audit.log()` senkrondur. Tek süreçte eşzamanlı sorgular `prevHash` kırmadan
-yazar. İki OS süreci aynı sink’e kilit olmadan ekler. Kilit ayrı karar;
-o kurulum desteklenmez.
+yazar. Aynı sink’i açan ikinci OS süreci reddedilir (`<sink>.lock`,
+advisory `wx`). Kilit, Conarium dışından dosyaya yazan süreci durdurmaz.
 
 ## Sıkı imza kipi opt-in
 

@@ -21,6 +21,7 @@ async function main() {
 
   process.on('SIGINT', async () => {
     for (const conn of deps.connectors) await conn.disconnect().catch(() => {})
+    deps.audit.close()
     process.exit(0)
   })
 }

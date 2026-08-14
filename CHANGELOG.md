@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **G5:** Audit sink takes an advisory `<sink>.lock` (`wx`, PID + start).
+  A second OS process is rejected; a stale lock (dead PID) is stolen.
+  Same-process re-entry stays allowed (console / validateChain boot).
+  The lock does not stop a writer outside Conarium.
+
 - **G4:** `profile: "production"` (or `CONARIUM_PROFILE=production`) refuses
   boot without Ed25519 AND HMAC, turns G3 strict signatures and OpenTimestamps
   anchoring on, and defaults HTTP rate-limit to 60/min unless explicitly 0.
