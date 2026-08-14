@@ -7,7 +7,8 @@ Not receipt conformance.
 not marked supported.
 
 Postgres policy uses `public.*`. MSSQL overlay (`dialectPolicy.mssql`) uses
-`dbo.*`. Oracle is absent until its three acceptance checks pass.
+`dbo.*`. Oracle SQL is present and the unit set is green; the live Docker
+check did not pass, so Oracle is not a supported dialect.
 
 `test/property_sql_gate.mjs` is the generated-attack leftover. A **real
 bypass** is written here as one JSON file and that check stays red.

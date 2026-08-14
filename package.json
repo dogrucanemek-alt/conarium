@@ -83,6 +83,7 @@
     "bench:overhead": "node scripts/benchmark-overhead.mjs"
   },
   "dependencies": {
+    "@guanmingchiu/sqlparser-ts": "^0.62.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "express": "^5.2.1",
     "js-yaml": "^5.2.3",

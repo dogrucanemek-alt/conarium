@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { Governance, PolicyError } from '../governance.js'
 import { guardMssqlQuery } from './mssql.js'
+import { guardOracleQuery } from './oracle.js'
 import type { GovernancePolicy } from '../types.js'
 
 type Dialect = 'postgres' | 'mssql' | 'oracle'
@@ -37,12 +38,14 @@ function policyFor(dialect: Dialect): GovernancePolicy {
 
 function guard(dialect: Dialect, sql: string, policy: GovernancePolicy) {
   if (dialect === 'mssql') return guardMssqlQuery(sql, policy)
+  if (dialect === 'oracle') return guardOracleQuery(sql, policy)
   if (dialect === 'postgres') return new Governance(policy).guardQuery(sql)
   throw new Error(`${dialect} is not supported in this runner`)
 }
 
 function capPattern(dialect: Dialect): RegExp {
   if (dialect === 'mssql') return /top\s+50\b/i
+  if (dialect === 'oracle') return /fetch\s+first\s+50\s+rows\s+only/i
   return /limit\s+\(?50\)?/i
 }
 
@@ -92,3 +95,4 @@ function runDialect(dialect: Dialect) {
 
 runDialect('postgres')
 runDialect('mssql')
+runDialect('oracle')

@@ -1,15 +1,33 @@
 {
   "policy": {
-    "allowTables": ["public.customers"],
-    "denyTables": ["public.secrets"],
-    "maskColumns": ["*.email"],
+    "allowTables": [
+      "public.customers"
+    ],
+    "denyTables": [
+      "public.secrets"
+    ],
+    "maskColumns": [
+      "*.email"
+    ],
     "maxRows": 50
   },
   "secret": "gate-secret-email@example.com",
   "dialectPolicy": {
     "mssql": {
-      "allowTables": ["dbo.customers"],
-      "denyTables": ["dbo.secrets"]
+      "allowTables": [
+        "dbo.customers"
+      ],
+      "denyTables": [
+        "dbo.secrets"
+      ]
+    },
+    "oracle": {
+      "allowTables": [
+        "app.customers"
+      ],
+      "denyTables": [
+        "app.secrets"
+      ]
     }
   },
   "vectors": [
@@ -19,7 +37,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT id FROM public.secrets",
-        "mssql": "SELECT id FROM dbo.secrets"
+        "mssql": "SELECT id FROM dbo.secrets",
+        "oracle": "SELECT id FROM app.secrets"
       }
     },
     {
@@ -28,7 +47,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT s.id FROM public.secrets AS s",
-        "mssql": "SELECT s.id FROM dbo.secrets AS s"
+        "mssql": "SELECT s.id FROM dbo.secrets AS s",
+        "oracle": "SELECT s.id FROM app.secrets s"
       }
     },
     {
@@ -37,7 +57,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT c.id FROM public.customers c JOIN public.secrets s ON s.id = c.id",
-        "mssql": "SELECT c.id FROM dbo.customers c JOIN dbo.secrets s ON s.id = c.id"
+        "mssql": "SELECT c.id FROM dbo.customers c JOIN dbo.secrets s ON s.id = c.id",
+        "oracle": "SELECT c.id FROM app.customers c JOIN app.secrets s ON s.id = c.id"
       }
     },
     {
@@ -46,7 +67,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT id FROM (SELECT id FROM public.secrets) AS x",
-        "mssql": "SELECT id FROM (SELECT id FROM dbo.secrets) AS x"
+        "mssql": "SELECT id FROM (SELECT id FROM dbo.secrets) AS x",
+        "oracle": "SELECT id FROM (SELECT id FROM app.secrets) x"
       }
     },
     {
@@ -55,7 +77,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "WITH x AS (SELECT id FROM public.secrets) SELECT * FROM x",
-        "mssql": "WITH x AS (SELECT id FROM dbo.secrets) SELECT * FROM x"
+        "mssql": "WITH x AS (SELECT id FROM dbo.secrets) SELECT * FROM x",
+        "oracle": "WITH x AS (SELECT id FROM app.secrets) SELECT * FROM x"
       }
     },
     {
@@ -64,7 +87,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT id FROM public.\"secrets\"",
-        "mssql": "SELECT id FROM dbo.[secrets]"
+        "mssql": "SELECT id FROM dbo.[secrets]",
+        "oracle": "SELECT id FROM app.\"secrets\""
       }
     },
     {
@@ -73,7 +97,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT id FROM PUBLIC.SECRETS",
-        "mssql": "SELECT id FROM DBO.SECRETS"
+        "mssql": "SELECT id FROM DBO.SECRETS",
+        "oracle": "SELECT id FROM APP.SECRETS"
       }
     },
     {
@@ -82,7 +107,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT id FROM public.secrets",
-        "mssql": "SELECT id FROM dbo.secrets"
+        "mssql": "SELECT id FROM dbo.secrets",
+        "oracle": "SELECT id FROM app.secrets"
       }
     },
     {
@@ -91,7 +117,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT id FROM /* join */ public.secrets",
-        "mssql": "SELECT id FROM /* join */ dbo.secrets"
+        "mssql": "SELECT id FROM /* join */ dbo.secrets",
+        "oracle": "SELECT id FROM /* join */ app.secrets"
       }
     },
     {
@@ -100,7 +127,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT id FROM secrets",
-        "mssql": "SELECT id FROM secrets"
+        "mssql": "SELECT id FROM secrets",
+        "oracle": "SELECT id FROM secrets"
       }
     },
     {
@@ -109,7 +137,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "INSERT INTO public.customers (id) VALUES (1)",
-        "mssql": "INSERT INTO dbo.customers (id) VALUES (1)"
+        "mssql": "INSERT INTO dbo.customers (id) VALUES (1)",
+        "oracle": "INSERT INTO app.customers (id) VALUES (1)"
       }
     },
     {
@@ -118,7 +147,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "UPDATE public.customers SET id = 1",
-        "mssql": "UPDATE dbo.customers SET id = 1"
+        "mssql": "UPDATE dbo.customers SET id = 1",
+        "oracle": "UPDATE app.customers SET id = 1"
       }
     },
     {
@@ -127,7 +157,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "DELETE FROM public.customers",
-        "mssql": "DELETE FROM dbo.customers"
+        "mssql": "DELETE FROM dbo.customers",
+        "oracle": "DELETE FROM app.customers"
       }
     },
     {
@@ -136,7 +167,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "DROP TABLE public.customers",
-        "mssql": "DROP TABLE dbo.customers"
+        "mssql": "DROP TABLE dbo.customers",
+        "oracle": "DROP TABLE app.customers"
       }
     },
     {
@@ -145,7 +177,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "MERGE INTO public.customers t USING public.customers s ON t.id = s.id WHEN MATCHED THEN UPDATE SET id = s.id",
-        "mssql": "MERGE dbo.customers t USING dbo.customers s ON t.id = s.id WHEN MATCHED THEN UPDATE SET t.id = s.id;"
+        "mssql": "MERGE dbo.customers t USING dbo.customers s ON t.id = s.id WHEN MATCHED THEN UPDATE SET t.id = s.id;",
+        "oracle": "MERGE INTO app.customers t USING app.customers s ON (t.id = s.id) WHEN MATCHED THEN UPDATE SET t.id = s.id"
       }
     },
     {
@@ -154,7 +187,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "COPY public.customers TO STDOUT",
-        "mssql": "SELECT id INTO x FROM dbo.customers"
+        "mssql": "SELECT id INTO x FROM dbo.customers",
+        "oracle": "CREATE TABLE app.x AS SELECT id FROM app.customers"
       }
     },
     {
@@ -163,7 +197,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "CREATE TABLE public.x (id int)",
-        "mssql": "CREATE TABLE dbo.x (id int)"
+        "mssql": "CREATE TABLE dbo.x (id int)",
+        "oracle": "CREATE TABLE app.x (id int)"
       }
     },
     {
@@ -172,7 +207,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "TRUNCATE public.customers",
-        "mssql": "TRUNCATE TABLE dbo.customers"
+        "mssql": "TRUNCATE TABLE dbo.customers",
+        "oracle": "TRUNCATE TABLE app.customers"
       }
     },
     {
@@ -181,7 +217,8 @@
       "expect": "cap",
       "sql": {
         "postgres": "SELECT id FROM public.customers LIMIT 9999",
-        "mssql": "SELECT TOP 9999 id FROM dbo.customers"
+        "mssql": "SELECT TOP 9999 id FROM dbo.customers",
+        "oracle": "SELECT id FROM app.customers FETCH FIRST 9999 ROWS ONLY"
       }
     },
     {
@@ -190,7 +227,8 @@
       "expect": "cap",
       "sql": {
         "postgres": "SELECT id FROM (SELECT id FROM public.customers LIMIT 9999) AS x",
-        "mssql": "SELECT id FROM (SELECT TOP 9999 id FROM dbo.customers) AS x"
+        "mssql": "SELECT id FROM (SELECT TOP 9999 id FROM dbo.customers) AS x",
+        "oracle": "SELECT id FROM (SELECT id FROM app.customers FETCH FIRST 9999 ROWS ONLY) x"
       }
     },
     {
@@ -199,7 +237,8 @@
       "expect": "cap",
       "sql": {
         "postgres": "SELECT id FROM public.customers UNION ALL SELECT id FROM public.customers",
-        "mssql": "SELECT id FROM dbo.customers UNION ALL SELECT id FROM dbo.customers"
+        "mssql": "SELECT id FROM dbo.customers UNION ALL SELECT id FROM dbo.customers",
+        "oracle": "SELECT id FROM app.customers UNION ALL SELECT id FROM app.customers"
       }
     },
     {
@@ -208,9 +247,12 @@
       "expect": "mask",
       "sql": {
         "postgres": "SELECT email AS contact FROM public.customers",
-        "mssql": "SELECT email AS contact FROM dbo.customers"
+        "mssql": "SELECT email AS contact FROM dbo.customers",
+        "oracle": "SELECT email AS contact FROM app.customers"
       },
-      "row": { "contact": "gate-secret-email@example.com" },
+      "row": {
+        "contact": "gate-secret-email@example.com"
+      },
       "rawField": "contact"
     },
     {
@@ -219,9 +261,12 @@
       "expect": "mask",
       "sql": {
         "postgres": "SELECT email || '@x' AS glued FROM public.customers",
-        "mssql": "SELECT email + '@x' AS glued FROM dbo.customers"
+        "mssql": "SELECT email + '@x' AS glued FROM dbo.customers",
+        "oracle": "SELECT email || '@x' AS glued FROM app.customers"
       },
-      "row": { "glued": "gate-secret-email@example.com@x" },
+      "row": {
+        "glued": "gate-secret-email@example.com@x"
+      },
       "rawField": "glued"
     },
     {
@@ -230,9 +275,12 @@
       "expect": "mask",
       "sql": {
         "postgres": "SELECT CASE WHEN true THEN email ELSE 'x' END AS picked FROM public.customers",
-        "mssql": "SELECT CASE WHEN 1=1 THEN email ELSE 'x' END AS picked FROM dbo.customers"
+        "mssql": "SELECT CASE WHEN 1=1 THEN email ELSE 'x' END AS picked FROM dbo.customers",
+        "oracle": "SELECT CASE WHEN 1=1 THEN email ELSE 'x' END AS picked FROM app.customers"
       },
-      "row": { "picked": "gate-secret-email@example.com" },
+      "row": {
+        "picked": "gate-secret-email@example.com"
+      },
       "rawField": "picked"
     },
     {
@@ -241,9 +289,12 @@
       "expect": "mask",
       "sql": {
         "postgres": "SELECT email FROM (SELECT email FROM public.customers) AS x",
-        "mssql": "SELECT email FROM (SELECT email FROM dbo.customers) AS x"
+        "mssql": "SELECT email FROM (SELECT email FROM dbo.customers) AS x",
+        "oracle": "SELECT email FROM (SELECT email FROM app.customers) x"
       },
-      "row": { "email": "gate-secret-email@example.com" },
+      "row": {
+        "email": "gate-secret-email@example.com"
+      },
       "rawField": "email"
     },
     {
@@ -252,7 +303,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "not sql at all !!!",
-        "mssql": "not sql at all !!!"
+        "mssql": "not sql at all !!!",
+        "oracle": "not sql at all !!!"
       }
     },
     {
@@ -261,7 +313,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "   ",
-        "mssql": "   "
+        "mssql": "   ",
+        "oracle": "   "
       }
     },
     {
@@ -270,7 +323,8 @@
       "expect": "deny",
       "sql": {
         "postgres": "SELECT id FROM public.customers; SELECT id FROM public.secrets",
-        "mssql": "SELECT id FROM dbo.customers; SELECT id FROM dbo.secrets"
+        "mssql": "SELECT id FROM dbo.customers; SELECT id FROM dbo.secrets",
+        "oracle": "SELECT id FROM app.customers; SELECT id FROM app.secrets"
       }
     }
   ]
