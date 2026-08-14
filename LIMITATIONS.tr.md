@@ -10,12 +10,12 @@ SOC 2 yok. ISO yok. Bağımsız sızma testi yok. Yol haritasında.
 
 Sürüm 0.2.x. API kırılabilir.
 
-## SQL yalnız Postgres
+## SQL: Postgres ve Microsoft SQL Server
 
-Oracle, Microsoft SQL Server ve MySQL yok.
-Tasarım notu var: [`docs/specs/2026-08-14-oracle-mssql-dialect-design.md`](docs/specs/2026-08-14-oracle-mssql-dialect-design.md).
-Kod yok.
-Bu bir konnektör değil, ikinci ayrıştırıcı katmanı. Bugünkü güvenlik kapısı `pgsql-ast-parser` üstünde duruyor. Yeni lehçe o katmanı yeniden kurar.
+Oracle ve MySQL yok.
+MSSQL: paylaşılan SQL-kapısı vektör seti T-SQL’de yeşil; ayrıştırılamayan girdi reddedilir. Canlı kontrol Docker `mcr.microsoft.com/mssql/server` ile yapıldı.
+Oracle vektörleri var; canlı örnek tutulamadı ve synonym hedefi çözülemez. Bu destek değildir.
+Bu bir konnektör değil, ikinci ayrıştırıcı katmanı. Postgres hâlâ `pgsql-ast-parser`. MSSQL `node-sql-parser` (transactsql) kullanır.
 
 ## Serbest metinde isim garantisi yok
 

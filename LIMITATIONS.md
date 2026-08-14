@@ -10,12 +10,12 @@ No SOC 2. No ISO. No independent penetration test. On the roadmap.
 
 Version is 0.2.x. The API can break.
 
-## SQL is Postgres only
+## SQL is Postgres and Microsoft SQL Server
 
-Oracle, Microsoft SQL Server, and MySQL are not implemented.
-A design note exists: [`docs/specs/2026-08-14-oracle-mssql-dialect-design.md`](docs/specs/2026-08-14-oracle-mssql-dialect-design.md).
-There is no code.
-This is a second parser layer, not a connector. Today's security gate sits on `pgsql-ast-parser`. A new dialect rebuilds that layer.
+Oracle and MySQL are not implemented.
+MSSQL means the shared SQL-gate vector set is green against T-SQL and unparseable input is denied. The live check used Docker `mcr.microsoft.com/mssql/server`.
+Oracle vectors exist; a live instance was not held, and synonym targets cannot be resolved. That is not support.
+This is a second parser layer, not a connector. Postgres still uses `pgsql-ast-parser`. MSSQL uses `node-sql-parser` (transactsql).
 
 ## Names in free text are not guaranteed
 
