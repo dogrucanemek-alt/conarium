@@ -25,6 +25,7 @@ export const GovernancePolicySchema = z.object({
   denyTables: stringArray.optional(),
   maskColumns: stringArray.optional(),
   maxRows: z.number().int().positive().max(10000).optional(),
+  dialect: z.enum(['postgres', 'mssql', 'oracle']).optional(),
   maskLabelledNames: z.boolean().optional(),
   allowTools: stringArray.optional(),
   denyTools: stringArray.optional(),

@@ -47,6 +47,11 @@ import {
   isSelectOrWith,
   normalizedSqlHead,
 } from './sql-gate/rules.js'
+import {
+  guardSqlByDialect,
+  resolveSqlDialect,
+  type SqlDialect,
+} from './sql-gate/dispatch.js'
 
 export interface GovernanceMetadata {
   accessedTables: string[]
@@ -192,9 +197,25 @@ export class Governance {
   private customPatterns: CompiledCustomPattern[]
 
   constructor(policy: GovernancePolicy = {}, profileName: string | null = null) {
+    // Fail closed here too: tests and console construct Governance by hand,
+    // not only through parseConariumConfig. A typo must not become postgres.
+    resolveSqlDialect(policy.dialect)
     this.policy = policy
     this.profileName = profileName
     this.customPatterns = compileCustomPatterns(policy.customPatterns)
+  }
+
+  /** Operator-declared SQL gate. Omitted dialect is postgres. */
+  dialect(): SqlDialect {
+    return resolveSqlDialect(this.policy.dialect)
+  }
+
+  /**
+   * Shipped `query` path. Picks the gate from `policy.dialect`.
+   * Does not inspect the SQL to choose a parser.
+   */
+  guardSql(sql: string): GuardedQuery {
+    return guardSqlByDialect(this.dialect(), sql, this.policy, (s) => this.guardQuery(s))
   }
 
   /** Name of the masking profile in force, or null for the base policy. */

@@ -14,8 +14,9 @@ Version is 0.2.x. The API can break.
 
 MySQL is not implemented.
 A dialect is listed here only when the shared SQL-gate vector set is green against that dialect, unparseable input is denied, and a live engine run applied the row cap.
-This is a second parser layer, not a connector. The shipped `query` tool still calls the Postgres gate (`Governance.guardQuery`). MSSQL and Oracle guards run when that dialect's function is called.
+This is a second parser layer, not a connector. The shipped `query` tool selects the gate from `policy.dialect` (`postgres` when omitted, or `mssql`, or `oracle`). The dialect is the operator's declaration — it is not inferred from the SQL. An unknown dialect rejects the config; it does not fall back to postgres.
 Oracle does not resolve synonyms: an allow-listed name is the name the parser sees, not the base table. Database links (`table@dblink`) are denied. `ROWNUM` is denied (it is not a row cap).
+There is no MSSQL or Oracle connector. The gate rewrites SQL; a connector that can speak that engine is still the operator's.
 Parsers: Postgres `pgsql-ast-parser` · MSSQL `node-sql-parser` (transactsql) · Oracle `@guanmingchiu/sqlparser-ts`.
 
 ## Names in free text are not guaranteed

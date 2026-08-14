@@ -19,6 +19,7 @@ import type { GovernanceMetadata } from './governance.js'
 import { Audit } from './audit.js'
 import type { ResolvedActor } from './tokens.js'
 import { parseConariumConfig } from './config.js'
+import { loadSqlGate, resolveSqlDialect } from './sql-gate/dispatch.js'
 import { installedVersion } from './update-check.js'
 import { capSearchResult, readGovernedSchemaResource, resolveGovernedSearchScope } from './search_policy.js'
 import { SupabaseRestConnector } from './connectors/supabase_rest.js'
@@ -63,6 +64,7 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
     )
   }
 
+  await loadSqlGate(resolveSqlDialect(config.policy?.dialect))
   const governance = new Governance(config.policy)
   const audit = new Audit({
     sink: config.audit?.sink,
@@ -311,7 +313,7 @@ export function buildServer(
           result = governance.redact(await conn.query(guardedSql), aliases, guardMetadata)
         } else {
           try {
-            const res = governance.guardQuery(a.sql)
+            const res = governance.guardSql(a.sql)
             guardedSql = res.sql
             aliases = res.aliases
             guardMetadata = res.metadata

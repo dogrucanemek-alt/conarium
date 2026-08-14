@@ -52,8 +52,10 @@ Every tool call — allowed or denied — is supposed to write a signed receipt.
 
 ### 2. Gateway ↔ database
 
-**Today:** Connectors are read-only. `Governance.guardQuery` rejects writes,
-multi-statement, and unknown AST. Row cap is applied in the engine.
+**Today:** Connectors are read-only. The shipped `query` tool selects the
+SQL gate from `policy.dialect` (omitted = postgres / `Governance.guardQuery`).
+The dialect is not inferred from the statement. Writes, multi-statement, and
+unknown AST are rejected. Row cap is applied in the engine.
 Supabase REST and docs connectors have their own read-only paths.
 
 **Bypass surface:**

@@ -8,7 +8,7 @@
  * legal unquoted Oracle identifier (not _conarium_cap).
  */
 import { spawnSync } from 'node:child_process'
-import { guardOracleQuery } from '../src/sql-gate/oracle.ts'
+import { callShippedQuery } from './mcp-query-live.mjs'
 
 const container = process.env.ORACLE_CONTAINER ?? 'conarium-oracle-gate'
 const password = process.env.ORACLE_APP_PASSWORD ?? 'Conarium_Gate1'
@@ -98,17 +98,35 @@ COMMIT;
 const ungated = sqlplus('SELECT COUNT(*) FROM customers;')
 assert(/80/.test(ungated), `ungated customers should be 80, got: ${ungated}`)
 
-const guarded = guardOracleQuery('SELECT id FROM app.customers', policy)
-assert(/FETCH FIRST 50 ROWS ONLY/i.test(guarded.sql), `missing FETCH FIRST 50: ${guarded.sql}`)
-const capped = sqlplus(`SELECT COUNT(*) FROM (${guarded.sql});`)
-assert(/50/.test(capped), `gated count should be 50, got: ${capped}\nSQL=${guarded.sql}`)
+function countFrom(sql) {
+  const out = sqlplus(`SELECT COUNT(*) FROM (${sql});`)
+  const n = Number((out.match(/(?:^|\n)\s*(\d+)\s*(?:\n|$)/) || [])[1])
+  if (!Number.isFinite(n)) throw new Error(`could not parse count from: ${out}`)
+  return { rows: Array.from({ length: n }, (_, i) => ({ id: i + 1 })), rowCount: n, fields: ['id'] }
+}
+
+const customers = await callShippedQuery({
+  dialect: 'oracle',
+  policy,
+  execute: countFrom,
+  sql: 'SELECT id FROM app.customers',
+})
+assert(customers.seen.length === 1, 'oracle query must reach the connector once')
+assert(/FETCH FIRST 50 ROWS ONLY/i.test(customers.seen[0]), `missing FETCH FIRST 50: ${customers.seen[0]}`)
+assert(customers.result.content, 'MCP query must return content')
+const body = JSON.parse(customers.result.content[0].text)
+assert(body.rowCount === 50, `gated count should be 50, got: ${body.rowCount}\nSQL=${customers.seen[0]}`)
 
 let secretsDenied = false
-try { guardOracleQuery('SELECT id FROM app.secrets', policy) } catch { secretsDenied = true }
+try {
+  await callShippedQuery({ dialect: 'oracle', policy, execute: countFrom, sql: 'SELECT id FROM app.secrets' })
+} catch { secretsDenied = true }
 assert(secretsDenied, 'app.secrets must be denied by the gate')
 
 let garbageDenied = false
-try { guardOracleQuery('not sql at all !!!', policy) } catch { garbageDenied = true }
+try {
+  await callShippedQuery({ dialect: 'oracle', policy, execute: countFrom, sql: 'not sql at all !!!' })
+} catch { garbageDenied = true }
 assert(garbageDenied, 'unparseable Oracle must be denied')
 
 const leak = sqlplus('SELECT COUNT(*) FROM secrets;')
@@ -117,7 +135,8 @@ assert(/1/.test(leak), `ungated secrets must exist so deny is not a vacuum: ${le
 console.log('PASS oracle-live')
 console.log(`  container ${container}`)
 console.log(`  ungated customers 80`)
-console.log(`  gated SQL ${guarded.sql}`)
+console.log(`  gated SQL ${customers.seen[0]}`)
+console.log('  path MCP query tool')
 console.log(`  gated rows 50`)
 console.log('  secrets denied by gate; ungated row still present')
 console.log('  unparseable denied')

@@ -472,6 +472,8 @@ Control access using a simple `conarium.json` policy file:
 
 Anything not in `allowTables` is denied by default; matched `maskColumns` are redacted to `[MASKED_PII]` before the data ever reaches the model.
 
+`policy.dialect` selects the SQL gate the `query` tool uses: `postgres` (omitted default), `mssql`, or `oracle`. It is the operator's declaration — Conarium does not guess the dialect from the statement. A typo or `mysql` rejects the config.
+
 > **Connectors are fail-closed.** `allowConnectors` is a strict allow-list:
 > if it is missing or empty, **no** connector is permitted (previously an empty
 > list meant "allow all"). If you configure connectors, you must list them here —

@@ -86,6 +86,7 @@ Parsed by `src/config.ts` (Zod `.strict()`). Unknown keys reject the file.
 | `serverName` `serverVersion` `consumer` | experimental |
 | `policy.allowTables` `denyTables` | **candidate** (default-deny, deny wins) |
 | `policy.maskColumns` `maxRows` | experimental (cap ceiling is 10 000 at parse) |
+| `policy.dialect` (`postgres` omitted default, `mssql`, `oracle`) | experimental — unknown values reject the file; not inferred from SQL |
 | `policy.allowConnectors` `denyConnectors` | experimental — empty allow is fail-closed |
 | `policy.allowTools` `denyTools` | experimental |
 | `policy.profiles` `actorProfiles` | experimental |

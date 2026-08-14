@@ -6,6 +6,7 @@ import {
   isSelectOrWith,
   normalizedSqlHead,
 } from './rules.js'
+import { registerSqlGate } from './dispatch.js'
 import type { DialectAdapter, DialectQuestions } from './types.js'
 
 await init()
@@ -233,3 +234,5 @@ export const oracleAdapter: DialectAdapter = {
     }
   },
 }
+
+registerSqlGate('oracle', guardOracleQuery)

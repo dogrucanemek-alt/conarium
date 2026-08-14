@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import { timingSafeEqual } from 'crypto'
 import { z } from 'zod'
 import { Governance } from './governance.js'
+import { loadSqlGate, resolveSqlDialect } from './sql-gate/dispatch.js'
 import { Audit } from './audit.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
 import { createHandoffStore, createSessionStore } from './console-handoff.js'
@@ -385,11 +386,12 @@ export function createConsoleApp(opts: {
     ],
   }
 
-  app.post('/api/playground', (req, res) => {
+  app.post('/api/playground', async (req, res) => {
     const query = String(req.body?.query || '').trim()
     let cfg = {
       maxRows: 100,
       maskColumns: ['*.email', '*.ssn', '*.tckn', '*.card', '*.phone'] as string[],
+      dialect: undefined as 'postgres' | 'mssql' | 'oracle' | undefined,
     }
     try {
       if (fs.existsSync(configFile)) {
@@ -398,8 +400,14 @@ export function createConsoleApp(opts: {
           parsed?.policy && typeof parsed.policy === 'object' ? parsed.policy : parsed
         if (typeof pol?.maxRows === 'number') cfg.maxRows = pol.maxRows
         if (Array.isArray(pol?.maskColumns)) cfg.maskColumns = pol.maskColumns
+        if (pol?.dialect !== undefined) cfg.dialect = resolveSqlDialect(pol.dialect)
       }
-    } catch {}
+    } catch (err) {
+      if (err instanceof Error && /policy\.dialect/.test(err.message)) {
+        res.status(400).json({ error: err.message })
+        return
+      }
+    }
 
     let decision = 'allow'
     let reason = ''
@@ -415,10 +423,12 @@ export function createConsoleApp(opts: {
       allowTables: ['*'],
       denyTables: ['public.secrets'],
       maskColumns: cfg.maskColumns,
+      dialect: cfg.dialect,
     })
 
     try {
-      const gRes = gov.guardQuery(query)
+      await loadSqlGate(gov.dialect())
+      const gRes = gov.guardSql(query)
       const match = query.match(/FROM\s+public\.([a-zA-Z0-9_]+)/i)
       table = match ? match[1].toLowerCase() : ''
 

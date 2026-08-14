@@ -6,6 +6,7 @@ import {
   isSelectOrWith,
   normalizedSqlHead,
 } from './rules.js'
+import { registerSqlGate } from './dispatch.js'
 import type { DialectAdapter, DialectQuestions } from './types.js'
 
 const require = createRequire(import.meta.url)
@@ -300,3 +301,5 @@ export const mssqlAdapter: DialectAdapter = {
     }
   },
 }
+
+registerSqlGate('mssql', guardMssqlQuery)
