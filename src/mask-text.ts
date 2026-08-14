@@ -28,6 +28,14 @@ export interface MaskTextOptions {
   customPatterns?: CompiledCustomPattern[]
 }
 
+export const SECRET_VALUE_RE =
+  /\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g
+
+export function maskSecretShapedValues(text: string, token = '[MASKED_SECRET]'): string {
+  SECRET_VALUE_RE.lastIndex = 0
+  return text.replace(SECRET_VALUE_RE, token)
+}
+
 export function maskSensitiveText(text: string, opts: MaskTextOptions = {}): string {
   if (text.length > resolveScanCharCap(opts.scanCharCap)) {
     return '[MASKED_PII]'
@@ -40,7 +48,7 @@ export function maskSensitiveText(text: string, opts: MaskTextOptions = {}): str
   masked = maskNumericPii(masked).text
   if (opts.detectors?.ip === true) masked = maskIps(masked).text
   if (opts.detectors?.mrz !== false) masked = maskMrz(masked).text
-  masked = masked.replace(/\b(?:sk-[A-Za-z0-9]{12,}|sk_live_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g, '[MASKED_SECRET]')
+  masked = maskSecretShapedValues(masked)
   masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, '$1[MASKED_SECRET]$2')
   masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, '$1[MASKED_SECRET]')
   masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, '$1[MASKED_SECRET]')

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Behavior change (G18):** Flat query rows apply the same column-name
+  secret/PII heuristic as nested JSON (`api_key` / `password` →
+  `[MASKED_SECRET]`). One function, two call sites.
+
+- **Behavior change (G19):** Console `/api/config` redacts `key`,
+  `anonKey`, `headers`, and `authorization`, and also redacts JWT /
+  `sk-` / `AKIA` shaped values under innocent names.
+
 - **Behavior change (G16):** Audit `reason`, `target`, and `governance`
   go through the same mask pipeline as `args`. A DB error that carries
   a cell value can no longer land unmasked on the signed sink.

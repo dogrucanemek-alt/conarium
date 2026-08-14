@@ -17,6 +17,7 @@ import {
   verifyCommandFor,
 } from './console-receipts.js'
 import { receiptToView, renderReceiptHtml } from './receipt-view.js'
+import { maskSecretShapedValues } from './mask-text.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -84,13 +85,20 @@ export function writeConfigAtomic(configFile: string, contents: string): void {
   }
 }
 
+const SECRET_FIELD_NAME =
+  /token|secret|password|apikey|api[_-]?key|servicekey|service_key|dsn|url|\bkey\b|anonkey|anon_key|headers|authorization/i
+
 export function redactSecretFields(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const shaped = maskSecretShapedValues(value, '[REDACTED]')
+    return shaped === value ? value : shaped
+  }
   if (Array.isArray(value)) return value.map(item => redactSecretFields(item))
   if (!value || typeof value !== 'object') return value
 
   const out: Record<string, unknown> = {}
   for (const [key, nested] of Object.entries(value)) {
-    if (/token|secret|password|apikey|api_key|servicekey|service_key|dsn|url/i.test(key)) {
+    if (SECRET_FIELD_NAME.test(key)) {
       out[key] = '[REDACTED]'
     } else {
       out[key] = redactSecretFields(nested)
