@@ -56,6 +56,12 @@ atlayabilir. Operatörün kendi süreci bu kapının denetim konusu değildir.
 yazar. İki OS süreci aynı sink’e kilit olmadan ekler. Kilit ayrı karar;
 o kurulum desteklenmez.
 
+## Sıkı imza kipi opt-in
+
+`CONARIUM_AUDIT_REQUIRE_SIG=1` imza anahtarı varken imzasız tek satırda
+boot'u reddeder. Varsayılan, HMAC sonradan eklenince tamamen imzasız
+eski zinciri hâlâ açar (08-05 uyumu).
+
 ## Denetlenmemiş kriptografi
 
 Ed25519 uygulaması resmî denetimden geçmedi.

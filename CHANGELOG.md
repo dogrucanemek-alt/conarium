@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **G3:** `CONARIUM_AUDIT_REQUIRE_SIG=1` is opt-in strict boot — any
+  unsigned line is rejected when a signing key is configured. Default
+  unchanged (legacy unsigned chains still open).
+
 - **Behavior change (G18):** Flat query rows apply the same column-name
   secret/PII heuristic as nested JSON (`api_key` / `password` →
   `[MASKED_SECRET]`). One function, two call sites.

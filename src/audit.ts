@@ -500,6 +500,19 @@ export class Audit {
         )
       }
 
+      if (process.env.CONARIUM_AUDIT_REQUIRE_SIG === '1' && (this.hmacKey || this.signingKey)) {
+        if (this.hmacKey && !hasSignature) {
+          throw new Error(
+            `Audit sink is corrupt: CONARIUM_AUDIT_REQUIRE_SIG=1 rejects unsigned HMAC line ${i + 1}.`,
+          )
+        }
+        if (this.signingKey && !hasSig) {
+          throw new Error(
+            `Audit sink is corrupt: CONARIUM_AUDIT_REQUIRE_SIG=1 rejects unsigned Ed25519 line ${i + 1}.`,
+          )
+        }
+      }
+
       // Trust-store verify (F5): any keyId in the store is accepted if crypto checks out;
       // unknown keyId fails closed. Empty store → skip Ed25519 crypto (HMAC-only / unsigned).
       if (hasSig && this.trustStore.size > 0) {

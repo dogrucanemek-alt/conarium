@@ -35,6 +35,7 @@ beforeEach(() => {
 afterEach(() => {
   if (eskiHmac === undefined) delete process.env.CONARIUM_AUDIT_HMAC_KEY
   else process.env.CONARIUM_AUDIT_HMAC_KEY = eskiHmac
+  delete process.env.CONARIUM_AUDIT_REQUIRE_SIG
 })
 
 /** Zincir kurar. imzali[i] === true ise o satıra geçerli HMAC imzası yazılır. */
@@ -70,6 +71,18 @@ describe('HMAC bitişiklik kuralı', () => {
     process.env.CONARIUM_AUDIT_HMAC_KEY = HMAC
     const sink = sinkYaz([false, false, false])
     // Eskiden: "entry signature mismatch" → sunucu hiç kalkmıyordu.
+    expect(() => new Audit({ sink })).not.toThrow()
+  })
+
+  it('G3: REQUIRE_SIG=1 rejects a fully unsigned chain; flag off keeps the old open', () => {
+    process.env.CONARIUM_AUDIT_HMAC_KEY = HMAC
+    const sink = sinkYaz([false, false, false])
+    process.env.CONARIUM_AUDIT_REQUIRE_SIG = '1'
+    try {
+      expect(() => new Audit({ sink })).toThrow(/REQUIRE_SIG/)
+    } finally {
+      delete process.env.CONARIUM_AUDIT_REQUIRE_SIG
+    }
     expect(() => new Audit({ sink })).not.toThrow()
   })
 

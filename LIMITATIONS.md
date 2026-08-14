@@ -58,6 +58,12 @@ of this gateway.
 without breaking `prevHash`. Two OS processes appending the same sink have
 no lock. That install is unsupported until a lock is an explicit decision.
 
+## Strict signature mode is opt-in
+
+`CONARIUM_AUDIT_REQUIRE_SIG=1` refuses boot if a signing key is set and
+any audit line is unsigned. The default still accepts a fully unsigned
+legacy chain when an HMAC key is later added (08-05 compatibility).
+
 ## Cryptography is not independently audited
 
 The Ed25519 implementation has not had a formal audit.
