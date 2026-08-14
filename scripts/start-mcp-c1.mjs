@@ -3,6 +3,7 @@
  * Loads Supabase URL/key from jarvis-web .env.local, never prints secrets.
  */
 import { readFileSync, existsSync } from 'fs'
+import { homedir } from 'os'
 import { pathToFileURL } from 'url'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
@@ -50,6 +51,28 @@ if (!url || !key) {
 
 process.env.CONARIUM_SUPABASE_URL = url
 process.env.CONARIUM_SUPABASE_KEY = key
+
+// receiptSink in c1 config requires Ed25519 at boot. Cursor mcp.json does not
+// set CONARIUM_AUDIT_SIGNING_KEY — that is why receipts-c1.jsonl never appeared
+// after the sink was added. Do not create an empty sink; the first governed
+// access writes the first line.
+if (!process.env.CONARIUM_AUDIT_SIGNING_KEY?.trim()) {
+  let receiptSink = ''
+  try {
+    receiptSink = JSON.parse(readFileSync(configPath, 'utf8'))?.audit?.receiptSink || ''
+  } catch { /* probe below still runs */ }
+  if (receiptSink) {
+    const fallback = join(homedir(), '.conarium', 'audit-ed25519.pem')
+    if (!existsSync(fallback)) {
+      console.error('[conarium-c1] receiptSink is set but CONARIUM_AUDIT_SIGNING_KEY is missing')
+      console.error(`[conarium-c1] expected signing key at ${fallback}`)
+      process.exit(1)
+    }
+    process.env.CONARIUM_AUDIT_SIGNING_KEY = fallback
+    console.error(`[conarium-c1] signing key=${fallback}`)
+    console.error('[conarium-c1] receipt file is created on the first governed access, not at start')
+  }
+}
 
 // Ensure dist/index.js sees --config (it reads process.argv)
 process.argv = [process.argv[0], dist, '--config', configPath]

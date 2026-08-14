@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **c1 launcher sets `CONARIUM_AUDIT_SIGNING_KEY`** from
+  `~/.conarium/audit-ed25519.pem` when `receiptSink` is set. Cursor MCP env
+  did not; the process could not boot receipts. The sink file is still not
+  invented empty.
 - **Desktop / panel mark.** `assets/conarium-mark.svg` (extracted, not
   redesigned) plus `.ico` / `.icns` / 512 PNG. Shortcuts set Icon; missing
   file warns. Panel CSS gradient square is gone.
