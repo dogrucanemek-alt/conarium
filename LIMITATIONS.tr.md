@@ -41,9 +41,9 @@ OpenTimestamps damgasının Bitcoin'de onaylanması saatler sürebilir. Makbuzda
 
 Ed25519 uygulaması resmî denetimden geçmedi.
 
-## OpenTimestamps opsiyonel bağımlılık ağacı
+## OpenTimestamps istemcisi
 
-Çıpalama açılırsa (`CONARIUM_ANCHOR_SINK=opentimestamps`, `conarium-stamp`, `conarium-anchor-upgrade` veya `npm install javascript-opentimestamps`) `web3`, `elliptic`, `crypto-js`, `request` ve `lodash` gelir.
-O ağaçta 7 kritik ve 3 yüksek bilinen açık var (ölçüm 2026-08-14).
-Varsayılan kurulumda gelmezler. Varsayılan üretim ağacında `npm audit --omit=dev` 0 raporlar.
-Bu ağaç olmadan damgalama yolu yazılmadı.
+Damgalama yerleşik takvim istemcisiyle yapılır (Node `crypto` + herkese açık takvimlere HTTPS).
+`javascript-opentimestamps` bağımlılık değil. `web3` / `elliptic` / `crypto-js` / `request` / `lodash` ağacı kurulmaz.
+Bitcoin onayı yine saatler sürebilir; makbuz `pending` gösterir.
+Bitcoin blok doğrulaması `blockstream.info`'ya sorar. O host yoksa doğrulayıcı "kontrol edemedim" der, "geçerli" demez.

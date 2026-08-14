@@ -113,19 +113,12 @@ describe('A6 OpenTimestamps anchoring', () => {
     }
   })
 
-  it('CONARIUM_ANCHOR_SINK=opentimestamps warns 7 critical / 3 high', () => {
+  it('CONARIUM_ANCHOR_SINK=opentimestamps uses the built-in client (no extra package)', () => {
     const prev = process.env.CONARIUM_ANCHOR_SINK
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     process.env.CONARIUM_ANCHOR_SINK = 'opentimestamps'
     try {
       expect(createAnchorSinkFromEnv()).not.toBeNull()
-      const text = spy.mock.calls.map((c) => String(c[0])).join('\n')
-      expect(text).toContain('7 critical')
-      expect(text).toContain('3 high')
-      expect(text).toContain('web3')
-      expect(text).toContain('Default install does not include them')
     } finally {
-      spy.mockRestore()
       if (prev === undefined) delete process.env.CONARIUM_ANCHOR_SINK
       else process.env.CONARIUM_ANCHOR_SINK = prev
     }

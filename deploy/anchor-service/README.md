@@ -73,7 +73,6 @@ Then: `curl -fsS http://127.0.0.1:8797/healthz`
 
 ## Peer dependency
 
-`javascript-opentimestamps` is optional in the npm package. A live anchoring
-service needs it installed, or `POST /anchor` returns 502. `/healthz` does
-not load it — that is deliberate, so a health probe does not depend on a
-calendar library.
+The OpenTimestamps client is built in (`src/ots/`). A live anchoring service
+needs outbound HTTPS to the calendars, or `POST /anchor` returns 502.
+`/healthz` does not stamp — a health probe does not depend on a calendar.

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Built-in OpenTimestamps client.** Stamp / upgrade / verify no longer
+  load `javascript-opentimestamps`. The `web3` / `request` / `bitcore` tree
+  is not installed. Old proofs still verify (pending fixture + dogfood
+  block 960327).
+- **Threat model and pentest scope** in `docs/security/`.
+
 - **LIMITATIONS.md** (and `LIMITATIONS.tr.md`) lists what this repository has
   not done. README links it in the body, not a footnote. Comparison stays on
   the site only.

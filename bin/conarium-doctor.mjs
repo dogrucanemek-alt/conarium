@@ -369,7 +369,7 @@ if (config) {
   }
 }
 
-// 10. Anchoring is an optional peer dependency since 0.1.0.
+// 10. Anchoring uses the built-in calendar client (no extra package).
 {
   const sink = (process.env.CONARIUM_ANCHOR_SINK || '').toLowerCase()
   const anchoring = Boolean(
@@ -379,29 +379,11 @@ if (config) {
       envSet('CONARIUM_ANCHOR_STORE') ||
       config?.audit?.anchor,
   )
-  const otsTree =
-    'That tree has 7 critical and 3 high known advisories (web3, elliptic, crypto-js, request, lodash; measured 2026-08-14). Default install does not include them.'
   if (anchoring) {
-    let present = false
-    try {
-      await import('javascript-opentimestamps')
-      present = true
-    } catch {
-      present = false
-    }
-    if (present)
-      warn(
-        'Anchoring',
-        `configured, javascript-opentimestamps present. ${otsTree}`,
-        'Leave CONARIUM_ANCHOR_SINK unset unless you accept that tree.',
-      )
-    else
-      fail(
-        'Anchoring',
-        'configured, but javascript-opentimestamps is not installed',
-        `It is an OPTIONAL peer dependency. ${otsTree} ` +
-          'Run: npm install javascript-opentimestamps — or turn anchoring off. Until then the verifier reports exit 15 (could not check).',
-      )
+    ok(
+      'Anchoring',
+      'configured — built-in OpenTimestamps client (Node crypto + calendar HTTPS). No javascript-opentimestamps.',
+    )
   }
 }
 

@@ -25,9 +25,6 @@
 import { createHash, createPublicKey, verify as cryptoVerify } from 'crypto'
 import { readFileSync, existsSync, statSync, readdirSync } from 'fs'
 import { join, extname } from 'path'
-import { createRequire } from 'module'
-
-const require = createRequire(import.meta.url)
 
 const RECEIPT_V1 = 'conarium-receipt/0.1'
 const RECEIPT_V2 = 'conarium-receipt/0.2'
@@ -175,70 +172,24 @@ function findAnchorRecord(rows, ref) {
   return null
 }
 
-/**
- * "Kontrol edemedim" ile "kanıt geçersiz" ayrımı.
- *
- * Yalnızca KESİN ulaşılamama durumları buraya girer. Tanımadığımız bir hata
- * `unknown` sayılmaz, 14 (kanıt başarısız) tarafında kalır: belirsizliği
- * "sorun yok" yönüne yuvarlamak, bu ayrımı yapmanın amacını yok ederdi.
- */
-const AG_HATA_KODLARI = new Set([
-  'ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND',
-  'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH', 'ECONNABORTED', 'EPIPE',
-])
-const AG_HATA_DESENI = /socket hang up|socket timed? ?out|network (is )?unreachable|getaddrinfo|request-promise|ESOCKETTIMEDOUT|ETIMEDOUT|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN/i
-
-function ulasilamadiMi(err) {
-  if (!err) return false
-  if (err.code && AG_HATA_KODLARI.has(String(err.code))) return true
-  if (err.cause && err.cause.code && AG_HATA_KODLARI.has(String(err.cause.code))) return true
-  return AG_HATA_DESENI.test(String(err.message || err))
-}
-
 async function verifyOtsProof(otsBase64, hash) {
-  let OpenTimestamps
+  let client
   try {
-    OpenTimestamps = require('javascript-opentimestamps')
-    if (OpenTimestamps && OpenTimestamps.default) OpenTimestamps = OpenTimestamps.default
+    client = await import(new URL('../dist/ots/client.js', import.meta.url))
   } catch {
-    // "Kontrol edemedim", "kanıt geçersiz" DEĞİL. Paket 2026-08-12'den beri
-    // opsiyonel bir bağımlılık (bagimlilik agacindaki kritik aciklar nedeniyle),
-    // dolayısıyla bu durum artık istisna değil, sıradan bir kurulum hâli.
-    return { unknown: true, detail: 'javascript-opentimestamps not installed — anchor not checked' }
+    // Built-in client lives in dist/. A lone copy of this file cannot check
+    // anchors — that is "could not check" (15), not "invalid" (14).
+    return { unknown: true, detail: 'ots client not available — anchor not checked' }
   }
-  try {
-    const hashBuf = hashPrefixToBuffer(hash)
-    const detached = OpenTimestamps.DetachedTimestampFile.fromHash(
-      new OpenTimestamps.Ops.OpSHA256(),
-      hashBuf,
-    )
-    const detachedOts = OpenTimestamps.DetachedTimestampFile.deserialize(Buffer.from(otsBase64, 'base64'))
-    // Digest mismatch (proof for another hash) → fail closed before calendar I/O when possible
-    if (typeof detachedOts.fileDigest === 'function') {
-      const fileDigest = Buffer.from(detachedOts.fileDigest())
-      if (!fileDigest.equals(hashBuf)) {
-        return { ok: false, pending: false, detail: 'ots proof digest does not match chain hash' }
-      }
-    }
-    const verified = await OpenTimestamps.verify(detachedOts, detached, {
-      ignoreBitcoinNode: true,
-      timeout: 15000,
-    })
-    if (!verified || Object.keys(verified).length === 0) {
-      return { ok: true, pending: true }
-    }
-    return { ok: true, pending: !verified.bitcoin }
-  } catch (err) {
-    // Takvime/blok gezginine ulaşılamaması bir KANIT BAŞARISIZLIĞI değildir.
-    // Bu projenin bütün iddiası "kaydedilmedi ≠ olmadı" ayrımını yapmak; kendi
-    // doğrulayıcısı içeride bu ayrımı yapmazsa iddia kendi kodunda çürür.
-    // Dijest karşılaştırması zaten yukarıda ÇEVRİMDIŞI yapıldı, yani yerel
-    // gerçek kaybolmuyor — kaybolan yalnızca zaman kanıtının teyidi.
-    if (ulasilamadiMi(err)) {
-      return { unknown: true, detail: `anchor calendar unreachable: ${err.message || String(err)}` }
-    }
-    return { ok: false, pending: false, detail: err.message || String(err) }
+  const hashBuf = hashPrefixToBuffer(hash)
+  const result = await client.verifyProof(Buffer.from(otsBase64, 'base64'), hashBuf)
+  if (result.unknown) {
+    return { unknown: true, detail: result.detail || 'anchor calendar unreachable' }
   }
+  if (!result.ok) {
+    return { ok: false, pending: false, detail: result.detail }
+  }
+  return { ok: true, pending: result.pending }
 }
 
 function loadVerifyKeys(paths) {

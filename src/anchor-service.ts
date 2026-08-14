@@ -23,12 +23,8 @@ import type { Request, Response } from 'express'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { dirname } from 'path'
-import { createRequire } from 'module'
 import { hashPrefixToBuffer } from './anchor.js'
-
-// Same trick anchor.ts uses: createRequire, because the OTS package is CJS and
-// Vite/vitest resolve it wrongly through import analysis.
-const require = createRequire(import.meta.url)
+import { stampHash, upgradeProof } from './ots/client.js'
 
 export interface AnchorRecord {
   id: string
@@ -59,35 +55,24 @@ export interface AnchorServiceOptions {
 // enough in practice and produced a 502 for a submission that would have landed.
 const OTS_TIMEOUT_MS = 30_000
 
-function loadOts(): any {
-  const mod = require('javascript-opentimestamps') as any
-  return mod?.default ?? mod
-}
-
 async function defaultStamp(digest: Buffer): Promise<string> {
-  const mod = loadOts()
-  const detached = mod.DetachedTimestampFile.fromHash(new mod.Ops.OpSHA256(), digest)
-  await Promise.race([
-    mod.stamp(detached),
-    new Promise((_, reject) =>
+  const otsBytes = await Promise.race([
+    stampHash(digest, { timeoutMs: OTS_TIMEOUT_MS }),
+    new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error(`stamp timed out after ${OTS_TIMEOUT_MS}ms`)), OTS_TIMEOUT_MS),
     ),
   ])
-  return Buffer.from(detached.serializeToBytes()).toString('base64')
+  return otsBytes.toString('base64')
 }
 
 async function defaultUpgrade(otsBase64: string): Promise<{ upgraded: boolean; block?: number; ots?: string }> {
-  const mod = loadOts()
-  const detached = mod.DetachedTimestampFile.deserialize(Array.from(Buffer.from(otsBase64, 'base64')))
-  const changed = await mod.upgrade(detached)
-  if (!changed) return { upgraded: false }
-  let block: number | undefined
-  for (const [, attestation] of detached.timestamp.allAttestations()) {
-    const height = attestation?.height
-    if (typeof height === 'number') block = height
-    else if (height && typeof height.toNumber === 'function') block = height.toNumber()
+  const up = await upgradeProof(Buffer.from(otsBase64, 'base64'))
+  if (!up.changed) return { upgraded: false }
+  return {
+    upgraded: true,
+    block: up.bitcoinBlock ?? undefined,
+    ots: up.otsBytes.toString('base64'),
   }
-  return { upgraded: true, block, ots: Buffer.from(detached.serializeToBytes()).toString('base64') }
 }
 
 /** Reads every record. The store is small by design — one line per anchor. */

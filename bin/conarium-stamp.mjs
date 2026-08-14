@@ -26,23 +26,13 @@
  */
 import { createHash } from 'crypto'
 import { readFileSync, existsSync, appendFileSync } from 'fs'
-import { createRequire } from 'module'
+import { stampHash } from '../dist/ots/client.js'
 
-const require = createRequire(import.meta.url)
 const STAMP_TIMEOUT_MS = 30_000
-
-function otsAdvisory() {
-  return (
-    'OpenTimestamps pulls javascript-opentimestamps → web3, elliptic, crypto-js, request, lodash. ' +
-    'That tree has 7 critical and 3 high known advisories (measured 2026-08-14). ' +
-    'Default install does not include them.'
-  )
-}
 
 function usage(msg) {
   if (msg) console.error(msg)
   console.error('Usage: conarium-stamp <file> [--sidecar <path>] [--json]')
-  console.error(otsAdvisory())
 }
 
 function parseArgs(argv) {
@@ -67,13 +57,6 @@ function parseArgs(argv) {
     }
   }
   return out
-}
-
-function loadOts() {
-  console.warn(otsAdvisory())
-  let mod = require('javascript-opentimestamps')
-  if (mod && mod.default) mod = mod.default
-  return mod
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -108,15 +91,13 @@ async function main(argv = process.argv.slice(2)) {
   let otsBase64
   const submittedAt = new Date().toISOString()
   try {
-    const mod = loadOts()
-    const detached = mod.DetachedTimestampFile.fromHash(new mod.Ops.OpSHA256(), digest)
-    await Promise.race([
-      mod.stamp(detached),
+    const otsBytes = await Promise.race([
+      stampHash(digest, { timeoutMs: STAMP_TIMEOUT_MS }),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error(`stamp timed out after ${STAMP_TIMEOUT_MS}ms`)), STAMP_TIMEOUT_MS),
       ),
     ])
-    otsBase64 = Buffer.from(detached.serializeToBytes()).toString('base64')
+    otsBase64 = otsBytes.toString('base64')
   } catch (err) {
     console.error(`stamping failed: ${err.message}`)
     process.exit(50)

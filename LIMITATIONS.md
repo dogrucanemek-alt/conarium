@@ -41,9 +41,9 @@ An OpenTimestamps stamp can take hours to confirm on Bitcoin. Receipts already s
 
 The Ed25519 implementation has not had a formal audit.
 
-## OpenTimestamps optional dependency tree
+## OpenTimestamps client
 
-Enabling anchoring (`CONARIUM_ANCHOR_SINK=opentimestamps`, `conarium-stamp`, `conarium-anchor-upgrade`, or `npm install javascript-opentimestamps`) pulls in `web3`, `elliptic`, `crypto-js`, `request`, and `lodash`.
-That tree has 7 critical and 3 high known advisories (measured 2026-08-14).
-The default install does not include them. A production `npm audit --omit=dev` on the default tree reports 0.
-A stamp path that does not pull this tree is not implemented.
+Stamping uses a built-in calendar client (Node `crypto` + HTTPS to the public calendars).
+`javascript-opentimestamps` is not a dependency. The `web3` / `elliptic` / `crypto-js` / `request` / `lodash` tree is not installed.
+Bitcoin confirmation still takes hours; receipts still show `pending` until upgrade.
+Bitcoin-block verification talks to `blockstream.info`. If that host is unreachable the verifier reports "could not check", not "valid".

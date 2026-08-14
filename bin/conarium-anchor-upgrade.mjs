@@ -4,23 +4,12 @@
  *
  * Usage: conarium-anchor-upgrade <anchors.jsonl>
  *
- * For each state:"pending" row, runs OpenTimestamps.upgrade(). On success refreshes
- * ots/state/bitcoinBlock/upgradedAt. If nothing changed, leaves the file untouched.
+ * For each state:"pending" row, asks the calendars for a fuller proof.
+ * On success refreshes ots/state/bitcoinBlock/upgradedAt.
+ * If nothing changed, leaves the file untouched.
  */
 import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { createRequire } from 'module'
-
-const require = createRequire(import.meta.url)
-
-function hashPrefixToBuffer(hash) {
-  const hex = hash.startsWith('sha256:') ? hash.slice('sha256:'.length) : hash
-  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error(`bad hash: ${hash}`)
-  }
-  const buf = Buffer.from(hex, 'hex')
-  if (buf.length !== 32) throw new Error('hash must be 32 bytes')
-  return buf
-}
+import { upgradeProof } from '../dist/ots/client.js'
 
 function loadRows(path) {
   if (!existsSync(path)) {
@@ -39,20 +28,6 @@ async function main() {
     process.exit(2)
   }
 
-  let OpenTimestamps
-  try {
-    OpenTimestamps = require('javascript-opentimestamps')
-    if (OpenTimestamps && OpenTimestamps.default) OpenTimestamps = OpenTimestamps.default
-  } catch {
-    console.error('javascript-opentimestamps is required')
-    process.exit(2)
-  }
-  console.warn(
-    'OpenTimestamps pulls javascript-opentimestamps → web3, elliptic, crypto-js, request, lodash. ' +
-      'That tree has 7 critical and 3 high known advisories (measured 2026-08-14). ' +
-      'Default install does not include them.',
-  )
-
   const rows = loadRows(path)
   let changedAny = false
   const out = []
@@ -63,34 +38,21 @@ async function main() {
       continue
     }
     try {
-      const hashBuf = hashPrefixToBuffer(row.hash)
-      const detached = OpenTimestamps.DetachedTimestampFile.fromHash(
-        new OpenTimestamps.Ops.OpSHA256(),
-        hashBuf,
-      )
-      const detachedOts = OpenTimestamps.DetachedTimestampFile.deserialize(
-        Buffer.from(row.ots, 'base64'),
-      )
-      const changed = await OpenTimestamps.upgrade(detachedOts)
-      if (!changed) {
+      const up = await upgradeProof(Buffer.from(row.ots, 'base64'))
+      if (!up.changed) {
         out.push(row)
         continue
       }
-      const verified = await OpenTimestamps.verify(detachedOts, detached, {
-        ignoreBitcoinNode: true,
-        timeout: 15000,
-      })
-      const height = verified?.bitcoin?.height
       const next = {
         ...row,
-        ots: Buffer.from(detachedOts.serializeToBytes()).toString('base64'),
-        state: height != null ? 'bitcoin' : 'pending',
-        bitcoinBlock: height ?? null,
+        ots: up.otsBytes.toString('base64'),
+        state: up.bitcoinBlock != null ? 'bitcoin' : 'pending',
+        bitcoinBlock: up.bitcoinBlock,
         upgradedAt: new Date().toISOString(),
       }
       out.push(next)
       changedAny = true
-      console.error(`[upgrade] seq=${row.seq} → ${next.state}${height != null ? ` block=${height}` : ''}`)
+      console.error(`[upgrade] seq=${row.seq} → ${next.state}${up.bitcoinBlock != null ? ` block=${up.bitcoinBlock}` : ''}`)
     } catch (err) {
       console.error(`[upgrade] seq=${row.seq} failed: ${err.message || err}`)
       out.push(row)

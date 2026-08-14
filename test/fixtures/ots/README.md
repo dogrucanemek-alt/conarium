@@ -9,4 +9,4 @@ Committed for offline/CI verify tests. **No private keys. No customer data.**
 | `other-ffff.ots` | Proof for digest `ff…ff` — mismatch fixture for A6.7 |
 | `pubkey.pem` + `.keyid` | Ed25519 public key that verifies `chain-pending.jsonl` |
 
-Regenerate (needs network once): stamp the receipt hash with `javascript-opentimestamps`, never commit the private key.
+Regenerate (needs network once): stamp the receipt hash with `conarium-stamp` / `src/ots`, never commit the private key.

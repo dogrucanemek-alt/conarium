@@ -84,10 +84,8 @@ npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --anchor-c
 
 Opt-in anchoring: `CONARIUM_ANCHOR_SINK=opentimestamps`. Upgrade pending proofs later with
 `npx conarium-anchor-upgrade ./audit.jsonl.anchors.jsonl`.
-Enabling that flag (or running `conarium-stamp`) installs `javascript-opentimestamps`
-and pulls `web3`, `elliptic`, `crypto-js`, `request`, and `lodash` — **7 critical
-and 3 high** known advisories (measured 2026-08-14). The default install does
-not include them. See [LIMITATIONS.md](LIMITATIONS.md).
+The client is in-tree (Node `crypto` + calendar HTTPS). It does not install
+`javascript-opentimestamps`. See [LIMITATIONS.md](LIMITATIONS.md).
 
 ### Per-person masking profiles
 

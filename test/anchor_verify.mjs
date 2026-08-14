@@ -91,17 +91,11 @@ function main() {
   assert.equal(res.code, 14, `A6.7 expected 14, got ${res.code}: ${res.stderr}`)
   assert.match(res.stderr, /anchor proof failed|does not match|File does not match/i)
 
-  // A6.8 — dogrulayici kurulu DEGILSE: 15, 14 DEGIL.
+  // A6.8 — ince OTS istemcisi YANINDA DEGILSE: 15, 14 DEGIL.
   //
-  // "Kontrol edemedim" ile "kanit gecersiz" ayni sey degildir. Bu, urunun butun
-  // gun soyledigi cumlenin (kaydedilmedi != olmadi) dogrulayicinin KENDI icinde
-  // uygulanmis hali. Ayrica javascript-opentimestamps 2026-08-12'de opsiyonel
-  // bagimliliga tasindi (bagimlilik agacinda duzeltilmemis kritik aciklar vardi),
-  // yani bu artik nadir bir kaza degil, siradan bir kurulum hali.
-  //
-  // Simulasyon yontemi: verify.mjs tek dis bagimlilikli ve gerisi Node built-in.
-  // Gecici bir dizine kopyalanip oradan kosuldugunda `javascript-opentimestamps`
-  // cozumlenemez — gercek bir "paket yok" kurulumu, stub'siz.
+  // "Kontrol edemedim" ile "kanit gecersiz" ayni sey degildir. verify.mjs
+  // dist/ots/client.js'i dinamik import eder; yalnizca bu dosya kopyalaninca
+  // istemci yok — gercek bir "kontrol edemedim" kurulumu, stub'siz.
   const isolatedDir = mkdtempSync(join(tmpdir(), 'cnr-noots-'))
   const isolatedVerify = join(isolatedDir, 'conarium-verify.mjs')
   writeFileSync(isolatedVerify, readFileSync(VERIFY, 'utf-8'))
@@ -126,7 +120,7 @@ function main() {
   const isoCode = isolated.status ?? 1
   assert.equal(isoCode, 15, `A6.8 expected 15 (could not check), got ${isoCode}: ${isolated.stderr}`)
   assert.match(isolated.stderr, /could not be checked/)
-  assert.match(isolated.stderr, /not installed/)
+  assert.match(isolated.stderr, /not available|not installed/)
   // Ve 0 DONMEMELI: cagiran, cipanin dogrulanMADIGINI bilmek zorunda.
   assert.notEqual(isoCode, 0, 'A6.8: sessizce 0 donmek, olculmemis bir seyi dogrulanmis gostermek olurdu')
 
