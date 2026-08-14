@@ -457,7 +457,7 @@ if (findings.length > 0) {
 mkdirSync(VECTOR_DIR, { recursive: true })
 writeFileSync(
   join(VECTOR_DIR, 'LAST-RUN.json'),
-  JSON.stringify({ ...summary, result: 'bulunamadi', when: new Date().toISOString() }, null, 2) + '\n',
+  JSON.stringify({ ...summary, result: 'bulunamadi' }, null, 2) + '\n',
 )
 console.log('bulunamadı')
 process.exit(0)

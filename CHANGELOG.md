@@ -9,6 +9,9 @@
 - **A2:** Dev-only `vitest` 2.1.9 → 4.1.10 (closes the vite/esbuild
   Dependabot chain). Production dependencies unchanged.
 
+- **A3:** `LAST-RUN.json` no longer carries a `when` timestamp, so a
+  green generator run does not dirty the tree.
+
 ## 0.2.13 — 2026-08-15
 
 Security hardening release. Two independent external reviews and one code

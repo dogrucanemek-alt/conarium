@@ -14,6 +14,8 @@ database links are not resolved — that is a documented limit, not a skip.
 bypass** is written here as one JSON file and that check stays red.
 
 `LAST-RUN.json` is the last green generator run (seed + counts). It is not
-a claim that no bypass exists.
+a claim that no bypass exists. There is no `when` timestamp — the file is
+a lock on those counts, so a test run only dirties git when the result
+changes.
 
 Receipt vectors stay in the parent folder and are unchanged.
