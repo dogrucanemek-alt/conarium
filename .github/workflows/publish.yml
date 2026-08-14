@@ -1,7 +1,10 @@
 # npm provenance publish — prepared, not wired to push.
 # First use is a patron + Claude decision. This file does not publish on its own.
 #
-# Requires repo secret NPM_TOKEN (automation token with publish).
+# Auth is npm Trusted Publishing (OIDC): npmjs.com must list this repo and this
+# workflow as a trusted publisher for @conarium-ai/core. No token is stored here.
+# A long-lived publish token in repo secrets would be one more secret to leak,
+# and npm is restricting 2FA-bypassing tokens for direct publishing anyway.
 # Verify after a release: see docs/security/NPM-PROVENANCE.md
 name: publish
 
@@ -32,7 +35,8 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:checks
+      # npm >= 11.5 exchanges the workflow's OIDC identity for a short-lived
+      # publish credential. Nothing is stored in repo secrets.
+      - run: npm install -g npm@latest
       - name: Publish with provenance
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
