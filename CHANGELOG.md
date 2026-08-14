@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Audit chain atomicity (G1/G2):** `lastHash` and `sinkSize` advance
+  only after a successful sink append — same order as `writeReceipt()`.
+  A failed write no longer orphans the in-memory chain.
+
 - **Behavior change (G15):** Content detectors treat `.` / `/` as group
   separators and use token boundaries (a glued letter or `_` no longer
   hides a card/phone/IBAN). Zero-padded `&#064;` emails are masked.

@@ -350,7 +350,6 @@ export class Audit {
     delete full.sig
     delete full.signature
     full.hash = computeEntryHash(full as unknown as Record<string, unknown>)
-    this.lastHash = full.hash
     if (this.hmacKey) {
       full.signature = createHmac('sha256', this.hmacKey).update(full.hash).digest('hex')
     }
@@ -368,12 +367,15 @@ export class Audit {
     if (this.sink) {
       try {
         appendFileSync(this.sink, line + '\n')
+        this.lastHash = full.hash
         this.sinkSize = this.currentSinkSize()
       } catch (err) {
         if (this.failClosed) {
           throw new Error(`Audit sink write failed: ${(err as Error).message}`)
         }
       }
+    } else {
+      this.lastHash = full.hash
     }
 
     // Makbuz üretimi — opt-in (receiptSink yapılandırıldıysa).
