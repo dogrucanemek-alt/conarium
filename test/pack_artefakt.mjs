@@ -62,7 +62,11 @@ try {
     console.error(res.stderr || res.stdout || '(cikti yok)')
     throw new Error('npm pack --dry-run basarisiz')
   }
-  const files = JSON.parse(res.stdout)[0].files.map((f) => f.path.replace(/\\/g, '/'))
+  // npm 10: `[{ files }]`. Newer npm: `{ "@scope/name": { files } }`.
+  const parsed = JSON.parse(res.stdout.trim())
+  const listing = Array.isArray(parsed) ? parsed[0] : parsed[Object.keys(parsed)[0]]
+  if (!listing?.files) throw new Error('npm pack --json: files list missing')
+  const files = listing.files.map((f) => f.path.replace(/\\/g, '/'))
 
   const leaked = files.filter((f) => f.startsWith('examples/') && /_keys\/|\.jsonl$|\.pem$|\.keyid$/.test(f))
   if (leaked.length) fail(`uretilmis artefakt tarball'da: ${leaked.join(', ')}`)
