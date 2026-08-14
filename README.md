@@ -488,6 +488,34 @@ product: masking that a bank can disable from a JSON file is not masking.
 }
 ```
 
+### `policy.customPatterns`
+
+Formats the built-in detectors do not know — a bank customer number, a
+house account code — can be registered as extra rules on the **same**
+scanner. This is not a second masking path and it does not replace
+`maskColumns`.
+
+Each rule needs a name (what the receipt records), a pattern, optional
+column globs, and a mask label. A broken or ReDoS-shaped pattern rejects
+the config; the pattern text is never written to logs or receipts.
+
+```json
+{
+  "customPatterns": [
+    {
+      "name": "teb-hesap",
+      "pattern": "HSP-[0-9]{8}",
+      "columns": ["*.hesap_no"],
+      "label": "[MASKED_HESAP]"
+    }
+  ]
+}
+```
+
+Quantifiers must be bounded (`{8}`, `{4,12}`). `+`, `*`, nested groups and
+lookaround are rejected at load. A rule names a format you already know;
+it does not invent one.
+
 `conarium-suggest-policy --sql schema.sql` prints a `maskColumns` guess from
 column names (`*name*`, `*address*`, `*tckn*`, …). It does not write your
 config. The first line of the output says so.

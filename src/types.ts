@@ -75,6 +75,27 @@ export interface GovernancePolicy {
    * data). `mrz` defaults on (a passport MRZ is identity and checksummed).
    */
   detectors?: DetectorToggles
+  /**
+   * Extra content detectors the operator writes. Same scanner as the built-in
+   * ones — not a second masking path. Each rule has a name (what the receipt
+   * records), a pattern, optional column globs, and a mask label.
+   *
+   * A broken or ReDoS-shaped pattern rejects the config. The pattern text is
+   * never written to logs or receipts.
+   */
+  customPatterns?: CustomPiiPattern[]
+}
+
+/** Operator-defined content detector. See `GovernancePolicy.customPatterns`. */
+export interface CustomPiiPattern {
+  /** Receipt `masking.byClass` key. Not the pattern. */
+  name: string
+  /** JS regex source. Compiled at load; never logged. */
+  pattern: string
+  /** Optional column globs (`*.hesap_no`). Empty / omitted = every scanned field. */
+  columns?: string[]
+  /** Replacement. Default `[MASKED_PII]`. Must be `[MASKED_…]`. */
+  label?: string
 }
 
 /** See `GovernancePolicy.detectors`. */

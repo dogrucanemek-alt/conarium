@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ConariumConfig } from './types.js'
+import { compileCustomPatterns, CustomPatternError } from './custom_patterns.js'
 
 const stringArray = z.array(z.string().min(1)).default([])
 
@@ -9,6 +10,13 @@ const MaskingProfileSchema = z.object({
   maskColumns: z.array(z.string().min(1)).optional(),
   maxRows: z.number().int().positive().max(10000).optional(),
   maskLabelledNames: z.boolean().optional(),
+}).strict()
+
+const CustomPatternSchema = z.object({
+  name: z.string().min(1),
+  pattern: z.string().min(1),
+  columns: z.array(z.string().min(1)).optional(),
+  label: z.string().min(1).optional(),
 }).strict()
 
 export const GovernancePolicySchema = z.object({
@@ -36,6 +44,7 @@ export const GovernancePolicySchema = z.object({
     ip: z.boolean().optional(),
     mrz: z.boolean().optional(),
   }).strict().optional(),
+  customPatterns: z.array(CustomPatternSchema).optional(),
 }).strict()
 
 export const AuditConfigSchema = z.object({
@@ -70,5 +79,30 @@ export const ConariumConfigSchema = z.object({
 }).strict()
 
 export function parseConariumConfig(raw: unknown): ConariumConfig {
-  return ConariumConfigSchema.parse(raw)
+  let cfg: ConariumConfig
+  try {
+    cfg = ConariumConfigSchema.parse(raw)
+  } catch (err) {
+    if (err instanceof z.ZodError) throw sanitizeCustomPatternZod(err)
+    throw err
+  }
+  // Compile here so loadConfig() fails closed before the process serves.
+  // Governance / Audit compile again; a hand-built policy cannot skip this.
+  try {
+    compileCustomPatterns(cfg.policy?.customPatterns)
+  } catch (err) {
+    if (err instanceof CustomPatternError) throw err
+    throw err
+  }
+  return cfg
+}
+
+/** Zod's default text can echo the received value. Pattern text must not leak. */
+function sanitizeCustomPatternZod(err: z.ZodError): Error {
+  const hit = err.issues.find((i) => i.path.includes('customPatterns') && i.path.includes('pattern'))
+  if (!hit) return err
+  const nameIdx = hit.path.indexOf('customPatterns')
+  const ruleIndex = hit.path[nameIdx + 1]
+  const shown = typeof ruleIndex === 'number' ? `#${ruleIndex}` : 'unknown'
+  return new CustomPatternError(shown, 'invalid')
 }

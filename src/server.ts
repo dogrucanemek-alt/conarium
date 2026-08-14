@@ -77,6 +77,7 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
     },
     scanCharCap: config.policy?.scanCharCap,
     detectors: config.policy?.detectors,
+    customPatterns: config.policy?.customPatterns,
   })
   const connectors: Connector[] = []
 

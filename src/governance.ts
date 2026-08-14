@@ -15,6 +15,12 @@ import {
 import { maskIps } from './ip_detect.js'
 import { maskMrz } from './mrz.js'
 import { maskSplitTcknFields } from './tckn.js'
+import {
+  applyCustomPatterns,
+  compileCustomPatterns,
+  mergeByClass,
+  type CompiledCustomPattern,
+} from './custom_patterns.js'
 import { parse, toSql } from 'pgsql-ast-parser'
 import type {
   Expr,
@@ -36,6 +42,8 @@ export interface GovernanceMetadata {
   appliedRowCap?: number
   maskedFields: string[]
   maskedCount: number
+  /** Detector / custom-rule name → hit count. Names only; no pattern text. */
+  byClass?: Record<string, number>
   truncated?: boolean
   denied: boolean
   denyReason?: string
@@ -215,10 +223,12 @@ interface SelectAnalysis {
 export class Governance {
   private policy: GovernancePolicy
   private profileName: string | null
+  private customPatterns: CompiledCustomPattern[]
 
   constructor(policy: GovernancePolicy = {}, profileName: string | null = null) {
     this.policy = policy
     this.profileName = profileName
+    this.customPatterns = compileCustomPatterns(policy.customPatterns)
   }
 
   /** Name of the masking profile in force, or null for the base policy. */
@@ -394,6 +404,7 @@ export class Governance {
     const maskedFieldLookup = new Set((metadata?.maskedFields ?? []).map(f => f.toLowerCase()))
     const maskedFields = new Set(metadata?.maskedFields ?? [])
     let maskedCount = 0
+    const byClass: Record<string, number> = { ...(metadata?.byClass ?? {}) }
 
     // PASS 1 — collect the raw values this policy has already declared to be PII.
     // See `knownValueMatchers`: the same name that gets masked in `customer_name`
@@ -419,11 +430,14 @@ export class Governance {
           continue
         }
 
-        const scanRes = this.maskPII(out[key])
+        const table = typeof out._table === 'string' ? out._table : ''
+        const qualified = table ? `${table}.${key}` : key
+        const scanRes = this.maskPII(out[key], { column: qualified })
         out[key] = scanRes.masked
         if (scanRes.count > 0) {
           maskedFields.add(key)
           maskedCount += scanRes.count
+          mergeByClass(byClass, scanRes.byClass)
         }
 
         if (typeof out[key] === 'string' && matchers.length > 0) {
@@ -446,6 +460,7 @@ export class Governance {
     const governance = this.metadataFromMetadata(metadata, {
       maskedFields,
       maskedCount,
+      byClass,
       truncated: result.rowCount > this.maxRows(),
     })
 
@@ -477,8 +492,8 @@ export class Governance {
       m.slice(m.lastIndexOf('.') + 1).toLowerCase() === keyLower)
   }
 
-  maskPII(obj: unknown): { masked: unknown, count: number } {
-    if (!obj) return { masked: obj, count: 0 };
+  maskPII(obj: unknown, ctx?: { column?: string }): { masked: unknown, count: number, byClass: Record<string, number> } {
+    if (!obj) return { masked: obj, count: 0, byClass: {} };
 
     // SAYISAL PII (NEO guvenlik taramasi, 2026-07-31 — deneysel dogrulandi).
     // Maskeleme yalnizca string ve object dallarinda calisiyordu; number/bigint
@@ -492,18 +507,19 @@ export class Governance {
     // 13–16 hane Luhn tutmuyorsa, veya dizi daha uzunsa (siparis no), icerik
     // tarayici dokunmaz — yarim maske + maskedCount yalanindan daha kotu.
     if (typeof obj === 'number' || typeof obj === 'bigint') {
-      const sonuc = this.maskPII(String(obj));
-      return sonuc.count > 0 ? sonuc : { masked: obj, count: 0 };
+      const sonuc = this.maskPII(String(obj), ctx);
+      return sonuc.count > 0 ? sonuc : { masked: obj, count: 0, byClass: {} };
     }
 
     if (typeof obj === 'string') {
       let count = 0;
+      const byClass: Record<string, number> = {};
       // Fail-closed size cap: scanning a 40 KB digit field is O(n²) on the
       // unbounded email regex and blocks the event loop. Skipping the scan
       // would be the attack ("send 100 KB, skip masking"). The whole field
       // is masked instead; maskedCount records that a decision was made.
       if (obj.length > resolveScanCharCap(this.policy.scanCharCap)) {
-        return { masked: '[MASKED_PII]', count: 1 }
+        return { masked: '[MASKED_PII]', count: 1, byClass: {} }
       }
       // Normalise first (ZWSP/homoglyph/fullwidth/unicode dash). The outgoing
       // string is this form even when nothing is PII — see pii_normalize.ts.
@@ -608,23 +624,36 @@ export class Governance {
       masked = encoded.text
       count += encoded.count
 
-      return { masked, count };
+      // Operator patterns last: they catch formats the built-ins do not know.
+      // Same scanner, same count. Receipt records the rule name, never the pattern.
+      if (this.customPatterns.length > 0) {
+        const custom = applyCustomPatterns(masked, this.customPatterns, ctx?.column)
+        masked = custom.text
+        count += custom.count
+        mergeByClass(byClass, custom.byClass)
+      }
+
+      return { masked, count, byClass };
     }
 
     if (Array.isArray(obj)) {
       let totalCount = 0;
+      const byClass: Record<string, number> = {};
       const maskedArray = obj.map(item => {
-        const res = this.maskPII(item);
+        const res = this.maskPII(item, ctx);
         totalCount += res.count;
+        mergeByClass(byClass, res.byClass);
         return res.masked;
       });
-      return { masked: maskedArray, count: totalCount };
+      return { masked: maskedArray, count: totalCount, byClass };
     }
 
     if (typeof obj === 'object') {
       let totalCount = 0;
+      const byClass: Record<string, number> = {};
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj)) {
+        const childCtx = { column: ctx?.column ? `${ctx.column}.${k}` : k }
         if (typeof v === 'string') {
           const lowerKey = k.toLowerCase();
           if (lowerKey.includes('email') || lowerKey.includes('phone') || lowerKey.includes('tckn') || lowerKey.includes('card') || lowerKey.includes('iban')) {
@@ -635,20 +664,22 @@ export class Governance {
             out[k] = '[MASKED_SECRET]';
             totalCount++;
           } else {
-            const res = this.maskPII(v);
+            const res = this.maskPII(v, childCtx);
             out[k] = res.masked;
             totalCount += res.count;
+            mergeByClass(byClass, res.byClass);
           }
         } else {
-          const res = this.maskPII(v);
+          const res = this.maskPII(v, childCtx);
           out[k] = res.masked;
           totalCount += res.count;
+          mergeByClass(byClass, res.byClass);
         }
       }
-      return { masked: out, count: totalCount };
+      return { masked: out, count: totalCount, byClass };
     }
 
-    return { masked: obj, count: 0 };
+    return { masked: obj, count: 0, byClass: {} };
   }
 
   private createAnalysisState(): AnalysisState {
@@ -665,6 +696,7 @@ export class Governance {
       appliedRowCap?: number
       maskedFields?: Set<string>
       maskedCount?: number
+      byClass?: Record<string, number>
       truncated?: boolean
       denied?: boolean
       denyReason?: string
@@ -677,6 +709,7 @@ export class Governance {
       appliedRowCap: opts.appliedRowCap,
       maskedFields: [...(opts.maskedFields ?? new Set<string>())].sort(),
       maskedCount: opts.maskedCount ?? 0,
+      byClass: opts.byClass && Object.keys(opts.byClass).length > 0 ? opts.byClass : undefined,
       truncated: opts.truncated,
       denied: opts.denied ?? false,
       denyReason: opts.denyReason,
@@ -688,6 +721,7 @@ export class Governance {
     opts: {
       maskedFields: Set<string>
       maskedCount: number
+      byClass?: Record<string, number>
       truncated: boolean
     }
   ): GovernanceMetadata {
@@ -698,6 +732,7 @@ export class Governance {
       appliedRowCap: metadata?.appliedRowCap ?? this.maxRows(),
       maskedFields: [...opts.maskedFields].sort(),
       maskedCount: opts.maskedCount,
+      byClass: opts.byClass && Object.keys(opts.byClass).length > 0 ? opts.byClass : undefined,
       truncated: opts.truncated,
       denied: metadata?.denied ?? false,
       denyReason: metadata?.denyReason,

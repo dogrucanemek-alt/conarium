@@ -35,7 +35,12 @@ import {
   type ReceiptInput,
 } from './receipt.js'
 import type { GovernanceMetadata } from './governance.js'
-import type { DetectorToggles } from './types.js'
+import type { CustomPiiPattern, DetectorToggles } from './types.js'
+import {
+  applyCustomPatterns,
+  compileCustomPatterns,
+  type CompiledCustomPattern,
+} from './custom_patterns.js'
 
 export interface AuditEntry {
   timestamp: string
@@ -138,7 +143,7 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
     flags: g.denyReason ? ['denied'] : [],
     masking: {
       maskedCount: entry.maskedCount ?? 0,
-      byClass: {},
+      byClass: g.byClass ?? {},
       rowsReturned: entry.rowsReturned ?? 0,
       rowCapApplied: Boolean(g.appliedRowCap),
     },
@@ -175,6 +180,7 @@ export class Audit {
   private receiptSeq = 0
   private scanCharCap?: number
   private detectors?: DetectorToggles
+  private customPatterns: CompiledCustomPattern[] = []
 
   constructor(opts: {
     sink?: string
@@ -184,11 +190,13 @@ export class Audit {
     receiptMeta?: ReceiptMeta
     scanCharCap?: number
     detectors?: DetectorToggles
+    customPatterns?: CustomPiiPattern[]
   } = {}) {
     this.sink = opts.sink
     this.consumer = opts.consumer || 'unknown'
     this.scanCharCap = opts.scanCharCap
     this.detectors = opts.detectors
+    this.customPatterns = compileCustomPatterns(opts.customPatterns)
     // Fail CLOSED by default: docs promise "every access is appended". A sink write
     // failure must stop the request, not silently drop the trail. Opt out explicitly
     // with failClosed: false for throwaway/demo setups.
@@ -315,6 +323,9 @@ export class Audit {
     masked = ibanPass.restore(masked)
     masked = collapsePartialMask(masked)
     masked = maskEmbeddedEncodedPii(masked, (s) => maskIbansInText(s).count > 0).text
+    if (this.customPatterns.length > 0) {
+      masked = applyCustomPatterns(masked, this.customPatterns).text
+    }
 
     if (typeof args === 'string') return masked
     try {
