@@ -65,7 +65,7 @@ export interface MaskIbanOpts {
  * No trailing `\b`: we shrink the greedy match ourselves.
  */
 const IBAN_CANDIDATE =
-  /\b[A-Za-z]{2}[\s-]*\d{2}(?:[\s-]*[A-Za-z0-9]){11,30}/g
+  /[A-Za-z]{2}[\s-]*\d{2}(?:[\s-]*[A-Za-z0-9]){11,30}/g
 
 function trimTrailingIbanChar(s: string): string {
   return s.replace(/[\s-]*[A-Za-z0-9]$/i, '')
@@ -109,7 +109,7 @@ export function prepareIbanPass(text: string, opts: MaskIbanOpts = {}): IbanPass
   // alnum) → checksum tutana kadar sondan kis → ve taramaya TUKETILEN parcanin
   // hemen ardindan devam et. Boylece asiri acgozlu akis ikinci IBAN'i yutsa
   // bile, imlec onun basina geri doner.
-  const ANCHOR = /\b[A-Za-z]{2}[\s-]*\d{2}/g
+  const ANCHOR = /[A-Za-z]{2}[\s-]*\d{2}/g
   const isAlnum = (c: string) => /[A-Za-z0-9]/.test(c)
   const isSep = (c: string) => /[\s-]/.test(c)
 
@@ -153,7 +153,10 @@ export function prepareIbanPass(text: string, opts: MaskIbanOpts = {}): IbanPass
     }
     const valid = longestWhere(run, (n) => looksLikeIban(n) && (!checksum || ibanMod97Ok(n)))
     const shape = valid ?? longestWhere(run, looksLikeIban)
-    if (!shape) {
+    const atWordBoundary = anchor.index === 0 || !/[A-Za-z0-9_]/.test(text[anchor.index - 1])
+    if (!shape || (!valid && !atWordBoundary)) {
+      // Glued prefix (`acctTR33…`): mask only a checksum-valid IBAN.
+      // Do not shield lookalikes — that hid cards (`kart 4111…`) and MRZ.
       ANCHOR.lastIndex = anchor.index + 1
       continue
     }

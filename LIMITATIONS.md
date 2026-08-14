@@ -19,6 +19,12 @@ Oracle does not resolve synonyms: an allow-listed name is the name the parser se
 There is no MSSQL or Oracle connector. An operator can attach their own executor (`connectors[].type: custom-sql`) that receives only gated SQL. That path requires an explicit `policy.dialect` — the omitted-dialect postgres default does not apply. The gate speaks three dialects; the connection is the operator's.
 Parsers: Postgres `pgsql-ast-parser` · MSSQL `node-sql-parser` (transactsql) · Oracle `@guanmingchiu/sqlparser-ts`.
 
+## Bare 9-digit US SSN is not a content detector
+
+`XXX-XX-XXXX` (hyphenated) is masked. A bare 9-digit run is not: it
+collides with order IDs and other identifiers. This is a measured
+limitation, not an oversight.
+
 ## Names in free text are not guaranteed
 
 Structured columns: deterministic (`maskColumns`).

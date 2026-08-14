@@ -19,6 +19,11 @@ Oracle synonym hedefini çözmez: allow-list’teki ad, parser’ın gördüğü
 MSSQL veya Oracle konnektörü yok. Operatör kendi çalıştırıcısını takabilir (`connectors[].type: custom-sql`); çalıştırıcıya yalnız kapıdan geçmiş SQL gider. Bu yolda `policy.dialect` zorunludur — yoksa postgres varsayılanı uygulanmaz. Kapı üç lehçeyi yönetir; bağlantıyı operatör getirir.
 Ayrıştırıcılar: Postgres `pgsql-ast-parser` · MSSQL `node-sql-parser` (transactsql) · Oracle `@guanmingchiu/sqlparser-ts`.
 
+## Çıplak 9 haneli ABD SSN içerik dedektörü değil
+
+`XXX-XX-XXXX` (tireli) maskelenir. Çıplak 9 haneli koşu maskelenmez:
+sipariş numarası ve benzeri kimliklerle çakışır. Ölçülmüş sınır, unutkanlık değil.
+
 ## Serbest metinde isim garantisi yok
 
 Yapılandırılmış kolonlar: deterministik (`maskColumns`).

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Behavior change (G15):** Content detectors treat `.` / `/` as group
+  separators and use token boundaries (a glued letter or `_` no longer
+  hides a card/phone/IBAN). Zero-padded `&#064;` emails are masked.
+  Hyphenated US SSN is masked; bare 9-digit SSN stays a documented
+  limitation.
+
 - **Behavior change (G14):** MSSQL and Oracle gates use the same function
   allow-list as Postgres (`isSafeBuiltinFunction` / `isBlockedDumpFunction`).
   `STRING_AGG` / `LISTAGG` and user/package functions are denied. MSSQL

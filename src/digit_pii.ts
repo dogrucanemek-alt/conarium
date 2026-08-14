@@ -58,13 +58,24 @@ export function luhnOk(digits: string): boolean {
 }
 
 const isDigit = (c: string) => c >= '0' && c <= '9'
-const isGroup = (c: string) => c === ' ' || c === '-'
+const isGroup = (c: string) => c === ' ' || c === '-' || c === '.' || c === '/'
 const isWord = (c: string) => /[A-Za-z0-9_]/.test(c)
 
 function isolatedSpan(s: string, start: number, end: number): boolean {
   const left = start === 0 ? '' : s[start - 1]
   const right = end >= s.length ? '' : s[end]
-  return !isWord(left) && !isWord(right)
+  // Left: a letter/`_` prefix must not hide the run (`x4111…`, `ref_0532…`).
+  // Right: still a token boundary — `ghp_1234567890abcd` is a secret, not a phone.
+  return !isDigit(left) && !isWord(right)
+}
+
+/** `11.22.33.44.55` / `1.2.3.4` — dotted 1–3 digit groups, not a PAN/phone. */
+function looksLikeDottedIpOrVersion(s: string, start: number, end: number): boolean {
+  const slice = s.slice(start, end)
+  if (!/[./]/.test(slice)) return false
+  const groups = slice.split(/[./]/).filter((g) => g.length > 0)
+  if (groups.length < 4) return false
+  return groups.every((g) => /^\d{1,3}$/.test(g))
 }
 
 /**
@@ -112,7 +123,11 @@ export function maskNumericPii(text: string): { text: string; count: number } {
       }
       break
     }
-    if (isolatedSpan(out, start, i) && classifyDigitRun(out, start, i, n)) {
+    if (
+      isolatedSpan(out, start, i)
+      && !looksLikeDottedIpOrVersion(out, start, i)
+      && classifyDigitRun(out, start, i, n)
+    ) {
       count++
       parts.push('[MASKED_PII]')
     } else {
@@ -137,6 +152,11 @@ function classifyDigitRun(s: string, start: number, end: number, n: number): boo
     return first >= '1' && first <= '9'
   }
   if (n === 10) return true
+  if (n === 9) {
+    // Formatted US SSN only (AAA-GG-SSSS). Bare 9-digit runs collide with
+    // order IDs — see LIMITATIONS.
+    return /^\d{3}-\d{2}-\d{4}$/.test(s.slice(start, end))
+  }
   if (n >= 13 && n <= 16) return luhnOk(collectDigits(s, start, end))
   return false
 }
@@ -163,12 +183,12 @@ export function maskEmails(text: string): { text: string; count: number } {
  * corrupt HTML (`5&#64; magaza`) and Windows paths (`C:\path\u0040abc`).
  * One pass only — `&amp;#64;` is not chased.
  */
-const ENCODED_AT = String.raw`(?:&#64;|&#x0*40;|&commat;|\\u0040|%40)`
+const ENCODED_AT = String.raw`(?:&#0*64;|&#x0*40;|&commat;|\\u0040|%40)`
 const ENTITY_EMAIL = new RegExp(
   `[a-zA-Z0-9._%+-]{1,64}${ENCODED_AT}[a-zA-Z0-9.-]{1,253}\\.[a-zA-Z]{2,24}`,
   'gi',
 )
-const ENCODED_AT_HINT = /&#64;|&#x0*40;|&commat;|\\u0040|%40/i
+const ENCODED_AT_HINT = /&#0*64;|&#x0*40;|&commat;|\\u0040|%40/i
 
 export function maskEntityEncodedEmails(text: string): { text: string; count: number } {
   if (!ENCODED_AT_HINT.test(text)) return { text, count: 0 }

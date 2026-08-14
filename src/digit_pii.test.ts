@@ -105,6 +105,42 @@ describe('collapsePartialMask — no quadratic when the mask is absent', () => {
   })
 })
 
+describe('G15 — content-detector bypasses', () => {
+  it('dotted PAN is masked (dot is a group separator)', () => {
+    const r = gov.maskPII('4111.1111.1111.1111')
+    expect(r.masked).toBe('[MASKED_PII]')
+    expect(String(r.masked)).not.toContain('4111')
+  })
+
+  it('single-letter prefix does not hide a PAN', () => {
+    const r = gov.maskPII('x4111111111111111')
+    expect(String(r.masked)).not.toContain('4111111111111111')
+    expect(String(r.masked)).toMatch(/MASKED/)
+  })
+
+  it('glued prefix does not hide a TR phone', () => {
+    const r = gov.maskPII('ref_05321234567')
+    expect(String(r.masked)).not.toContain('05321234567')
+    expect(String(r.masked)).toMatch(/MASKED/)
+  })
+
+  it('zero-padded entity email is masked', () => {
+    const r = gov.maskPII('yaz patron&#064;sirket.com')
+    expect(r.masked).toBe('yaz [MASKED_PII]')
+    expect(gov.maskPII('yaz patron&#0064;sirket.com').masked).toBe('yaz [MASKED_PII]')
+  })
+
+  it('order numbers and dates stay unmasked', () => {
+    expect(gov.maskPII('siparis 12345678901234567890').count).toBe(0)
+    expect(gov.maskPII('13.08.2026 tarihli 45000 TL').count).toBe(0)
+  })
+
+  it('hyphenated SSN is masked; bare 9-digit is not (LIMITATIONS)', () => {
+    expect(gov.maskPII('ssn 123-45-6789').masked).toBe('ssn [MASKED_PII]')
+    expect(gov.maskPII('ref 123456789').masked).toBe('ref 123456789')
+  })
+})
+
 describe('encoded @ — scan copy only', () => {
   it('entity / json / percent emails are masked; non-email encodings are left', () => {
     const hit = maskEntityEncodedEmails('yaz patron&#64;sirket.com')

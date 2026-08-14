@@ -141,6 +141,16 @@ describe('IBAN content detector', () => {
   })
 })
 
+describe('G15 — glued IBAN prefix', () => {
+  const gov = new Governance({ allowTables: ['public.notes'], maskColumns: [] })
+
+  it('acctTR33… is masked (no word-boundary required)', () => {
+    const r = gov.maskPII(`acct${TR}`)
+    expect(String(r.masked)).not.toContain(TR)
+    expect(String(r.masked)).toMatch(/MASKED/)
+  })
+})
+
 describe('IBAN normalize', () => {
   it('drops spaces and hyphens', () => {
     expect(normalizeIban('TR12 3456-7890')).toBe('TR1234567890')
