@@ -82,11 +82,11 @@ Parsed by `src/config.ts` (Zod `.strict()`). Unknown keys reject the file.
 | Field | Label |
 |---|---|
 | `connectors[]` (`type`, `name`, `description`, `config`) | experimental |
-| `connectors[].type` enum (`postgres`, `supabase`, `supabase-rest`, `openapi`, `files`, `docs`, `slack`, `jira`) | experimental — values can be added or removed |
+| `connectors[].type` enum (`postgres`, `supabase`, `supabase-rest`, `openapi`, `files`, `docs`, `slack`, `jira`, `custom-sql`) | experimental — values can be added or removed |
 | `serverName` `serverVersion` `consumer` | experimental |
 | `policy.allowTables` `denyTables` | **candidate** (default-deny, deny wins) |
 | `policy.maskColumns` `maxRows` | experimental (cap ceiling is 10 000 at parse) |
-| `policy.dialect` (`postgres` omitted default, `mssql`, `oracle`) | experimental — unknown values reject the file; not inferred from SQL |
+| `policy.dialect` (`postgres` omitted default, `mssql`, `oracle`) | experimental — unknown values reject the file; not inferred from SQL; required when a `custom-sql` connector is present |
 | `policy.allowConnectors` `denyConnectors` | experimental — empty allow is fail-closed |
 | `policy.allowTools` `denyTools` | experimental |
 | `policy.profiles` `actorProfiles` | experimental |

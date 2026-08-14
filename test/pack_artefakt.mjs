@@ -94,6 +94,9 @@ try {
   const EXAMPLES_ALLOWLIST = [
     'examples/claude-desktop-config.json',
     'examples/cursor-mcp-settings.json',
+    'examples/custom-sql/README.md',
+    'examples/custom-sql/conarium.config.json',
+    'examples/custom-sql/memory-executor.mjs',
     'examples/demo-bank/README.md',
     'examples/demo-bank/conarium.config.json',
     'examples/demo-bank/docker-compose.yml',

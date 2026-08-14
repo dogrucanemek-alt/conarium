@@ -6,6 +6,7 @@ import { OpenApiConnector } from './openapi.js'
 import { SlackConnector } from './slack.js'
 import { JiraConnector } from './jira.js'
 import { SupabaseRestConnector } from './supabase_rest.js'
+import { CustomSqlConnector } from './custom-sql.js'
 import { ConnectorConfigSchema } from '../config.js'
 
 export { PostgresConnector } from './postgres.js'
@@ -15,6 +16,7 @@ export { OpenApiConnector } from './openapi.js'
 export { SlackConnector } from './slack.js'
 export { JiraConnector } from './jira.js'
 export { SupabaseRestConnector } from './supabase_rest.js'
+export { CustomSqlConnector } from './custom-sql.js'
 
 export function createConnector(config: ConnectorConfig): Connector {
   const parsed = ConnectorConfigSchema.parse(config)
@@ -33,7 +35,9 @@ export function createConnector(config: ConnectorConfig): Connector {
       return new SlackConnector(parsed)
     case 'jira':
       return new JiraConnector(parsed)
+    case 'custom-sql':
+      return new CustomSqlConnector(parsed)
     default:
-      throw new Error(`Unknown connector type: ${parsed.type}. Supported: postgres, supabase, supabase-rest, docs, openapi, slack, jira`)
+      throw new Error(`Unknown connector type: ${parsed.type}. Supported: postgres, supabase, supabase-rest, docs, openapi, slack, jira, custom-sql`)
   }
 }

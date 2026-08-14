@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Operator SQL executor (`custom-sql`).** No MSSQL/Oracle driver is
+  shipped. The operator registers a function or a local `config.module`;
+  it receives only gated SQL. `policy.dialect` is required on that path.
+  Row cap and masking still apply on the return. See
+  `examples/custom-sql/`.
+
 - **Postgres overhead measured.** Same SELECT, default `maxRows` 100: about
   5 ms added when email is masked. 500 → ~87 ms. 5 000 → ~22 s. Cost
   follows distinct masked values. Doctor and boot warn above 100; they

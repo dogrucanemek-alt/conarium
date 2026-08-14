@@ -65,7 +65,7 @@ export const AuditConfigSchema = z.object({
 }).strict()
 
 export const ConnectorConfigSchema = z.object({
-  type: z.enum(['postgres', 'supabase', 'supabase-rest', 'openapi', 'files', 'docs', 'slack', 'jira']),
+  type: z.enum(['postgres', 'supabase', 'supabase-rest', 'openapi', 'files', 'docs', 'slack', 'jira', 'custom-sql']),
   name: z.string().min(1),
   description: z.string().min(1),
   config: z.record(z.string()).default({}),
@@ -100,7 +100,23 @@ export function parseConariumConfig(raw: unknown): ConariumConfig {
   for (const profile of Object.values(cfg.policy?.profiles ?? {})) {
     warnIfMaxRowsHigh(profile.maxRows)
   }
+  assertCustomSqlDialect(cfg)
   return cfg
+}
+
+/**
+ * A plugged-in executor is an unknown engine. Applying the omitted-dialect
+ * postgres default would parse that engine with the Postgres gate — a silent
+ * hole. custom-sql therefore requires an explicit policy.dialect.
+ */
+export function assertCustomSqlDialect(cfg: ConariumConfig): void {
+  if (!cfg.connectors.some((c) => c.type === 'custom-sql')) return
+  const d = cfg.policy?.dialect
+  if (d === 'postgres' || d === 'mssql' || d === 'oracle') return
+  throw new Error(
+    'Conarium: a custom-sql connector requires an explicit policy.dialect (postgres, mssql, or oracle). ' +
+      'The omitted-dialect postgres default does not apply — that would parse an unknown engine with the Postgres gate.',
+  )
 }
 
 /** Zod's default text can echo the received value. Pattern text must not leak. */

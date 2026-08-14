@@ -18,11 +18,12 @@ import { Governance, PolicyError } from './governance.js'
 import type { GovernanceMetadata } from './governance.js'
 import { Audit } from './audit.js'
 import type { ResolvedActor } from './tokens.js'
-import { parseConariumConfig } from './config.js'
+import { assertCustomSqlDialect, parseConariumConfig } from './config.js'
 import { loadSqlGate, resolveSqlDialect } from './sql-gate/dispatch.js'
 import { installedVersion } from './update-check.js'
 import { capSearchResult, readGovernedSchemaResource, resolveGovernedSearchScope } from './search_policy.js'
 import { SupabaseRestConnector } from './connectors/supabase_rest.js'
+import { CustomSqlConnector } from './connectors/custom-sql.js'
 
 export interface ConariumDeps {
   config: ConariumConfig
@@ -64,6 +65,8 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
     )
   }
 
+  assertCustomSqlDialect(config)
+
   await loadSqlGate(resolveSqlDialect(config.policy?.dialect))
   const governance = new Governance(config.policy)
   const audit = new Audit({
@@ -99,6 +102,17 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
   }
 
   return { config, governance, audit, connectors }
+}
+
+/**
+ * custom-sql.query() is closed so ungated SQL cannot reach the operator
+ * function. Only this path — after guardSql — calls runGoverned.
+ */
+async function runConnectorQuery(conn: Connector, guardedSql: string) {
+  if (conn instanceof CustomSqlConnector) {
+    return conn.runGoverned(guardedSql)
+  }
+  return conn.query(guardedSql)
 }
 
 /**
@@ -322,7 +336,7 @@ export function buildServer(
             kaydet({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message, governance: policyMetadata })
             throw err
           }
-          result = governance.redact(await conn.query(guardedSql), aliases, guardMetadata)
+          result = governance.redact(await runConnectorQuery(conn, guardedSql), aliases, guardMetadata)
         }
 
         const cap = governance.maxRows()

@@ -21,8 +21,9 @@ export interface GovernancePolicy {
   maxRows?: number
   /**
    * Which SQL gate the shipped `query` tool uses. Operator declaration —
-   * never inferred from the statement. Omitted = `postgres` (today's path).
-   * Unknown values reject the config; they do not fall back.
+   * never inferred from the statement. Omitted = `postgres` (today's path)
+   * except when a `custom-sql` connector is present: that path requires an
+   * explicit dialect. Unknown values reject the config; they do not fall back.
    */
   dialect?: 'postgres' | 'mssql' | 'oracle'
   /**
@@ -132,7 +133,7 @@ export interface AuditConfig {
 }
 
 export interface ConnectorConfig {
-  type: 'postgres' | 'supabase' | 'supabase-rest' | 'openapi' | 'files' | 'docs' | 'slack' | 'jira'
+  type: 'postgres' | 'supabase' | 'supabase-rest' | 'openapi' | 'files' | 'docs' | 'slack' | 'jira' | 'custom-sql'
   name: string
   description: string
   config: Record<string, string>

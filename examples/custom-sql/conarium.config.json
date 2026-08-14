@@ -1,0 +1,22 @@
+{
+  "serverName": "Conarium custom-sql example",
+  "consumer": "custom-sql-example",
+  "connectors": [
+    {
+      "type": "custom-sql",
+      "name": "memory",
+      "description": "In-memory reference executor — no extra dependency",
+      "config": {
+        "module": "./memory-executor.mjs"
+      }
+    }
+  ],
+  "policy": {
+    "dialect": "postgres",
+    "allowConnectors": ["memory"],
+    "allowTables": ["public.customers"],
+    "denyTables": ["public.secrets"],
+    "maskColumns": ["*.email"],
+    "maxRows": 50
+  }
+}
