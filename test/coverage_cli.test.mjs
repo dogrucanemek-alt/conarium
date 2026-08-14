@@ -134,4 +134,54 @@ describe('conarium-coverage CLI chain-gap behavior', () => {
     expect(result.code).toBe(0)
     expect(result.stdout).toMatch(/contiguous=false/)
   })
+
+  it('G21: --receipts with a broken Ed25519 sig is not complete', () => {
+    const dir = tmpDir()
+    const keys = writeKeyPair(dir)
+    const receipt = {
+      id: 'r-bad-sig',
+      chain: { seq: 1, prevHash: 'sha256:' + '00'.repeat(32), hash: 'sha256:' + 'ab'.repeat(32) },
+      policy: { decision: 'allow' },
+      dataRefs: [{ object: 'public.customers' }],
+      request: { tool: 'query', target: 'public.customers' },
+      sig: { alg: 'Ed25519', keyId: keys.keyId, value: Buffer.from('not-a-sig').toString('base64') },
+    }
+    const decl = signedDeclaration(keys, {
+      chain: { firstSeq: 1, lastSeq: 1, count: 1, contiguous: true, gaps: [] },
+      decisions: { allow: 1, partial: 0, deny: 0 },
+    })
+    const declPath = join(dir, 'decl.json')
+    const recPath = join(dir, 'receipts.jsonl')
+    writeJSON(declPath, decl)
+    writeFileSync(recPath, JSON.stringify(receipt) + '\n')
+    const result = runCoverage(declPath, keys.pubPath, ['--receipts', recPath])
+    expect(result.code).not.toBe(0)
+    expect(`${result.stderr}\n${result.stdout}`).toMatch(/r-bad-sig/)
+    expect(`${result.stderr}\n${result.stdout}`).not.toMatch(/^ok:/m)
+  })
+
+  it('G21: output never claims no access occurred', () => {
+    const dir = tmpDir()
+    const keys = writeKeyPair(dir)
+    const decl = signedDeclaration(keys, {
+      coverage: {
+        declared: 2,
+        accessed: 1,
+        notRecorded: 1,
+        accessedObjects: ['public.customers'],
+        notRecordedObjects: ['public.orders'],
+        unassignedReceiptCount: 0,
+      },
+      declaredScope: ['public.customers', 'public.orders'],
+    })
+    const path = join(dir, 'decl.json')
+    writeJSON(path, decl)
+    const result = runCoverage(path, keys.pubPath)
+    expect(result.code).toBe(0)
+    const text = `${result.stdout}\n${result.stderr}`
+    expect(text).toMatch(/notRecorded|NOT RECORDED/)
+    expect(text).not.toMatch(/no access occurred/i)
+    expect(text).not.toMatch(/erişim olmadı/i)
+    expect(text).toMatch(/start not pinned|window start not pinned|başlangıç sabitlenmedi/i)
+  })
 })

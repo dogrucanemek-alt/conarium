@@ -10,7 +10,7 @@
  * RECORDED") geçirilmiştir — yorumda değil, koddadır.
  */
 import { createHash } from 'crypto'
-import { ulid, canonicalize, type Receipt } from './receipt.js'
+import { ulid, canonicalize, receiptHash, type Receipt } from './receipt.js'
 import { type SigningKey, signHash, type VerifyKey, verifyHash } from './keys.js'
 
 export const COVERAGE_VERSION = 'conarium-coverage/0.2' as const
@@ -28,6 +28,9 @@ export interface CoverageChain {
   count: number
   contiguous: boolean
   gaps: CoverageGap[]
+  /** False = prefix truncation is invisible. Never a silent complete. */
+  windowStartPinned: boolean
+  expectedFirstSeq: number | null
 }
 
 export interface CoverageDecisions {
@@ -83,7 +86,10 @@ export function coverageHash(d: Omit<CoverageDeclaration, 'sig'>): string {
  * Makbuzlardan seq aralığını ve kesintisizliği hesapla.
  * seq 1..N arası her değer tam olarak bir kez mi? Boşluk varsa gaps doldurulur.
  */
-export function computeChain(receipts: Receipt[]): CoverageChain {
+export function computeChain(
+  receipts: Receipt[],
+  opts: { seqFrom?: number } = {},
+): CoverageChain {
   if (receipts.length === 0) {
     throw new Error('coverage: no receipts to declare coverage over (refusing silent pass)')
   }
@@ -91,6 +97,10 @@ export function computeChain(receipts: Receipt[]): CoverageChain {
   const firstSeq = seqs[0]
   const lastSeq = seqs[seqs.length - 1]
   const gaps: CoverageGap[] = []
+  const pinned = opts.seqFrom != null
+  if (pinned && firstSeq !== opts.seqFrom) {
+    gaps.push({ expectedSeq: opts.seqFrom, foundSeq: firstSeq })
+  }
   for (let expected = firstSeq; expected < lastSeq; expected++) {
     if (!seqs.includes(expected)) {
       // Boşluktan sonraki ilk gerçek seq'i bul.
@@ -105,6 +115,8 @@ export function computeChain(receipts: Receipt[]): CoverageChain {
     count: receipts.length,
     contiguous: gaps.length === 0,
     gaps,
+    windowStartPinned: pinned,
+    expectedFirstSeq: pinned ? opts.seqFrom : null,
   }
 }
 
@@ -181,7 +193,7 @@ export function buildCoverageDeclaration(
   receipts: Receipt[],
   declaredScope: string[],
   key: SigningKey,
-  opts: { id?: string; ts?: string } = {},
+  opts: { id?: string; ts?: string; seqFrom?: number } = {},
 ): CoverageDeclaration {
   if (receipts.length === 0) {
     throw new Error('coverage: no receipts to declare coverage over (refusing silent pass)')
@@ -190,7 +202,7 @@ export function buildCoverageDeclaration(
     throw new Error('coverage: declaredScope is empty — nothing to declare coverage over')
   }
 
-  const chain = computeChain(receipts)
+  const chain = computeChain(receipts, { seqFrom: opts.seqFrom })
   const decisions = computeDecisions(receipts)
   const coverage = computeCoverage(receipts, declaredScope)
 
@@ -236,4 +248,27 @@ export function verifyCoverageSignature(d: CoverageDeclaration, key: VerifyKey):
   const { sig: _sig, ...body } = d
   const hash = coverageHash(body)
   return verifyHash(key, hash, d.sig.value)
+}
+
+/**
+ * Re-verify each receipt Ed25519 signature. A broken sig is not COMPLETE.
+ */
+export function verifyReceiptSignatures(
+  receipts: Receipt[],
+  keys: VerifyKey[],
+): { ok: true } | { ok: false; receiptId: string; reason: string } {
+  const byId = new Map(keys.map((k) => [k.keyId, k]))
+  for (const r of receipts) {
+    const id = r.id || `seq:${r.chain?.seq}`
+    if (!r.sig) return { ok: false, receiptId: id, reason: 'missing sig' }
+    const key = byId.get(r.sig.keyId)
+    if (!key) return { ok: false, receiptId: id, reason: `unknown keyId ${r.sig.keyId}` }
+    if (receiptHash(r) !== r.chain.hash) {
+      return { ok: false, receiptId: id, reason: 'hash mismatch' }
+    }
+    if (!verifyHash(key, r.chain.hash, r.sig.value)) {
+      return { ok: false, receiptId: id, reason: 'signature cryptographically invalid' }
+    }
+  }
+  return { ok: true }
 }

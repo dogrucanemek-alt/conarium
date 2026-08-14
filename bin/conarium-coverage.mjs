@@ -64,6 +64,20 @@ function coverageHash(d) {
   return `sha256:${digest}`
 }
 
+function receiptHash(r) {
+  const copy = { ...r }
+  delete copy.hash
+  delete copy.sig
+  delete copy.anchor
+  if (copy.chain && typeof copy.chain === 'object') {
+    const chain = { ...copy.chain }
+    delete chain.hash
+    copy.chain = chain
+  }
+  const digest = createHash('sha256').update(canonicalize(copy)).digest('hex')
+  return `sha256:${digest}`
+}
+
 // Exported for cross-check tests (dynamic import of this file).
 export { canonicalize, coverageHash }
 
@@ -72,12 +86,12 @@ export { canonicalize, coverageHash }
 function usage(msg) {
   if (msg) console.error(msg)
   console.error(
-    'Usage: conarium-coverage <declaration.json> --pubkey <path> [--receipts <receipts.jsonl>] [--allow-gaps] [--json]',
+    'Usage: conarium-coverage <declaration.json> --pubkey <path> [--receipts <receipts.jsonl>] [--expect-seq-from N] [--allow-gaps] [--json]',
   )
 }
 
 function parseArgs(argv) {
-  const out = { target: null, pubkeys: [], receiptsPath: null, json: false, allowGaps: false }
+  const out = { target: null, pubkeys: [], receiptsPath: null, json: false, allowGaps: false, expectSeqFrom: null }
   const args = [...argv]
   while (args.length) {
     const a = args.shift()
@@ -93,6 +107,10 @@ function parseArgs(argv) {
       out.json = true
     } else if (a === '--allow-gaps') {
       out.allowGaps = true
+    } else if (a === '--expect-seq-from') {
+      const n = args.shift()
+      if (n === undefined || !/^\d+$/.test(n)) throw new Error('--expect-seq-from requires an integer')
+      out.expectSeqFrom = Number(n)
     } else if (a === '--help' || a === '-h') {
       usage()
       process.exit(0)
@@ -204,6 +222,30 @@ function schemaOk(d) {
   if (typeof d.sig.keyId !== 'string' || !d.sig.keyId) return 'missing sig.keyId'
   if (typeof d.sig.value !== 'string' || !d.sig.value) return 'missing sig.value'
   return null
+}
+
+function verifyReceiptSig(keys, receipt) {
+  const id = receipt.id || `seq:${receipt.chain?.seq}`
+  if (!receipt.sig || typeof receipt.sig !== 'object') {
+    return { id, error: 'missing sig' }
+  }
+  if (receipt.sig.alg !== 'Ed25519') return { id, error: `unsupported sig.alg ${receipt.sig.alg}` }
+  const pk = keys.get(receipt.sig.keyId)
+  if (!pk) return { id, error: `unknown keyId ${receipt.sig.keyId}` }
+  try {
+    if (receipt.chain?.hash && receiptHash(receipt) !== receipt.chain.hash) {
+      return { id, error: 'hash mismatch' }
+    }
+    const ok = cryptoVerify(
+      null,
+      Buffer.from(receipt.chain.hash, 'utf-8'),
+      pk,
+      Buffer.from(receipt.sig.value, 'base64'),
+    )
+    return ok ? null : { id, error: 'signature cryptographically invalid' }
+  } catch (err) {
+    return { id, error: `signature verify error: ${err.message}` }
+  }
 }
 
 function verifySig(keys, d) {
@@ -370,9 +412,31 @@ async function main(argv = process.argv.slice(2)) {
     if (recResult.error) {
       fail(recResult.code, recResult.error, opts.json)
     }
+    for (const receipt of recResult.receipts) {
+      const sigFail = verifyReceiptSig(keys, receipt)
+      if (sigFail) {
+        fail(
+          13,
+          `receipt signature invalid at ${sigFail.id}: ${sigFail.error} — coverage is not COMPLETE`,
+          opts.json,
+          { receiptId: sigFail.id },
+        )
+      }
+    }
     const crossErr = crossCheck(d, recResult.receipts)
     if (crossErr) {
       fail(30, `inconsistent with receipts: ${crossErr}`, opts.json)
+    }
+    if (opts.expectSeqFrom !== null && recResult.receipts.length) {
+      const seqs = recResult.receipts.map((r) => r.chain.seq).sort((a, b) => a - b)
+      if (seqs[0] !== opts.expectSeqFrom) {
+        fail(
+          12,
+          `window start mismatch: expected seq ${opts.expectSeqFrom}, receipts start at ${seqs[0]} — coverage is not COMPLETE`,
+          opts.json,
+          { expectedFirstSeq: opts.expectSeqFrom, firstSeq: seqs[0] },
+        )
+      }
     }
   }
 
@@ -391,20 +455,39 @@ async function main(argv = process.argv.slice(2)) {
     fail(12, msg, opts.json, { gaps: d.chain.gaps })
   }
 
+  const windowStartPinned = d.chain.windowStartPinned === true || opts.expectSeqFrom !== null
+  const complete = d.chain.contiguous === true && windowStartPinned
+  const pinNote = windowStartPinned
+    ? 'window start pinned'
+    : 'window start not pinned (başlangıç sabitlenmedi)'
+
   if (opts.json) {
-    console.log(JSON.stringify({ ok: true, code: 0, declaration: d.id, version: d.v }))
+    console.log(JSON.stringify({
+      ok: true,
+      code: 0,
+      declaration: d.id,
+      version: d.v,
+      complete,
+      windowStartPinned,
+      pinNote,
+    }))
   } else {
     const unassigned = d.v === COVERAGE_V ? d.coverage.unassignedReceiptCount : 0
     console.log(
       `ok: coverage declaration ${d.id} verified (version ${d.v}, ${d.chain.count} receipts, ` +
-        `contiguous=${d.chain.contiguous}, accessed=${d.coverage.accessed}, ` +
-        `notRecorded=${d.coverage.notRecorded})`,
+        `contiguous=${d.chain.contiguous}, ${pinNote}, accessed=${d.coverage.accessed}, ` +
+        `notRecorded=${d.coverage.notRecorded} (access NOT RECORDED))`,
     )
+    if (!windowStartPinned) {
+      console.warn(
+        'warning: window start not pinned — prefix truncation is invisible; pass --expect-seq-from N',
+      )
+    }
     // Belirsizlik uyarısı: notRecorded listesi ancak unassigned=0 iken "kesin" sayılabilir.
     // "erişilmedi"/"not accessed" ifadesi YASAK — kaydın yokluğu belirsizdir, erişim yokluğu değil.
     if (unassigned > 0) {
       console.warn(
-        `warning: notRecorded=${d.coverage.notRecorded} (${unassigned} receipt(s) could not be attributed ` +
+        `warning: notRecorded=${d.coverage.notRecorded} (access NOT RECORDED; ${unassigned} receipt(s) could not be attributed ` +
           `to a specific object; this list is NOT definitive)`,
       )
     }

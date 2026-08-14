@@ -150,7 +150,7 @@ your own key.
 ## Coverage declaration (one-sided)
 
 ```
-conarium-coverage <declaration.json> --pubkey <path> [--receipts <receipts.jsonl>] [--allow-gaps] [--json]
+conarium-coverage <declaration.json> --pubkey <path> [--receipts <receipts.jsonl>] [--expect-seq-from N] [--allow-gaps] [--json]
 ```
 
 A signed declaration over a period and the declared scope (`policy.allowTables`):
@@ -160,9 +160,9 @@ occurred"** — an absent record is ambiguous by nature.
 
 | Exit | Meaning |
 |---|---|
-| 0 | Declaration signature valid (+ consistent with receipts if given), chain contiguous |
-| 12 | Chain has gaps — coverage incomplete (`--allow-gaps` verifies authenticity only) |
-| 13 | Signature invalid / pubkey missing (fail-closed) |
+| 0 | Declaration signature valid (+ consistent with receipts if given), chain contiguous. Unpinned window start is printed, not a silent complete. |
+| 12 | Chain has gaps — coverage incomplete (`--allow-gaps` verifies authenticity only); also `--expect-seq-from` miss |
+| 13 | Signature invalid / pubkey missing (fail-closed); also a receipt Ed25519 failure under `--receipts` |
 | 20 | Schema invalid |
 | 30 | Inconsistent with the receipts file |
 

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Behavior change (G21):** `conarium-coverage --receipts` re-verifies each
+  receipt Ed25519 signature; a broken sig is not COMPLETE and names the
+  receipt. The declaration carries `windowStartPinned` — an unpinned
+  prefix-truncated window is no longer a silent complete. Output says
+  "access NOT RECORDED", never "no access occurred". `--expect-seq-from`
+  pins the window start.
+
 - **Behavior change (G17):** Receipt HTML never prints raw `anchor.state`
   as a trust signal — forged `state: bitcoin` renders as `doğrulanmadı`
   until the OTS sidecar verifies. `--anchor-check` skips `anchor:null`

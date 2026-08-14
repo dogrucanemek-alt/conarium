@@ -7,6 +7,7 @@ import {
   computeChain,
   computeCoverage,
   verifyCoverageSignature,
+  verifyReceiptSignatures,
   type CoverageDeclaration,
 } from './coverage.js'
 
@@ -123,6 +124,38 @@ describe('coverage — computeChain', () => {
     expect(chain.contiguous).toBe(false)
     expect(chain.gaps).toEqual([{ expectedSeq: 6, foundSeq: 7 }])
     expect(chain.count).toBe(9)
+  })
+
+  it('G21: prefix-truncated window stays internally contiguous but start is unpinned', () => {
+    const key = makeKey()
+    let prev = GENESIS
+    const receipts: Receipt[] = []
+    for (let i = 1; i <= 5; i++) {
+      const r = makeReceipt(i, prev, 'public.t', 'allow', `2026-08-01T0${i}:00:00.000Z`, key.signing)
+      receipts.push(r)
+      prev = r.chain.hash
+    }
+    const window = receipts.slice(2) // seq 3..5
+    const chain = computeChain(window)
+    expect(chain.firstSeq).toBe(3)
+    expect(chain.contiguous).toBe(true)
+    expect(chain.windowStartPinned).toBe(false)
+  })
+
+  it('G21: pinning seqFrom=1 on a prefix-truncated window is not complete', () => {
+    const key = makeKey()
+    let prev = GENESIS
+    const receipts: Receipt[] = []
+    for (let i = 1; i <= 5; i++) {
+      const r = makeReceipt(i, prev, 'public.t', 'allow', `2026-08-01T0${i}:00:00.000Z`, key.signing)
+      receipts.push(r)
+      prev = r.chain.hash
+    }
+    const chain = computeChain(receipts.slice(2), { seqFrom: 1 })
+    expect(chain.windowStartPinned).toBe(true)
+    expect(chain.expectedFirstSeq).toBe(1)
+    expect(chain.contiguous).toBe(false)
+    expect(chain.gaps[0]).toEqual({ expectedSeq: 1, foundSeq: 3 })
   })
 })
 
@@ -287,6 +320,15 @@ describe('coverage — buildCoverageDeclaration + verify', () => {
     expect(decl.coverage.accessed).toBe(0)
     expect(decl.coverage.notRecorded).toBe(1)
     expect(verifyCoverageSignature(decl, key.verify)).toBe(true)
+  })
+
+  it('G21: verifyReceiptSignatures names a tampered receipt', () => {
+    const key = makeKey()
+    const r = makeReceipt(1, GENESIS, 'public.t', 'allow', '2026-08-01T01:00:00.000Z', key.signing)
+    const broken = { ...r, sig: { ...r.sig!, value: Buffer.from('nope').toString('base64') } }
+    const out = verifyReceiptSignatures([broken], [key.verify])
+    expect(out.ok).toBe(false)
+    if (!out.ok) expect(out.receiptId).toBe(r.id)
   })
 
 })
