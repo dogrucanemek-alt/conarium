@@ -472,6 +472,24 @@ if (config) {
   }
 }
 
+// 7c. HTTP rate limit — default 0 is intentional; say so when HTTP is on
+{
+  const httpMode = Boolean(envSet('CONARIUM_MCP_TOKEN'))
+  if (httpMode) {
+    const rateRaw = process.env.CONARIUM_MCP_RATE_PER_MIN
+    const rate = rateRaw === undefined || rateRaw === '' ? 0 : Number(rateRaw)
+    if (!Number.isFinite(rate) || rate === 0) {
+      warn(
+        'HTTP rate limit',
+        'CONARIUM_MCP_RATE_PER_MIN is 0 (off)',
+        'Public HTTP should set a limit. Production profile defaults to 60/min unless explicitly 0.',
+      )
+    } else {
+      ok('HTTP rate limit', `${rate}/min`)
+    }
+  }
+}
+
 // 8. Signing key material — never printed, only described
 {
   const keyPath = envSet('CONARIUM_AUDIT_SIGNING_KEY')

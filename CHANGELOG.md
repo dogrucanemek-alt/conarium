@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **G12:** `conarium-doctor` warns when HTTP is on and
+  `CONARIUM_MCP_RATE_PER_MIN` is 0; a positive limit is an info line.
+  The default remains 0 (production profile fills 60).
+
 - **G11:** Unpinned `conarium-verify` still exits 0, but stderr says the
   tail was not seen and `--json` carries `tailPinned`. `--strict` requires
   a tail pin (exit 11) and pins seq from 1. The console verify command
