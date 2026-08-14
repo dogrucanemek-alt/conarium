@@ -161,7 +161,7 @@ function collectFunctions(root: unknown): string[] {
     const schema = parts.length > 1 ? parts.slice(0, -1).join('.').toLowerCase() : undefined
     const id = parts.join('.').toLowerCase()
     names.push(id)
-    const reason = denyUnsafeFunction(baseName, schema)
+    const reason = denyUnsafeFunction(baseName, schema, 'oracle')
     if (reason) deny(reason)
   })
   return names

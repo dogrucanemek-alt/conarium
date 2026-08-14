@@ -152,7 +152,7 @@ function collectFunctions(root: unknown): string[] {
     const fn = mssqlFunctionId(rec)
     if (!fn) return
     names.push(fn.id)
-    const reason = denyUnsafeFunction(fn.baseName, fn.schema)
+    const reason = denyUnsafeFunction(fn.baseName, fn.schema, 'mssql')
     if (reason) deny(reason)
   })
   return names

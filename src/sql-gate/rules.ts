@@ -2,6 +2,7 @@
  * Shared gate rules. Dialect-independent decisions.
  * A new dialect must not copy these lists — it must call them.
  */
+import type { SqlDialectId } from './types.js'
 
 export const WRITE_TOKENS = [
   'DROP ', 'TRUNCATE ', 'DELETE ', 'UPDATE ', 'INSERT ', 'ALTER ', 'CREATE ',
@@ -42,6 +43,45 @@ export const SAFE_BUILTIN_FUNCTIONS = new Set([
   'upper',
 ])
 
+/**
+ * Lehçeye özgü skaler fonksiyonlar. Ortak liste Postgres adlarını taşır; MSSQL ve
+ * Oracle kapıları da o listeye bağlanınca `GETDATE`/`NVL` gibi en sıradan çağrılar
+ * reddedilir hâle gelmişti — açık kapanırken meşru kullanım kırılıyordu.
+ *
+ * Kural: buraya YALNIZ saf, okuma amaçlı, satır sayısını değiştirmeyen skaler
+ * dönüşümler girer. Satır toplayan/serileştiren her şey BLOCKED_DUMP_FUNCTIONS'ın
+ * işidir; dinamik SQL üreten, dosya/ağ/OS'a uzanan aileler (DBMS_*, UTL_*, xp_*,
+ * sp_*, OPENROWSET/OPENJSON) hiçbir koşulda buraya yazılmaz.
+ */
+export const DIALECT_SAFE_FUNCTIONS: Record<'mssql' | 'oracle', ReadonlySet<string>> = {
+  mssql: new Set([
+    'charindex',
+    'convert',
+    'dateadd',
+    'datediff',
+    'datepart',
+    'getdate',
+    'isnull',
+    'left',
+    'len',
+    'right',
+    'substring',
+    'sysdatetime',
+  ]),
+  oracle: new Set([
+    'decode',
+    'instr',
+    'last_day',
+    'months_between',
+    'nvl',
+    'nvl2',
+    'to_char',
+    'to_date',
+    'to_number',
+    'trunc',
+  ]),
+}
+
 export const BLOCKED_DUMP_FUNCTIONS = new Set([
   'array_agg',
   'json_agg',
@@ -80,8 +120,19 @@ export function hasRowLockClause(norm: string): boolean {
   return /\bFOR\s+(?:UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/.test(norm)
 }
 
-export function isSafeBuiltinFunction(baseName: string, schema?: string): boolean {
-  return SAFE_BUILTIN_FUNCTIONS.has(baseName) && (!schema || schema === 'pg_catalog')
+export function isSafeBuiltinFunction(
+  baseName: string,
+  schema?: string,
+  dialect?: SqlDialectId,
+): boolean {
+  if (SAFE_BUILTIN_FUNCTIONS.has(baseName) && (!schema || schema === 'pg_catalog')) return true
+  // Lehçe listesi YALNIZ şemasız çağrıyı karşılar: `app.pkg.nvl` kullanıcı paketidir,
+  // yerleşik değil — şema niteleyicisi varsa lehçe listesi devreye girmez.
+  if (schema) return false
+  if (dialect === 'mssql' || dialect === 'oracle') {
+    return DIALECT_SAFE_FUNCTIONS[dialect].has(baseName)
+  }
+  return false
 }
 
 export function isBlockedDumpFunction(baseName: string): boolean {
@@ -89,12 +140,16 @@ export function isBlockedDumpFunction(baseName: string): boolean {
 }
 
 /** Same deny text as the Postgres gate — dialects must not invent their own. */
-export function denyUnsafeFunction(baseName: string, schema?: string): string | undefined {
+export function denyUnsafeFunction(
+  baseName: string,
+  schema?: string,
+  dialect?: SqlDialectId,
+): string | undefined {
   const id = schema ? `${schema}.${baseName}` : baseName
   if (isBlockedDumpFunction(baseName)) {
     return `High-risk aggregate/serialization function '${id}' is not permitted by policy.`
   }
-  if (!isSafeBuiltinFunction(baseName, schema)) {
+  if (!isSafeBuiltinFunction(baseName, schema, dialect)) {
     return `Function '${id}' is not permitted by policy.`
   }
   return undefined
