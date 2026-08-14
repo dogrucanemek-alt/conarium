@@ -21,7 +21,7 @@ describe('sql-gate rules (lock — do not silently shrink)', () => {
 
   it('keeps dump aggregates blocked', () => {
     expect([...BLOCKED_DUMP_FUNCTIONS].sort()).toEqual([
-      'array_agg', 'json_agg', 'jsonb_agg', 'row_to_json', 'string_agg',
+      'array_agg', 'json_agg', 'jsonb_agg', 'listagg', 'row_to_json', 'string_agg',
     ])
   })
 

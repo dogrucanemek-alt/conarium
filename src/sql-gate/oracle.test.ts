@@ -49,3 +49,25 @@ describe('oracle inventory locks', () => {
     expect(out.aliases.glued).toBe('email')
   })
 })
+
+describe('G14 — Oracle function allow-list + fetch-cap comments', () => {
+  it('denies LISTAGG (dump aggregate)', () => {
+    denied("SELECT LISTAGG(email, ',') WITHIN GROUP (ORDER BY email) FROM app.customers")
+  })
+
+  it('denies package/user functions (app.pkg.fn)', () => {
+    denied('SELECT app.pkg.fn(id) FROM app.customers')
+  })
+
+  it('COUNT / SUM / COALESCE stay permitted', () => {
+    expect(guardOracleQuery('SELECT COUNT(*) FROM app.customers', policy).sql).toMatch(/count/i)
+    expect(guardOracleQuery('SELECT SUM(id) FROM app.customers', policy).sql).toMatch(/sum/i)
+    expect(guardOracleQuery("SELECT COALESCE(email, 'x') FROM app.customers", policy).sql).toMatch(/coalesce/i)
+  })
+
+  it('trailing -- comment cannot swallow FETCH FIRST', () => {
+    const out = guardOracleQuery('SELECT id FROM app.customers -- trailing', policy)
+    expect(out.sql).toMatch(/fetch\s+first\s+50\s+rows\s+only/i)
+    expect(out.sql).not.toMatch(/--[^\n]*FETCH FIRST/i)
+  })
+})

@@ -46,6 +46,7 @@ export const BLOCKED_DUMP_FUNCTIONS = new Set([
   'array_agg',
   'json_agg',
   'jsonb_agg',
+  'listagg',
   'row_to_json',
   'string_agg',
 ])
@@ -77,4 +78,60 @@ export function isSafeBuiltinFunction(baseName: string, schema?: string): boolea
 
 export function isBlockedDumpFunction(baseName: string): boolean {
   return BLOCKED_DUMP_FUNCTIONS.has(baseName)
+}
+
+/** Same deny text as the Postgres gate — dialects must not invent their own. */
+export function denyUnsafeFunction(baseName: string, schema?: string): string | undefined {
+  const id = schema ? `${schema}.${baseName}` : baseName
+  if (isBlockedDumpFunction(baseName)) {
+    return `High-risk aggregate/serialization function '${id}' is not permitted by policy.`
+  }
+  if (!isSafeBuiltinFunction(baseName, schema)) {
+    return `Function '${id}' is not permitted by policy.`
+  }
+  return undefined
+}
+
+/** Strip line and block comments without touching quoted strings. */
+export function stripSqlComments(sql: string): string {
+  let out = ''
+  let i = 0
+  let inSingle = false
+  while (i < sql.length) {
+    const c = sql[i]
+    const n = sql[i + 1]
+    if (inSingle) {
+      out += c
+      if (c === "'" && n === "'") {
+        out += n
+        i += 2
+        continue
+      }
+      if (c === "'") inSingle = false
+      i += 1
+      continue
+    }
+    if (c === "'") {
+      inSingle = true
+      out += c
+      i += 1
+      continue
+    }
+    if (c === '-' && n === '-') {
+      i += 2
+      while (i < sql.length && sql[i] !== '\n' && sql[i] !== '\r') i += 1
+      out += ' '
+      continue
+    }
+    if (c === '/' && n === '*') {
+      i += 2
+      while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) i += 1
+      if (i < sql.length) i += 2
+      out += ' '
+      continue
+    }
+    out += c
+    i += 1
+  }
+  return out
 }

@@ -318,6 +318,34 @@
       }
     },
     {
+      "id": "deny-string-agg",
+      "class": "dump-fn",
+      "expect": "deny",
+      "sql": {
+        "postgres": "SELECT STRING_AGG(email, ',') FROM public.customers",
+        "mssql": "SELECT STRING_AGG(email, ',') FROM dbo.customers",
+        "oracle": "SELECT LISTAGG(email, ',') WITHIN GROUP (ORDER BY email) FROM app.customers"
+      }
+    },
+    {
+      "id": "deny-user-fn",
+      "class": "dump-fn",
+      "expect": "deny",
+      "sql": {
+        "postgres": "SELECT app.pkg.fn(id) FROM public.customers",
+        "mssql": "SELECT dbo.fn_x(id) FROM dbo.customers",
+        "oracle": "SELECT app.pkg.fn(id) FROM app.customers"
+      }
+    },
+    {
+      "id": "deny-updlock",
+      "class": "locking-hint",
+      "expect": "deny",
+      "sql": {
+        "mssql": "SELECT id FROM dbo.customers WITH (UPDLOCK)"
+      }
+    },
+    {
       "id": "fail-two-statements",
       "class": "fail-closed",
       "expect": "deny",

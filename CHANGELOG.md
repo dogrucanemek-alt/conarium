@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Behavior change (G14):** MSSQL and Oracle gates use the same function
+  allow-list as Postgres (`isSafeBuiltinFunction` / `isBlockedDumpFunction`).
+  `STRING_AGG` / `LISTAGG` and user/package functions are denied. MSSQL
+  locking hints (`WITH (UPDLOCK)` and kin) are denied. Oracle row-cap
+  wrapper strips comments so a trailing `--` cannot swallow `FETCH FIRST`.
+
 - **Behavior change (G13):** Connector/DB error text is masked before it
   reaches the model. Failed `query` / `search` / `describe_table` paths
   that previously skipped the audit trail now write a `denied` line.

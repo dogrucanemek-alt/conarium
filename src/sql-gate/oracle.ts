@@ -2,9 +2,11 @@ import { init, parse } from '@guanmingchiu/sqlparser-ts'
 import { PolicyError, type GovernanceMetadata } from '../governance.js'
 import type { GovernancePolicy } from '../types.js'
 import {
+  denyUnsafeFunction,
   findWriteToken,
   isSelectOrWith,
   normalizedSqlHead,
+  stripSqlComments,
 } from './rules.js'
 import { registerSqlGate } from './dispatch.js'
 import type { DialectAdapter, DialectQuestions } from './types.js'
@@ -148,8 +150,25 @@ function policyAllows(policy: GovernancePolicy, qualified: string): boolean {
   return allow.some(p => matchGlob(p, qualified))
 }
 
+function collectFunctions(root: unknown): string[] {
+  const names: string[] = []
+  walk(root, rec => {
+    const fn = rec.Function as { name?: unknown[] } | undefined
+    if (!fn || !Array.isArray(fn.name)) return
+    const parts = fn.name.map(identValue).filter((p): p is string => !!p)
+    if (parts.length === 0) return
+    const baseName = parts[parts.length - 1].toLowerCase()
+    const schema = parts.length > 1 ? parts.slice(0, -1).join('.').toLowerCase() : undefined
+    const id = parts.join('.').toLowerCase()
+    names.push(id)
+    const reason = denyUnsafeFunction(baseName, schema)
+    if (reason) deny(reason)
+  })
+  return names
+}
+
 function applyFetchCap(sql: string, cap: number): string {
-  const core = sql.trim().replace(/;+\s*$/, '')
+  const core = stripSqlComments(sql).trim().replace(/;+\s*$/, '')
   return `SELECT * FROM (${core}) conarium_cap FETCH FIRST ${cap} ROWS ONLY`
 }
 
@@ -183,6 +202,7 @@ export function guardOracleQuery(sql: string, policy: GovernancePolicy): OracleG
 
   const ctes = collectCteNames(stmt)
   const tables = collectTables(stmt, ctes)
+  const functions = collectFunctions(stmt)
 
   for (const qualified of tables) {
     if (qualified.startsWith('sys.') || qualified.startsWith('system.')) {
@@ -200,6 +220,7 @@ export function guardOracleQuery(sql: string, policy: GovernancePolicy): OracleG
     aliases,
     metadata: meta({
       accessedTables: [...tables],
+      accessedFunctions: functions,
       appliedRowCap: cap,
       maskedFields,
     }),
@@ -216,7 +237,7 @@ export const oracleAdapter: DialectAdapter = {
         tables: out.metadata.accessedTables,
         columns: Object.keys(out.aliases),
         writes: false,
-        functions: [],
+        functions: out.metadata.accessedFunctions,
         hasRowLimitNode: /fetch\s+first\s+\d+/i.test(out.sql),
         parseFailed: false,
       }

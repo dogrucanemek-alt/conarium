@@ -59,3 +59,25 @@ describe('mssql inventory locks (parser-accepted bypasses)', () => {
     expect(out.metadata.appliedRowCap).toBe(50)
   })
 })
+
+describe('G14 — MSSQL function allow-list + locking hints', () => {
+  it('denies STRING_AGG (dump aggregate)', () => {
+    denied("SELECT STRING_AGG(email, ',') FROM dbo.customers")
+  })
+
+  it('denies schema-qualified user functions', () => {
+    denied('SELECT dbo.fn_x(id) FROM dbo.customers')
+  })
+
+  it('denies WITH (UPDLOCK) / WITH (XLOCK)', () => {
+    denied('SELECT id FROM dbo.customers WITH (UPDLOCK)')
+    denied('SELECT id FROM dbo.customers WITH (XLOCK)')
+    denied('SELECT id FROM dbo.customers WITH (NOLOCK, UPDLOCK)')
+  })
+
+  it('COUNT / SUM / COALESCE stay permitted', () => {
+    expect(guardMssqlQuery('SELECT COUNT(*) FROM dbo.customers', policy).sql).toMatch(/count/i)
+    expect(guardMssqlQuery('SELECT SUM(id) FROM dbo.customers', policy).sql).toMatch(/sum/i)
+    expect(guardMssqlQuery("SELECT COALESCE(email, 'x') FROM dbo.customers", policy).sql).toMatch(/coalesce/i)
+  })
+})

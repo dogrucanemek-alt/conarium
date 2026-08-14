@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { PolicyError, type GovernanceMetadata } from '../governance.js'
 import type { GovernancePolicy } from '../types.js'
 import {
+  denyUnsafeFunction,
   findWriteToken,
   isSelectOrWith,
   normalizedSqlHead,
@@ -28,6 +29,7 @@ const PRE_DENY = [
   { re: /\bFOR\s+XML\b/i, reason: 'FOR XML is not permitted.' },
   { re: /\bFOR\s+JSON\b/i, reason: 'FOR JSON is not permitted.' },
   { re: /\bSET\s+ROWCOUNT\b/i, reason: 'SET ROWCOUNT is not permitted.' },
+  { re: /\bWITH\s*\([^)]*\b(?:UPDLOCK|XLOCK|HOLDLOCK|SERIALIZABLE|PAGLOCK|TABLOCKX|TABLOCK|ROWLOCK|READPAST|READCOMMITTEDLOCK)\b/i, reason: 'Locking hints are not permitted on a read-only gate.' },
 ] as const
 
 export interface MssqlGuarded {
@@ -128,6 +130,34 @@ function collectTables(root: Record<string, unknown>, ctes: Set<string>): Set<st
   return tables
 }
 
+function mssqlFunctionId(rec: Record<string, unknown>): { baseName: string; schema?: string; id: string } | null {
+  if (rec.type !== 'function' && rec.type !== 'aggr_func') return null
+  const name = rec.name
+  if (typeof name === 'string') {
+    const baseName = name.toLowerCase()
+    return { baseName, id: baseName }
+  }
+  if (!name || typeof name !== 'object') return null
+  const n = name as { name?: Array<{ value?: string }>; schema?: { value?: string } }
+  const last = n.name?.[n.name.length - 1]?.value
+  if (!last) return null
+  const baseName = last.toLowerCase()
+  const schema = typeof n.schema?.value === 'string' ? n.schema.value.toLowerCase() : undefined
+  return { baseName, schema, id: schema ? `${schema}.${baseName}` : baseName }
+}
+
+function collectFunctions(root: unknown): string[] {
+  const names: string[] = []
+  walk(root, rec => {
+    const fn = mssqlFunctionId(rec)
+    if (!fn) return
+    names.push(fn.id)
+    const reason = denyUnsafeFunction(fn.baseName, fn.schema)
+    if (reason) deny(reason)
+  })
+  return names
+}
+
 function collectColumnRefs(node: unknown, into: string[]): void {
   walk(node, rec => {
     if (rec.type === 'column_ref' && typeof rec.column === 'string' && rec.column !== '*') {
@@ -226,6 +256,7 @@ export function guardMssqlQuery(sql: string, policy: GovernancePolicy): MssqlGua
 
   const ctes = collectCteNames(stmt)
   const tables = collectTables(stmt, ctes)
+  const functions = collectFunctions(stmt)
 
   for (const qualified of tables) {
     if (qualified.startsWith('sys.') || qualified.startsWith('information_schema.')) {
@@ -267,6 +298,7 @@ export function guardMssqlQuery(sql: string, policy: GovernancePolicy): MssqlGua
     aliases,
     metadata: meta({
       accessedTables: [...tables],
+      accessedFunctions: functions,
       appliedRowCap: cap,
       maskedFields,
     }),
@@ -283,7 +315,7 @@ export const mssqlAdapter: DialectAdapter = {
         tables: out.metadata.accessedTables,
         columns: Object.keys(out.aliases),
         writes: false,
-        functions: [],
+        functions: out.metadata.accessedFunctions,
         hasRowLimitNode: /top\s+\d+/i.test(out.sql),
         parseFailed: false,
       }
