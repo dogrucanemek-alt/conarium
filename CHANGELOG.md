@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Behavior change (G16):** Audit `reason`, `target`, and `governance`
+  go through the same mask pipeline as `args`. A DB error that carries
+  a cell value can no longer land unmasked on the signed sink.
+
 - **Audit chain atomicity (G1):** `lastHash` and `sinkSize` advance
   only after a successful sink append — same order as `writeReceipt()`.
   A failed write no longer orphans the in-memory chain.

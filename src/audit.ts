@@ -343,6 +343,15 @@ export class Audit {
     if (full.args) {
       full.args = this.maskArgs(full.args)
     }
+    if (typeof full.reason === 'string') {
+      full.reason = this.maskText(full.reason)
+    }
+    if (typeof full.target === 'string') {
+      full.target = this.maskText(full.target)
+    }
+    if (full.governance != null) {
+      full.governance = this.maskArgs(full.governance)
+    }
 
     this.syncLastHashIfStale()
     full.prevHash = this.lastHash
