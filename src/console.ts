@@ -202,6 +202,7 @@ export function createConsoleApp(opts: {
   app.use(express.json({ limit: '64kb' }))
 
   const publicDir = path.join(__dirname, '../public')
+  const assetsDir = path.join(__dirname, '../assets')
   const configFile = opts.configFile || path.join(__dirname, '../conarium.config.json')
   const auditFile = opts.auditFile || path.join(__dirname, '../audit.log.jsonl')
   const audit = createPlaygroundAudit(auditFile)
@@ -222,6 +223,7 @@ export function createConsoleApp(opts: {
     res.redirect(302, '/')
   })
 
+  if (fs.existsSync(assetsDir)) app.use('/assets', express.static(assetsDir))
   app.use(express.static(publicDir))
   // Hiz siniri KIMLIK KONTROLUNDEN ONCE.
   //

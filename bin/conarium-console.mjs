@@ -95,6 +95,9 @@ if (has('--install-shortcut') || has('--uninstall-shortcut')) {
       token: token || undefined,
     })
     console.error(`conarium-console: shortcut at ${out.dest}${out.collided ? ' (name was taken, used -2)' : ''}`)
+    if (out.iconMissing) {
+      console.error('conarium-console: assets/ mark icon is missing; shortcut has no custom icon')
+    }
     if (!token) {
       console.error('conarium-console: CONARIUM_CONSOLE_TOKEN was not set; the shortcut will need it in the environment, or re-run install with the token exported')
     }

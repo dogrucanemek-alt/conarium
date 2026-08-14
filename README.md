@@ -405,8 +405,9 @@ Export `CONARIUM_CONSOLE_TOKEN` before `--install-shortcut` so the launcher
 can read it from `~/.conarium/console.token` (created `0600`). The shortcut
 file itself does not contain the token.
 
-No `.ico` / `.icns` / 512px PNG ships in this package yet, so the shortcut
-has no custom icon.
+The shortcut uses `assets/conarium-mark.ico` / `.icns` / `-512.png`,
+all from the same SVG. If those files are missing the shortcut is still
+created and the command warns.
 
 The console **Makbuzlar** tab lists signed receipts from `audit.receiptSink`
 (newest first) and shows the same receipt HTML as `demo.conarium.dev/proof`.

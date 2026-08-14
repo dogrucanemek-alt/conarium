@@ -9,6 +9,7 @@ import {
   macLauncherScript,
   nextAvailablePath,
   planShortcut,
+  shortcutIconPath,
   uninstallShortcut,
   windowsShortcutScript,
   writeBorn0600,
@@ -41,6 +42,15 @@ describe('shortcut paths', () => {
     expect(ps).toMatch(/WindowStyle = 7/)
     expect(ps).toContain('--launch')
     expect(ps).not.toContain(secret)
+    const withIcon = windowsShortcutScript({
+      dest: 'C:\\Desk\\Conarium Console.lnk',
+      nodePath: 'C:\\n\\node.exe',
+      scriptPath: 'C:\\p\\conarium-console.mjs',
+      workdir: 'C:\\w',
+      iconPath: 'C:\\p\\assets\\conarium-mark.ico',
+    })
+    expect(withIcon).toMatch(/IconLocation/)
+    expect(withIcon).toContain('conarium-mark.ico')
   })
 
   it('mac launcher and linux desktop carry --launch, not a token', () => {
@@ -53,6 +63,14 @@ describe('shortcut paths', () => {
     })
     expect(sh).toContain('--launch')
     expect(desk).toContain('Terminal=false')
+    expect(desk).not.toContain('Icon=')
+    const deskIcon = linuxDesktopFile({
+      nodePath: '/usr/bin/node',
+      scriptPath: '/opt/conarium-console.mjs',
+      workdir: '/home/u',
+      iconPath: '/opt/assets/conarium-mark-512.png',
+    })
+    expect(deskIcon).toContain('Icon=/opt/assets/conarium-mark-512.png')
     expect(sh).not.toContain(secret)
     expect(desk).not.toContain(secret)
   })
@@ -106,6 +124,37 @@ describe('install / uninstall', () => {
     expect(seen).toContain('--launch')
     expect(seen).not.toContain(secret)
     expect(readFileSync(join(home, TOKEN_REL), 'utf8').trim()).toBe(secret)
+  })
+
+  it('sets iconMissing when the mark file is absent, and Icon when present', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cnr-sc-icon-'))
+    mkdirSync(join(home, '.local', 'share', 'applications'), { recursive: true })
+    const emptyAssets = mkdtempSync(join(tmpdir(), 'cnr-noicon-'))
+    const missing = installShortcut({
+      platform: 'linux',
+      home,
+      nodePath: '/usr/bin/node',
+      scriptPath: '/opt/bin/conarium-console.mjs',
+      workdir: '/proj',
+      assetsDir: emptyAssets,
+    })
+    expect(missing.iconMissing).toBe(true)
+    expect(readFileSync(missing.dest, 'utf8')).not.toMatch(/^Icon=/m)
+    const assets = mkdtempSync(join(tmpdir(), 'cnr-yesicon-'))
+    writeFileSync(join(assets, 'conarium-mark-512.png'), 'png')
+    expect(shortcutIconPath('linux', assets)).toBe(join(assets, 'conarium-mark-512.png'))
+    const home2 = mkdtempSync(join(tmpdir(), 'cnr-sc-icon2-'))
+    mkdirSync(join(home2, '.local', 'share', 'applications'), { recursive: true })
+    const present = installShortcut({
+      platform: 'linux',
+      home: home2,
+      nodePath: '/usr/bin/node',
+      scriptPath: '/opt/bin/conarium-console.mjs',
+      workdir: '/proj',
+      assetsDir: assets,
+    })
+    expect(present.iconMissing).toBe(false)
+    expect(readFileSync(present.dest, 'utf8')).toContain('Icon=')
   })
 
   it('does not overwrite an existing shortcut', () => {

@@ -2,9 +2,10 @@
  * Desktop shortcut for conarium-console. The shortcut holds a command,
  * never a token.
  */
-import { existsSync, mkdirSync, writeFileSync, chmodSync, readFileSync, rmSync, unlinkSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, writeFileSync, chmodSync, readFileSync, rmSync, unlinkSync } from 'node:fs'
 import { homedir as osHomedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 
 export const SHORTCUT_NAME = 'Conarium Console'
@@ -56,14 +57,33 @@ export function writeBorn0600(file: string, contents: string): void {
   try { chmodSync(file, 0o600) } catch { /* windows */ }
 }
 
+export function packageAssetsDir(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), '..', 'assets')
+}
+
+export function shortcutIconPath(
+  platform: NodeJS.Platform,
+  assetsDir = packageAssetsDir(),
+): string | null {
+  const name =
+    platform === 'win32'
+      ? 'conarium-mark.ico'
+      : platform === 'darwin'
+        ? 'conarium-mark.icns'
+        : 'conarium-mark-512.png'
+  const p = join(assetsDir, name)
+  return existsSync(p) ? p : null
+}
+
 export function windowsShortcutScript(opts: {
   dest: string
   nodePath: string
   scriptPath: string
   workdir: string
+  iconPath?: string | null
 }): string {
   const q = (s: string) => s.replace(/'/g, "''")
-  return [
+  const lines = [
     `$ws = New-Object -ComObject WScript.Shell`,
     `$s = $ws.CreateShortcut('${q(opts.dest)}')`,
     `$s.TargetPath = '${q(opts.nodePath)}'`,
@@ -71,15 +91,21 @@ export function windowsShortcutScript(opts: {
     `$s.WorkingDirectory = '${q(opts.workdir)}'`,
     `$s.WindowStyle = 7`,
     `$s.Description = 'Conarium Console'`,
-    `$s.Save()`,
-  ].join('\n')
+  ]
+  if (opts.iconPath) lines.push(`$s.IconLocation = '${q(opts.iconPath)}'`)
+  lines.push(`$s.Save()`)
+  return lines.join('\n')
 }
 
 export function macLauncherScript(nodePath: string, scriptPath: string): string {
   return `#!/bin/sh\nexec "${nodePath.replace(/"/g, '\\"')}" "${scriptPath.replace(/"/g, '\\"')}" --launch\n`
 }
 
-export function macInfoPlist(): string {
+export function macInfoPlist(opts: { iconFile?: string | null } = {}): string {
+  const icon = opts.iconFile
+    ? `
+  <key>CFBundleIconFile</key><string>${opts.iconFile}</string>`
+    : ''
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -88,14 +114,19 @@ export function macInfoPlist(): string {
   <key>CFBundleIdentifier</key><string>dev.conarium.console</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleExecutable</key><string>launcher</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundlePackageType</key><string>APPL</string>${icon}
 </dict>
 </plist>
 `
 }
 
-export function linuxDesktopFile(opts: { nodePath: string; scriptPath: string; workdir: string }): string {
-  return [
+export function linuxDesktopFile(opts: {
+  nodePath: string
+  scriptPath: string
+  workdir: string
+  iconPath?: string | null
+}): string {
+  const lines = [
     '[Desktop Entry]',
     'Type=Application',
     'Name=Conarium Console',
@@ -103,8 +134,10 @@ export function linuxDesktopFile(opts: { nodePath: string; scriptPath: string; w
     `Path=${opts.workdir}`,
     'Terminal=false',
     'Categories=Utility;',
-    '',
-  ].join('\n')
+  ]
+  if (opts.iconPath) lines.push(`Icon=${opts.iconPath}`)
+  lines.push('')
+  return lines.join('\n')
 }
 
 export function installShortcut(opts: {
@@ -115,7 +148,8 @@ export function installShortcut(opts: {
   workdir: string
   token?: string
   runWindows?: (script: string) => void
-}): { dest: string; kind: ShortcutPlan['kind']; collided: boolean } {
+  assetsDir?: string
+}): { dest: string; kind: ShortcutPlan['kind']; collided: boolean; iconMissing: boolean } {
   const platform = opts.platform ?? process.platform
   const home = opts.home ?? process.env.CONARIUM_CONSOLE_HOME ?? osHomedir()
   const nodePath = opts.nodePath ?? process.execPath
@@ -123,9 +157,17 @@ export function installShortcut(opts: {
   const dest = nextAvailablePath(planned.dest)
   const collided = dest !== planned.dest
   mkdirSync(dirname(dest), { recursive: true })
+  const iconPath = shortcutIconPath(platform, opts.assetsDir ?? packageAssetsDir())
+  const iconMissing = !iconPath
 
   if (planned.kind === 'lnk') {
-    const script = windowsShortcutScript({ dest, nodePath, scriptPath: opts.scriptPath, workdir: opts.workdir })
+    const script = windowsShortcutScript({
+      dest,
+      nodePath,
+      scriptPath: opts.scriptPath,
+      workdir: opts.workdir,
+      iconPath,
+    })
     if (script.includes(opts.token || '\u0000') && opts.token) {
       throw new Error('shortcut script must not contain the token')
     }
@@ -138,12 +180,18 @@ export function installShortcut(opts: {
     const mac = dest
     mkdirSync(join(mac, 'Contents', 'MacOS'), { recursive: true })
     mkdirSync(join(mac, 'Contents', 'Resources'), { recursive: true })
-    writeFileSync(join(mac, 'Contents', 'Info.plist'), macInfoPlist())
+    if (iconPath) {
+      copyFileSync(iconPath, join(mac, 'Contents', 'Resources', 'conarium-mark.icns'))
+    }
+    writeFileSync(join(mac, 'Contents', 'Info.plist'), macInfoPlist({ iconFile: iconPath ? 'conarium-mark' : null }))
     const launcher = join(mac, 'Contents', 'MacOS', 'launcher')
     writeFileSync(launcher, macLauncherScript(nodePath, opts.scriptPath), { mode: 0o755 })
     try { chmodSync(launcher, 0o755) } catch { /* */ }
   } else {
-    writeFileSync(dest, linuxDesktopFile({ nodePath, scriptPath: opts.scriptPath, workdir: opts.workdir }))
+    writeFileSync(
+      dest,
+      linuxDesktopFile({ nodePath, scriptPath: opts.scriptPath, workdir: opts.workdir, iconPath }),
+    )
   }
 
   const state: ShortcutState = { path: dest, workdir: opts.workdir, kind: planned.kind }
@@ -151,7 +199,7 @@ export function installShortcut(opts: {
   if (opts.token?.trim()) {
     writeBorn0600(join(home, TOKEN_REL), opts.token.trim() + '\n')
   }
-  return { dest, kind: planned.kind, collided }
+  return { dest, kind: planned.kind, collided, iconMissing }
 }
 
 export function uninstallShortcut(opts: { home?: string } = {}): { removed: string | null } {

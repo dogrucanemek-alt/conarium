@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Desktop / panel mark.** `assets/conarium-mark.svg` (extracted, not
+  redesigned) plus `.ico` / `.icns` / 512 PNG. Shortcuts set Icon; missing
+  file warns. Panel CSS gradient square is gone.
 - **`/proof` HTML shows known English sentences in Turkish.** The JSON
   bytes are unchanged; unknown strings are left as-is.
 - **Makbuzlar tab paints "Yükleniyor…" on the same click that switches the tab.**

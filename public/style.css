@@ -57,12 +57,10 @@ body {
     gap: 1rem;
 }
 
-.logo-icon {
+.logo-mark {
     width: 32px;
     height: 32px;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-    border-radius: 8px;
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+    display: block;
 }
 
 .sidebar nav {
