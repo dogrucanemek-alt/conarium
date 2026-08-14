@@ -2,9 +2,14 @@
 
 ## Unreleased
 
-- **Audit chain atomicity (G1/G2):** `lastHash` and `sinkSize` advance
+- **Audit chain atomicity (G1):** `lastHash` and `sinkSize` advance
   only after a successful sink append — same order as `writeReceipt()`.
   A failed write no longer orphans the in-memory chain.
+
+- **Audit self-heal (G2):** After a failed append, the next successful
+  `log()` chains from the last hash that is actually on disk. A fresh
+  `Audit({sink})` boot `validateChain` stays clean. `failClosed=true`
+  also leaves state unmoved.
 
 - **Behavior change (G15):** Content detectors treat `.` / `/` as group
   separators and use token boundaries (a glued letter or `_` no longer
