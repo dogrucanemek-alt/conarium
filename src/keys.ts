@@ -76,16 +76,31 @@ function readKeyIdSidecar(pemPath: string): KeyId | null {
   return raw.length > 0 ? raw : null
 }
 
-function warnIfWorldReadable(path: string): void {
+/** POSIX only. win32 modes are meaningless — never fail-closed there. */
+export function assertPrivateKeyMode(
+  path: string,
+  mode: number,
+  opts: { platform?: NodeJS.Platform; allowLoose?: boolean } = {},
+): void {
+  const plat = opts.platform ?? platform()
+  if (plat === 'win32') return
+  const bits = mode & 0o777
+  if ((bits & 0o077) === 0) return
+  const allow = opts.allowLoose ?? process.env.CONARIUM_ALLOW_LOOSE_KEY_PERMS === '1'
+  const msg = `[conarium:keys] ${path} mode is ${bits.toString(8)} (expected 0600); private key may be readable by others`
+  if (allow) {
+    console.warn(msg)
+    return
+  }
+  throw new Error(`${msg}. Set CONARIUM_ALLOW_LOOSE_KEY_PERMS=1 to continue.`)
+}
+
+function assertKeyFilePerms(path: string): void {
   if (platform() === 'win32') return
   try {
-    const mode = statSync(path).mode & 0o777
-    if ((mode & 0o077) !== 0) {
-      console.warn(
-        `[conarium:keys] warning: ${path} mode is ${mode.toString(8)} (expected 0600); private key may be readable by others`,
-      )
-    }
-  } catch {
+    assertPrivateKeyMode(path, statSync(path).mode)
+  } catch (err) {
+    if (err instanceof Error && /expected 0600/.test(err.message)) throw err
     // ignore — load will fail separately if unreadable
   }
 }
@@ -96,7 +111,7 @@ export function loadSigningKey(): SigningKey | null {
   if (!existsSync(path)) {
     throw new Error(`loadSigningKey: CONARIUM_AUDIT_SIGNING_KEY file not found: ${path}`)
   }
-  warnIfWorldReadable(path)
+  assertKeyFilePerms(path)
   let pem: string
   try {
     pem = readFileSync(path, 'utf-8')

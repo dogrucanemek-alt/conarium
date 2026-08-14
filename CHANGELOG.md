@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Behavior change (G9):** Private key files that are not 0600 fail
+  boot. Escape hatch `CONARIUM_ALLOW_LOOSE_KEY_PERMS=1` restores the
+  old warning. win32 skips the check (POSIX mode is meaningless).
+
 - **Behavior change (G6):** HTTP sessions idle out after
   `CONARIUM_SESSION_IDLE_MS` (default 30 minutes; 0 = off). Owner-binding
   is unchanged. Sweeper uses `unref()`.
