@@ -13,6 +13,7 @@ import {
   findReceipt,
   loadReceiptsForConsole,
   publicPemForPanel,
+  tailPinFromReceipts,
   toListItems,
   verifyCommandFor,
 } from './console-receipts.js'
@@ -302,7 +303,7 @@ export function createConsoleApp(opts: {
     const html = renderReceiptHtml(
       receiptToView(receipt, {
         publicKey: publicPemForPanel(),
-        verify: verifyCommandFor(loaded.sink),
+        verify: verifyCommandFor(loaded.sink, tailPinFromReceipts(loaded.receipts)),
         entries: loaded.receipts.length,
         chainIntegrity: loaded.chain,
         jsonHref: `/api/receipts/${encodeURIComponent(receipt.id)}/raw`,
@@ -327,7 +328,7 @@ export function createConsoleApp(opts: {
     const html = renderReceiptHtml(
       receiptToView(receipt, {
         publicKey: publicPemForPanel(),
-        verify: verifyCommandFor(loaded.sink),
+        verify: verifyCommandFor(loaded.sink, tailPinFromReceipts(loaded.receipts)),
         entries: loaded.receipts.length,
         chainIntegrity: loaded.chain,
         jsonHref: `/api/receipts/${encodeURIComponent(receipt.id)}/raw`,

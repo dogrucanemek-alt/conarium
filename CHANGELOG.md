@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **G11:** Unpinned `conarium-verify` still exits 0, but stderr says the
+  tail was not seen and `--json` carries `tailPinned`. `--strict` requires
+  a tail pin (exit 11) and pins seq from 1. The console verify command
+  embeds `--expect-count` and `--expect-last-hash` for the current chain.
+
 - **Behavior change (G10):** OpenAPI fetch uses `redirect: manual` and
   re-checks every hop (max 5). The approved DNS address is pinned via
   an undici Agent lookup; TLS SNI stays the original hostname. undici

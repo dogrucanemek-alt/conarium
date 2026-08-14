@@ -148,7 +148,23 @@ export function publicPemForPanel(): string | null {
   }
 }
 
-export function verifyCommandFor(sink: string | null): string {
+export function tailPinFromReceipts(
+  receipts: Array<{ chain?: { hash?: string } }>,
+): { count: number; lastHash: string } | null {
+  if (!receipts.length) return null
+  const hash = receipts[receipts.length - 1]?.chain?.hash
+  if (typeof hash !== 'string' || !hash) return null
+  return { count: receipts.length, lastHash: hash }
+}
+
+export function verifyCommandFor(
+  sink: string | null,
+  pin?: { count: number; lastHash: string } | null,
+): string {
   const file = sink ? basename(sink) : 'conarium-receipts.jsonl'
-  return `npx conarium-verify ${file} --pubkey <key.pub.pem>`
+  let cmd = `npx conarium-verify ${file} --pubkey <key.pub.pem>`
+  if (pin && pin.count > 0 && pin.lastHash) {
+    cmd += ` --expect-count ${pin.count} --expect-last-hash ${pin.lastHash}`
+  }
+  return cmd
 }

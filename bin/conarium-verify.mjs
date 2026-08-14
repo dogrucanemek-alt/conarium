@@ -8,13 +8,13 @@
  * Usage:
  *   conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...]
  *                   [--anchor-check] [--require-head-anchor] [--expect-seq-from N]
- *                   [--expect-count N] [--expect-last-hash sha256:…] [--json]
+ *                   [--expect-count N] [--expect-last-hash sha256:…] [--strict] [--json]
  *
  * Exit codes (design §5):
  *   0  chain intact, signatures valid
  *  10  hash mismatch (tampered)
  *  11  prevHash break (deleted / inserted) OR opt-in tail pin
- *      (--expect-count / --expect-last-hash) missed
+ *      (--expect-count / --expect-last-hash) missed; also --strict without a pin
  *  12  seq gap or non-increasing
  *  13  signature invalid / no pubkey
  *  14  claimed anchor proof failed under --anchor-check
@@ -91,7 +91,7 @@ export { canonicalize, receiptHash }
 function usage(msg) {
   if (msg) console.error(msg)
   console.error(
-    'Usage: conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--anchor-check] [--require-head-anchor] [--anchors <path>] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--json]',
+    'Usage: conarium-verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--anchor-check] [--require-head-anchor] [--anchors <path>] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--strict] [--json]',
   )
 }
 
@@ -105,6 +105,7 @@ function parseArgs(argv) {
     expectSeqFrom: null,
     expectCount: null,
     expectLastHash: null,
+    strict: false,
     json: false,
   }
   const args = [...argv]
@@ -137,6 +138,8 @@ function parseArgs(argv) {
         throw new Error('--expect-last-hash requires sha256:<64 hex chars>')
       }
       out.expectLastHash = h.toLowerCase()
+    } else if (a === '--strict') {
+      out.strict = true
     } else if (a === '--json') {
       out.json = true
     } else if (a === '--help' || a === '-h') {
@@ -152,6 +155,13 @@ function parseArgs(argv) {
   }
   return out
 }
+
+function isTailPinned(opts) {
+  return opts.expectCount !== null || opts.expectLastHash !== null || opts.anchorCheck
+}
+
+const TAIL_UNPINNED_NOTE =
+  'note: tail truncation is not visible — this run did not see receipts deleted from the end of the file. Pin with --expect-count, --expect-last-hash, or --anchor-check.'
 
 function hashPrefixToBuffer(hash) {
   const hex = typeof hash === 'string' && hash.startsWith('sha256:') ? hash.slice(7) : hash
@@ -376,6 +386,17 @@ async function main(argv = process.argv.slice(2)) {
     process.exit(20)
   }
 
+  if (opts.strict && opts.expectSeqFrom === null) {
+    opts.expectSeqFrom = 1
+  }
+  if (opts.strict && !isTailPinned(opts)) {
+    fail(
+      11,
+      'strict mode requires a tail pin: --expect-count, --expect-last-hash, or --anchor-check',
+      opts.json,
+    )
+  }
+
   const keyResult = loadVerifyKeys(opts.pubkeys)
   if (keyResult.error) {
     fail(keyResult.code, keyResult.error, opts.json)
@@ -423,7 +444,15 @@ async function main(argv = process.argv.slice(2)) {
     if (opts.requireHeadAnchor) {
       fail(14, 'head anchor required but chain is empty', opts.json, { count: 0 })
     }
-    if (opts.json) console.log(JSON.stringify({ ok: true, code: 0, warning: 'empty', count: 0 }))
+    if (opts.json) {
+      console.log(JSON.stringify({
+        ok: true,
+        code: 0,
+        warning: 'empty',
+        count: 0,
+        tailPinned: isTailPinned(opts),
+      }))
+    }
     process.exit(0)
   }
   if (receipts.length === 1) {
@@ -607,6 +636,8 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   const summary = `${anchoredCount}/${receipts.length} anchored, head anchored: ${headAnchored ? 'yes' : 'no'}`
+  const tailPinned = isTailPinned(opts)
+  if (!tailPinned) console.error(TAIL_UNPINNED_NOTE)
 
   if (opts.json) {
     console.log(JSON.stringify({
@@ -618,6 +649,7 @@ async function main(argv = process.argv.slice(2)) {
       anchored: anchoredCount,
       headAnchored,
       anchorSummary: opts.anchorCheck ? summary : undefined,
+      tailPinned,
     }))
   } else {
     const ek = notlar.length ? ` (${notlar.join(', ')})` : ''

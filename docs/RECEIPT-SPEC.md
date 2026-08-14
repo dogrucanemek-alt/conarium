@@ -92,14 +92,17 @@ merely *who* it is, and the coverage declaration's rule that absence is reported
 ## Verifier
 
 ```
-conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [--require-head-anchor] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--json]
+conarium-verify <file|dir> --pubkey <path> [--pubkey <path2>] [--anchor-check] [--require-head-anchor] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--strict] [--json]
 ```
 
 `--expect-count` / `--expect-last-hash` are **opt-in tail pins**. Without them,
 a chain that had its last receipts deleted still exits 0 — the remainder is a
-valid shorter chain. With them, a count or last-hash miss is exit **11** (same
+valid shorter chain. An unpinned run prints one stderr note and, with `--json`,
+`"tailPinned": false`. With a pin, a count or last-hash miss is exit **11** (same
 code as a `prevHash` break: the chain as presented is not the chain you pinned).
-Default behaviour and the exit-code list are unchanged.
+`--strict` requires a tail pin (else exit 11) and, if `--expect-seq-from` is
+omitted, pins the first receipt at seq 1. Default exit codes without `--strict`
+are unchanged.
 
 | Exit | Meaning |
 |---|---|
