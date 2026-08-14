@@ -539,13 +539,11 @@ profiles · immutable hash-chained audit ledger · Ed25519-signed receipt per ac
 with an offline verifier · signed coverage declarations · two-sided reconciliation
 against the database's own counters · OpenTimestamps anchoring and an optional
 anchoring service · conformance vectors · Postgres, Supabase, docs, OpenAPI, Jira
-and Slack connectors · `conarium-init` / `conarium-doctor` from source (npm
-publish is the remaining step before `npx` works).
+and Slack connectors · `conarium-init` / `conarium-doctor` via `npx` (`@conarium-ai/core`).
 
 **Next:** consent binding ([spec published](docs/CONSENT-BINDING-SPEC.md), no code —
 patent review first) · a second independent implementation of the receipt format ·
-per-user identity bound to an identity provider rather than an operator token map ·
-publishing `@conarium-ai/core` to npm so `npx conarium-init` works without a clone.
+per-user identity bound to an identity provider rather than an operator token map.
 
 **Deliberately not planned**, so nobody waits for it:
 
