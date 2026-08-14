@@ -191,6 +191,22 @@ interface SelectAnalysis {
   aliases: Record<string, string>
 }
 
+/** Column-name heuristic shared by nested JSON and flat query rows (G18). */
+export function maskByColumnName(column: string): '[MASKED_PII]' | '[MASKED_SECRET]' | null {
+  const leaf = column.slice(column.lastIndexOf('.') + 1).toLowerCase()
+  // Split-TCKN keys (`tckn_1`/`tckn_2`) are decided by checksum pairing, not by name.
+  if (/(?:tckn|tc_no|tcno|tc_kimlik)[._-]?(?:1|2|left|right|part[12]|a|b)$/i.test(leaf)) {
+    return null
+  }
+  if (leaf.includes('email') || leaf.includes('phone') || leaf.includes('tckn') || leaf.includes('card') || leaf.includes('iban')) {
+    return '[MASKED_PII]'
+  }
+  if (/secret|token|password|passwd|pwd|api[_-]?key|access[_-]?key|\bkey\b|credential/.test(leaf)) {
+    return '[MASKED_SECRET]'
+  }
+  return null
+}
+
 export class Governance {
   private policy: GovernancePolicy
   private profileName: string | null
@@ -496,6 +512,10 @@ export class Governance {
     }
 
     if (typeof obj === 'string') {
+      if (ctx?.column) {
+        const named = maskByColumnName(ctx.column)
+        if (named) return { masked: named, count: 1, byClass: {} }
+      }
       let count = 0;
       const byClass: Record<string, number> = {};
       // Fail-closed size cap: scanning a 40 KB digit field is O(n²) on the
@@ -639,14 +659,10 @@ export class Governance {
       for (const [k, v] of Object.entries(obj)) {
         const childCtx = { column: ctx?.column ? `${ctx.column}.${k}` : k }
         if (typeof v === 'string') {
-          const lowerKey = k.toLowerCase();
-          if (lowerKey.includes('email') || lowerKey.includes('phone') || lowerKey.includes('tckn') || lowerKey.includes('card') || lowerKey.includes('iban')) {
-            out[k] = '[MASKED_PII]';
-            totalCount++;
-          } else if (/secret|token|password|passwd|pwd|api[_-]?key|access[_-]?key|\bkey\b|credential/.test(lowerKey)) {
-            // Sütun ADI sır ima ediyorsa (api_key, secret, token, password) değeri her hâlükârda maskele.
-            out[k] = '[MASKED_SECRET]';
-            totalCount++;
+          const named = maskByColumnName(childCtx.column)
+          if (named) {
+            out[k] = named
+            totalCount++
           } else {
             const res = this.maskPII(v, childCtx);
             out[k] = res.masked;
