@@ -6,7 +6,6 @@ import type {
   QueryResult,
   ConnectorCapabilities,
 } from '../types.js'
-import fetch from 'node-fetch'
 import fs from 'fs/promises'
 import dns from 'dns/promises'
 import net from 'net'

@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 export interface ExecutorConfig {
   baseUrl: string;
   authHeader?: string;

@@ -1,0 +1,38 @@
+# npm provenance publish — prepared, not wired to push.
+# First use is a patron + Claude decision. This file does not publish on its own.
+#
+# Requires repo secret NPM_TOKEN (automation token with publish).
+# Verify after a release: see docs/security/NPM-PROVENANCE.md
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type publish to release the version in package.json'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  npm:
+    if: ${{ github.event.inputs.confirm == 'publish' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:checks
+      - name: Publish with provenance
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

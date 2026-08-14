@@ -41,6 +41,7 @@ Bitcoin-block checks use `blockstream.info`. Unreachable explorer → exit 15
 
 The tester pack is [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md)
 and [`docs/security/PENTEST-SCOPE.md`](docs/security/PENTEST-SCOPE.md).
+npm provenance (after a dispatch publish): [`docs/security/NPM-PROVENANCE.md`](docs/security/NPM-PROVENANCE.md).
 Those documents are not an audit.
 
 ## Threat model

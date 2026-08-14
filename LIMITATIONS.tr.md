@@ -45,6 +45,12 @@ OpenTimestamps damgasının Bitcoin'de onaylanması saatler sürebilir. Makbuzda
 operatörün kimlik bilgisiyle veritabanına bağlanmakla aynı yetkiyle
 atlayabilir. Operatörün kendi süreci bu kapının denetim konusu değildir.
 
+## İki süreç, tek denetim dosyası
+
+`Audit.log()` senkrondur. Tek süreçte eşzamanlı sorgular `prevHash` kırmadan
+yazar. İki OS süreci aynı sink’e kilit olmadan ekler. Kilit ayrı karar;
+o kurulum desteklenmez.
+
 ## Denetlenmemiş kriptografi
 
 Ed25519 uygulaması resmî denetimden geçmedi.

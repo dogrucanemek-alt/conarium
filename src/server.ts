@@ -21,7 +21,13 @@ import type { ResolvedActor } from './tokens.js'
 import { assertCustomSqlDialect, parseConariumConfig } from './config.js'
 import { loadSqlGate, resolveSqlDialect } from './sql-gate/dispatch.js'
 import { installedVersion } from './update-check.js'
-import { capSearchResult, readGovernedSchemaResource, resolveGovernedSearchScope } from './search_policy.js'
+import { capSearchResult, MAX_SEARCH_PAYLOAD_BYTES, readGovernedSchemaResource, resolveGovernedSearchScope } from './search_policy.js'
+import {
+  isMissingTableMessage,
+  publicizeTableError,
+  tableFromAccessDeny,
+  tableUnavailableError,
+} from './table-unavailable.js'
 import { SupabaseRestConnector } from './connectors/supabase_rest.js'
 import { CustomSqlConnector } from './connectors/custom-sql.js'
 
@@ -288,13 +294,41 @@ export function buildServer(
         const a = args as { table: string; connector?: string }
         const conn = getConnector(a.connector, 'canDescribeTable')
         if (!governance.allowsTable(a.table)) {
-          kaydet({ tool: 'describe_table', target: a.table, args: a, denied: true, reason: 'policy' })
-          throw new PolicyError(`Access to table '${a.table}' is not permitted by policy.`)
+          kaydet({
+            tool: 'describe_table',
+            target: a.table,
+            args: a,
+            denied: true,
+            reason: `Access to table '${a.table}' is not permitted by policy.`,
+          })
+          throw tableUnavailableError(a.table)
         }
-        const table = await conn.describeTable(a.table)
+        let table
+        try {
+          table = await conn.describeTable(a.table)
+        } catch (err) {
+          const real = (err as Error).message
+          if (isMissingTableMessage(real)) {
+            kaydet({ tool: 'describe_table', target: a.table, args: a, denied: true, reason: real })
+            throw tableUnavailableError(a.table)
+          }
+          throw err
+        }
+        const responseJson = JSON.stringify(table, null, 2)
+        if (Buffer.byteLength(responseJson, 'utf8') > MAX_SEARCH_PAYLOAD_BYTES) {
+          const limitErr = new Error('Response payload exceeds 50KB limit. Aggregation or massive row detected.')
+          kaydet({
+            tool: 'describe_table',
+            target: a.table,
+            args: a,
+            denied: true,
+            reason: limitErr.message,
+          })
+          throw limitErr
+        }
         kaydet({ tool: 'describe_table', target: a.table, args: a, denied: false })
         return {
-          content: [{ type: 'text', text: JSON.stringify(table, null, 2) }],
+          content: [{ type: 'text', text: responseJson }],
         }
       }
 
@@ -321,8 +355,14 @@ export function buildServer(
           const schema = conn.schemaName
           const qualified = `${schema}.${parsed.table}`
           if (!governance.allowsTable(qualified)) {
-            kaydet({ tool: 'query', target: qualified, args: a, denied: true, reason: 'policy' })
-            throw new PolicyError(`Access to table '${qualified}' is not permitted by policy.`)
+            kaydet({
+              tool: 'query',
+              target: qualified,
+              args: a,
+              denied: true,
+              reason: `Access to table '${qualified}' is not permitted by policy.`,
+            })
+            throw tableUnavailableError(qualified)
           }
           const lim = Math.min(parsed.limit, governance.maxRows())
           guardedSql = `SELECT ${parsed.columns.join(', ')} FROM ${schema}.${parsed.table} LIMIT ${lim}`
@@ -343,10 +383,30 @@ export function buildServer(
             guardMetadata = res.metadata
           } catch (err) {
             const policyMetadata = err instanceof PolicyError ? err.metadata : undefined
-            kaydet({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message, governance: policyMetadata })
+            const real = (err as Error).message
+            kaydet({ tool: 'query', args: { sql: a.sql }, denied: true, reason: real, governance: policyMetadata })
+            const deniedTable = tableFromAccessDeny(real)
+            if (deniedTable) throw tableUnavailableError(deniedTable)
             throw err
           }
-          result = governance.redact(await runConnectorQuery(conn, guardedSql), aliases, guardMetadata)
+          try {
+            result = governance.redact(await runConnectorQuery(conn, guardedSql), aliases, guardMetadata)
+          } catch (err) {
+            const real = (err as Error).message
+            if (isMissingTableMessage(real)) {
+              const table = guardMetadata?.accessedTables?.[0] ?? 'unknown'
+              kaydet({
+                tool: 'query',
+                target: conn.name,
+                args: { sql: a.sql },
+                denied: true,
+                reason: real,
+                governance: guardMetadata,
+              })
+              throw tableUnavailableError(table)
+            }
+            throw err
+          }
         }
 
         const cap = governance.maxRows()
@@ -398,7 +458,7 @@ export function buildServer(
           requested = await resolveGovernedSearchScope(conn, governance, a.query, a.tables)
         } catch (err) {
           kaydet({ tool: 'search', target: conn.name, args: a, denied: true, reason: (err as Error).message })
-          throw err
+          publicizeTableError(err, a.tables?.[0])
         }
 
         const capped = capSearchResult(await conn.search(a.query, requested), governance.maxRows())

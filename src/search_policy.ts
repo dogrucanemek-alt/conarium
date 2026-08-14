@@ -34,9 +34,9 @@ export async function resolveGovernedSearchScope(
     throw new PolicyError(`Search on connector '${connector.name}' is not permitted by policy.`)
   }
 
-  const allowed = governance
-    .filterTables(await connector.listTables())
-    .map(qualifiedTableName)
+  const listed = await connector.listTables()
+  const listedLookup = new Map(listed.map(t => [qualifiedTableName(t).toLowerCase(), qualifiedTableName(t)]))
+  const allowed = governance.filterTables(listed).map(qualifiedTableName)
 
   if (allowed.length === 0) {
     throw new PolicyError(`Search on connector '${connector.name}' has no allowed scope.`)
@@ -52,7 +52,13 @@ export async function resolveGovernedSearchScope(
     .filter((scope): scope is string => Boolean(scope))
 
   if (requested.length === 0) {
-    throw new PolicyError(`Search request has no tables permitted by policy.`)
+    const first = requestedTables[0]?.trim() || 'unknown'
+    const existed = listedLookup.has(first.toLowerCase())
+    throw new PolicyError(
+      existed
+        ? `Access to table '${listedLookup.get(first.toLowerCase())}' is not permitted by policy.`
+        : `Table not found: ${first}`,
+    )
   }
 
   return requested

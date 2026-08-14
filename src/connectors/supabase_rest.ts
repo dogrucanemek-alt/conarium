@@ -10,7 +10,6 @@ import type {
   QueryResult,
   SchemaTable,
 } from '../types.js'
-import fetch from 'node-fetch'
 
 const WRITE = /\b(DROP|TRUNCATE|DELETE|UPDATE|INSERT|ALTER|CREATE|GRANT|REVOKE|MERGE|EXEC|EXECUTE|CALL)\b/i
 

@@ -46,6 +46,12 @@ library can skip the gate the same way it can open the database with the
 operator's credential. The operator's own process is not an audit subject
 of this gateway.
 
+## Two processes, one audit file
+
+`Audit.log()` is synchronous. One process can write many concurrent queries
+without breaking `prevHash`. Two OS processes appending the same sink have
+no lock. That install is unsupported until a lock is an explicit decision.
+
 ## Cryptography is not independently audited
 
 The Ed25519 implementation has not had a formal audit.

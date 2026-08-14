@@ -100,6 +100,10 @@ Pending OpenTimestamps is disclosed as `pending`. Bitcoin upgrade is hours later
 - A shorter leftover chain still verifies. That is structural, not a bug.
 - Anchor calendars and `blockstream.info` are third parties. Unreachable →
   exit 15 ("could not check"), not exit 0.
+- Two OS processes writing the same audit/receipt sink have no file lock.
+  In-process concurrent `log()` is synchronous and keeps the chain (measured:
+  50 queries, 0 `prevHash` breaks). Same-millisecond writers across processes
+  can fork the chain. Single-process installs are the supported shape.
 
 ## Out of scope — the operator
 

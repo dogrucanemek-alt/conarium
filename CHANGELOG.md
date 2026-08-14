@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Table existence oracle closed.** Assistant `describe_table` / `search` /
+  `query` errors no longer distinguish denied from missing. The audit log
+  keeps the real reason. Denied tables still never reach the connector.
+  `describe_table` now has the same 50KB payload cap as `query` / `search`.
+- **Dropped `js-yaml` and `node-fetch`.** Zero remaining imports. HTTP uses
+  Node's built-in `fetch` (engines already `>=18`).
+- **npm provenance workflow** prepared (`publish.yml`, dispatch-only). Does
+  not publish on push. See `docs/security/NPM-PROVENANCE.md`.
+- **Two-process audit sink** stated in LIMITATIONS and the threat model.
+  No lock in this release.
+
 - **Operator is inside the boundary.** Threat model and LIMITATIONS state
   it in the open: importing the library can skip the gate the same way
   opening the database with the operator's credential can. Not a vulnerability.

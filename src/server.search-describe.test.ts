@@ -111,7 +111,8 @@ describe('describe_table — traced', () => {
     const s = fixture()
     const out = await s.call('describe_table', { table: 'public.secrets' })
     expect(out.isError).toBe(true)
-    expect(text(out)).toMatch(/not permitted by policy/)
+    expect(text(out)).toMatch(/not available/)
+    expect(text(out)).not.toMatch(/not permitted by policy/)
     expect(s.describeCalls).toEqual([])
   })
 
@@ -143,7 +144,7 @@ describe('describe_table — traced', () => {
     expect(lines[1].target).toBe('public.customers')
   })
 
-  it('FINDING (open): allow * + denyTables is an existence oracle', async () => {
+  it('allow * + denyTables: assistant messages are indistinguishable', async () => {
     const s = fixture({
       policy: { allowConnectors: ['mem'], allowTables: ['*'], denyTables: ['public.secrets'] },
     })
@@ -151,10 +152,41 @@ describe('describe_table — traced', () => {
     const missing = await s.call('describe_table', { table: 'public.ghost' })
     expect(denied.isError).toBe(true)
     expect(missing.isError).toBe(true)
-    expect(text(denied)).toMatch(/not permitted by policy/)
-    expect(text(missing)).toMatch(/Table not found/)
-    expect(text(denied)).not.toBe(text(missing))
+    expect(text(denied).replace('public.secrets', 'T')).toBe(text(missing).replace('public.ghost', 'T'))
+    expect(text(denied)).toMatch(/is not available/)
+    expect(text(denied)).not.toMatch(/not permitted|Table not found/)
     expect(s.describeCalls).toEqual(['public.ghost'])
+  })
+
+  it('audit keeps the real reason when the assistant cannot tell', async () => {
+    const s = fixture({
+      policy: { allowConnectors: ['mem'], allowTables: ['*'], denyTables: ['public.secrets'] },
+    })
+    await s.call('describe_table', { table: 'public.secrets' })
+    await s.call('describe_table', { table: 'public.ghost' })
+    const lines = readFileSync(s.sink, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(lines[0].reason).toMatch(/not permitted by policy/)
+    expect(lines[1].reason).toMatch(/Table not found/)
+    expect(lines[0].reason).not.toBe(lines[1].reason)
+  })
+
+  it('describe_table payload over 50KB is denied', async () => {
+    const s = fixture({
+      describe: async (t) => ({
+        schema: 'public',
+        name: t.split('.')[1] ?? t,
+        columns: Array.from({ length: 4000 }, (_, i) => ({
+          name: `col_${i}_${'x'.repeat(20)}`,
+          type: 'text',
+          nullable: true,
+          isPrimary: false,
+          isForeign: false,
+        })),
+      }),
+    })
+    const out = await s.call('describe_table', { table: 'public.customers' })
+    expect(out.isError).toBe(true)
+    expect(text(out)).toMatch(/50KB/)
   })
 })
 
@@ -173,7 +205,22 @@ describe('search — traced', () => {
     const s = fixture()
     const out = await s.call('search', { query: 'alice', tables: ['public.secrets'] })
     expect(out.isError).toBe(true)
-    expect(text(out)).toMatch(/no tables permitted by policy/)
+    expect(text(out)).toMatch(/not available/)
+    expect(text(out)).not.toMatch(/not permitted|Table not found/)
+    expect(s.searchCalls).toHaveLength(0)
+  })
+
+  it('search denied vs missing: same assistant text, distinct audit reasons', async () => {
+    const s = fixture({
+      policy: { allowConnectors: ['mem'], allowTables: ['*'], denyTables: ['public.secrets'] },
+    })
+    const denied = await s.call('search', { query: 'alice', tables: ['public.secrets'] })
+    const missing = await s.call('search', { query: 'alice', tables: ['public.ghost'] })
+    expect(text(denied).replace('public.secrets', 'T')).toBe(text(missing).replace('public.ghost', 'T'))
+    expect(text(denied)).toMatch(/is not available/)
+    const lines = readFileSync(s.sink, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(lines[0].reason).toMatch(/not permitted by policy/)
+    expect(lines[1].reason).toMatch(/Table not found/)
     expect(s.searchCalls).toHaveLength(0)
   })
 
@@ -204,5 +251,76 @@ describe('search — traced', () => {
     await s.call('search', { query: 'alice' })
     const lines = readFileSync(s.sink, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     expect(lines.some((l) => l.tool === 'search' && l.denied === false)).toBe(true)
+  })
+})
+
+describe('query — table unavailable', () => {
+  function queryFixture(policy?: ConstructorParameters<typeof Governance>[0]) {
+    const queryCalls: string[] = []
+    const conn: Connector = {
+      name: 'mem',
+      description: 'k2 query',
+      capabilities: { canQuery: true, canListSchema: false, canDescribeTable: false, canSearch: false },
+      connect: async () => {},
+      disconnect: async () => {},
+      listTables: async () => [],
+      describeTable: async (t) => ({ schema: 'public', name: t, columns: [] }),
+      query: async (sql) => {
+        queryCalls.push(sql)
+        if (/ghost/i.test(sql)) throw new Error('relation "public.ghost" does not exist')
+        return { rows: [{ id: 1 }], rowCount: 1, fields: ['id'] }
+      },
+      search: async () => ({ rows: [], rowCount: 0, fields: [] }),
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'conarium-k2q-'))
+    const sink = join(dir, 'audit.jsonl')
+    const deps: ConariumDeps = {
+      config: { serverName: 'test', consumer: 'k2', connectors: [] } as ConariumDeps['config'],
+      governance: new Governance({
+        allowConnectors: ['mem'],
+        allowTables: ['public.customers'],
+        denyTables: ['public.secrets'],
+        maxRows: 50,
+        ...policy,
+      }),
+      audit: new Audit({ consumer: 'k2', sink }),
+      connectors: [conn],
+    }
+    const server = buildServer(deps)
+    const handlers = (server as unknown as { _requestHandlers: Map<string, (r: unknown) => Promise<unknown>> })._requestHandlers
+    return {
+      queryCalls,
+      sink,
+      async call(sql: string) {
+        const h = handlers.get(CallToolRequestSchema.shape.method.value)
+        if (!h) throw new Error('CallTool handler missing')
+        return h({ method: 'tools/call', params: { name: 'query', arguments: { sql } } }) as Promise<{
+          isError?: boolean
+          content?: { text: string }[]
+        }>
+      },
+    }
+  }
+
+  it('default-deny still never calls the connector for a closed table', async () => {
+    const s = queryFixture()
+    const out = await s.call('SELECT id FROM public.secrets')
+    expect(out.isError).toBe(true)
+    expect(text(out)).toMatch(/not available/)
+    expect(s.queryCalls).toHaveLength(0)
+  })
+
+  it('allow * + deny: assistant cannot tell denied from missing; audit can', async () => {
+    const s = queryFixture({ allowConnectors: ['mem'], allowTables: ['*'], denyTables: ['public.secrets'] })
+    const denied = await s.call('SELECT id FROM public.secrets')
+    const missing = await s.call('SELECT id FROM public.ghost')
+    expect(text(denied).replace('public.secrets', 'T')).toBe(text(missing).replace('public.ghost', 'T'))
+    expect(text(denied)).toMatch(/is not available/)
+    expect(text(denied)).not.toMatch(/not permitted|does not exist/)
+    expect(s.queryCalls).toHaveLength(1)
+    expect(s.queryCalls[0]).toMatch(/ghost/i)
+    const lines = readFileSync(s.sink, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(lines[0].reason).toMatch(/not permitted by policy/)
+    expect(lines[1].reason).toMatch(/does not exist/)
   })
 })
