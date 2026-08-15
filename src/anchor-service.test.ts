@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import request from 'supertest'
-import { createAnchorService, validateAnchorLog } from './anchor-service.js'
+import { createAnchorService, validateAnchorLog, verifyInclusionProof } from './anchor-service.js'
 import { GENESIS_HASH } from './audit-hash.js'
 import { verifyAnchorRecord } from './anchor-sign.js'
 import { generateKeyPair, type SigningKey, type VerifyKey } from './keys.js'
@@ -261,6 +261,35 @@ describe('anchor service', () => {
 
     const json = await request(app).get(`/anchor/${created.body.id}`).set('accept', 'application/json')
     expect(json.headers['content-type']).toMatch(/json/)
+  })
+
+  it('returns an inclusion proof that independently verifies (C3)', async () => {
+    const { app, readStore } = svc()
+    const created = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
+    await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH2 })
+    const fetched = await request(app).get(`/anchor/${created.body.id}`)
+    expect(fetched.status).toBe(200)
+    // RED 2026-08-15: GET returns the record but not a path to the log head.
+    expect(fetched.body.inclusion).toEqual(
+      expect.objectContaining({
+        seq: 1,
+        hash: expect.any(String),
+        head: expect.objectContaining({ seq: 2, hash: expect.any(String) }),
+        path: expect.any(Array),
+      }),
+    )
+    const rec = readStore()[0]
+    expect(verifyInclusionProof(rec, fetched.body.inclusion)).toBe(true)
+  })
+
+  it('cannot produce an inclusion proof for a deleted or moved record', async () => {
+    const { app } = svc()
+    const created = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
+    await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH2 })
+    const path = join(dir, 'anchors.jsonl')
+    const lines = readFileSync(path, 'utf-8').trim().split('\n')
+    writeFileSync(path, lines[1] + '\n')
+    expect((await request(app).get(`/anchor/${created.body.id}`)).status).not.toBe(200)
   })
 
   it('404s an unknown id instead of leaking whether it ever existed', async () => {

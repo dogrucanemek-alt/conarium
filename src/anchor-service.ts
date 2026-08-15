@@ -130,6 +130,70 @@ export function readLiveStore(path: string): AnchorRecord[] {
   return rows
 }
 
+export interface InclusionLink {
+  seq: number
+  hash: string
+  prevHash: string
+}
+
+export interface InclusionProof {
+  seq: number
+  hash: string
+  prevHash: string
+  head: {
+    seq: number
+    hash: string
+    state: 'pending' | 'bitcoin'
+    bitcoinBlock?: number
+  }
+  path: InclusionLink[]
+}
+
+export function buildInclusionProof(rows: AnchorRecord[], target: AnchorRecord): InclusionProof {
+  if (!Number.isInteger(target.seq) || target.seq < 1 || target.seq > rows.length) {
+    throw new Error('cannot build inclusion proof: record not in log')
+  }
+  const at = rows[target.seq - 1]
+  if (at.hash !== target.hash || at.seq !== target.seq) {
+    throw new Error('cannot build inclusion proof: record moved')
+  }
+  const head = rows[rows.length - 1]
+  return {
+    seq: target.seq,
+    hash: target.hash,
+    prevHash: target.prevHash,
+    head: {
+      seq: head.seq,
+      hash: head.hash,
+      state: head.state,
+      ...(head.bitcoinBlock !== undefined ? { bitcoinBlock: head.bitcoinBlock } : {}),
+    },
+    path: rows.slice(target.seq - 1).map((r) => ({
+      seq: r.seq,
+      hash: r.hash,
+      prevHash: r.prevHash,
+    })),
+  }
+}
+
+export function verifyInclusionProof(
+  record: { seq: number; hash: string; prevHash: string },
+  proof: InclusionProof,
+): boolean {
+  if (proof.seq !== record.seq || proof.hash !== record.hash || proof.prevHash !== record.prevHash) {
+    return false
+  }
+  if (proof.path.length === 0) return false
+  if (proof.path[0].hash !== record.hash || proof.path[0].seq !== record.seq) return false
+  let prev = record.prevHash
+  for (const step of proof.path) {
+    if (step.prevHash !== prev) return false
+    prev = step.hash
+  }
+  const last = proof.path[proof.path.length - 1]
+  return last.hash === proof.head.hash && last.seq === proof.head.seq
+}
+
 function nextLink(rows: AnchorRecord[]): { seq: number; prevHash: string } {
   if (rows.length === 0) return { seq: 1, prevHash: GENESIS_HASH }
   const last = rows[rows.length - 1]
@@ -303,7 +367,7 @@ export function createAnchorService(opts: AnchorServiceOptions) {
     // wastes a calendar submission and produces a second id for one fact.
     const existing = rows.find((r) => r.type === 'submit' && r.digest === hash && r.owner === owner)
     if (existing) {
-      res.status(200).json({ ...publicView(latestView(rows, existing), base), deduplicated: true })
+      res.status(200).json({ ...publicView(latestView(rows, existing), base, rows, existing), deduplicated: true })
       return
     }
 
@@ -334,7 +398,7 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       opts.signingKey,
     )
     appendFileSync(opts.storePath, JSON.stringify(record) + '\n')
-    res.status(201).json(publicView(record, base))
+    res.status(201).json(publicView(record, base, [...rows, record]))
   })
 
   app.get('/anchor/:id', (req, res) => {
@@ -349,11 +413,15 @@ export function createAnchorService(opts: AnchorServiceOptions) {
     // Public on purpose: a verification URL only a token holder can open is not
     // a verification URL. It carries a hash and a proof, never content.
     res.setHeader('Vary', 'Accept')
-    if (req.accepts(['json', 'html']) === 'html') {
-      res.type('html').send(humanPage(record, base))
-      return
+    try {
+      if (req.accepts(['json', 'html']) === 'html') {
+        res.type('html').send(humanPage(record, base, rows, submit))
+        return
+      }
+      res.json(publicView(record, base, rows, submit))
+    } catch {
+      res.status(503).json({ error: 'cannot build inclusion proof' })
     }
-    res.json(publicView(record, base))
   })
 
   app.get('/anchor/:id/ots', (req, res) => {
@@ -423,7 +491,8 @@ export function createAnchorService(opts: AnchorServiceOptions) {
   return { app, runUpgrade, readStore: () => readStore(opts.storePath) }
 }
 
-function publicView(r: AnchorRecord, base: string) {
+function publicView(r: AnchorRecord, base: string, rows?: AnchorRecord[], target?: AnchorRecord) {
+  const inclusion = rows ? buildInclusionProof(rows, target ?? r) : undefined
   return {
     id: r.id,
     hash: r.digest,
@@ -435,6 +504,7 @@ function publicView(r: AnchorRecord, base: string) {
     submittedAt: r.submittedAt,
     ...(r.upgradedAt ? { upgradedAt: r.upgradedAt } : {}),
     sig: r.sig,
+    ...(inclusion ? { inclusion } : {}),
     verify: `${base}/anchor/${r.id}/ots`,
     claim:
       r.state === 'bitcoin'
@@ -447,8 +517,12 @@ function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 }
 
-function humanPage(r: AnchorRecord, base: string): string {
-  const v = publicView(r, base)
+function humanPage(r: AnchorRecord, base: string, rows?: AnchorRecord[], target?: AnchorRecord): string {
+  const v = publicView(r, base, rows, target)
+  const proof = v.inclusion
+  const incl = proof
+    ? `<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">inclusion</td><td><code>seq ${proof.seq} → head ${proof.head.seq} (${esc(proof.head.state)})</code></td></tr>`
+    : ''
   return `<!doctype html><meta charset="utf-8"><title>Conarium anchor ${esc(r.id)}</title>
 <body style="font:15px/1.6 system-ui,sans-serif;max-width:44rem;margin:3rem auto;padding:0 1rem">
 <h1 style="font-size:1.3rem">Anchor ${esc(r.id)}</h1>
@@ -459,6 +533,7 @@ function humanPage(r: AnchorRecord, base: string): string {
 ${r.bitcoinBlock !== undefined ? `<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">bitcoin block</td><td><code>${r.bitcoinBlock}</code></td></tr>` : ''}
 <tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">submitted</td><td><code>${esc(r.submittedAt)}</code></td></tr>
 <tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">countersign</td><td><code>Ed25519 ${esc(r.sig.keyId)}</code></td></tr>
+${incl}
 </table>
 <p>${esc(v.claim)}</p>
 <p>Raw proof: <a href="${esc(v.verify)}">${esc(v.verify)}</a> — verify it with the reference
