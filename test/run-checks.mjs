@@ -26,6 +26,7 @@ export const CHECKS = [
   'test/console_handoff.mjs',
   'test/console_receipts.mjs',
   'test/console_receipts_tab.mjs',
+  'test/console_receipts_first_click.mjs',
   'test/mark_assets.mjs',
   'test/c1_receipt_sink.mjs',
   'test/init.mjs',
