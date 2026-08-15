@@ -202,9 +202,19 @@ export function signHash(key: SigningKey, hash: string): string {
   return sig.toString('base64')
 }
 
+function decodeCanonicalBase64(s: string): Buffer | null {
+  if (typeof s !== 'string' || s.length === 0 || s.length % 4 !== 0) return null
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(s)) return null
+  const buf = Buffer.from(s, 'base64')
+  if (buf.toString('base64') !== s) return null
+  return buf
+}
+
 export function verifyHash(key: VerifyKey, hash: string, signatureBase64: string): boolean {
+  const sigBuf = decodeCanonicalBase64(signatureBase64)
+  if (!sigBuf) return false
   try {
-    return cryptoVerify(null, Buffer.from(hash, 'utf-8'), key.publicKey, Buffer.from(signatureBase64, 'base64'))
+    return cryptoVerify(null, Buffer.from(hash, 'utf-8'), key.publicKey, sigBuf)
   } catch {
     return false
   }

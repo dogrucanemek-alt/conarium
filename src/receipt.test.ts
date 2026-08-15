@@ -252,6 +252,22 @@ describe('T5 verify scenarios', () => {
     expect(res.code).toBe(13)
   })
 
+  it('T5.7 non-canonical base64 signature → exit 13', () => {
+    const receipts = chainOf(1, key)
+    const sig = receipts[0].sig!.value
+    const cases = [
+      sig.replace('+', '-'),
+      sig.replace('/', '_'),
+      sig.endsWith('==') ? sig.slice(0, -2) + '>>' : sig.slice(0, -1) + '>',
+    ]
+    for (const value of cases) {
+      if (value === sig) continue
+      const path = writeChain([{ ...receipts[0], sig: { ...receipts[0].sig!, value } }], `canon-${value.length}.jsonl`)
+      const res = runVerify([path, '--pubkey', publicPath])
+      expect(res.code).toBe(13)
+    }
+  })
+
   it('T5.6 key rotation mixed chain with both pubkeys → 0', () => {
     const oldPair = writeKeyPairFiles(join(dir, 'cnr-old'), 'cnr-old')
     const newPair = writeKeyPairFiles(join(dir, 'cnr-new'), 'cnr-new')

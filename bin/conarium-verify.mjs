@@ -346,6 +346,14 @@ function schemaOk(r) {
   return null
 }
 
+function decodeCanonicalBase64(s) {
+  if (typeof s !== 'string' || s.length === 0 || s.length % 4 !== 0) return null
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(s)) return null
+  const buf = Buffer.from(s, 'base64')
+  if (buf.toString('base64') !== s) return null
+  return buf
+}
+
 function verifySig(keys, receipt) {
   if (!receipt.sig || typeof receipt.sig !== 'object') {
     return 'missing sig'
@@ -353,12 +361,14 @@ function verifySig(keys, receipt) {
   if (receipt.sig.alg !== 'Ed25519') return `unsupported sig.alg ${receipt.sig.alg}`
   const pk = keys.get(receipt.sig.keyId)
   if (!pk) return `unknown keyId ${receipt.sig.keyId}`
+  const sigBuf = decodeCanonicalBase64(receipt.sig.value)
+  if (!sigBuf) return 'signature is not canonical base64'
   try {
     const ok = cryptoVerify(
       null,
       Buffer.from(receipt.chain.hash, 'utf-8'),
       pk,
-      Buffer.from(receipt.sig.value, 'base64'),
+      sigBuf,
     )
     return ok ? null : 'signature cryptographically invalid'
   } catch (err) {
