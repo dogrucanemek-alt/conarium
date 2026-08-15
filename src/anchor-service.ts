@@ -4,8 +4,9 @@
  * What it does: takes a hash, countersigns the stored record with this
  * process's Ed25519 key, submits the hash to the OpenTimestamps calendars,
  * keeps the proof, and serves both forever at a stable URL. A background pass
- * upgrades each proof from `pending` to a Bitcoin block height by appending
- * a new row — the original line is never rewritten.
+ * stamps the log head off the request path, and upgrades that stamp from
+ * `pending` to a Bitcoin block height by appending a new row — the original
+ * line is never rewritten.
  *
  * What it is NOT — and this must never be blurred in the copy: Conarium is not
  * the timestamp authority. The calendars and Bitcoin are. The signature is
@@ -31,7 +32,7 @@ import { isServablePublicPem, signAnchorRecord, type CountersignSig } from './an
 import type { SigningKey } from './keys.js'
 import { stampHash, upgradeProof } from './ots/client.js'
 
-export type AnchorRecordType = 'submit' | 'upgrade'
+export type AnchorRecordType = 'submit' | 'upgrade' | 'stamp'
 
 export interface AnchorRecord {
   type: AnchorRecordType
@@ -49,8 +50,10 @@ export interface AnchorRecord {
   upgradedAt?: string
   seq: number
   prevHash: string
-  /** Set on `type: 'upgrade'` — the submit seq this row confirms. */
+  /** Set on `type: 'upgrade'` — the submit/stamp seq this row confirms. */
   upgradesSeq?: number
+  /** Set on `type: 'stamp'` — the log seq whose entry hash was sent to calendars. */
+  stampedSeq?: number
   sig: CountersignSig
 }
 
@@ -347,9 +350,8 @@ export function createAnchorService(opts: AnchorServiceOptions) {
     if (!owner) return
 
     const hash = typeof req.body?.hash === 'string' ? req.body.hash : ''
-    let digest: Buffer
     try {
-      digest = hashPrefixToBuffer(hash)
+      hashPrefixToBuffer(hash)
     } catch (err) {
       res.status(400).json({ error: (err as Error).message })
       return
@@ -375,16 +377,7 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       return
     }
 
-    let ots: string
-    try {
-      ots = await stamp(digest)
-    } catch (err) {
-      // Fail loudly. A silent 200 here would mean the customer believes their
-      // chain is anchored when nothing was submitted.
-      res.status(502).json({ error: `calendar submission failed: ${(err as Error).message}` })
-      return
-    }
-
+    // Stamp is off the request path (C5). A slow calendar must not lock accept.
     const link = nextLink(rows)
     const record = sealRecord(
       {
@@ -393,7 +386,7 @@ export function createAnchorService(opts: AnchorServiceOptions) {
         digest: hash,
         owner,
         log: 'opentimestamps',
-        ots,
+        ots: '',
         state: 'pending',
         submittedAt: new Date().toISOString(),
         seq: link.seq,
@@ -436,7 +429,12 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       res.status(404).json({ error: 'no such anchor' })
       return
     }
-    const record = latestView(rows, submit)
+    const stampRow = rows.find((r) => r.type === 'stamp' && (r.stampedSeq ?? 0) >= submit.seq)
+    if (!stampRow || !stampRow.ots) {
+      res.status(404).json({ error: 'not yet stamped — wait for the next head stamp' })
+      return
+    }
+    const record = latestView(rows, stampRow)
     res.type('application/octet-stream').send(Buffer.from(record.ots, 'base64'))
   })
 
@@ -452,13 +450,48 @@ export function createAnchorService(opts: AnchorServiceOptions) {
     }
   })
 
+  async function runStamp(): Promise<{ attempted: number; stamped: number }> {
+    const rows = readLiveStore(opts.storePath)
+    if (rows.length === 0) return { attempted: 0, stamped: 0 }
+    const head = rows[rows.length - 1]
+    if (head.type === 'stamp') return { attempted: 0, stamped: 0 }
+    if (rows.some((r) => r.type === 'stamp' && r.stampedSeq === head.seq)) {
+      return { attempted: 0, stamped: 0 }
+    }
+    try {
+      const ots = await stamp(hashPrefixToBuffer(`sha256:${head.hash}`))
+      const link = nextLink(rows)
+      const next = sealRecord(
+        {
+          type: 'stamp',
+          id: randomBytes(9).toString('base64url'),
+          digest: `sha256:${head.hash}`,
+          owner: 'conarium',
+          log: 'opentimestamps',
+          ots,
+          state: 'pending',
+          submittedAt: new Date().toISOString(),
+          seq: link.seq,
+          prevHash: link.prevHash,
+          stampedSeq: head.seq,
+        },
+        opts.signingKey,
+      )
+      appendFileSync(opts.storePath, JSON.stringify(next) + '\n')
+      return { attempted: 1, stamped: 1 }
+    } catch {
+      return { attempted: 1, stamped: 0 }
+    }
+  }
+
   async function runUpgrade(): Promise<{ checked: number; upgraded: number }> {
     const rows = readLiveStore(opts.storePath)
     let upgraded = 0
     let checked = 0
     for (const row of rows) {
-      if (row.type !== 'submit' || row.state !== 'pending') continue
+      if (row.type !== 'stamp' || row.state !== 'pending') continue
       if (alreadyUpgraded(rows, row.seq)) continue
+      if (!row.ots) continue
       checked += 1
       try {
         const out = await upgrade(row.ots)
@@ -492,7 +525,7 @@ export function createAnchorService(opts: AnchorServiceOptions) {
     return { checked, upgraded }
   }
 
-  return { app, runUpgrade, readStore: () => readStore(opts.storePath) }
+  return { app, runUpgrade, runStamp, readStore: () => readStore(opts.storePath) }
 }
 
 function publicView(r: AnchorRecord, base: string, rows?: AnchorRecord[], target?: AnchorRecord) {

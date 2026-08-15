@@ -69,7 +69,7 @@ const host = process.env.CONARIUM_ANCHOR_HOST ?? '127.0.0.1'
 const submitsPerMinute = Number(process.env.CONARIUM_ANCHOR_RATE ?? 60)
 const upgradeMinutes = Number(process.env.CONARIUM_ANCHOR_UPGRADE_MINUTES ?? 60)
 
-const { app, runUpgrade } = createAnchorService({
+const { app, runUpgrade, runStamp } = createAnchorService({
   storePath,
   tokens,
   publicBaseUrl: baseUrl,
@@ -90,10 +90,12 @@ app.listen(port, host, () => {
 if (upgradeMinutes > 0) {
   const tick = async () => {
     try {
+      const s = await runStamp()
+      if (s.stamped) console.log(`stamped log head (${s.stamped}/${s.attempted})`)
       const r = await runUpgrade()
-      if (r.upgraded) console.log(`upgraded ${r.upgraded}/${r.checked} pending anchor(s)`)
+      if (r.upgraded) console.log(`upgraded ${r.upgraded}/${r.checked} pending stamp(s)`)
     } catch (err) {
-      console.error(`upgrade pass failed: ${err.message}`)
+      console.error(`maintenance pass failed: ${err.message}`)
     }
   }
   setInterval(tick, upgradeMinutes * 60_000).unref?.()

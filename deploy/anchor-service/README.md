@@ -79,6 +79,7 @@ Then: `curl -fsS http://127.0.0.1:8797/healthz`
 
 ## Peer dependency
 
-The OpenTimestamps client is built in (`src/ots/`). A live anchoring service
-needs outbound HTTPS to the calendars, or `POST /anchor` returns 502.
+The OpenTimestamps client is built in (`src/ots/`). Calendars are reached
+from the background tick (`runStamp` / `runUpgrade`), never from `POST /anchor`.
+A calendar outage does not return 5xx on submit; the next tick retries the head.
 `/healthz` does not stamp — a health probe does not depend on a calendar.

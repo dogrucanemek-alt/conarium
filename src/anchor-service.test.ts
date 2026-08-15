@@ -142,35 +142,45 @@ describe('anchor service', () => {
     expect(body).not.toContain('tok-a')
   })
 
-  it('fails loudly when the calendar is down instead of pretending to anchor', async () => {
-    const { app } = svc({
+  it('stamps the log head once, not every submit (C5)', async () => {
+    let calls = 0
+    const { app, runStamp } = svc({
+      stamp: async () => {
+        calls += 1
+        return Buffer.from('head-ots').toString('base64')
+      },
+    })
+    expect((await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })).status).toBe(201)
+    expect((await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH2 })).status).toBe(201)
+    expect(calls).toBe(0)
+    // RED 2026-08-15: every POST hits the calendars. N submits must be 1 stamp.
+    const tick = await runStamp()
+    expect(tick).toEqual({ attempted: 1, stamped: 1 })
+    expect(calls).toBe(1)
+  })
+
+  it('accepts a submit when the calendar is down and stamps on the next tick', async () => {
+    const { app, runStamp, readStore } = svc({
       stamp: async () => {
         throw new Error('calendars unreachable')
       },
     })
     const res = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
-    expect(res.status).toBe(502)
-    // Nothing may be written: a stored record would claim an anchor that does not exist.
-    expect(() => readFileSync(join(dir, 'anchors.jsonl'), 'utf-8')).toThrow()
+    expect(res.status).toBe(201)
+    expect(readStore()).toHaveLength(1)
+    expect(await runStamp()).toEqual({ attempted: 1, stamped: 0 })
+    expect(readStore()).toHaveLength(1)
   })
 
   it('deduplicates the same hash for the same owner, but not across owners', async () => {
-    let calls = 0
-    const { app } = svc({
-      stamp: async () => {
-        calls += 1
-        return Buffer.from('p').toString('base64')
-      },
-    })
+    const { app } = svc()
     const a1 = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
     const a2 = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
     expect(a2.body.id).toBe(a1.body.id)
     expect(a2.body.deduplicated).toBe(true)
-    expect(calls).toBe(1)
 
     const b1 = await request(app).post('/anchor').set('authorization', 'Bearer tok-b').send({ hash: HASH })
     expect(b1.body.id).not.toBe(a1.body.id)
-    expect(calls).toBe(2)
   })
 
   it('enforces the per-owner rate limit without blocking another owner', async () => {
@@ -199,18 +209,19 @@ describe('anchor service', () => {
   })
 
   it('upgrades by appending a new row and keeps the original line', async () => {
-    const { app, runUpgrade, readStore } = svc()
+    const { app, runStamp, runUpgrade, readStore } = svc()
     const a = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
     const b = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH2 })
 
+    expect(await runStamp()).toEqual({ attempted: 1, stamped: 1 })
     const first = await runUpgrade()
-    expect(first).toEqual({ checked: 2, upgraded: 2 })
+    expect(first).toEqual({ checked: 1, upgraded: 1 })
     const rows = readStore()
     expect(rows).toHaveLength(4)
     expect(rows.filter((r) => r.type === 'submit').every((r) => r.state === 'pending')).toBe(true)
+    expect(rows.filter((r) => r.type === 'stamp').every((r) => r.state === 'pending')).toBe(true)
     expect(rows.filter((r) => r.type === 'upgrade').every((r) => r.state === 'bitcoin' && r.bitcoinBlock === 961333)).toBe(true)
-    expect(rows[2].upgradesSeq).toBe(rows[0].seq)
-    expect(rows[3].upgradesSeq).toBe(rows[1].seq)
+    expect(rows[3].upgradesSeq).toBe(rows[2].seq)
     validateAnchorLog(rows)
 
     const onDisk = readFileSync(join(dir, 'anchors.jsonl'), 'utf-8').trim().split('\n')
@@ -220,9 +231,9 @@ describe('anchor service', () => {
     expect(await runUpgrade()).toEqual({ checked: 0, upgraded: 0 })
 
     const viewed = await request(app).get(`/anchor/${a.body.id}`)
-    expect(viewed.body.state).toBe('bitcoin')
     expect(viewed.body.hash).toBe(HASH)
     expect(viewed.body.id).toBe(a.body.id)
+    expect(viewed.body.inclusion.head.state).toBe('bitcoin')
 
     const head = await request(app).get('/anchor/log/head')
     expect(head.status).toBe(200)
@@ -233,19 +244,22 @@ describe('anchor service', () => {
   })
 
   it('keeps a record pending when the upgrade throws, rather than losing it', async () => {
-    const { app, runUpgrade, readStore } = svc({
+    const { app, runStamp, runUpgrade, readStore } = svc({
       upgrade: async () => {
         throw new Error('calendar 500')
       },
     })
     await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
+    expect(await runStamp()).toEqual({ attempted: 1, stamped: 1 })
     expect(await runUpgrade()).toEqual({ checked: 1, upgraded: 0 })
-    expect(readStore()[0].state).toBe('pending')
+    expect(readStore().every((r) => r.state === 'pending')).toBe(true)
   })
 
   it('serves the raw proof so a third party can verify without this service', async () => {
-    const { app } = svc()
+    const { app, runStamp } = svc()
     const created = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
+    expect((await request(app).get(`/anchor/${created.body.id}/ots`)).status).toBe(404)
+    await runStamp()
     const raw = await request(app).get(`/anchor/${created.body.id}/ots`)
     expect(raw.status).toBe(200)
     expect(raw.body.toString()).toBe('fake-ots-proof')
