@@ -19,10 +19,10 @@ jobs:
     name: Build, lint & test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0   # gecmis taramasi icin sart — sig klon "temiz" yalani soyler
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 20
           cache: npm
@@ -88,21 +88,21 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: github/codeql-action/init@v3
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: github/codeql-action/init@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
         with:
           languages: javascript-typescript
           queries: security-extended
           # Test fixtures are hostile by design; scanning them reported the
           # fixture as the finding. src/ and api/ stay in scope.
           config-file: ./.github/codeql/codeql-config.yml
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 20
           cache: npm
       - run: npm ci
       - run: npm run build
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
 
   semgrep:
     name: Semgrep (static security)
@@ -110,7 +110,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - run: semgrep scan --config p/security-audit --config p/secrets --config p/javascript --config p/typescript --error
         # Hard-gates on any finding. .semgrepignore drops generated/marketing/test
         # noise; the product code (src/, api/) scans clean (verified: 0 findings).
