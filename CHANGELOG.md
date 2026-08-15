@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.2.20 — 2026-08-16
+
+- **`policy.protectedColumns`: a column you may read but not ask about.**
+  `maskColumns` hides a value in the result. LIMITATIONS has always said what
+  that leaves open: `WHERE email LIKE 'a%'` still reaches the database, and one
+  row versus none answers a question about the value it never printed. The
+  answer until now was to refuse the whole table. A column listed in
+  `protectedColumns` is the narrower answer — same glob syntax, still masked on
+  the way out, but the query is refused before it reaches the database if the
+  column appears in `WHERE`, `HAVING`, `JOIN … ON`, `ORDER BY`, `GROUP BY`,
+  `SELECT DISTINCT`, or a derived `SELECT` expression. Aliases, CTEs, table
+  aliases, function wrappers, subqueries and both arms of a `UNION` are walked;
+  a shape the walk cannot classify is refused rather than passed. A profile
+  cannot add or relax the field, and a dialect whose AST this walk cannot
+  traverse refuses to boot instead of quietly enforcing nothing.
+
+  This is not a claim that masked values in general became unlearnable. It
+  applies to listed columns, and counting channels (`COUNT`, `EXISTS`, repeated
+  probing) remain — LIMITATIONS says so in both languages.
+
+- **Behaviour is byte-identical without the field.** A config that does not set
+  `protectedColumns` runs exactly as 0.2.19 did; a test locks that.
+
 ## 0.2.19 — 2026-08-16
 
 - **Listable in the official MCP Registry.** `package.json` carries `mcpName`

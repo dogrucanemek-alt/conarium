@@ -6,12 +6,12 @@
     "url": "https://github.com/dogrucanemek-alt/conarium",
     "source": "github"
   },
-  "version": "0.2.19",
+  "version": "0.2.20",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@conarium-ai/core",
-      "version": "0.2.19",
+      "version": "0.2.20",
       "transport": {
         "type": "stdio"
       },
