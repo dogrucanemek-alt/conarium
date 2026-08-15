@@ -74,6 +74,10 @@ examples/per-user-identity/conarium.tokens.json
 !test-vectors/keys/*.pub.pem
 !test-vectors/keys/*.pub.pem.keyid
 
+# Built second verifier (stdlib Go). Source stays; the binary does not.
+verifiers/go/conarium-verify
+verifiers/go/conarium-verify.exe
+
 # Jazzer.js crash / timeout artefacts — a found crash is copied into
 # fuzz/corpus/ as a pinned seed, not left at the repo root.
 /crash-*

@@ -15,6 +15,23 @@ permissions:
   contents: read
 
 jobs:
+  go-verify:
+    name: Go verifier (vectors + differential)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: verifiers/go/go.mod
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 20
+      - name: Vectors through both verifiers
+        run: node test/go_verify_diff.mjs
+
   build-test:
     name: Build, lint & test
     runs-on: ubuntu-latest

@@ -81,6 +81,8 @@ npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --expect-c
 npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --anchor-check
 ```
 
+A second verifier, Go and the standard library only, is in [`verifiers/go`](verifiers/go). `go build -o conarium-verify .` then the same arguments as `conarium-verify`; `test-vectors/` is the contract.
+
 Opt-in anchoring: `CONARIUM_ANCHOR_SINK=opentimestamps`. Upgrade pending proofs later with
 `npx conarium-anchor-upgrade ./audit.jsonl.anchors.jsonl`.
 The client is in-tree (Node `crypto` + calendar HTTPS). It does not install
