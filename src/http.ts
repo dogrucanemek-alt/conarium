@@ -30,7 +30,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { loadConfig, bootDeps, buildServer } from './server.js'
 import { resolveHttpRatePerMin } from './config.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { loadTokenStore, resolveActor } from './tokens.js'
 import { announceUpdate } from './update-check.js'
 
@@ -38,13 +38,30 @@ const PORT = Number(process.env.CONARIUM_MCP_PORT || 8791)
 const HOST = process.env.CONARIUM_MCP_HOST || '127.0.0.1'
 const TOKEN = process.env.CONARIUM_MCP_TOKEN || ''
 // Bir kez yuklenir; dosya yoksa null = kisi bazli kimlik kapali (davranis birebir eski).
-const TOKEN_STORE_REF: { store: ReturnType<typeof loadTokenStore>; mtimeMs: number; path: string } = {
+/**
+ * Staleness is decided by the file's CONTENT, not its mtime.
+ *
+ * mtime has filesystem-dependent resolution, so two writes inside one tick are
+ * indistinguishable. For a token file that is not a cosmetic problem: revoke a
+ * token in the same tick as an earlier edit and the revocation is silently
+ * ignored — the token keeps working until something else touches the file.
+ * The file is a small map by construction; hashing it on read costs less than
+ * being wrong about who is allowed in.
+ */
+const TOKEN_STORE_REF: { store: ReturnType<typeof loadTokenStore>; fingerprint: string; path: string } = {
   store: loadTokenStore(),
-  mtimeMs: 0,
+  fingerprint: '',
   path: process.env.CONARIUM_TOKENS_FILE || 'conarium.tokens.json',
 }
+
+function tokenFileFingerprint(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex')
+}
+
 try {
-  if (existsSync(TOKEN_STORE_REF.path)) TOKEN_STORE_REF.mtimeMs = statSync(TOKEN_STORE_REF.path).mtimeMs
+  if (existsSync(TOKEN_STORE_REF.path)) {
+    TOKEN_STORE_REF.fingerprint = tokenFileFingerprint(TOKEN_STORE_REF.path)
+  }
 } catch { /* first load already happened */ }
 
 export function currentTokenStore(): ReturnType<typeof loadTokenStore> {
@@ -52,17 +69,17 @@ export function currentTokenStore(): ReturnType<typeof loadTokenStore> {
   try {
     if (!existsSync(path)) {
       TOKEN_STORE_REF.store = null
-      TOKEN_STORE_REF.mtimeMs = 0
+      TOKEN_STORE_REF.fingerprint = ''
       TOKEN_STORE_REF.path = path
       return null
     }
-    const mtimeMs = statSync(path).mtimeMs
-    if (path === TOKEN_STORE_REF.path && mtimeMs === TOKEN_STORE_REF.mtimeMs) {
+    const fingerprint = tokenFileFingerprint(path)
+    if (path === TOKEN_STORE_REF.path && fingerprint === TOKEN_STORE_REF.fingerprint) {
       return TOKEN_STORE_REF.store
     }
     const next = loadTokenStore(path)
     TOKEN_STORE_REF.store = next
-    TOKEN_STORE_REF.mtimeMs = mtimeMs
+    TOKEN_STORE_REF.fingerprint = fingerprint
     TOKEN_STORE_REF.path = path
     return next
   } catch (err) {

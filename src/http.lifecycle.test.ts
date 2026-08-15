@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, statSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { resolveActor } from './tokens.js'
@@ -122,5 +122,27 @@ describe('G8 token hot reload', () => {
     writeFileSync(tokensFile, JSON.stringify({ tokens: [] }))
     const kisi = resolveActor(AYSE, currentTokenStore(), 'servis')
     expect(kisi.isUser).toBe(false)
+  })
+
+  it('a revocation written inside one mtime tick is still seen', () => {
+    // Two writes fast enough to share an mtime value used to be invisible to a
+    // reload keyed on mtime, so the revoked token kept resolving. Forcing both
+    // files to the same timestamp reproduces that on any filesystem, whatever
+    // its clock resolution happens to be.
+    // The timestamp is pinned before BOTH reads. Stamping only the second write
+    // is not enough: utimesSync writes millisecond precision while a natural
+    // mtimeMs carries sub-millisecond digits, so the two would differ by
+    // accident and the stale path would never be taken.
+    const stamp = new Date(Math.floor(Date.now() / 1000) * 1000)
+
+    writeFileSync(tokensFile, JSON.stringify({ tokens: [{ sha256: sha256hex(AYSE), id: 'ayse' }] }))
+    utimesSync(tokensFile, stamp, stamp)
+    expect(resolveActor(AYSE, currentTokenStore(), 'servis').isUser).toBe(true)
+
+    writeFileSync(tokensFile, JSON.stringify({ tokens: [] }))
+    utimesSync(tokensFile, stamp, stamp)
+    expect(statSync(tokensFile).mtimeMs).toBe(stamp.getTime())
+
+    expect(resolveActor(AYSE, currentTokenStore(), 'servis').isUser).toBe(false)
   })
 })
