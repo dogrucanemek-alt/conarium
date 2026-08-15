@@ -52,6 +52,7 @@ import {
   resolveSqlDialect,
   type SqlDialect,
 } from './sql-gate/dispatch.js'
+import { enforceProtectedColumns } from './protected-columns.js'
 
 export interface GovernanceMetadata {
   accessedTables: string[]
@@ -366,6 +367,11 @@ export class Governance {
 
     if (ast.length > 1) {
       this.deny(emptyState, 'Multiple statements are not permitted.')
+    }
+
+    const protectedCols = this.policy.protectedColumns
+    if (protectedCols && protectedCols.length > 0) {
+      enforceProtectedColumns(ast[0], protectedCols, (reason) => this.deny(emptyState, reason))
     }
 
     const state = this.createAnalysisState()
