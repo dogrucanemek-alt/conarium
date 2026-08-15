@@ -144,14 +144,14 @@ describe('G15 — content-detector bypasses', () => {
 describe('A1 — trailing letter must not hide PAN/phone', () => {
   it('single-letter suffix does not hide a PAN', () => {
     const r = gov.maskPII('4111111111111111x')
+    expect(r.masked).toBe('[MASKED_PII]')
     expect(String(r.masked)).not.toContain('4111111111111111')
-    expect(String(r.masked)).toMatch(/MASKED/)
   })
 
   it('single-letter suffix does not hide a TR phone', () => {
     const r = gov.maskPII('05321234567x')
+    expect(r.masked).toBe('[MASKED_PII]')
     expect(String(r.masked)).not.toContain('05321234567')
-    expect(String(r.masked)).toMatch(/MASKED/)
   })
 
   it('prefix cases stay masked (G15 lock)', () => {

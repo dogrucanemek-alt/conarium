@@ -136,6 +136,12 @@ export function maskNumericPii(text: string): { text: string; count: number } {
       && classifyDigitRun(out, start, i, n)
     ) {
       count++
+      // isolatedSpan accepted one trailing letter (`4111…x`) — swallow it
+      // so the mask is the whole token, not `[MASKED_PII]x`.
+      if (i < out.length && /[A-Za-z_]/.test(out[i])) {
+        const after = i + 1 < out.length ? out[i + 1] : ''
+        if (!after || !isWord(after)) i += 1
+      }
       parts.push('[MASKED_PII]')
     } else {
       parts.push(out.slice(start, i))
