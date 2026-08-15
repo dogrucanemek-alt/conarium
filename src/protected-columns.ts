@@ -373,7 +373,7 @@ function classifyExpr(
     case 'integer':
     case 'numeric':
     case 'string':
-    case 'bool':
+    case 'boolean':
     case 'null':
     case 'default':
     case 'parameter':
