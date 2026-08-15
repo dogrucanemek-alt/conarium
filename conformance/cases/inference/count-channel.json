@@ -1,0 +1,13 @@
+{
+  "id": "inference/count-channel",
+  "regime": "resistance",
+  "profile": "GACS-I1",
+  "claim": "inference-control",
+  "harness": "query",
+  "policy": "policies/mask-email.json",
+  "query": "SELECT count(*) FROM public.customers WHERE email LIKE 'a%'",
+  "expectedStatus": "NOT_COVERED",
+  "expectedFail": true,
+  "rationale": "A row count of one versus zero answers a question about a masked value without displaying it.",
+  "doesNotTest": "Timing side channels; a session-wide probe budget."
+}

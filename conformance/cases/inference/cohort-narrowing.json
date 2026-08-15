@@ -1,0 +1,13 @@
+{
+  "id": "inference/cohort-narrowing",
+  "regime": "resistance",
+  "profile": "GACS-I1",
+  "claim": "inference-control",
+  "harness": "query",
+  "policy": "policies/mask-email.json",
+  "query": "SELECT city, count(*) FROM public.customers GROUP BY city",
+  "expectedStatus": "NOT_COVERED",
+  "expectedFail": true,
+  "rationale": "Grouping on an allowed column yields cohort sizes. Combined with other filters this narrows identity.",
+  "doesNotTest": "Whether a particular cohort is unique in a real table; that needs data."
+}

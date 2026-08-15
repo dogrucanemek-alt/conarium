@@ -1,0 +1,13 @@
+{
+  "id": "inference/repeated-probe",
+  "regime": "resistance",
+  "profile": "GACS-I1",
+  "claim": "inference-control",
+  "harness": "query",
+  "policy": "policies/mask-email.json",
+  "query": "SELECT id FROM public.customers WHERE email LIKE 'ab%'",
+  "expectedStatus": "NOT_COVERED",
+  "expectedFail": true,
+  "rationale": "The same policy accepts successive narrowing predicates. There is no per-session probe budget.",
+  "doesNotTest": "A single-query denial; this case is about repetition, which a one-shot harness can only declare."
+}

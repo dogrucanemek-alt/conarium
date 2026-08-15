@@ -32,7 +32,7 @@ function validate(c, file) {
 }
 
 const files = walk(join('conformance', 'cases'))
-assert.ok(files.length >= 40, `expected ≥40 migrated cases, got ${files.length}`)
+assert.ok(files.length >= 46, `expected ≥46 cases, got ${files.length}`)
 for (const file of files) validate(load(file).case, file)
 
 const hollow = {

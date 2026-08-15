@@ -1,0 +1,15 @@
+{
+  "id": "coverage/tail-without-pin",
+  "regime": "resistance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "verify",
+  "receipt": "test-vectors/002-chain-of-three/receipts.jsonl",
+  "verifyArgs": ["--pubkey", "KEYS/vector-key.pub.pem"],
+  "expectExit": 0,
+  "expectedStatus": "DETECTED_WITH_EXTERNAL_PIN",
+  "expectedFail": true,
+  "rationale": "Without --expect-count / --expect-last-hash / an anchor, a chain that lost its tail still verifies. The pin is the control.",
+  "doesNotTest": "A live database counter; this case only shows the receipt file cannot see a missing tail by itself.",
+  "sourceVector": "test-vectors/manifest.json#002-chain-of-three"
+}

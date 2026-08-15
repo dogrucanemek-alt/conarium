@@ -1,0 +1,13 @@
+{
+  "id": "coverage/expect-count-pin",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "verify",
+  "receipt": "test-vectors/002-chain-of-three/receipts.jsonl",
+  "verifyArgs": ["--pubkey", "KEYS/vector-key.pub.pem", "--expect-count", "3"],
+  "expectExit": 0,
+  "rationale": "A length pin makes a shorter leftover chain fail. The three-receipt vector still verifies when the pin matches.",
+  "doesNotTest": "Live comparison against a database's own query counters.",
+  "sourceVector": "test-vectors/manifest.json#002-chain-of-three"
+}
