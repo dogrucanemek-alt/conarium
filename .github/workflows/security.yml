@@ -93,6 +93,9 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-extended
+          # Test fixtures are hostile by design; scanning them reported the
+          # fixture as the finding. src/ and api/ stay in scope.
+          config-file: ./.github/codeql/codeql-config.yml
       - uses: actions/setup-node@v5
         with:
           node-version: 20

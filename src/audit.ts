@@ -191,7 +191,9 @@ function acquireSinkLock(sink: string): string | undefined {
   const body = `${JSON.stringify({ pid: process.pid, startedAt: Date.now() })}\n`
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      writeFileSync(lockPath, body, { flag: 'wx' })
+      // `wx` refuses a pre-created path, so a planted symlink cannot redirect
+      // this write. 0600 keeps the lock as private as the sink it guards.
+      writeFileSync(lockPath, body, { flag: 'wx', mode: 0o600 })
       heldLocks.set(lockPath, 1)
       return lockPath
     } catch (err) {

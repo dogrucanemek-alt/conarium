@@ -53,6 +53,17 @@ describe('shortcut paths', () => {
     expect(withIcon).toContain('conarium-mark.ico')
   })
 
+  it('a path that looks like a command stays a path', () => {
+    // The launcher used double quotes and escaped only `"`, so `$(…)` and
+    // backticks in a path this code does not choose stayed live shell.
+    const sh = macLauncherScript('/opt/$(id)/node', "/opt/a'b/`id`/app.mjs")
+    // sh: inside single quotes only `'` can end the quote, and it is escaped
+    // with the '\'' idiom rather than left to close the string early.
+    expect(sh).toContain(String.raw`'/opt/$(id)/node'`)
+    expect(sh).toContain(String.raw`'/opt/a'\''b/`)
+    expect(sh).not.toMatch(/"/)
+  })
+
   it('mac launcher and linux desktop carry --launch, not a token', () => {
     const secret = 'tok-secret'
     const sh = macLauncherScript('/usr/bin/node', '/opt/conarium-console.mjs')

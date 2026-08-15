@@ -98,7 +98,11 @@ export function windowsShortcutScript(opts: {
 }
 
 export function macLauncherScript(nodePath: string, scriptPath: string): string {
-  return `#!/bin/sh\nexec "${nodePath.replace(/"/g, '\\"')}" "${scriptPath.replace(/"/g, '\\"')}" --launch\n`
+  // Single quotes are literal in sh, and the only character that can end the
+  // quote is `'` itself. Escaping just `"` inside double quotes left `$(…)`,
+  // backticks and `\` live in paths this code does not choose.
+  const sh = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
+  return `#!/bin/sh\nexec ${sh(nodePath)} ${sh(scriptPath)} --launch\n`
 }
 
 export function macInfoPlist(opts: { iconFile?: string | null } = {}): string {

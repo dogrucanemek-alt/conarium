@@ -1,0 +1,13 @@
+name: conarium-codeql
+
+# Test files carry hostile input on purpose: a ReDoS pattern the loader must
+# reject, a URL the verifier must refuse. Scanning them reports the fixture as
+# the vulnerability and buries the product findings under noise that can never
+# be "fixed" without deleting the test.
+#
+# src/ and api/ stay in scope. Nothing here narrows the product surface.
+paths-ignore:
+  - '**/*.test.ts'
+  - test
+  - redteam
+  - examples
