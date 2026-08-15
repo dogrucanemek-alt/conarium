@@ -50,9 +50,20 @@ jobs:
       # server.json before it will accept the server. github-oidc reuses this
       # job's identity — no token, and the namespace it grants
       # (io.github.<owner>/) is the one server.json asks for.
+      # This job holds the npm publish identity, so nothing unverified runs in
+      # it: the publisher is pinned to a release and its digest is checked
+      # before extraction, the same discipline the Actions above get from SHA
+      # pinning. `latest` would let a replaced asset execute here.
       - name: Publish to the MCP Registry
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.1
+          MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
         run: |
-          curl -sSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          set -euo pipefail
+          curl -sSLf -o mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish
       # Every tag before 0.2.18 was made by hand after the fact. A publish that
