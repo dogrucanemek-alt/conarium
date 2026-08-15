@@ -53,6 +53,13 @@ onun hakkındaki bir soruyu cevaplar. Geçerli jetonu olan bir asistan maskeli
 değerleri bu yolla parça parça öğrenebilir. Bir sütunun yalnızca gizli değil
 **öğrenilemez** olması gerekiyorsa, onu taşıyan tabloya izin verme.
 
+`policy.protectedColumns` listesindeki bir sütun daha dar bir istisnadır:
+sözdizimi `maskColumns` ile aynıdır ve değer sonuçta yine maskelenir. Ayrıca
+sütun `WHERE`, `HAVING`, `JOIN … ON`, `ORDER BY`, `GROUP BY` veya türetilmiş
+bir `SELECT` ifadesinde geçemez — sorgu veritabanına gitmeden reddedilir.
+Listede olmayan sütunlar için yukarıdaki paragraf aynen geçerlidir. Bu,
+maskelenen değerlerin genel olarak öğrenilemez olduğu iddiası değildir.
+
 ## Satır tavanı sorgu başınadır, oturum başına değil
 
 `maxRows` tek sorguyu sınırlar. `OFFSET` korunur; izinli ve maskesiz bir tablo

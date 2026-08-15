@@ -124,6 +124,8 @@ Deliberately narrow, because this is the one feature that can *loosen* protectio
 - A profile may override **`maskColumns`, `maxRows` and `maskLabelledNames` — and
   nothing else.** Table, tool and connector permissions stay global; a profile can
   never widen what is reachable, only what is legible within it.
+  `protectedColumns` is not overlayable: a profile that could drop it would be a
+  per-person back door.
 - **Per-user tokens only.** An actor authenticated with a shared token never
   receives a profile. "Whoever holds this string sees unmasked PII" is precisely
   the failure this product exists to prevent.
@@ -511,11 +513,21 @@ Control access using a simple `conarium.json` policy file:
   "allowTables": ["public.customers", "public.orders"],
   "denyTables": ["public.secrets", "public.financials"],
   "maskColumns": ["email", "ssn", "*.card", "*.api_key"],
+  "protectedColumns": ["*.email", "customers.tckn"],
   "allowConnectors": ["postgres-main", "docs"]
 }
 ```
 
 Anything not in `allowTables` is denied by default; matched `maskColumns` are redacted to `[MASKED_PII]` before the data ever reaches the model.
+
+`protectedColumns` uses the same glob syntax. Every pattern is also masked in
+the result. In addition, that column may not appear in a predicate (`WHERE`,
+`HAVING`, `JOIN … ON`, `ORDER BY`, `GROUP BY`) or a derived `SELECT` expression
+— the query is refused. A bare `SELECT email` is still allowed and comes back
+masked. Omit the field and behaviour is unchanged. A profile cannot set it.
+`mssql` / `oracle` refuse to boot if the field is non-empty: those gates cannot
+walk predicate positions, and this product does not claim a rule it cannot
+enforce.
 
 `policy.dialect` selects the SQL gate the `query` tool uses: `postgres` (omitted default), `mssql`, or `oracle`. It is the operator's declaration — Conarium does not guess the dialect from the statement. A typo or `mysql` rejects the config.
 

@@ -49,7 +49,7 @@ Version string: `conarium-receipt/0.3` (verifier also accepts `0.1` and `0.2` �
 | `client` | calling client | `source` + name / version |
 | `dataRefs` | reference databases consulted | source + object + field *names* only |
 | `policy` | applied governance | decision + rule ids |
-| `flags` | triggered policy flags | strings |
+| `flags` | triggered policy flags | strings (`denied`, `protected-column-denied`, …) — free list; schema string unchanged |
 | `masking` | counts by class | never raw values |
 | `request.argsHash` | request fingerprint | `sha256:…` of args — not the query text |
 | `consentRef` | reserved | always `null` in `conarium-receipt/0.3` (and in 0.1/0.2). The field exists so a later schema can fill it without renaming. |
@@ -62,6 +62,11 @@ Version string: `conarium-receipt/0.3` (verifier also accepts `0.1` and `0.2` �
 stripped before hashing. Prefix: `sha256:` + hex.
 
 Raw data **never** enters a field — only numbers, class names, and hashes.
+
+`flags` is a free string array in `conarium-receipt/0.3`. A query refused
+because a `protectedColumns` pattern appeared in a predicate carries
+`protected-column-denied` (and `denied`). The flag is a class name — it does
+not carry the column value.
 
 ### Meta provenance (v0.3)
 

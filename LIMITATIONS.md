@@ -54,6 +54,14 @@ masked value without ever displaying it. An assistant with a valid token can
 learn masked values bit by bit this way. If a column must be unlearnable rather
 than merely hidden, do not allow the table that carries it.
 
+A column listed in `policy.protectedColumns` is the narrower exception: the
+same glob syntax as `maskColumns`, and the value is still masked in the result.
+In addition, the column may not appear in `WHERE`, `HAVING`, `JOIN … ON`,
+`ORDER BY`, `GROUP BY`, or a derived `SELECT` expression. The query is refused
+before it reaches the database. Columns that are not on that list are unchanged
+— the paragraph above still applies to them in full. This is not a claim that
+masked values in general have become unlearnable.
+
 ## The row cap is per query, not per session
 
 `maxRows` caps a single query. `OFFSET` is preserved, so an allowed, unmasked
