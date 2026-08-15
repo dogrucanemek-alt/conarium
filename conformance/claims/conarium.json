@@ -1,0 +1,12 @@
+{
+  "implementation": "conarium",
+  "version": "0.2.20",
+  "claims": [
+    "table-policy",
+    "row-cap",
+    "masking",
+    "receipts",
+    "reconciliation"
+  ],
+  "verify": ["node", "bin/conarium-verify.mjs"]
+}
