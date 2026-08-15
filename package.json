@@ -16,6 +16,7 @@
     "!examples/**/*.jsonl",
     "!examples/**/*.keyid",
     "!examples/**/conarium.tokens.json",
+    "conformance",
     "test-vectors",
     "!**/*.pem",
     "test-vectors/keys/vector-key.pub.pem",
