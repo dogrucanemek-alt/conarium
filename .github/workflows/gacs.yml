@@ -1,0 +1,42 @@
+name: gacs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gacs:
+    name: GACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Import fence
+        run: node test/gacs_import_fence.mjs
+      - name: Case schema
+        run: node test/gacs_case_schema.mjs
+      - name: Regime lock
+        run: node test/gacs_regime.mjs
+      - name: Run GACS
+        run: node conformance/run.mjs --adapter conformance/adapters/conarium.mjs --claims conformance/claims/conarium.json
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gacs-report
+          path: |
+            conformance/report.md
+            conformance/report.json
+          if-no-files-found: warn
