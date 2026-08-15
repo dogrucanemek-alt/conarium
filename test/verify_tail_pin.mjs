@@ -83,6 +83,14 @@ test('empty file, no pin → 0, stderr says this is not a verification', () => {
   assert.match(r.stderr, /not a verification that nothing was deleted/)
 })
 
+test('truncated JSONL line is exit 20, not a silent skip', () => {
+  const broken = path.join(tmp, 'truncated-line.jsonl')
+  fs.writeFileSync(broken, full[0] + '\n{"v":"0.3","id":\n')
+  const r = verify(broken)
+  assert.equal(r.status, 20, `expected 20, got ${r.status}\n${r.stderr}\n${r.stdout}`)
+  assert.match(`${r.stderr}${r.stdout}`, /invalid JSON/)
+})
+
 for (const { name, fn } of tests) {
   try {
     fn()

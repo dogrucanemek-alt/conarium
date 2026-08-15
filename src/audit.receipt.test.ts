@@ -233,6 +233,21 @@ describe('audit receipt — zincir sürekliliği', () => {
   })
 })
 
+describe('audit receipt — yazılamayan sink (iddia denetimi S4)', () => {
+  it('yazılamayan receiptSink + failClosed → log() throw eder, sessiz başarı yok', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'conarium-receipt-fail-'))
+    const receiptSink = join(dir, 'yok-boyle-bir-klasor', 'receipts.jsonl')
+    const a = new Audit({
+      sink: join(dir, 'audit.jsonl'),
+      receiptSink,
+      receiptMeta: RECEIPT_META,
+    })
+    expect(() => a.log({ tool: 'query', target: 'public.t', denied: false })).toThrow(
+      /Audit receipt sink write failed/,
+    )
+  })
+})
+
 describe('audit receipt — geriye uyum', () => {
   it('receiptSink verilmezse HİÇ makbuz üretilmez', () => {
     const dir = mkdtempSync(join(tmpdir(), 'conarium-receipt-off-'))

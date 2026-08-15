@@ -13,7 +13,7 @@
  * ZORUNDA: elemenin fazla genis olmadigi da burada kilitlenir.
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -134,6 +134,18 @@ try {
   const limitations = ['LIMITATIONS.md', 'LIMITATIONS.tr.md'].filter((f) => files.includes(f))
   if (limitations.length !== 2) fail(`LIMITATIONS.md / LIMITATIONS.tr.md pakette yok (bulunan: ${limitations.join(', ') || 'hiç'})`)
   else pass('LIMITATIONS.md ve LIMITATIONS.tr.md tarballda')
+
+  if (!files.includes('docs/COUNTERSIGN.md')) fail('docs/COUNTERSIGN.md tarballda yok — karşı-imza iddiası paketten düşmüş')
+  else pass('docs/COUNTERSIGN.md tarballda')
+
+  const envFiles = files.filter((f) => /(^|\/)\.env($|\.)/.test(f))
+  if (envFiles.length) fail(`pakette .env var: ${envFiles.join(', ')}`)
+  else pass('pakette .env yok')
+
+  const pkgJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  const installHooks = ['preinstall', 'install', 'postinstall', 'prepare'].filter((k) => pkgJson.scripts?.[k])
+  if (installHooks.length) fail(`package.json kurulum kancası var: ${installHooks.join(', ')}`)
+  else pass('package.json preinstall/install/postinstall/prepare yok (prepublishOnly = build, kurulumda çalışmaz)')
 } catch (e) {
   fail(e.message)
 } finally {
