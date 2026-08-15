@@ -38,6 +38,7 @@ export const CHECKS = [
   'test/property_sql_gate.mjs',
   'test/security_hardening_14.mjs',
   'test/anchor_verify.mjs',
+  'deploy/anchor-service/dry-run.mjs',
   'test/spec_exitcode_drift.mjs',
   'test/encoding_evasion_mask.mjs',
   'test/verify_tail_pin.mjs',

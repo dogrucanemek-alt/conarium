@@ -1,29 +1,33 @@
 /**
- * Hosted anchoring endpoint.
+ * Hosted anchoring + countersign endpoint.
  *
- * What it does: takes a hash, submits it to the OpenTimestamps calendars, keeps
- * the resulting proof, and serves it forever at a stable URL. A background pass
+ * What it does: takes a hash, countersigns the stored record with this
+ * process's Ed25519 key, submits the hash to the OpenTimestamps calendars,
+ * keeps the proof, and serves both forever at a stable URL. A background pass
  * upgrades each proof from `pending` to a Bitcoin block height once the block
  * lands.
  *
  * What it is NOT — and this must never be blurred in the copy: Conarium is not
- * the timestamp authority. The calendars and Bitcoin are. This service is
- * retention, a permanent public address, and the upgrade job nobody remembers
- * to run. It sells convenience and durability, never trust.
+ * the timestamp authority. The calendars and Bitcoin are. The signature is
+ * ours; the time is not. An anchoring service you have to trust for the stamp
+ * would defeat the point of anchoring. The countersign is a named claim that
+ * we saw this hash and wrote this record — nothing more.
  *
- * The proof is served raw at `/anchor/:id/ots`, so a third party can verify with
- * the reference OpenTimestamps client and ignore this service entirely. An
- * anchoring service you have to trust would defeat the point of anchoring.
+ * The proof is served raw at `/anchor/:id/ots`, so a third party can verify the
+ * stamp with the reference OpenTimestamps client and ignore this service. The
+ * public key is at `/anchor/key.pem`.
  *
  * The code is MIT like the rest — self-host it if you prefer. What is sold is
- * someone else keeping it alive.
+ * the key and someone else keeping the log alive.
  */
 import express from 'express'
 import type { Request, Response } from 'express'
-import { randomBytes, timingSafeEqual } from 'crypto'
+import { createPublicKey, randomBytes, timingSafeEqual } from 'crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { dirname } from 'path'
 import { hashPrefixToBuffer } from './anchor.js'
+import { isServablePublicPem, signAnchorRecord, type CountersignSig } from './anchor-sign.js'
+import type { SigningKey } from './keys.js'
 import { stampHash, upgradeProof } from './ots/client.js'
 
 export interface AnchorRecord {
@@ -36,6 +40,7 @@ export interface AnchorRecord {
   bitcoinBlock?: number
   submittedAt: string
   upgradedAt?: string
+  sig: CountersignSig
 }
 
 export interface AnchorServiceOptions {
@@ -45,6 +50,10 @@ export interface AnchorServiceOptions {
   tokens: Map<string, string>
   /** Public base URL, used to build the permanent verification address. */
   publicBaseUrl: string
+  /** Required. A countersign service that can start without a key is not one. */
+  signingKey: SigningKey
+  /** Override the derived public PEM (tests). Still refused if it looks private. */
+  publicPem?: string
   submitsPerMinute?: number
   /** Injected in tests so the suite never touches a calendar server. */
   stamp?: (digest: Buffer) => Promise<string>
@@ -115,10 +124,18 @@ function resolveOwner(tokens: Map<string, string>, presented: string): string | 
 }
 
 export function createAnchorService(opts: AnchorServiceOptions) {
+  if (!opts.signingKey) {
+    throw new Error(
+      'createAnchorService: signingKey is required — a countersign service without a key is not one',
+    )
+  }
   const stamp = opts.stamp ?? defaultStamp
   const upgrade = opts.upgrade ?? defaultUpgrade
   const perMinute = opts.submitsPerMinute ?? 60
   const base = opts.publicBaseUrl.replace(/\/+$/, '')
+  const publicPem =
+    opts.publicPem ??
+    createPublicKey(opts.signingKey.privateKey).export({ type: 'spki', format: 'pem' }).toString()
 
   mkdirSync(dirname(opts.storePath), { recursive: true })
 
@@ -154,6 +171,19 @@ export function createAnchorService(opts: AnchorServiceOptions) {
 
   app.get('/healthz', (_req, res) => {
     res.json({ ok: true, service: 'conarium-anchor', anchors: readStore(opts.storePath).length })
+  })
+
+  // Registered before /anchor/:id so "key.pem" is never treated as an id.
+  app.get('/anchor/key.pem', (_req, res) => {
+    if (!isServablePublicPem(publicPem)) {
+      res.status(403).type('text/plain').send('refusing to serve a private key')
+      return
+    }
+    res.type('application/x-pem-file').send(publicPem)
+  })
+
+  app.get('/anchor/key.pem.keyid', (_req, res) => {
+    res.type('text/plain').send(opts.signingKey.keyId + '\n')
   })
 
   app.post('/anchor', async (req, res) => {
@@ -192,15 +222,18 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       return
     }
 
-    const record: AnchorRecord = {
-      id: randomBytes(9).toString('base64url'),
-      hash,
-      owner,
-      log: 'opentimestamps',
-      ots,
-      state: 'pending',
-      submittedAt: new Date().toISOString(),
-    }
+    const record = signAnchorRecord(
+      {
+        id: randomBytes(9).toString('base64url'),
+        hash,
+        owner,
+        log: 'opentimestamps' as const,
+        ots,
+        state: 'pending' as const,
+        submittedAt: new Date().toISOString(),
+      },
+      opts.signingKey,
+    )
     appendFileSync(opts.storePath, JSON.stringify(record) + '\n')
     res.status(201).json(publicView(record, base))
   })
@@ -252,6 +285,10 @@ export function createAnchorService(opts: AnchorServiceOptions) {
           row.ots = out.ots ?? row.ots
           if (typeof out.block === 'number') row.bitcoinBlock = out.block
           row.upgradedAt = new Date().toISOString()
+          // In-place upgrade changes signed fields; re-sign so C1 records
+          // stay verifiable until C2 turns upgrade into a new row.
+          const resigned = signAnchorRecord(row, opts.signingKey)
+          row.sig = resigned.sig
           upgraded += 1
         }
       } catch {
@@ -275,6 +312,7 @@ function publicView(r: AnchorRecord, base: string) {
     ...(r.bitcoinBlock !== undefined ? { bitcoinBlock: r.bitcoinBlock } : {}),
     submittedAt: r.submittedAt,
     ...(r.upgradedAt ? { upgradedAt: r.upgradedAt } : {}),
+    sig: r.sig,
     verify: `${base}/anchor/${r.id}/ots`,
     claim:
       r.state === 'bitcoin'
@@ -297,6 +335,7 @@ function humanPage(r: AnchorRecord, base: string): string {
 <tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">state</td><td><code>${esc(r.state)}</code></td></tr>
 ${r.bitcoinBlock !== undefined ? `<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">bitcoin block</td><td><code>${r.bitcoinBlock}</code></td></tr>` : ''}
 <tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">submitted</td><td><code>${esc(r.submittedAt)}</code></td></tr>
+<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">countersign</td><td><code>Ed25519 ${esc(r.sig.keyId)}</code></td></tr>
 </table>
 <p>${esc(v.claim)}</p>
 <p>Raw proof: <a href="${esc(v.verify)}">${esc(v.verify)}</a> — verify it with the reference

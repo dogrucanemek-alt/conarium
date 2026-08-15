@@ -8,20 +8,23 @@
  *   node bin/conarium-anchor-service.mjs
  *
  * Env:
- *   CONARIUM_ANCHOR_TOKENS    required — JSON map of {"token":"owner-id"}
- *   CONARIUM_ANCHOR_BASE_URL  required — public origin used to build verify URLs
- *   CONARIUM_ANCHOR_STORE     default ./anchor-store.jsonl
- *   CONARIUM_ANCHOR_PORT      default 8797
- *   CONARIUM_ANCHOR_HOST      default 127.0.0.1 (put a TLS proxy in front)
- *   CONARIUM_ANCHOR_RATE      default 60 submissions per owner per minute
+ *   CONARIUM_ANCHOR_TOKENS       required — JSON map of {"token":"owner-id"}
+ *   CONARIUM_ANCHOR_BASE_URL     required — public origin used to build verify URLs
+ *   CONARIUM_ANCHOR_SIGNING_KEY  required — Ed25519 private PEM path
+ *   CONARIUM_ANCHOR_KEY_ID       optional — else read <pem>.keyid
+ *   CONARIUM_ANCHOR_STORE        default ./anchor-store.jsonl
+ *   CONARIUM_ANCHOR_PORT         default 8797
+ *   CONARIUM_ANCHOR_HOST         default 127.0.0.1 (put a TLS proxy in front)
+ *   CONARIUM_ANCHOR_RATE         default 60 submissions per owner per minute
  *   CONARIUM_ANCHOR_UPGRADE_MINUTES  default 60; 0 disables the background pass
  *
  * Exits non-zero on missing configuration rather than starting an endpoint that
  * accepts anonymous writes — an anchoring service anyone can write to is a disk
- * filling up, not a service.
+ * filling up, not a service. A countersign service without a key is not one.
  */
 import { existsSync } from 'fs'
 import { createAnchorService, loadTokensFile } from '../dist/anchor-service.js'
+import { loadAnchorSigningKey } from '../dist/keys.js'
 
 function need(name) {
   const v = process.env[name]
@@ -34,6 +37,7 @@ function need(name) {
 
 const tokensPath = need('CONARIUM_ANCHOR_TOKENS')
 const baseUrl = need('CONARIUM_ANCHOR_BASE_URL')
+const signingKeyPath = need('CONARIUM_ANCHOR_SIGNING_KEY')
 
 if (!existsSync(tokensPath)) {
   console.error(`token file not found: ${tokensPath}`)
@@ -46,18 +50,38 @@ if (tokens.size === 0) {
   process.exit(2)
 }
 
+if (!existsSync(signingKeyPath)) {
+  console.error(`signing key file not found: ${signingKeyPath}`)
+  process.exit(2)
+}
+
+let signingKey
+try {
+  signingKey = loadAnchorSigningKey()
+} catch (err) {
+  console.error(err.message)
+  process.exit(2)
+}
+
 const storePath = process.env.CONARIUM_ANCHOR_STORE ?? './anchor-store.jsonl'
 const port = Number(process.env.CONARIUM_ANCHOR_PORT ?? 8797)
 const host = process.env.CONARIUM_ANCHOR_HOST ?? '127.0.0.1'
 const submitsPerMinute = Number(process.env.CONARIUM_ANCHOR_RATE ?? 60)
 const upgradeMinutes = Number(process.env.CONARIUM_ANCHOR_UPGRADE_MINUTES ?? 60)
 
-const { app, runUpgrade } = createAnchorService({ storePath, tokens, publicBaseUrl: baseUrl, submitsPerMinute })
+const { app, runUpgrade } = createAnchorService({
+  storePath,
+  tokens,
+  publicBaseUrl: baseUrl,
+  submitsPerMinute,
+  signingKey,
+})
 
 app.listen(port, host, () => {
   console.log(`conarium-anchor listening on http://${host}:${port}`)
   console.log(`  store   ${storePath}`)
   console.log(`  owners  ${new Set(tokens.values()).size}`)
+  console.log(`  keyId   ${signingKey.keyId}`)
   console.log(`  public  ${baseUrl}`)
 })
 

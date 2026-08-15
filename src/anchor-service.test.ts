@@ -1,19 +1,38 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { createPrivateKey, createPublicKey } from 'crypto'
 import { mkdtempSync, rmSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import request from 'supertest'
 import { createAnchorService } from './anchor-service.js'
+import { verifyAnchorRecord } from './anchor-sign.js'
+import { generateKeyPair, type SigningKey, type VerifyKey } from './keys.js'
 
 const HASH = 'sha256:' + 'ab'.repeat(32)
 const HASH2 = 'sha256:' + 'cd'.repeat(32)
 
 let dir: string
+let signing: SigningKey
+let verify: VerifyKey
+let publicPem: string
+let privatePem: string
+
+function makeKey() {
+  const pair = generateKeyPair('test-anchor-key')
+  return {
+    signing: { keyId: pair.keyId, privateKey: createPrivateKey(pair.privatePem) } satisfies SigningKey,
+    verify: { keyId: pair.keyId, publicKey: createPublicKey(pair.publicPem) } satisfies VerifyKey,
+    publicPem: pair.publicPem,
+    privatePem: pair.privatePem,
+  }
+}
+
 function svc(over: Partial<Parameters<typeof createAnchorService>[0]> = {}) {
   return createAnchorService({
     storePath: join(dir, 'anchors.jsonl'),
     tokens: new Map([['tok-a', 'acme'], ['tok-b', 'globex']]),
     publicBaseUrl: 'https://anchor.example/',
+    signingKey: signing,
     stamp: async () => Buffer.from('fake-ots-proof').toString('base64'),
     upgrade: async () => ({ upgraded: true, block: 961333, ots: Buffer.from('upgraded').toString('base64') }),
     ...over,
@@ -22,6 +41,11 @@ function svc(over: Partial<Parameters<typeof createAnchorService>[0]> = {}) {
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'anchor-svc-'))
+  const k = makeKey()
+  signing = k.signing
+  verify = k.verify
+  publicPem = k.publicPem
+  privatePem = k.privatePem
 })
 
 describe('anchor service', () => {
@@ -44,6 +68,52 @@ describe('anchor service', () => {
     const res = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: 'not-a-hash' })
     expect(res.status).toBe(400)
     expect(calls).toBe(0)
+  })
+
+  it('countersigns each accepted submit with Ed25519 (C1)', async () => {
+    const { app, readStore } = svc()
+    const created = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
+    expect(created.status).toBe(201)
+    expect(created.body.sig).toEqual({
+      alg: 'Ed25519',
+      keyId: 'test-anchor-key',
+      value: expect.any(String),
+    })
+
+    const rec = readStore()[0]
+    expect(verifyAnchorRecord(rec as unknown as Record<string, unknown>, verify)).toBe(true)
+
+    const pem = await request(app).get('/anchor/key.pem')
+    expect(pem.status).toBe(200)
+    expect(pem.text).toBe(publicPem)
+    expect(pem.text).toContain('BEGIN PUBLIC KEY')
+    expect(pem.text).not.toMatch(/PRIVATE KEY/)
+
+    const keyId = await request(app).get('/anchor/key.pem.keyid')
+    expect(keyId.status).toBe(200)
+    expect(keyId.text.trim()).toBe('test-anchor-key')
+
+    const mutated = { ...rec, hash: rec.hash.slice(0, -1) + (rec.hash.endsWith('a') ? 'b' : 'a') }
+    expect(verifyAnchorRecord(mutated as unknown as Record<string, unknown>, verify)).toBe(false)
+  })
+
+  it('refuses to construct without a signing key', () => {
+    expect(() =>
+      createAnchorService({
+        storePath: join(dir, 'anchors.jsonl'),
+        tokens: new Map([['tok-a', 'acme']]),
+        publicBaseUrl: 'https://anchor.example/',
+        signingKey: undefined as unknown as SigningKey,
+        stamp: async () => 'x',
+      }),
+    ).toThrow(/signingKey is required/)
+  })
+
+  it('refuses to serve a private PEM at /anchor/key.pem', async () => {
+    const { app } = svc({ publicPem: privatePem })
+    const res = await request(app).get('/anchor/key.pem')
+    expect(res.status).toBe(403)
+    expect(res.text).toMatch(/private key/)
   })
 
   it('anchors a hash and serves it at a permanent url', async () => {

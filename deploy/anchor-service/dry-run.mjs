@@ -6,6 +6,7 @@
  *   2. with env present, GET /healthz returns 200 (pm2 "online" is not this)
  */
 import { spawn } from 'node:child_process'
+import { generateKeyPairSync } from 'node:crypto'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -66,7 +67,29 @@ console.log('ok  missing env refuses start and names CONARIUM_ANCHOR_TOKENS')
 const dir = mkdtempSync(join(tmpdir(), 'conarium-anchor-dry-'))
 const tokensPath = join(dir, 'tokens.json')
 const storePath = join(dir, 'store.jsonl')
+const keyPath = join(dir, 'anchor.pem')
 writeFileSync(tokensPath, JSON.stringify({ 'dry-run-token': 'dry-run-owner' }) + '\n')
+
+const missingKey = await runOnce({
+  CONARIUM_ANCHOR_TOKENS: tokensPath,
+  CONARIUM_ANCHOR_BASE_URL: 'http://127.0.0.1:1',
+  CONARIUM_ANCHOR_SIGNING_KEY: '',
+})
+if (missingKey.status !== 2) {
+  console.error(`expected exit 2 on missing signing key, got ${missingKey.status}\n${missingKey.out}`)
+  rmSync(dir, { recursive: true, force: true })
+  process.exit(1)
+}
+if (!/CONARIUM_ANCHOR_SIGNING_KEY/.test(missingKey.out)) {
+  console.error(`missing-key refusal did not name CONARIUM_ANCHOR_SIGNING_KEY:\n${missingKey.out}`)
+  rmSync(dir, { recursive: true, force: true })
+  process.exit(1)
+}
+console.log('ok  missing signing key refuses start and names CONARIUM_ANCHOR_SIGNING_KEY')
+
+const pair = generateKeyPairSync('ed25519')
+writeFileSync(keyPath, pair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString())
+writeFileSync(keyPath + '.keyid', 'dry-run-key\n')
 const port = await freePort()
 
 const child = spawn(process.execPath, [BIN], {
@@ -74,6 +97,7 @@ const child = spawn(process.execPath, [BIN], {
     ...process.env,
     CONARIUM_ANCHOR_TOKENS: tokensPath,
     CONARIUM_ANCHOR_BASE_URL: 'http://127.0.0.1:' + port,
+    CONARIUM_ANCHOR_SIGNING_KEY: keyPath,
     CONARIUM_ANCHOR_STORE: storePath,
     CONARIUM_ANCHOR_HOST: '127.0.0.1',
     CONARIUM_ANCHOR_PORT: String(port),

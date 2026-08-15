@@ -13,6 +13,8 @@
  *                                  (each needs a sibling `.keyid`); forms the
  *                                  multi-keyId trust store together with the
  *                                  current signing key's derived public key
+ *   CONARIUM_ANCHOR_SIGNING_KEY  — same shape, for the countersign service
+ *   CONARIUM_ANCHOR_KEY_ID       — optional override; else read sidecar
  */
 import {
   generateKeyPairSync,
@@ -105,11 +107,14 @@ function assertKeyFilePerms(path: string): void {
   }
 }
 
-export function loadSigningKey(): SigningKey | null {
-  const path = process.env.CONARIUM_AUDIT_SIGNING_KEY
-  if (!path) return null
+export function loadSigningKeyFrom(
+  path: string,
+  opts: { keyId?: string; pathEnv?: string; keyIdEnv?: string } = {},
+): SigningKey {
+  const pathEnv = opts.pathEnv ?? 'CONARIUM_AUDIT_SIGNING_KEY'
+  const keyIdEnv = opts.keyIdEnv ?? 'CONARIUM_AUDIT_KEY_ID'
   if (!existsSync(path)) {
-    throw new Error(`loadSigningKey: CONARIUM_AUDIT_SIGNING_KEY file not found: ${path}`)
+    throw new Error(`loadSigningKey: ${pathEnv} file not found: ${path}`)
   }
   assertKeyFilePerms(path)
   let pem: string
@@ -127,13 +132,34 @@ export function loadSigningKey(): SigningKey | null {
   if (privateKey.asymmetricKeyType !== 'ed25519') {
     throw new Error(`loadSigningKey: expected Ed25519 key, got ${privateKey.asymmetricKeyType ?? 'unknown'} at ${path}`)
   }
-  const keyId = process.env.CONARIUM_AUDIT_KEY_ID?.trim() || readKeyIdSidecar(path)
+  const keyId = opts.keyId?.trim() || readKeyIdSidecar(path)
   if (!keyId) {
-    throw new Error(
-      `loadSigningKey: missing keyId — set CONARIUM_AUDIT_KEY_ID or create ${path}.keyid`,
-    )
+    throw new Error(`loadSigningKey: missing keyId — set ${keyIdEnv} or create ${path}.keyid`)
   }
   return { keyId, privateKey }
+}
+
+export function loadSigningKey(): SigningKey | null {
+  const path = process.env.CONARIUM_AUDIT_SIGNING_KEY
+  if (!path) return null
+  return loadSigningKeyFrom(path, {
+    keyId: process.env.CONARIUM_AUDIT_KEY_ID,
+    pathEnv: 'CONARIUM_AUDIT_SIGNING_KEY',
+    keyIdEnv: 'CONARIUM_AUDIT_KEY_ID',
+  })
+}
+
+/** Anchor / countersign key. Unlike the audit loader, missing env is an error. */
+export function loadAnchorSigningKey(): SigningKey {
+  const path = process.env.CONARIUM_ANCHOR_SIGNING_KEY
+  if (!path) {
+    throw new Error('loadAnchorSigningKey: missing CONARIUM_ANCHOR_SIGNING_KEY')
+  }
+  return loadSigningKeyFrom(path, {
+    keyId: process.env.CONARIUM_ANCHOR_KEY_ID,
+    pathEnv: 'CONARIUM_ANCHOR_SIGNING_KEY',
+    keyIdEnv: 'CONARIUM_ANCHOR_KEY_ID',
+  })
 }
 
 export function loadVerifyKeys(paths: string[]): VerifyKey[] {

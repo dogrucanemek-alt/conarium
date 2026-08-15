@@ -10,13 +10,16 @@ nobody remembers to run.
 
 ## What must be set
 
-See `env.example`. The process **refuses to start** if either of these is
+See `env.example`. The process **refuses to start** if any of these is
 missing, and names the variable:
 
 - `CONARIUM_ANCHOR_TOKENS` — path to a JSON map `{"token":"owner-id"}`
 - `CONARIUM_ANCHOR_BASE_URL` — public origin used in verify URLs
+- `CONARIUM_ANCHOR_SIGNING_KEY` — Ed25519 private PEM (sidecar `.keyid` or `CONARIUM_ANCHOR_KEY_ID`)
 
 An anchoring endpoint anyone can write to is a disk filling up, not a service.
+A countersign service without a key is not one. The public half is served at
+`GET /anchor/key.pem` — a private PEM is refused with 403.
 
 ## Ports and health
 
@@ -41,8 +44,9 @@ node deploy/anchor-service/dry-run.mjs
 It asserts:
 
 1. missing env → exit 2, the variable is named
-2. with a throwaway tokens file, `GET /healthz` returns 200
-3. the process is then killed
+2. tokens present but no signing key → exit 2, `CONARIUM_ANCHOR_SIGNING_KEY` is named
+3. with throwaway tokens + key, `GET /healthz` returns 200
+4. the process is then killed
 
 `CONARIUM_ANCHOR_UPGRADE_MINUTES=0` so the dry-run never talks to a calendar.
 
