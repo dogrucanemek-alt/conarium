@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { ConariumConfig } from './types.js'
 import { compileCustomPatterns, CustomPatternError } from './custom_patterns.js'
 import { warnIfMaxRowsHigh } from './masking-cost.js'
+import { assertProtectedColumnsSupported } from './protected-columns.js'
 
 const stringArray = z.array(z.string().min(1)).default([])
 
@@ -139,6 +140,7 @@ export function parseConariumConfig(raw: unknown): ConariumConfig {
     warnIfMaxRowsHigh(profile.maxRows)
   }
   assertCustomSqlDialect(cfg)
+  assertProtectedColumnsSupported(cfg.policy)
   return cfg
 }
 

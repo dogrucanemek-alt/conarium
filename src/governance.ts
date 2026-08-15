@@ -52,7 +52,7 @@ import {
   resolveSqlDialect,
   type SqlDialect,
 } from './sql-gate/dispatch.js'
-import { enforceProtectedColumns } from './protected-columns.js'
+import { assertProtectedColumnsSupported, enforceProtectedColumns } from './protected-columns.js'
 
 export interface GovernanceMetadata {
   accessedTables: string[]
@@ -217,6 +217,7 @@ export class Governance {
     // Fail closed here too: tests and console construct Governance by hand,
     // not only through parseConariumConfig. A typo must not become postgres.
     resolveSqlDialect(policy.dialect)
+    assertProtectedColumnsSupported(policy)
     this.policy = policy
     this.profileName = profileName
     this.customPatterns = compileCustomPatterns(policy.customPatterns)
