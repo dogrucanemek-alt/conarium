@@ -51,6 +51,16 @@ writeFileSync(recPath, JSON.stringify(rec) + '\n')
 const good = run([recPath, '--pubkey', pubPath])
 assert.equal(good.code, 0, `valid countersign expected 0, got ${good.code}: ${good.stderr}`)
 
+// The usage line promises <record.json>. Every case above writes one compact
+// line, which is the one shape a person is least likely to produce by hand:
+// `curl … | jq . > record.json` yields a pretty-printed object whose first line
+// is just "{". That was rejected as "invalid JSON" — valid JSON, our own
+// documented input, refused.
+const prettyPath = join(dir, 'record.pretty.json')
+writeFileSync(prettyPath, JSON.stringify(rec, null, 2) + '\n')
+const pretty = run([prettyPath, '--pubkey', pubPath])
+assert.equal(pretty.code, 0, `pretty-printed record expected 0, got ${pretty.code}: ${pretty.stderr}`)
+
 const broken = JSON.parse(JSON.stringify(rec))
 broken.sig.value = broken.sig.value.replace(/A/g, 'B').replace(/B/g, 'A')
 if (broken.sig.value === rec.sig.value) broken.sig.value = 'AAAA'

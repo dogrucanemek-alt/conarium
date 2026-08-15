@@ -133,11 +133,21 @@ function loadRecord(path) {
   } catch (err) {
     return { error: `cannot read ${path}: ${err.message}`, code: 20 }
   }
+  // Whole file first: the usage line says <record.json>, and anyone who saves an
+  // API response readably (`curl … | jq . > record.json`) has a pretty-printed
+  // object whose first line is just "{". Parsing only that line rejected valid
+  // JSON with "invalid JSON" — the instruction failing for the natural form of
+  // its own documented input. The single-line path stays for a store line
+  // lifted straight out of the JSONL log.
   let rec
   try {
-    rec = JSON.parse(raw.split('\n')[0])
-  } catch (err) {
-    return { error: `invalid JSON: ${err.message}`, code: 20 }
+    rec = JSON.parse(raw)
+  } catch {
+    try {
+      rec = JSON.parse(raw.split('\n')[0])
+    } catch (err) {
+      return { error: `invalid JSON: ${err.message}`, code: 20 }
+    }
   }
   if (!rec || typeof rec !== 'object') return { error: 'record must be an object', code: 20 }
   if (rec.type !== 'submit' && rec.type !== 'upgrade') {
