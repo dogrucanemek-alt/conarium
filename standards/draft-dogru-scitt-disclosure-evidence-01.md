@@ -3,7 +3,7 @@ title: "Transformation Evidence and Coverage Reconciliation for Auditable Data D
 abbrev: "Disclosure Evidence"
 category: std
 
-docname: draft-dogru-scitt-disclosure-evidence-00
+docname: draft-dogru-scitt-disclosure-evidence-01
 submissiontype: IETF
 number:
 date:
@@ -25,6 +25,7 @@ author:
  -
     fullname: Emekcan Dogru
     organization: VERAX TEKNOLOJI A.S.
+    country: Turkey
     email: dogrucanemek@gmail.com
 
 normative:
