@@ -131,7 +131,7 @@ describe('anchor service', () => {
 
     const fetched = await request(app).get(`/anchor/${created.body.id}`)
     expect(fetched.status).toBe(200)
-    expect(fetched.body.hash).toBe(HASH)
+    expect(fetched.body.digest).toBe(HASH)
   })
 
   it('never returns the owner or the token in a public view', async () => {
@@ -231,7 +231,7 @@ describe('anchor service', () => {
     expect(await runUpgrade()).toEqual({ checked: 0, upgraded: 0 })
 
     const viewed = await request(app).get(`/anchor/${a.body.id}`)
-    expect(viewed.body.hash).toBe(HASH)
+    expect(viewed.body.digest).toBe(HASH)
     expect(viewed.body.id).toBe(a.body.id)
     expect(viewed.body.inclusion.head.state).toBe('bitcoin')
 

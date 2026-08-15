@@ -416,8 +416,16 @@ export function createAnchorService(opts: AnchorServiceOptions) {
         return
       }
       res.json(publicView(record, base, rows, submit))
-    } catch {
-      res.status(503).json({ error: 'cannot build inclusion proof' })
+    } catch (err) {
+      // Only an actual proof failure may be reported as one. This catch used to
+      // label every error "cannot build inclusion proof", so a rendering bug
+      // sent whoever was debugging it to the log instead of to the renderer.
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.startsWith('cannot build inclusion proof')) {
+        res.status(503).json({ error: 'cannot build inclusion proof' })
+        return
+      }
+      res.status(500).json({ error: 'internal error while rendering this record' })
     }
   })
 
@@ -532,7 +540,14 @@ function publicView(r: AnchorRecord, base: string, rows?: AnchorRecord[], target
   const inclusion = rows ? buildInclusionProof(rows, target ?? r) : undefined
   return {
     id: r.id,
-    hash: r.digest,
+    // `digest` is what the customer submitted; `chainHash` is this record's link
+    // in our log. Both used to be reachable as "hash" in one document — the
+    // top-level field held the customer digest while inclusion.hash held the
+    // chain hash, so the same name carried two different values next to a
+    // prevHash that chains only one of them. In an evidence product that
+    // ambiguity is not a style question.
+    digest: r.digest,
+    chainHash: r.hash,
     log: r.log,
     state: r.state,
     seq: r.seq,
@@ -564,7 +579,8 @@ function humanPage(r: AnchorRecord, base: string, rows?: AnchorRecord[], target?
 <body style="font:15px/1.6 system-ui,sans-serif;max-width:44rem;margin:3rem auto;padding:0 1rem">
 <h1 style="font-size:1.3rem">Anchor ${esc(r.id)}</h1>
 <table style="border-collapse:collapse">
-<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">hash</td><td><code>${esc(v.hash)}</code></td></tr>
+<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">submitted digest</td><td><code>${esc(v.digest)}</code></td></tr>
+<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">chain hash</td><td><code>${esc(v.chainHash)}</code></td></tr>
 <tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">seq</td><td><code>${r.seq}</code></td></tr>
 <tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">state</td><td><code>${esc(r.state)}</code></td></tr>
 ${r.bitcoinBlock !== undefined ? `<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">bitcoin block</td><td><code>${r.bitcoinBlock}</code></td></tr>` : ''}
