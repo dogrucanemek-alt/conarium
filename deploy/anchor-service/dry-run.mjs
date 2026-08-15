@@ -7,7 +7,7 @@
  */
 import { spawn } from 'node:child_process'
 import { generateKeyPairSync } from 'node:crypto'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -89,6 +89,11 @@ console.log('ok  missing signing key refuses start and names CONARIUM_ANCHOR_SIG
 
 const pair = generateKeyPairSync('ed25519')
 writeFileSync(keyPath, pair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString())
+// The loader refuses a private key others can read, which is the behaviour we
+// want and which this dry run must not ask to be excused from. Windows ignores
+// the mode bits, so writing 644 here passed locally and only failed on a POSIX
+// runner. chmod after the write: the mode argument is masked by umask.
+chmodSync(keyPath, 0o600)
 writeFileSync(keyPath + '.keyid', 'dry-run-key\n')
 const port = await freePort()
 
