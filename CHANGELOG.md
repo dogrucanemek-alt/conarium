@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.17 — 2026-08-15
+
+- **`GET /anchor` describes the service.** The path only accepted POST, so the
+  address a visitor types first answered with Express's default `Cannot GET
+  /anchor` under `<title>Error</title>`. Every other surface in this product
+  explains itself; the front door of the countersigning service was the one that
+  looked broken. It now returns, in JSON or HTML, who signs, where the public key
+  and log head are, how to submit, the exact verify command — and the three
+  sentences about what a countersignature does **not** say. The test asserts the
+  index carries nothing that was not already public.
+
 ## 0.2.16 — 2026-08-15
 
 Countersigning: a second party on your chain head, and a revocation fix that

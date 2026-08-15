@@ -314,6 +314,42 @@ export function createAnchorService(opts: AnchorServiceOptions) {
     })
   })
 
+  // `/anchor` is where a curious visitor types first, and it only accepted POST,
+  // so a browser got Express's default "Cannot GET /anchor" with <title>Error</title>.
+  // Every other surface in this product explains itself; the front door of the
+  // countersigning service should not be the one that looks broken.
+  app.get(['/anchor', '/anchor/'], (req, res) => {
+    const index = {
+      service: 'conarium-countersign',
+      keyId: opts.signingKey.keyId,
+      publicKey: `${base}/anchor/key.pem`,
+      keyIdSidecar: `${base}/anchor/key.pem.keyid`,
+      logHead: `${base}/anchor/log/head`,
+      record: `${base}/anchor/<id>`,
+      submit: {
+        method: 'POST',
+        path: '/anchor',
+        auth: 'Authorization: Bearer <token>',
+        body: { hash: 'sha256:<64 hex>' },
+        note: 'A digest and nothing else. No content is sent to this service and none is stored.',
+      },
+      verify: `npx conarium-countersign-verify record.json --pubkey key.pem --log-url ${base}/anchor/<id>`,
+      claim:
+        'A countersignature says a signer other than you saw this digest at this time and placed it at this position in a log that is appended to, never rewritten.',
+      limits: [
+        'It does not say your records were correct when they were written.',
+        'It is not a claim that the countersigner is honest — only that this log cannot be quietly rearranged afterwards.',
+        'If the signing key leaks, every signature under this keyId is worthless and there is no recall.',
+      ],
+    }
+    res.setHeader('Vary', 'Accept')
+    if (req.accepts(['json', 'html']) === 'html') {
+      res.type('html').send(indexPage(index))
+      return
+    }
+    res.json(index)
+  })
+
   // Registered before /anchor/:id so these paths are never treated as an id.
   app.get('/anchor/key.pem', (_req, res) => {
     if (!isServablePublicPem(publicPem)) {
@@ -567,6 +603,36 @@ function publicView(r: AnchorRecord, base: string, rows?: AnchorRecord[], target
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
+}
+
+function indexPage(i: {
+  keyId: string
+  publicKey: string
+  logHead: string
+  verify: string
+  claim: string
+  limits: string[]
+  submit: { method: string; path: string; auth: string; body: { hash: string } }
+}): string {
+  return `<!doctype html><meta charset="utf-8"><title>Conarium countersigning</title>
+<body style="font:15px/1.6 system-ui,sans-serif;max-width:44rem;margin:3rem auto;padding:0 1rem">
+<h1 style="font-size:1.3rem">Conarium countersigning</h1>
+<p>${esc(i.claim)}</p>
+<table style="border-collapse:collapse">
+<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">key id</td><td><code>${esc(i.keyId)}</code></td></tr>
+<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">public key</td><td><a href="${esc(i.publicKey)}"><code>${esc(i.publicKey)}</code></a></td></tr>
+<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">log head</td><td><a href="${esc(i.logHead)}"><code>${esc(i.logHead)}</code></a></td></tr>
+</table>
+<h2 style="font-size:1rem;margin-top:2rem">Submit a chain head</h2>
+<pre style="background:#f5f5f5;padding:.8rem;overflow-x:auto"><code>${esc(i.submit.method)} ${esc(i.submit.path)}
+${esc(i.submit.auth)}
+${esc(JSON.stringify(i.submit.body))}</code></pre>
+<p style="opacity:.75">A digest and nothing else. No content is sent to this service and none is stored.</p>
+<h2 style="font-size:1rem;margin-top:2rem">Verify one you were given</h2>
+<pre style="background:#f5f5f5;padding:.8rem;overflow-x:auto"><code>${esc(i.verify)}</code></pre>
+<h2 style="font-size:1rem;margin-top:2rem">What this does not say</h2>
+<ul>${i.limits.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
+</body>`
 }
 
 function humanPage(r: AnchorRecord, base: string, rows?: AnchorRecord[], target?: AnchorRecord): string {

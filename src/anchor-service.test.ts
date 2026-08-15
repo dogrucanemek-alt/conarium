@@ -277,6 +277,29 @@ describe('anchor service', () => {
     expect(json.headers['content-type']).toMatch(/json/)
   })
 
+  it('GET /anchor describes the service instead of Express saying Cannot GET', async () => {
+    const { app } = svc()
+
+    const html = await request(app).get('/anchor').set('accept', 'text/html')
+    expect(html.status).toBe(200)
+    expect(html.text).not.toMatch(/Cannot GET/)
+    expect(html.text).not.toMatch(/<title>Error<\/title>/)
+    // the three things a visitor needs: who signs, where the key is, how to check
+    expect(html.text).toContain('test-anchor-key')
+    expect(html.text).toContain('/anchor/key.pem')
+    expect(html.text).toContain('conarium-countersign-verify')
+    // and the sentence that keeps the claim honest
+    expect(html.text).toMatch(/does not say your records were correct/i)
+
+    const json = await request(app).get('/anchor').set('accept', 'application/json')
+    expect(json.status).toBe(200)
+    expect(json.body.keyId).toBe('test-anchor-key')
+    expect(json.body.submit.method).toBe('POST')
+    expect(Array.isArray(json.body.limits)).toBe(true)
+    // the index must never carry anything that is not already public
+    expect(JSON.stringify(json.body)).not.toMatch(/PRIVATE KEY|tok-a|Bearer tok/)
+  })
+
   it('returns an inclusion proof that independently verifies (C3)', async () => {
     const { app, readStore } = svc()
     const created = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
