@@ -23,6 +23,18 @@ export interface GovernancePolicy {
   denyTables?: string[]
   /** Columns to mask before data leaves the boundary ("customers.email", "*.tckn"). */
   maskColumns?: string[]
+  /**
+   * Columns whose values must not be learnable through predicates.
+   * Same glob syntax as `maskColumns` (`"customers.email"`, `"*.tckn"`).
+   *
+   * Every pattern here is also treated as a `maskColumns` pattern: the value
+   * is redacted in the result set. A column that cannot be queried but is
+   * returned in the clear would be meaningless. You do not need to repeat
+   * the pattern in `maskColumns`.
+   *
+   * A profile cannot set, clear, or replace this field. Protection is global.
+   */
+  protectedColumns?: string[]
   /** Hard cap on rows returned to the AI assistant (default 100). */
   maxRows?: number
   /**
@@ -64,7 +76,8 @@ export interface GovernancePolicy {
    * Deliberately narrow: a profile may override `maskColumns`, `maxRows` and
    * `maskLabelledNames` — and NOTHING else. Table, tool and connector permissions
    * stay global, so a profile can never widen what is reachable — only what is
-   * legible within it.
+   * legible within it. `protectedColumns` is not overlayable: a per-person
+   * profile that could drop a protection rule would be a back door.
    */
   profiles?: Record<string, MaskingProfile>
   /**

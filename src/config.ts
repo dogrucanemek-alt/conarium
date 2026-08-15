@@ -24,6 +24,10 @@ export const GovernancePolicySchema = z.object({
   allowTables: stringArray.optional(),
   denyTables: stringArray.optional(),
   maskColumns: stringArray.optional(),
+  // Same glob syntax as maskColumns. Not on MaskingProfileSchema — a profile
+  // that could drop this field would be a per-person back door. .strict()
+  // on the profile schema rejects the key if it is added there.
+  protectedColumns: stringArray.optional(),
   maxRows: z.number().int().positive().max(10000).optional(),
   dialect: z.enum(['postgres', 'mssql', 'oracle']).optional(),
   maskLabelledNames: z.boolean().optional(),

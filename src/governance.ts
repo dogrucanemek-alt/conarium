@@ -400,6 +400,17 @@ export class Governance {
     return this.policy.maxRows ?? 100
   }
 
+  /**
+   * `protectedColumns` is also a mask list. When the field is absent or empty
+   * this returns `maskColumns` unchanged so an omitted field is bit-identical.
+   */
+  private maskPatterns(): string[] {
+    const masks = this.policy.maskColumns ?? []
+    const extra = this.policy.protectedColumns
+    if (!extra || extra.length === 0) return masks
+    return [...masks, ...extra]
+  }
+
   redact(result: QueryResult, aliases: Record<string, string> = {}, metadata?: GovernanceMetadata): GovernedQueryResult {
     const maskedFieldLookup = new Set((metadata?.maskedFields ?? []).map(f => f.toLowerCase()))
     const maskedFields = new Set(metadata?.maskedFields ?? [])
@@ -477,7 +488,7 @@ export class Governance {
     const keyLower = key.toLowerCase()
     if (maskedFieldLookup.has(keyLower)) return true
 
-    const masks = this.policy.maskColumns ?? []
+    const masks = this.maskPatterns()
     const table = typeof row._table === 'string' ? row._table : ''
     const sourceKey = aliases?.[keyLower] || key
     const qualifiedSource = table ? `${table}.${sourceKey}` : sourceKey
@@ -1131,7 +1142,7 @@ export class Governance {
   }
 
   private matchesMaskedColumn(schema: string | undefined, table: string | undefined, column: string): boolean {
-    const masks = this.policy.maskColumns ?? []
+    const masks = this.maskPatterns()
     const candidates = new Set<string>([column])
 
     if (table) candidates.add(`${table}.${column}`)
