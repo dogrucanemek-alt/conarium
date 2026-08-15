@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dogrucanemek-alt/conarium",
+  "description": "Governed database access for AI assistants: masking, signed receipts, coverage reconciliation.",
+  "repository": {
+    "url": "https://github.com/dogrucanemek-alt/conarium",
+    "source": "github"
+  },
+  "version": "0.2.19",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@conarium-ai/core",
+      "version": "0.2.19",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--config",
+          "description": "Path to conarium.config.json. The gateway refuses to start without a policy; conarium-init writes one.",
+          "isRequired": true,
+          "format": "filepath",
+          "value": "./conarium.config.json"
+        }
+      ]
+    }
+  ]
+}

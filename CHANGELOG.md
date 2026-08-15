@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.2.19 — 2026-08-16
+
+- **Listable in the official MCP Registry.** `package.json` carries `mcpName`
+  and the repository ships a `server.json`, the two files the registry checks
+  against each other before it will accept a server. Directories that used to
+  take submissions by hand now read from that registry, so this is the entry
+  the ecosystem actually looks at.
+
+- **A signature must be canonical base64.** Node's decoder is lenient: it
+  accepted a URL-safe alphabet and a dropped `=`, so a signature could be
+  rewritten and still verify. Every signature check — the library and both
+  shipped verifiers — now re-encodes the decoded bytes and refuses anything
+  that does not round-trip. Exit codes are unchanged.
+
+- **Invariants under random input.** Masking, the row cap, JCS key ordering and
+  tamper detection each hold over a thousand generated cases per run, and four
+  fuzz targets (SQL gate, receipt JSONL, JCS, countersignature) run in CI.
+
+- **A second, independent verifier.** `verifiers/go` checks a receipt chain
+  using only the Go standard library, with no code shared with the TypeScript
+  implementation; CI runs every conformance vector through both and compares
+  exit codes. It is not part of the npm package.
+
 ## 0.2.18 — 2026-08-15
 
 - **LIMITATIONS catches up with reality.** The published package still said
