@@ -70,11 +70,16 @@ a claim that the countersigner is honest — only that the log's own history
 cannot be quietly rearranged afterwards. If the signing key leaks, every
 signature it ever made is worth what the key is worth: nothing.
 
-## Conarium does not run a countersigning service yet
+## The countersigning service is one key on one server
 
-The endpoint ships in this package and you can operate it. There is no public
-Conarium-operated one, so the tier of the argument that depends on the signer
-being someone other than you is, today, code rather than a service.
+Since 2026-08-15 a Conarium-operated endpoint exists (`demo.conarium.dev/anchor`,
+keyId `verax-cs-20260815`). The signing key lives on one server, on disk, with
+no HSM. An encrypted copy is escrowed off that server, so losing the machine
+does not end the keyId — but escrow is recovery, not protection: if the key
+leaks, every countersignature under that keyId is void, as the section above
+says. The endpoint still ships in this package and you can operate it yourself;
+a countersigner you operate proves ordering to you, not to a third party who
+does not trust you.
 
 ## The operator is inside the boundary
 

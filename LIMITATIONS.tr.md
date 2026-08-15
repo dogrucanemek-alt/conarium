@@ -69,11 +69,16 @@ iddia etmez — yalnızca kütüğün kendi geçmişinin sonradan sessizce yenid
 dizilemeyeceğini söyler. İmza anahtarı sızarsa, o anahtarın attığı bütün
 imzalar anahtar kadar değerlidir: hiç.
 
-## Conarium henüz bir karşı-imza servisi işletmiyor
+## Karşı-imza servisi tek sunucuda tek anahtardır
 
-Uç nokta bu pakette geliyor ve kendin çalıştırabilirsin. Conarium'un işlettiği
-halka açık bir tanesi yok; dolayısıyla "imzalayan sen değilsin" argümanına
-dayanan katman bugün bir servis değil, çalıştırabileceğin bir kod.
+2026-08-15'ten beri Conarium'un işlettiği bir uç nokta var
+(`demo.conarium.dev/anchor`, keyId `verax-cs-20260815`). İmza anahtarı tek
+sunucuda, diskte durur; HSM yok. Şifreli bir kopyası sunucunun dışında emanette —
+makinenin kaybı keyId'yi bitirmez. Ama emanet kurtarma içindir, koruma değil:
+anahtar sızarsa o keyId ile atılmış her karşı-imza geçersizdir; üstteki bölüm
+tam olarak bunu söylüyor. Uç nokta yine bu pakette geliyor ve kendin
+çalıştırabilirsin; kendi işlettiğin karşı-imza sıralamayı sana kanıtlar, sana
+güvenmeyen üçüncü tarafa değil.
 
 ## Operatör sınırın içindedir
 

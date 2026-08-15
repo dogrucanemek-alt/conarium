@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.18 — 2026-08-15
+
+- **LIMITATIONS catches up with reality.** The published package still said
+  "Conarium does not run a countersigning service yet" — false since the
+  endpoint went live at `demo.conarium.dev/anchor`. The section now states what
+  actually holds: one key on one server, no HSM, and an encrypted off-site
+  escrow that lets the keyId survive losing the machine but does nothing
+  against theft. This release also ships two sections written after 0.2.17 was
+  published: masking hides values, it does not make them unlearnable, and the
+  row cap is per query, not per session.
+
+- **A release tags itself.** Every git tag so far was pushed by hand after the
+  fact, which is exactly the kind of step that gets skipped once. `publish.yml`
+  now pushes `v<version>` after a successful publish and leaves no tag behind a
+  failed one.
+
 ## 0.2.17 — 2026-08-15
 
 - **`GET /anchor` describes the service.** The path only accepted POST, so the
