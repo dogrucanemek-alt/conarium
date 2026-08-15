@@ -51,6 +51,7 @@ export const CHECKS = [
   'test/suggest_policy.mjs',
   'test/mint_token_mode.mjs',
   'test/run_checks_continue.mjs',
+  'test/gacs_import_fence.mjs',
 ]
 
 export function runChecks({ files = CHECKS, cwd = root, spawn = spawnSync } = {}) {
