@@ -70,10 +70,12 @@ Then: `curl -fsS http://127.0.0.1:8797/healthz`
 
 1. Stop the unit / `pm2 stop conarium-anchor`
 2. The store is append-only JSONL (`CONARIUM_ANCHOR_STORE`). Keep the file.
-   Starting an older binary against the same store is safe: records are
-   `{id,hash,owner,log,ots,state,...}` and unknown fields are ignored on read.
+   Each line is a hash-chained, countersigned row (`seq` / `prevHash` / `hash`).
+   A pending→bitcoin upgrade appends a new `type: 'upgrade'` line; the original
+   submit line stays. An older binary that does not know `digest`/`seq` will
+   not read this store correctly — do not mix versions against one file.
 3. Do not rewrite the store to "fix" a proof. A store that can be rewritten
-   is not an anchoring log.
+   is not an anchoring log. The process will refuse to serve a tampered file.
 
 ## Peer dependency
 

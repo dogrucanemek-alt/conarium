@@ -4,8 +4,8 @@
  * What it does: takes a hash, countersigns the stored record with this
  * process's Ed25519 key, submits the hash to the OpenTimestamps calendars,
  * keeps the proof, and serves both forever at a stable URL. A background pass
- * upgrades each proof from `pending` to a Bitcoin block height once the block
- * lands.
+ * upgrades each proof from `pending` to a Bitcoin block height by appending
+ * a new row — the original line is never rewritten.
  *
  * What it is NOT — and this must never be blurred in the copy: Conarium is not
  * the timestamp authority. The calendars and Bitcoin are. The signature is
@@ -15,7 +15,7 @@
  *
  * The proof is served raw at `/anchor/:id/ots`, so a third party can verify the
  * stamp with the reference OpenTimestamps client and ignore this service. The
- * public key is at `/anchor/key.pem`.
+ * public key is at `/anchor/key.pem`. The log head is at `/anchor/log/head`.
  *
  * The code is MIT like the rest — self-host it if you prefer. What is sold is
  * the key and someone else keeping the log alive.
@@ -23,15 +23,22 @@
 import express from 'express'
 import type { Request, Response } from 'express'
 import { createPublicKey, randomBytes, timingSafeEqual } from 'crypto'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs'
 import { dirname } from 'path'
 import { hashPrefixToBuffer } from './anchor.js'
+import { computeEntryHash, GENESIS_HASH } from './audit-hash.js'
 import { isServablePublicPem, signAnchorRecord, type CountersignSig } from './anchor-sign.js'
 import type { SigningKey } from './keys.js'
 import { stampHash, upgradeProof } from './ots/client.js'
 
+export type AnchorRecordType = 'submit' | 'upgrade'
+
 export interface AnchorRecord {
+  type: AnchorRecordType
   id: string
+  /** Customer-submitted digest (`sha256:…`). Public views expose this as `hash`. */
+  digest: string
+  /** Entry hash — same rule as audit-hash.ts (`hash`/`sig`/`anchor` excluded). */
   hash: string
   owner: string
   log: 'opentimestamps'
@@ -40,6 +47,10 @@ export interface AnchorRecord {
   bitcoinBlock?: number
   submittedAt: string
   upgradedAt?: string
+  seq: number
+  prevHash: string
+  /** Set on `type: 'upgrade'` — the submit seq this row confirms. */
+  upgradesSeq?: number
   sig: CountersignSig
 }
 
@@ -84,7 +95,7 @@ async function defaultUpgrade(otsBase64: string): Promise<{ upgraded: boolean; b
   }
 }
 
-/** Reads every record. The store is small by design — one line per anchor. */
+/** Reads every record. Does not validate the chain — use readLiveStore. */
 export function readStore(path: string): AnchorRecord[] {
   if (!existsSync(path)) return []
   const raw = readFileSync(path, 'utf-8').trim()
@@ -92,12 +103,60 @@ export function readStore(path: string): AnchorRecord[] {
   return raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as AnchorRecord)
 }
 
-/**
- * An upgrade is the one legitimate reason to rewrite a line, so the whole file
- * is rewritten rather than appended to. Everything else is append-only.
- */
-function rewriteStore(path: string, rows: AnchorRecord[]): void {
-  writeFileSync(path, rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''))
+export function validateAnchorLog(rows: AnchorRecord[]): void {
+  let previous = GENESIS_HASH
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    if (!Number.isInteger(row.seq) || row.seq !== i + 1) {
+      throw new Error(`anchor log corrupt: seq at index ${i}`)
+    }
+    if (row.prevHash !== previous) {
+      throw new Error('anchor log corrupt: prevHash mismatch')
+    }
+    if (!row.hash) {
+      throw new Error('anchor log corrupt: missing entry hash')
+    }
+    const expected = computeEntryHash(row as unknown as Record<string, unknown>)
+    if (row.hash !== expected) {
+      throw new Error('anchor log corrupt: entry hash mismatch')
+    }
+    previous = row.hash
+  }
+}
+
+export function readLiveStore(path: string): AnchorRecord[] {
+  const rows = readStore(path)
+  validateAnchorLog(rows)
+  return rows
+}
+
+function nextLink(rows: AnchorRecord[]): { seq: number; prevHash: string } {
+  if (rows.length === 0) return { seq: 1, prevHash: GENESIS_HASH }
+  const last = rows[rows.length - 1]
+  return { seq: last.seq + 1, prevHash: last.hash }
+}
+
+function sealRecord(unsigned: Omit<AnchorRecord, 'hash' | 'sig'>, key: SigningKey): AnchorRecord {
+  const hashed = {
+    ...unsigned,
+    hash: computeEntryHash(unsigned as unknown as Record<string, unknown>),
+  }
+  return signAnchorRecord(hashed, key)
+}
+
+function findSubmit(rows: AnchorRecord[], id: string): AnchorRecord | undefined {
+  return rows.find((r) => r.id === id && r.type === 'submit')
+}
+
+function latestView(rows: AnchorRecord[], submit: AnchorRecord): AnchorRecord {
+  const upgrades = rows.filter((r) => r.type === 'upgrade' && r.upgradesSeq === submit.seq)
+  if (upgrades.length === 0) return submit
+  const last = upgrades[upgrades.length - 1]
+  return { ...last, id: submit.id, digest: submit.digest }
+}
+
+function alreadyUpgraded(rows: AnchorRecord[], seq: number): boolean {
+  return rows.some((r) => r.type === 'upgrade' && r.upgradesSeq === seq)
 }
 
 export function loadTokensFile(path: string): Map<string, string> {
@@ -169,11 +228,26 @@ export function createAnchorService(opts: AnchorServiceOptions) {
     return owner
   }
 
+  function live(res: Response): AnchorRecord[] | null {
+    try {
+      return readLiveStore(opts.storePath)
+    } catch {
+      res.status(503).json({ error: 'anchor log corrupt' })
+      return null
+    }
+  }
+
   app.get('/healthz', (_req, res) => {
-    res.json({ ok: true, service: 'conarium-anchor', anchors: readStore(opts.storePath).length })
+    const rows = live(res)
+    if (!rows) return
+    res.json({
+      ok: true,
+      service: 'conarium-anchor',
+      anchors: rows.filter((r) => r.type === 'submit').length,
+    })
   })
 
-  // Registered before /anchor/:id so "key.pem" is never treated as an id.
+  // Registered before /anchor/:id so these paths are never treated as an id.
   app.get('/anchor/key.pem', (_req, res) => {
     if (!isServablePublicPem(publicPem)) {
       res.status(403).type('text/plain').send('refusing to serve a private key')
@@ -184,6 +258,24 @@ export function createAnchorService(opts: AnchorServiceOptions) {
 
   app.get('/anchor/key.pem.keyid', (_req, res) => {
     res.type('text/plain').send(opts.signingKey.keyId + '\n')
+  })
+
+  app.get('/anchor/log/head', (_req, res) => {
+    const rows = live(res)
+    if (!rows) return
+    if (rows.length === 0) {
+      res.json({ seq: 0, hash: GENESIS_HASH, prevHash: GENESIS_HASH, empty: true })
+      return
+    }
+    const head = rows[rows.length - 1]
+    res.json({
+      seq: head.seq,
+      hash: head.hash,
+      prevHash: head.prevHash,
+      type: head.type,
+      state: head.state,
+      ...(head.bitcoinBlock !== undefined ? { bitcoinBlock: head.bitcoinBlock } : {}),
+    })
   })
 
   app.post('/anchor', async (req, res) => {
@@ -204,11 +296,14 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       return
     }
 
+    const rows = live(res)
+    if (!rows) return
+
     // Same content, same owner, same answer. Re-anchoring an identical hash
     // wastes a calendar submission and produces a second id for one fact.
-    const existing = readStore(opts.storePath).find((r) => r.hash === hash && r.owner === owner)
+    const existing = rows.find((r) => r.type === 'submit' && r.digest === hash && r.owner === owner)
     if (existing) {
-      res.status(200).json({ ...publicView(existing, base), deduplicated: true })
+      res.status(200).json({ ...publicView(latestView(rows, existing), base), deduplicated: true })
       return
     }
 
@@ -222,15 +317,19 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       return
     }
 
-    const record = signAnchorRecord(
+    const link = nextLink(rows)
+    const record = sealRecord(
       {
+        type: 'submit',
         id: randomBytes(9).toString('base64url'),
-        hash,
+        digest: hash,
         owner,
-        log: 'opentimestamps' as const,
+        log: 'opentimestamps',
         ots,
-        state: 'pending' as const,
+        state: 'pending',
         submittedAt: new Date().toISOString(),
+        seq: link.seq,
+        prevHash: link.prevHash,
       },
       opts.signingKey,
     )
@@ -239,11 +338,14 @@ export function createAnchorService(opts: AnchorServiceOptions) {
   })
 
   app.get('/anchor/:id', (req, res) => {
-    const record = readStore(opts.storePath).find((r) => r.id === req.params.id)
-    if (!record) {
+    const rows = live(res)
+    if (!rows) return
+    const submit = findSubmit(rows, req.params.id)
+    if (!submit) {
       res.status(404).json({ error: 'no such anchor' })
       return
     }
+    const record = latestView(rows, submit)
     // Public on purpose: a verification URL only a token holder can open is not
     // a verification URL. It carries a hash and a proof, never content.
     res.setHeader('Vary', 'Accept')
@@ -255,11 +357,14 @@ export function createAnchorService(opts: AnchorServiceOptions) {
   })
 
   app.get('/anchor/:id/ots', (req, res) => {
-    const record = readStore(opts.storePath).find((r) => r.id === req.params.id)
-    if (!record) {
+    const rows = live(res)
+    if (!rows) return
+    const submit = findSubmit(rows, req.params.id)
+    if (!submit) {
       res.status(404).json({ error: 'no such anchor' })
       return
     }
+    const record = latestView(rows, submit)
     res.type('application/octet-stream').send(Buffer.from(record.ots, 'base64'))
   })
 
@@ -267,28 +372,44 @@ export function createAnchorService(opts: AnchorServiceOptions) {
   app.post('/upgrade', async (req, res) => {
     const owner = auth(req, res)
     if (!owner) return
-    const result = await runUpgrade()
-    res.json(result)
+    try {
+      const result = await runUpgrade()
+      res.json(result)
+    } catch {
+      res.status(503).json({ error: 'anchor log corrupt' })
+    }
   })
 
   async function runUpgrade(): Promise<{ checked: number; upgraded: number }> {
-    const rows = readStore(opts.storePath)
+    const rows = readLiveStore(opts.storePath)
     let upgraded = 0
     let checked = 0
     for (const row of rows) {
-      if (row.state !== 'pending') continue
+      if (row.type !== 'submit' || row.state !== 'pending') continue
+      if (alreadyUpgraded(rows, row.seq)) continue
       checked += 1
       try {
         const out = await upgrade(row.ots)
         if (out.upgraded) {
-          row.state = 'bitcoin'
-          row.ots = out.ots ?? row.ots
-          if (typeof out.block === 'number') row.bitcoinBlock = out.block
-          row.upgradedAt = new Date().toISOString()
-          // In-place upgrade changes signed fields; re-sign so C1 records
-          // stay verifiable until C2 turns upgrade into a new row.
-          const resigned = signAnchorRecord(row, opts.signingKey)
-          row.sig = resigned.sig
+          const link = nextLink(rows)
+          const unsigned: Omit<AnchorRecord, 'hash' | 'sig'> = {
+            type: 'upgrade',
+            id: randomBytes(9).toString('base64url'),
+            digest: row.digest,
+            owner: row.owner,
+            log: row.log,
+            ots: out.ots ?? row.ots,
+            state: 'bitcoin',
+            submittedAt: row.submittedAt,
+            upgradedAt: new Date().toISOString(),
+            seq: link.seq,
+            prevHash: link.prevHash,
+            upgradesSeq: row.seq,
+          }
+          if (typeof out.block === 'number') unsigned.bitcoinBlock = out.block
+          const next = sealRecord(unsigned, opts.signingKey)
+          appendFileSync(opts.storePath, JSON.stringify(next) + '\n')
+          rows.push(next)
           upgraded += 1
         }
       } catch {
@@ -296,7 +417,6 @@ export function createAnchorService(opts: AnchorServiceOptions) {
         // It stays pending and the next pass tries again.
       }
     }
-    if (upgraded) rewriteStore(opts.storePath, rows)
     return { checked, upgraded }
   }
 
@@ -306,9 +426,11 @@ export function createAnchorService(opts: AnchorServiceOptions) {
 function publicView(r: AnchorRecord, base: string) {
   return {
     id: r.id,
-    hash: r.hash,
+    hash: r.digest,
     log: r.log,
     state: r.state,
+    seq: r.seq,
+    prevHash: r.prevHash,
     ...(r.bitcoinBlock !== undefined ? { bitcoinBlock: r.bitcoinBlock } : {}),
     submittedAt: r.submittedAt,
     ...(r.upgradedAt ? { upgradedAt: r.upgradedAt } : {}),
@@ -331,7 +453,8 @@ function humanPage(r: AnchorRecord, base: string): string {
 <body style="font:15px/1.6 system-ui,sans-serif;max-width:44rem;margin:3rem auto;padding:0 1rem">
 <h1 style="font-size:1.3rem">Anchor ${esc(r.id)}</h1>
 <table style="border-collapse:collapse">
-<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">hash</td><td><code>${esc(r.hash)}</code></td></tr>
+<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">hash</td><td><code>${esc(v.hash)}</code></td></tr>
+<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">seq</td><td><code>${r.seq}</code></td></tr>
 <tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">state</td><td><code>${esc(r.state)}</code></td></tr>
 ${r.bitcoinBlock !== undefined ? `<tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">bitcoin block</td><td><code>${r.bitcoinBlock}</code></td></tr>` : ''}
 <tr><td style="padding:.3rem 1rem .3rem 0;opacity:.7">submitted</td><td><code>${esc(r.submittedAt)}</code></td></tr>

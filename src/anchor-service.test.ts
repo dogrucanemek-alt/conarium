@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createPrivateKey, createPublicKey } from 'crypto'
-import { mkdtempSync, rmSync, readFileSync } from 'fs'
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import request from 'supertest'
-import { createAnchorService } from './anchor-service.js'
+import { createAnchorService, validateAnchorLog } from './anchor-service.js'
+import { GENESIS_HASH } from './audit-hash.js'
 import { verifyAnchorRecord } from './anchor-sign.js'
 import { generateKeyPair, type SigningKey, type VerifyKey } from './keys.js'
 
@@ -81,6 +82,9 @@ describe('anchor service', () => {
     })
 
     const rec = readStore()[0]
+    expect(rec.digest).toBe(HASH)
+    expect(rec.seq).toBe(1)
+    expect(rec.prevHash).toBe(GENESIS_HASH)
     expect(verifyAnchorRecord(rec as unknown as Record<string, unknown>, verify)).toBe(true)
 
     const pem = await request(app).get('/anchor/key.pem')
@@ -178,18 +182,54 @@ describe('anchor service', () => {
     expect((await request(app).post('/anchor').set('authorization', 'Bearer tok-b').send({ hash: h(4) })).status).toBe(201)
   })
 
-  it('upgrades pending anchors to a block and is idempotent', async () => {
+  it('rejects a hand-edited store line (C2)', async () => {
+    const { app } = svc()
+    const created = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
+    expect(created.status).toBe(201)
+    const path = join(dir, 'anchors.jsonl')
+    const row = JSON.parse(readFileSync(path, 'utf-8').trim()) as { owner: string }
+    row.owner = 'tampered'
+    writeFileSync(path, JSON.stringify(row) + '\n')
+    // RED 2026-08-15: the store is unsigned JSONL. Editing a line still
+    // serves 200. A log that cannot notice a rewrite is not a log.
+    const fetched = await request(app).get(`/anchor/${created.body.id}`)
+    expect(fetched.status).toBe(503)
+    expect(fetched.body.error).toMatch(/corrupt/)
+    expect(() => validateAnchorLog([JSON.parse(readFileSync(path, 'utf-8').trim())])).toThrow(/corrupt/)
+  })
+
+  it('upgrades by appending a new row and keeps the original line', async () => {
     const { app, runUpgrade, readStore } = svc()
-    await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
-    await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH2 })
+    const a = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
+    const b = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH2 })
 
     const first = await runUpgrade()
     expect(first).toEqual({ checked: 2, upgraded: 2 })
     const rows = readStore()
-    expect(rows.every((r) => r.state === 'bitcoin' && r.bitcoinBlock === 961333)).toBe(true)
+    expect(rows).toHaveLength(4)
+    expect(rows.filter((r) => r.type === 'submit').every((r) => r.state === 'pending')).toBe(true)
+    expect(rows.filter((r) => r.type === 'upgrade').every((r) => r.state === 'bitcoin' && r.bitcoinBlock === 961333)).toBe(true)
+    expect(rows[2].upgradesSeq).toBe(rows[0].seq)
+    expect(rows[3].upgradesSeq).toBe(rows[1].seq)
+    validateAnchorLog(rows)
 
-    // Nothing left pending: a second pass must be a no-op, not a re-submission.
+    const onDisk = readFileSync(join(dir, 'anchors.jsonl'), 'utf-8').trim().split('\n')
+    expect(JSON.parse(onDisk[0]).state).toBe('pending')
+    expect(JSON.parse(onDisk[0]).type).toBe('submit')
+
     expect(await runUpgrade()).toEqual({ checked: 0, upgraded: 0 })
+
+    const viewed = await request(app).get(`/anchor/${a.body.id}`)
+    expect(viewed.body.state).toBe('bitcoin')
+    expect(viewed.body.hash).toBe(HASH)
+    expect(viewed.body.id).toBe(a.body.id)
+
+    const head = await request(app).get('/anchor/log/head')
+    expect(head.status).toBe(200)
+    expect(head.body.seq).toBe(4)
+    expect(head.body.hash).toBe(rows[3].hash)
+    expect(head.body.state).toBe('bitcoin')
+    expect(b.body.seq).toBe(2)
   })
 
   it('keeps a record pending when the upgrade throws, rather than losing it', async () => {
