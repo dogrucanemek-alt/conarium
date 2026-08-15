@@ -45,6 +45,16 @@ jobs:
       - run: npm install -g npm@latest
       - name: Publish with provenance
         run: npm publish --access public --provenance
+      # The registry stores metadata, not artefacts, so it runs after npm has
+      # the package: it checks that the published tarball's mcpName matches
+      # server.json before it will accept the server. github-oidc reuses this
+      # job's identity — no token, and the namespace it grants
+      # (io.github.<owner>/) is the one server.json asks for.
+      - name: Publish to the MCP Registry
+        run: |
+          curl -sSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
       # Every tag before 0.2.18 was made by hand after the fact. A publish that
       # succeeds now records itself; a failed publish leaves no tag behind.
       - name: Tag the release
