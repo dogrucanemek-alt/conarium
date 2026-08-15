@@ -1,6 +1,38 @@
 # Changelog
 
-## Unreleased
+## 0.2.14 — 2026-08-15
+
+Follow-up to the 0.2.13 hardening: the detector rule that 0.2.13 half-fixed,
+plus the findings CodeQL raised on the new code.
+
+- **Behavior change:** what a digit run proves now decides whether letters
+  around it can hide it, instead of how long the tail is. A Luhn card, a
+  checksum-valid TCKN and a TR mobile number are masked under any letter tail
+  (`4111…xyz`, `0532…xyz`). A run that is merely ten or eleven digits keeps the
+  bounded rule, because relaxing that one would mask the digits inside a token
+  and leave `ghp_[MASKED_PII]abcd` where the secret detector can no longer
+  recognise it. Vector values that fail the TCKN checksum on purpose are
+  unchanged.
+
+- **Launcher paths are quoted for sh.** The macOS launcher wrapped both paths
+  in double quotes and escaped only `"`, so `$(…)`, backticks and `\` in a path
+  this code does not choose stayed live shell. Single quotes with the `'\''`
+  idiom make a path a path.
+
+- **The audit sink lock is 0600.** It was written with the default mode, next
+  to data that is not world-readable. `wx` already refused a planted symlink.
+
+- **CodeQL scope excludes tests** (`.github/codeql/codeql-config.yml`). A ReDoS
+  pattern the loader must reject and a hostile URL the verifier must refuse are
+  fixtures, not defects; reporting them buried the product findings. `src/` and
+  `api/` are unchanged in scope.
+
+- **Docs:** `examples/proof-service/` said the `/proof` service existed only on
+  the box and invited someone to copy it here. Its sources are versioned in the
+  site repo; the page now records the one thing that matters to this package —
+  the service resolves the receipt view from `CONARIUM_ROOT` but keeps its own
+  copies of `governance.js` and `audit-hash.js`, so a masking or audit-hash
+  change does not reach `/proof` until those are recopied and it restarts.
 
 - **Behavior change (A1):** A single trailing letter no longer hides a
   card or TR phone (`4111…x`, `0532…x`). A longer alphanumeric tail
