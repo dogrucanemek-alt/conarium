@@ -1,0 +1,15 @@
+# Draft only. Filing the OSS-Fuzz application is a separate decision.
+# Do not submit this file as-is without reviewing contacts and the
+# ClusterFuzzLite build on a clean clone.
+homepage: "https://github.com/dogrucanemek-alt/conarium"
+language: javascript
+primary_contact: "e.dogru@conarium.dev"
+auto_ccs:
+  - "e.dogru@conarium.dev"
+fuzzing_engines:
+  - libfuzzer
+sanitizers:
+  - none
+main_repo: "https://github.com/dogrucanemek-alt/conarium.git"
+file_github_issue: true
+vendor_ccs: []

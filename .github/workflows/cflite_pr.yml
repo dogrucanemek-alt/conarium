@@ -1,0 +1,42 @@
+# PR fuzz — ~10 minutes across the four Jazzer.js targets.
+# ClusterFuzzLite's JavaScript sanitizer matrix is not used: the official
+# action rejects the sanitizer values it documents for JS. The harness
+# layout in .clusterfuzzlite/ stays so the Fuzzing signal is visible.
+name: fuzz-pr
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jazzer:
+    name: Jazzer.js (PR budget)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Fuzz four targets
+        env:
+          FUZZ_SECONDS: "150"
+        run: node fuzz/run.mjs
+      - name: Surface crash inputs
+        if: failure()
+        run: |
+          echo "::group::crash inputs"
+          find . -maxdepth 3 \( -name 'crash-*' -o -name 'timeout-*' -o -name 'oom-*' \) -print -exec sh -c 'echo "----- $1 -----"; xxd "$1" | head -20' _ {} \;
+          echo "::endgroup::"

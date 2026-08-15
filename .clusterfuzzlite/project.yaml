@@ -1,0 +1,8 @@
+homepage: "https://github.com/dogrucanemek-alt/conarium"
+language: javascript
+fuzzing_engines:
+  - libfuzzer
+sanitizers:
+  - none
+main_repo: "https://github.com/dogrucanemek-alt/conarium.git"
+primary_contact: "e.dogru@conarium.dev"

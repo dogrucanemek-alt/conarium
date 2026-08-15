@@ -88,6 +88,8 @@
     "lint": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "test:vectors": "node test/vectors_run.mjs",
+    "fuzz": "npm run build && node fuzz/run.mjs",
+    "fuzz:regression": "npm run build && node fuzz/run.mjs --regression",
     "bench:overhead": "node scripts/benchmark-overhead.mjs"
   },
   "dependencies": {
@@ -100,6 +102,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@jazzer.js/core": "^4.0.0",
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.0",
     "fast-check": "^4.9.0",

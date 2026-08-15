@@ -1,0 +1,1 @@
+SELECT DBMS_XMLGEN.GETXML('SELECT * FROM app.customers') FROM dual
