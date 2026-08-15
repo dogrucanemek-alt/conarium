@@ -1,12 +1,24 @@
 version: 2
+# One pull request per ecosystem per week instead of one per dependency.
+# Ungrouped updates opened ten PRs in a single run, each firing ci and fuzz-pr.
+# Security updates are a separate channel and are not slowed down by grouping.
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - '*'
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
+    groups:
+      production:
+        dependency-type: production
+      development:
+        dependency-type: development
