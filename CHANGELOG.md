@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.15 — 2026-08-15
+
+A rendering fix that only shows up when something else has gone wrong.
+
+- **The unanchored notice is rendered in Turkish.** `/proof` says, when the
+  chain head carries no timestamp, that the demo is not anchored. The English
+  sentence had no entry in the presentation dictionary, so a Turkish page
+  printed one English line — and it printed it precisely when stamping had
+  failed, which is the moment the page should look most deliberate rather than
+  least. Nothing about the claim changed; only the language it appears in.
+
+- **A click on the receipts tab must fill the table on the first click.** The
+  panel had been reported as filling only on the second click. The path was
+  already correct; this release pins it with a test that drives the real
+  `app.js` click handler, so the report cannot come back unnoticed.
+
 ## 0.2.14 — 2026-08-15
 
 Follow-up to the 0.2.13 hardening: the detector rule that 0.2.13 half-fixed,
