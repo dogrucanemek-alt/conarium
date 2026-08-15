@@ -164,6 +164,49 @@ describe('A1 — trailing letter must not hide PAN/phone', () => {
   })
 })
 
+/**
+ * A single trailing letter was allowed, two were not, which left `4111…xy`
+ * readable. The length of the tail was never the point: what matters is
+ * whether the digits prove themselves. Luhn, the TCKN check digit and the
+ * TR mobile prefix each do; "eleven digits" does not, and relaxing that one
+ * would eat the digits inside a token.
+ */
+describe('tail length stops mattering once the digits carry themselves', () => {
+  it('a Luhn PAN is masked under any letter tail', () => {
+    for (const tail of ['x', 'xy', 'xyz', 'abcdef']) {
+      expect(String(gov.maskPII(`4111111111111111${tail}`).masked)).toBe('[MASKED_PII]')
+    }
+  })
+
+  it('a TR mobile number is masked under any letter tail', () => {
+    for (const tail of ['x', 'xy', 'xyz']) {
+      expect(String(gov.maskPII(`05321234567${tail}`).masked)).toBe('[MASKED_PII]')
+    }
+  })
+
+  it('a checksum-valid TCKN is masked under a long tail', () => {
+    // 10000000146 satisfies both TCKN check digits.
+    expect(String(gov.maskPII('10000000146xy').masked)).toBe('[MASKED_PII]')
+  })
+
+  it('eleven digits that fail the checksum keep the old bounded rule', () => {
+    // Vector value, checksum-invalid on purpose (see tckn.ts).
+    expect(String(gov.maskPII('12345678901').masked)).toMatch(/MASKED/)
+    expect(String(gov.maskPII('12345678901xy').masked)).toBe('12345678901xy')
+  })
+
+  it('digits inside a token are still not a phone number', () => {
+    expect(String(gov.maskPII('abc1234567890def').masked)).toBe('abc1234567890def')
+    expect(String(gov.maskPII('ghp_1234567890abcdefghij').masked)).toContain('[MASKED_SECRET]')
+  })
+
+  it('order numbers, versions and dates stay unmasked', () => {
+    for (const s of ['SKU-2026-0815', 'order 12345', '2026-08-15', 'v0.2.13']) {
+      expect(gov.maskPII(s).count).toBe(0)
+    }
+  })
+})
+
 describe('encoded @ — scan copy only', () => {
   it('entity / json / percent emails are masked; non-email encodings are left', () => {
     const hit = maskEntityEncodedEmails('yaz patron&#64;sirket.com')

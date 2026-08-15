@@ -1,3 +1,5 @@
+import { tcknChecksumOk } from './tckn.js'
+
 /**
  * Numeric PII — card / TCKN / phone — with the same class of fix IBAN got
  * in 0.2.2: never start a match in the middle of a longer digit run.
@@ -61,14 +63,26 @@ const isDigit = (c: string) => c >= '0' && c <= '9'
 const isGroup = (c: string) => c === ' ' || c === '-' || c === '.' || c === '/'
 const isWord = (c: string) => /[A-Za-z0-9_]/.test(c)
 
-function isolatedSpan(s: string, start: number, end: number): boolean {
+/**
+ * How much the digits prove on their own.
+ *
+ * `checksummed` — a Luhn-valid 13–16 digit run. Evidence by itself, so what
+ * sits next to it cannot hide it.
+ * `shape-only` — a 10- or 11-digit run is *any* number of that length. With
+ * no checksum to lean on it leans on its surroundings instead, otherwise the
+ * digits inside a token (`ghp_1234567890abcd`) read as a phone number.
+ */
+type RunStrength = 'checksummed' | 'shape-only'
+
+function isolatedSpan(s: string, start: number, end: number, strength: RunStrength): boolean {
   const left = start === 0 ? '' : s[start - 1]
   const right = end >= s.length ? '' : s[end]
   // A digit neighbour means this is a slice of a longer run — refuse.
   if (isDigit(left) || isDigit(right)) return false
   // Prefix letter/`_` never hides (`x4111…`, `ref_0532…`).
-  // Suffix: one trailing letter is the G15 twin (`4111…x`). More word
-  // characters after that (`ghp_1234567890abcd`) stay a token, not a phone.
+  if (strength === 'checksummed') return true
+  // Shape-only: one trailing letter is the G15 twin (`0532…x`). More word
+  // characters after that stay a token, not a phone.
   if (right && /[A-Za-z_]/.test(right)) {
     const after = end + 1 < s.length ? s[end + 1] : ''
     if (after && isWord(after)) return false
@@ -130,15 +144,19 @@ export function maskNumericPii(text: string): { text: string; count: number } {
       }
       break
     }
+    const strength = classifyDigitRun(out, start, i, n)
     if (
-      isolatedSpan(out, start, i)
+      strength !== null
       && !looksLikeDottedIpOrVersion(out, start, i)
-      && classifyDigitRun(out, start, i, n)
+      && isolatedSpan(out, start, i, strength)
     ) {
       count++
-      // isolatedSpan accepted one trailing letter (`4111…x`) — swallow it
-      // so the mask is the whole token, not `[MASKED_PII]x`.
-      if (i < out.length && /[A-Za-z_]/.test(out[i])) {
+      // The span was accepted with a letter tail — swallow it so the mask is
+      // the whole token, not `[MASKED_PII]x`. A checksummed run keeps the
+      // whole tail; a shape-only run was only ever allowed a single letter.
+      if (strength === 'checksummed') {
+        while (i < out.length && isWord(out[i])) i++
+      } else if (i < out.length && /[A-Za-z_]/.test(out[i])) {
         const after = i + 1 < out.length ? out[i + 1] : ''
         if (!after || !isWord(after)) i += 1
       }
@@ -158,20 +176,28 @@ function collectDigits(s: string, start: number, end: number): string {
   return d
 }
 
-function classifyDigitRun(s: string, start: number, end: number, n: number): boolean {
+function classifyDigitRun(s: string, start: number, end: number, n: number): RunStrength | null {
   if (n === 11) {
+    const digits = collectDigits(s, start, end)
+    // A valid TCKN check digit, or the TR mobile prefix, is a specific shape
+    // rather than "eleven digits". Either one carries itself, so a letter tail
+    // cannot hide it. A run that is merely eleven digits long still cannot:
+    // vectors like `12345678901` fail the checksum on purpose (see tckn.ts).
+    if (tcknChecksumOk(digits) || /^05\d{9}$/.test(digits)) return 'checksummed'
     const first = s[start]
-    if (first === '0') return true
-    return first >= '1' && first <= '9'
+    if (first === '0') return 'shape-only'
+    return first >= '1' && first <= '9' ? 'shape-only' : null
   }
-  if (n === 10) return true
+  if (n === 10) return 'shape-only'
   if (n === 9) {
     // Formatted US SSN only (AAA-GG-SSSS). Bare 9-digit runs collide with
     // order IDs — see LIMITATIONS.
-    return /^\d{3}-\d{2}-\d{4}$/.test(s.slice(start, end))
+    return /^\d{3}-\d{2}-\d{4}$/.test(s.slice(start, end)) ? 'shape-only' : null
   }
-  if (n >= 13 && n <= 16) return luhnOk(collectDigits(s, start, end))
-  return false
+  if (n >= 13 && n <= 16) {
+    return luhnOk(collectDigits(s, start, end)) ? 'checksummed' : null
+  }
+  return null
 }
 
 /** Bounded email. Unbounded `{local}+@` backtracks O(n²) on a long
