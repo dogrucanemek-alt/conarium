@@ -100,6 +100,20 @@ describe('renderReceiptHtml', () => {
     expect(html).toContain('Sentetik demo verisi, gerçek müşteri verisi değil.')
     expect(html).toContain('aktör bir hizmet kimliği, gerçek kişi değil.')
     expect(html).toContain('Çıpa pending olabilir')
+    expect(
+      presentKnownText('This demo is not anchored — the chain head was never sent to a calendar.'),
+    ).toBe('Bu demo çıpalanmıyor — zincir başı hiçbir zaman damgasına gönderilmedi.')
+    const unanchored = demoProof({
+      anchor: null,
+      limitations: [
+        'Synthetic demo data, not real customer data.',
+        'This demo is not anchored — the chain head was never sent to a calendar.',
+      ],
+    })
+    const unanchoredHtml = renderReceiptHtml(proofToView(unanchored), { mode: 'document' })
+    expect(unanchoredHtml).toContain('Bu demo çıpalanmıyor — zincir başı hiçbir zaman damgasına gönderilmedi.')
+    expect(unanchoredHtml).toContain('Çıpa yok.')
+    expect(unanchoredHtml).not.toContain('saatler sürer')
     expect(html).toContain('Bu kayıtlar oluşturulduktan sonra değiştirilmedi')
     expect(html).toContain('aylık ciro')
     expect(html).toContain('politika izin vermiyor')

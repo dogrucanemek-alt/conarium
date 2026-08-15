@@ -84,6 +84,8 @@ const PRESENTATION_TR: Record<string, string> = {
     'aktör bir hizmet kimliği, gerçek kişi değil.',
   'Anchor may be pending — Bitcoin attestation takes hours.':
     'Çıpa pending olabilir — Bitcoin tasdiki saatler sürer.',
+  'This demo is not anchored — the chain head was never sent to a calendar.':
+    'Bu demo çıpalanmıyor — zincir başı hiçbir zaman damgasına gönderilmedi.',
   'Signature is meaningless: ephemeral mode (CONARIUM_PROOF_ALLOW_EPHEMERAL=1); not a compliance attestation.':
     'İmza anlamsız: ephemeral kip (CONARIUM_PROOF_ALLOW_EPHEMERAL=1); tasdik değil.',
   'revenue by month': 'aylık ciro',
