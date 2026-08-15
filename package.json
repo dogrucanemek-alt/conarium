@@ -69,6 +69,7 @@
     "conarium-doctor": "bin/conarium-doctor.mjs",
     "conarium-init": "bin/conarium-init.mjs",
     "conarium-verify": "bin/conarium-verify.mjs",
+    "conarium-countersign-verify": "bin/conarium-countersign-verify.mjs",
     "conarium-coverage": "bin/conarium-coverage.mjs",
     "conarium-reconcile": "bin/conarium-reconcile.mjs",
     "conarium-stamp": "bin/conarium-stamp.mjs",

@@ -367,7 +367,11 @@ export function createAnchorService(opts: AnchorServiceOptions) {
     // wastes a calendar submission and produces a second id for one fact.
     const existing = rows.find((r) => r.type === 'submit' && r.digest === hash && r.owner === owner)
     if (existing) {
-      res.status(200).json({ ...publicView(latestView(rows, existing), base, rows, existing), deduplicated: true })
+      res.status(200).json({
+        ...publicView(latestView(rows, existing), base, rows, existing),
+        countersign: existing,
+        deduplicated: true,
+      })
       return
     }
 
@@ -398,7 +402,7 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       opts.signingKey,
     )
     appendFileSync(opts.storePath, JSON.stringify(record) + '\n')
-    res.status(201).json(publicView(record, base, [...rows, record]))
+    res.status(201).json({ ...publicView(record, base, [...rows, record]), countersign: record })
   })
 
   app.get('/anchor/:id', (req, res) => {
