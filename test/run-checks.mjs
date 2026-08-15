@@ -52,6 +52,7 @@ export const CHECKS = [
   'test/mint_token_mode.mjs',
   'test/run_checks_continue.mjs',
   'test/gacs_import_fence.mjs',
+  'test/gacs_case_schema.mjs',
 ]
 
 export function runChecks({ files = CHECKS, cwd = root, spawn = spawnSync } = {}) {

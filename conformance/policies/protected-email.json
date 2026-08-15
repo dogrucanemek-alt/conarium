@@ -1,0 +1,6 @@
+{
+  "allowTables": ["public.customers"],
+  "maskColumns": ["*.email"],
+  "protectedColumns": ["*.email"],
+  "maxRows": 100
+}

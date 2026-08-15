@@ -1,0 +1,13 @@
+{
+  "id": "evidence/008-unsigned-no-pubkey",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/008-unsigned-no-pubkey/receipts.jsonl",
+  "verifyArgs": [],
+  "expectExit": 13,
+  "rationale": "An unsigned receipt, verified without --pubkey. Hash and chain are intact, yet the answer is still 13: the verifier never reports success on a signature it did not check.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#008-unsigned-no-pubkey"
+}

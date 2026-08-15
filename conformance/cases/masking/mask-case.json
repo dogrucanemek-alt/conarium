@@ -1,0 +1,14 @@
+{
+  "id": "masking/mask-case",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "masking",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "SELECT CASE WHEN true THEN email ELSE 'x' END AS picked FROM public.customers",
+  "rationale": "A configured column is marked for masking in the result, including through alias, concat, CASE, and subquery.",
+  "doesNotTest": "Inference through predicates on the same column; content detectors on other fields.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#mask-case",
+  "expect": "allow",
+  "expectMaskedContains": "picked"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "evidence/006-bad-signature",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/006-bad-signature/receipts.jsonl",
+  "verifyArgs": [
+    "--pubkey",
+    "KEYS/vector-key.pub.pem"
+  ],
+  "expectExit": 13,
+  "rationale": "First byte of the signature flipped. Body and hash are untouched — only the signature is wrong.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#006-bad-signature"
+}

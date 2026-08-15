@@ -1,0 +1,16 @@
+{
+  "id": "evidence/004-prevhash-break",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/004-prevhash-break/receipts.jsonl",
+  "verifyArgs": [
+    "--pubkey",
+    "KEYS/vector-key.pub.pem"
+  ],
+  "expectExit": 11,
+  "rationale": "The middle receipt of the chain was deleted. #3 points at a hash that is no longer present.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#004-prevhash-break"
+}

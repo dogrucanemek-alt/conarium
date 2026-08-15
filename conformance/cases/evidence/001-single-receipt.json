@@ -1,0 +1,16 @@
+{
+  "id": "evidence/001-single-receipt",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/001-single-receipt/receipts.jsonl",
+  "verifyArgs": [
+    "--pubkey",
+    "KEYS/vector-key.pub.pem"
+  ],
+  "expectExit": 0,
+  "rationale": "One valid signed receipt. The smallest passing case.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#001-single-receipt"
+}

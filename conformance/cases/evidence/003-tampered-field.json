@@ -1,0 +1,16 @@
+{
+  "id": "evidence/003-tampered-field",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/003-tampered-field/receipts.jsonl",
+  "verifyArgs": [
+    "--pubkey",
+    "KEYS/vector-key.pub.pem"
+  ],
+  "expectExit": 10,
+  "rationale": "outcome.rows changed from 2 to 999 after signing. The stored hash no longer matches the body.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#003-tampered-field"
+}

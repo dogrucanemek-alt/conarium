@@ -1,0 +1,14 @@
+{
+  "id": "rowcap/cap-nested",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "row-cap",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "SELECT id FROM (SELECT id FROM public.customers LIMIT 9999) AS x",
+  "rationale": "A requested row count above the policy cap is rewritten down to the cap.",
+  "doesNotTest": "Session-wide extraction by repeating the query with OFFSET.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#cap-nested",
+  "expect": "allow",
+  "expectRewritten": "limit\\s+\\(?50"
+}

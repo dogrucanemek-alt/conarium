@@ -1,0 +1,16 @@
+{
+  "id": "evidence/005-seq-gap",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/005-seq-gap/receipts.jsonl",
+  "verifyArgs": [
+    "--pubkey",
+    "KEYS/vector-key.pub.pem"
+  ],
+  "expectExit": 12,
+  "rationale": "seq jumps 1 -> 7. prevHash still links, so only the counter reveals the gap.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#005-seq-gap"
+}

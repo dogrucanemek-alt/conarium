@@ -1,0 +1,16 @@
+{
+  "id": "evidence/009-unsigned-but-pubkey-given",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/009-unsigned-but-pubkey-given/receipts.jsonl",
+  "verifyArgs": [
+    "--pubkey",
+    "KEYS/vector-key.pub.pem"
+  ],
+  "expectExit": 13,
+  "rationale": "The same unsigned receipt, but the caller asked for signature verification. Fail-closed: a missing signature is not a passing signature.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#009-unsigned-but-pubkey-given"
+}

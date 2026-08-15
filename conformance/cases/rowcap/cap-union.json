@@ -1,0 +1,14 @@
+{
+  "id": "rowcap/cap-union",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "row-cap",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "SELECT id FROM public.customers UNION ALL SELECT id FROM public.customers",
+  "rationale": "A requested row count above the policy cap is rewritten down to the cap.",
+  "doesNotTest": "Session-wide extraction by repeating the query with OFFSET.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#cap-union",
+  "expect": "allow",
+  "expectRewritten": "limit\\s+\\(?50"
+}

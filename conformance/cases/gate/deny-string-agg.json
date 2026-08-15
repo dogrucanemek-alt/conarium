@@ -1,0 +1,13 @@
+{
+  "id": "gate/deny-string-agg",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "table-policy",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "SELECT STRING_AGG(email, ',') FROM public.customers",
+  "rationale": "Serialization and dump aggregates are refused.",
+  "doesNotTest": "Leakage through allowed aggregates such as count or avg.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#deny-string-agg",
+  "expect": "deny"
+}

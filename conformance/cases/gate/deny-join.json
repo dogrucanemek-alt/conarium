@@ -1,0 +1,13 @@
+{
+  "id": "gate/deny-join",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "table-policy",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "SELECT c.id FROM public.customers c JOIN public.secrets s ON s.id = c.id",
+  "rationale": "A table that is denied (or not allowed) is refused, including through alias, join, CTE, subquery, quoting, and comments.",
+  "doesNotTest": "Database-role grants; information_schema contents; dialects other than the postgres spelling used here.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#deny-join",
+  "expect": "deny"
+}

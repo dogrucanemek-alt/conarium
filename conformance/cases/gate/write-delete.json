@@ -1,0 +1,13 @@
+{
+  "id": "gate/write-delete",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "table-policy",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "DELETE FROM public.customers",
+  "rationale": "A write token is refused on a read-only gate.",
+  "doesNotTest": "Whether the database role itself could execute the write if the gate were bypassed.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#write-delete",
+  "expect": "deny"
+}

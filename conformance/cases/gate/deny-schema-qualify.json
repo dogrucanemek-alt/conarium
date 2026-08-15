@@ -1,0 +1,13 @@
+{
+  "id": "gate/deny-schema-qualify",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "table-policy",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "SELECT id FROM public.secrets",
+  "rationale": "A table that is denied (or not allowed) is refused, including through alias, join, CTE, subquery, quoting, and comments.",
+  "doesNotTest": "Database-role grants; information_schema contents; dialects other than the postgres spelling used here.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#deny-schema-qualify",
+  "expect": "deny"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "evidence/007-schema-invalid",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/007-schema-invalid/receipts.jsonl",
+  "verifyArgs": [
+    "--pubkey",
+    "KEYS/vector-key.pub.pem"
+  ],
+  "expectExit": 20,
+  "rationale": "policy removed. The verifier must reject the shape before it trusts anything else in the file.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#007-schema-invalid"
+}

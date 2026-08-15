@@ -1,0 +1,16 @@
+{
+  "id": "evidence/002-chain-of-three",
+  "regime": "conformance",
+  "profile": "GACS-D1",
+  "claim": "receipts",
+  "harness": "verify",
+  "receipt": "test-vectors/002-chain-of-three/receipts.jsonl",
+  "verifyArgs": [
+    "--pubkey",
+    "KEYS/vector-key.pub.pem"
+  ],
+  "expectExit": 0,
+  "rationale": "Three receipts linked by prevHash. Contiguous, all signed.",
+  "doesNotTest": "That the records were correct when created; tail truncation without an external pin.",
+  "sourceVector": "test-vectors/manifest.json#002-chain-of-three"
+}

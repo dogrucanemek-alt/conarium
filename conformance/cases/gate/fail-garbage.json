@@ -1,0 +1,13 @@
+{
+  "id": "gate/fail-garbage",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "table-policy",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "not sql at all !!!",
+  "rationale": "Unparseable or multi-statement input is refused rather than executed.",
+  "doesNotTest": "Parser differences across dialects; the exact error string.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#fail-garbage",
+  "expect": "deny"
+}

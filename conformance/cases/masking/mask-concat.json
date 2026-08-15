@@ -1,0 +1,14 @@
+{
+  "id": "masking/mask-concat",
+  "regime": "conformance",
+  "profile": "GACS-E1",
+  "claim": "masking",
+  "harness": "query",
+  "policy": "policies/sql-gate.json",
+  "query": "SELECT email || '@x' AS glued FROM public.customers",
+  "rationale": "A configured column is marked for masking in the result, including through alias, concat, CASE, and subquery.",
+  "doesNotTest": "Inference through predicates on the same column; content detectors on other fields.",
+  "sourceVector": "test-vectors/sql-gate/vectors.json#mask-concat",
+  "expect": "allow",
+  "expectMaskedContains": "glued"
+}

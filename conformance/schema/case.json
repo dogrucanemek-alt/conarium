@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GACS case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "regime", "profile", "claim", "rationale", "doesNotTest"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "regime": { "enum": ["conformance", "resistance"] },
+    "profile": { "enum": ["GACS-D1", "GACS-E1", "GACS-C1", "GACS-I1"] },
+    "claim": { "type": "string", "minLength": 1 },
+    "policy": { "type": "string" },
+    "query": { "type": "string" },
+    "harness": { "enum": ["query", "verify"] },
+    "receipt": { "type": "string" },
+    "verifyArgs": { "type": "array", "items": { "type": "string" } },
+    "expect": { "enum": ["allow", "deny"] },
+    "expectExit": { "type": "integer" },
+    "expectRewritten": { "type": "string" },
+    "expectMaskedContains": { "type": "string" },
+    "expectedStatus": {
+      "enum": [
+        "ENFORCED",
+        "BOUNDED",
+        "NOT_COVERED",
+        "DECLARED_ONLY",
+        "DETECTED_WITH_EXTERNAL_PIN",
+        "NOT_CLAIMED"
+      ]
+    },
+    "expectedFail": { "type": "boolean" },
+    "rationale": { "type": "string", "minLength": 1 },
+    "doesNotTest": { "type": "string", "minLength": 1 },
+    "sourceVector": { "type": "string" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "doesNotTest": { "const": "" } }, "required": ["doesNotTest"] },
+      "then": { "not": {} }
+    }
+  ]
+}
