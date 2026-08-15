@@ -272,17 +272,21 @@ if (config) {
   // 4. Is anything actually being protected?
   const pol = config.policy || {}
   const hasMask = Array.isArray(pol.maskColumns) && pol.maskColumns.length > 0
+  const hasProtected = Array.isArray(pol.protectedColumns) && pol.protectedColumns.length > 0
   const hasDeny = Array.isArray(pol.denyTables) && pol.denyTables.length > 0
   const hasAllowTables = Array.isArray(pol.allowTables) && pol.allowTables.length > 0
-  if (!hasMask && !hasDeny && !hasAllowTables) {
+  if (!hasMask && !hasProtected && !hasDeny && !hasAllowTables) {
     warn(
       'Policy surface',
-      'no maskColumns, no denyTables, no allowTables',
+      'no maskColumns, no protectedColumns, no denyTables, no allowTables',
       'Content detectors (email / national id / card / secrets) still run, but no column or table rule is set. ' +
         'That is a valid choice — make sure it is a choice.',
     )
   } else {
-    ok('Policy surface', [hasAllowTables && 'allowTables', hasDeny && 'denyTables', hasMask && 'maskColumns'].filter(Boolean).join(' + '))
+    ok('Policy surface', [hasAllowTables && 'allowTables', hasDeny && 'denyTables', hasMask && 'maskColumns', hasProtected && 'protectedColumns'].filter(Boolean).join(' + '))
+  }
+  if (hasProtected) {
+    ok('policy.protectedColumns', pol.protectedColumns.join(', '))
   }
 
   // 4b. Raised maxRows — performance warning, not a deny.

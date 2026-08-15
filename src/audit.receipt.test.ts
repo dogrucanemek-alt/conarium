@@ -154,6 +154,30 @@ describe('audit receipt — mutlu yol', () => {
     expect(receipts[1].flags).toContain('denied')
   })
 
+  it('protected-column-denied is a receipt flag — names only, schema unchanged', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'conarium-receipt-prot-'))
+    const receiptSink = join(dir, 'receipts.jsonl')
+    const a = new Audit({ sink: join(dir, 'audit.jsonl'), receiptSink, receiptMeta: RECEIPT_META })
+
+    a.log({
+      tool: 'query',
+      target: 'public.customers',
+      denied: true,
+      reason: 'protected column "customers.email" may not appear in WHERE',
+      governance: {
+        denyReason: 'protected column "customers.email" may not appear in WHERE',
+        flags: ['protected-column-denied'],
+      },
+    })
+
+    const receipts = readReceipts(receiptSink)
+    expect(receipts).toHaveLength(1)
+    expect(receipts[0].v).toBe('conarium-receipt/0.3')
+    expect(receipts[0].flags).toContain('denied')
+    expect(receipts[0].flags).toContain('protected-column-denied')
+    expect(JSON.stringify(receipts[0].masking)).not.toMatch(/@/)
+  })
+
   it('partial karar (masking) doğru işaretlenir', () => {
     const dir = mkdtempSync(join(tmpdir(), 'conarium-receipt-partial-'))
     const receiptSink = join(dir, 'receipts.jsonl')

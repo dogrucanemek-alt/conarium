@@ -66,6 +66,8 @@ export interface GovernanceMetadata {
   truncated?: boolean
   denied: boolean
   denyReason?: string
+  /** Receipt `flags` extras. Names only — never values. */
+  flags?: string[]
 }
 
 export interface GuardedQuery {
@@ -372,7 +374,9 @@ export class Governance {
 
     const protectedCols = this.policy.protectedColumns
     if (protectedCols && protectedCols.length > 0) {
-      enforceProtectedColumns(ast[0], protectedCols, (reason) => this.deny(emptyState, reason))
+      enforceProtectedColumns(ast[0], protectedCols, (reason) =>
+        this.deny(emptyState, reason, ['protected-column-denied']),
+      )
     }
 
     const state = this.createAnalysisState()
@@ -718,6 +722,7 @@ export class Governance {
       truncated?: boolean
       denied?: boolean
       denyReason?: string
+      flags?: string[]
     } = {}
   ): GovernanceMetadata {
     return {
@@ -731,6 +736,7 @@ export class Governance {
       truncated: opts.truncated,
       denied: opts.denied ?? false,
       denyReason: opts.denyReason,
+      flags: opts.flags && opts.flags.length > 0 ? opts.flags : undefined,
     }
   }
 
@@ -757,11 +763,12 @@ export class Governance {
     }
   }
 
-  private deny(state: AnalysisState, reason: string): never {
+  private deny(state: AnalysisState, reason: string, flags?: string[]): never {
     throw new PolicyError(reason, this.metadataFrom(state, {
       appliedRowCap: this.maxRows(),
       denied: true,
       denyReason: reason,
+      flags,
     }))
   }
 

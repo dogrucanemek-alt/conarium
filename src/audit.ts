@@ -128,7 +128,10 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
       decision,
       rulesApplied: g.accessedFunctions ?? [],
     },
-    flags: g.denyReason ? ['denied'] : [],
+    flags: [
+      ...(g.denyReason ? ['denied'] : []),
+      ...(g.flags ?? []),
+    ],
     masking: {
       maskedCount: entry.maskedCount ?? 0,
       byClass: g.byClass ?? {},
