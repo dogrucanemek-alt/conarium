@@ -4,6 +4,9 @@
   <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data—without exposing a single secret—and hands you a signed, independently verifiable receipt of every access.</p>
   
   <p>
+    <a href="https://www.npmjs.com/package/@conarium-ai/core"><img src="https://img.shields.io/npm/v/@conarium-ai/core?style=for-the-badge" alt="npm" /></a>
+    <a href="https://github.com/dogrucanemek-alt/conarium/actions/workflows/security.yml"><img src="https://img.shields.io/github/actions/workflow/status/dogrucanemek-alt/conarium/security.yml?branch=main&style=for-the-badge&label=CI" alt="CI" /></a>
+    <a href="https://securityscorecards.dev/viewer/?uri=github.com/dogrucanemek-alt/conarium"><img src="https://api.securityscorecards.dev/projects/github.com/dogrucanemek-alt/conarium/badge" alt="OpenSSF Scorecard" /></a>
     <a href="https://conarium.dev"><img src="https://img.shields.io/badge/Website-conarium.dev-5a8cff?style=for-the-badge" alt="Website" /></a>
     <a href="https://github.com/dogrucanemek-alt/conarium/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-f2d79a?style=for-the-badge" alt="License" /></a>
     <img src="https://img.shields.io/badge/Status-Early%20Access-ff6f80?style=for-the-badge" alt="Early Access" />
@@ -20,6 +23,11 @@ What this repository has **not** done is in [LIMITATIONS.md](LIMITATIONS.md)
 ([Türkçe](LIMITATIONS.tr.md)). The dated comparison page is
 [conarium.dev/compare.html](https://conarium.dev/compare.html) — that is the
 only copy; this repo does not keep a second one.
+
+## Standards
+
+[draft-dogru-scitt-disclosure-evidence](https://datatracker.ietf.org/doc/draft-dogru-scitt-disclosure-evidence/)
+on the IETF Datatracker. Source files live in [`standards/`](standards/).
 
 ## 👁️ The Problem
 
