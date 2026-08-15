@@ -63,4 +63,30 @@ describe('P2 protectedColumns predicate positions', () => {
   it('WHERE on a non-protected column is allowed', () => {
     expect(() => gov().guardQuery('SELECT id FROM public.customers WHERE id = 1')).not.toThrow()
   })
+
+  // `SELECT DISTINCT x` answers the same question as `GROUP BY x`: how many
+  // distinct values are there, and which rows share one. The parser gives
+  // `DISTINCT ON (…)` as an array but a plain `DISTINCT` as a string, so a
+  // check that looks only for the array lets the second form through.
+  it('plain SELECT DISTINCT on a protected column is denied', () => {
+    denied('SELECT DISTINCT email FROM public.customers', 'GROUP BY')
+    denied('SELECT DISTINCT id, email FROM public.customers', 'GROUP BY')
+  })
+
+  it('SELECT DISTINCT * is denied — a star cannot rule a protected column out', () => {
+    expect(() => gov().guardQuery('SELECT DISTINCT * FROM public.customers')).toThrow(PolicyError)
+    expect(() => gov().guardQuery('SELECT DISTINCT * FROM public.customers')).toThrow(
+      /cannot rule out a protected column under SELECT DISTINCT \*/,
+    )
+  })
+
+  it('SELECT DISTINCT on a non-protected column is still allowed', () => {
+    expect(() => gov().guardQuery('SELECT DISTINCT id FROM public.customers')).not.toThrow()
+  })
+
+  it('without protectedColumns, DISTINCT behaves exactly as before', () => {
+    const plain = new Governance({ allowTables: ['public.customers'], maskColumns: ['*.email'] })
+    expect(() => plain.guardQuery('SELECT DISTINCT email FROM public.customers')).not.toThrow()
+    expect(() => plain.guardQuery('SELECT DISTINCT * FROM public.customers')).not.toThrow()
+  })
 })

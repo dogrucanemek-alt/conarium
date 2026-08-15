@@ -187,6 +187,11 @@ function walkSelect(
       assertNoProtected(expr, 'GROUP BY', patterns, deny, scope, cteNames, cteOutputs)
     }
   }
+  // `SELECT DISTINCT x` is `GROUP BY x` wearing another hat: both answer how many
+  // distinct values the column holds and which rows share one. The parser gives
+  // `DISTINCT ON (…)` as an array and a plain `DISTINCT` as the string, so the
+  // array check above sees only half of the syntax.
+  const distinctAll = statement.distinct === 'distinct'
 
   const outputs = new Map<string, string>()
   const columns = statement.columns ?? []
@@ -194,6 +199,14 @@ function walkSelect(
     const classified = classifyExpr(column.expr, patterns, deny, scope, cteNames, cteOutputs)
     if (classified.kind === 'unknown') {
       deny('protected column analysis cannot classify this expression in SELECT')
+    }
+    if (distinctAll && classified.kind === 'protected') {
+      deny(protectedColumnDenyMessage(classified.name, 'GROUP BY'))
+    }
+    if (distinctAll && classified.kind === 'star') {
+      // A star hides its columns from this walk, so a protected one cannot be
+      // ruled out — and under DISTINCT that would be the same leak. Refuse.
+      deny('protected column analysis cannot rule out a protected column under SELECT DISTINCT *')
     }
     if (classified.kind === 'protected' && classified.derived) {
       deny(protectedColumnDenyMessage(classified.name, 'SELECT'))
