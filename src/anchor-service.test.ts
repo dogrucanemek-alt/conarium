@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createPrivateKey, createPublicKey } from 'crypto'
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -168,7 +168,15 @@ describe('anchor service', () => {
     const res = await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH })
     expect(res.status).toBe(201)
     expect(readStore()).toHaveLength(1)
-    expect(await runStamp()).toEqual({ attempted: 1, stamped: 0 })
+    // The failure must reach stderr: an operator whose stamping has been broken
+    // for weeks otherwise sees only endless 404s on /:id/ots, with no cause.
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(await runStamp()).toEqual({ attempted: 1, stamped: 0 })
+      expect(err).toHaveBeenCalledWith(expect.stringContaining('calendars unreachable'))
+    } finally {
+      err.mockRestore()
+    }
     expect(readStore()).toHaveLength(1)
   })
 

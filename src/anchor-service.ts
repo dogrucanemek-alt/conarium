@@ -523,7 +523,14 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       )
       appendFileSync(opts.storePath, JSON.stringify(next) + '\n')
       return { attempted: 1, stamped: 1 }
-    } catch {
+    } catch (err) {
+      // The C5 contract holds: a dead calendar never turns a submit into a 5xx,
+      // and the next tick retries. But swallowing the reason meant an operator
+      // whose stamping had been failing for weeks saw only endless 404s on
+      // GET /:id/ots, with nothing in stderr to say why. Say why.
+      console.error(
+        `[conarium-anchor] head stamp failed, will retry next tick: ${err instanceof Error ? err.message : String(err)}`,
+      )
       return { attempted: 1, stamped: 0 }
     }
   }

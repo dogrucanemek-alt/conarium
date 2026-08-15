@@ -45,6 +45,22 @@ Bus factor 1.
 
 An OpenTimestamps stamp can take hours to confirm on Bitcoin. Receipts already show `pending`.
 
+## Masking hides values; it does not make them unlearnable
+
+Masking is applied to result rows. A query's WHERE clause is checked for table
+permission, not rewritten: `WHERE email LIKE 'a%'` on an allowed table reaches
+the database, and a row count of one versus zero answers a question about a
+masked value without ever displaying it. An assistant with a valid token can
+learn masked values bit by bit this way. If a column must be unlearnable rather
+than merely hidden, do not allow the table that carries it.
+
+## The row cap is per query, not per session
+
+`maxRows` caps a single query. `OFFSET` is preserved, so an allowed, unmasked
+table can be read in full, cap-sized pages at a time. That is what allowing a
+table means; the cap exists to stop single-query bulk exfiltration and to keep
+result sets small, not to ration total access.
+
 ## A countersignature is not a statement about the data
 
 The countersigning service says that a signer other than you saw this chain head

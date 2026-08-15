@@ -44,6 +44,22 @@ Bus factor 1.
 
 OpenTimestamps damgasının Bitcoin'de onaylanması saatler sürebilir. Makbuzda `pending` zaten görünür.
 
+## Maskeleme değeri gizler; öğrenilemez kılmaz
+
+Maskeleme sonuç satırlarına uygulanır. Sorgunun WHERE koşulu tablo izni için
+denetlenir, yeniden yazılmaz: izinli bir tabloda `WHERE email LIKE 'a%'`
+veritabanına gider ve bir/sıfır satır sayısı, maskeli değeri hiç göstermeden
+onun hakkındaki bir soruyu cevaplar. Geçerli jetonu olan bir asistan maskeli
+değerleri bu yolla parça parça öğrenebilir. Bir sütunun yalnızca gizli değil
+**öğrenilemez** olması gerekiyorsa, onu taşıyan tabloya izin verme.
+
+## Satır tavanı sorgu başınadır, oturum başına değil
+
+`maxRows` tek sorguyu sınırlar. `OFFSET` korunur; izinli ve maskesiz bir tablo
+tavan boyunda sayfalarla baştan sona okunabilir. Tabloya izin vermek budur;
+tavan tek sorguluk toplu sızdırmayı durdurmak ve sonuç kümesini küçük tutmak
+için vardır, toplam erişimi karneye bağlamak için değil.
+
 ## Karşı-imza, verinin doğruluğu hakkında bir beyan değildir
 
 Karşı-imza servisi şunu söyler: senden başka bir imzalayan bu zincir başını şu
