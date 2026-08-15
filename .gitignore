@@ -96,3 +96,6 @@ DURUM.md
 # Elle alinmis config yedekleri: canli DSN/token tasiyabilir, kopya oldugu icin
 # kimse icerigini gozden gecirmez. (08-13'te iki tane duruyordu.)
 *.yedek-*
+# Box-side hand backups (conarium-proof: proof.js.bak-0210, .bak-20260814).
+*.bak
+*.bak-*

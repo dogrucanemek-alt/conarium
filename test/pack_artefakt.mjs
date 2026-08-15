@@ -112,6 +112,7 @@ try {
     'examples/per-user-identity/policy.overlay.json',
     'examples/per-user-identity/prove-identity.mjs',
     'examples/per-user-identity/rollback.sh',
+    'examples/proof-service/README.md',
   ].sort()
   const packedExamples = files.filter((f) => f.startsWith('examples/')).sort()
   const unexpected = packedExamples.filter((f) => !EXAMPLES_ALLOWLIST.includes(f))

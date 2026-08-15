@@ -12,6 +12,9 @@
 - **A3:** `LAST-RUN.json` no longer carries a `when` timestamp, so a
   green generator run does not dirty the tree.
 
+- **A4:** `examples/proof-service/README.md` is the repo seat for the
+  box-only `/proof` process. `.gitignore` now covers `*.bak-*`.
+
 ## 0.2.13 — 2026-08-15
 
 Security hardening release. Two independent external reviews and one code
