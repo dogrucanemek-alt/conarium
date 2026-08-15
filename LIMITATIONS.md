@@ -45,6 +45,21 @@ Bus factor 1.
 
 An OpenTimestamps stamp can take hours to confirm on Bitcoin. Receipts already show `pending`.
 
+## A countersignature is not a statement about the data
+
+The countersigning service says that a signer other than you saw this chain head
+at this time and put it at this position in a log that is appended to, never
+rewritten. It says nothing about whether the records were correct, and it is not
+a claim that the countersigner is honest — only that the log's own history
+cannot be quietly rearranged afterwards. If the signing key leaks, every
+signature it ever made is worth what the key is worth: nothing.
+
+## Conarium does not run a countersigning service yet
+
+The endpoint ships in this package and you can operate it. There is no public
+Conarium-operated one, so the tier of the argument that depends on the signer
+being someone other than you is, today, code rather than a service.
+
 ## The operator is inside the boundary
 
 The product defends the assistant-to-gateway path. Code that imports the

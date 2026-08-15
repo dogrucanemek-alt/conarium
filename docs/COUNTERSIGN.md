@@ -132,5 +132,12 @@ Independent re-hash of a chain row must use `JSON.stringify`, not JCS.
 See LIMITATIONS.md — "Audit sink hash is not JCS".
 
 The customer digest lives in `digest`. The field `hash` on a stored
-row is the entry hash, the same name audit uses. Public JSON still
-exposes the customer digest as `hash`.
+row is the entry hash, the same name audit uses; it stays that way
+because the signature covers the field names, so renaming it would
+change the signed bytes of every record.
+
+Public JSON does not reuse either name loosely: the submitted value is
+`digest` and the row's own link is `chainHash`. It used to expose the
+customer digest as `hash` while the inclusion proof beside it used the
+same word for the entry hash — one word, two values, in a document
+whose only job is to be unambiguous to a reader who does not trust us.

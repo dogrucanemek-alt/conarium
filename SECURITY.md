@@ -39,6 +39,22 @@ OpenTimestamps calendars over HTTPS and hashes with Node `crypto`.
 Bitcoin-block checks use `blockstream.info`. Unreachable explorer → exit 15
 ("could not check"), never a silent pass.
 
+## Countersigning key
+
+The countersigning endpoint (`conarium-anchor-service`) signs with an Ed25519
+key read from `CONARIUM_ANCHOR_SIGNING_KEY`. It refuses to start without one,
+and refuses a key file other users can read — an unsigned countersigning
+service is not one, and a readable key is not a key. The published
+`GET /anchor/key.pem` serves the public half only and inspects the file
+contents before answering, so a private PEM placed at that path is refused
+rather than served.
+
+What the key protects is the whole product: a leaked signing key makes every
+countersignature it ever produced worthless, including past ones. Custody,
+rotation, and what a compromise costs are in
+[`docs/COUNTERSIGN.md`](docs/COUNTERSIGN.md). Conarium does not operate a
+public countersigning endpoint yet.
+
 The tester pack is [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md)
 and [`docs/security/PENTEST-SCOPE.md`](docs/security/PENTEST-SCOPE.md).
 npm provenance (after a dispatch publish): [`docs/security/NPM-PROVENANCE.md`](docs/security/NPM-PROVENANCE.md).

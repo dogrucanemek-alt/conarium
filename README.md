@@ -6,7 +6,6 @@
   <p>
     <a href="https://conarium.dev"><img src="https://img.shields.io/badge/Website-conarium.dev-5a8cff?style=for-the-badge" alt="Website" /></a>
     <a href="https://github.com/dogrucanemek-alt/conarium/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-f2d79a?style=for-the-badge" alt="License" /></a>
-    <a href="https://github.com/dogrucanemek-alt/conarium/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-f2d79a?style=for-the-badge" alt="License" /></a>
     <img src="https://img.shields.io/badge/Status-Early%20Access-ff6f80?style=for-the-badge" alt="Early Access" />
   </p>
 </div>
@@ -228,6 +227,42 @@ performed on ourselves and the tool caught:
 [`docs/dogfood/2026-08-06-reconcile.md`](docs/dogfood/2026-08-06-reconcile.md).
 
 Full schema, exit codes, and known gaps: [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
+
+### Countersigning (the part you cannot do for yourself)
+
+Receipts prove what went **through** the gateway. Reconciliation proves nothing
+went **around** it. Both are yours, self-hosted, and signed by your own key —
+which is exactly what an auditor discounts: you kept the record, you signed it,
+and you stored it. A countersignature answers that by putting a **second party**
+on the same chain head.
+
+The service is in this package, so you can run your own and sign your own heads
+— useful for a second internal custodian, and pointless against the objection
+above. What makes it worth anything is that the signer is not you.
+
+```bash
+# Run the endpoint (refuses to start without a signing key or a token file)
+CONARIUM_ANCHOR_TOKENS=./anchor.tokens.json \
+CONARIUM_ANCHOR_SIGNING_KEY=./anchor.pem \
+CONARIUM_ANCHOR_BASE_URL=https://anchor.example.com \
+npx conarium-anchor-service
+
+# Verify a countersignature you were given — offline, no network, no package
+npx conarium-countersign-verify ./record.json --pubkey ./anchor.pub.pem
+# exit 0  = signature valid (and inclusion valid if a proof or --log-url was given)
+# exit 13 = signature invalid / unknown keyId
+# exit 14 = inclusion proof present and false
+# exit 15 = the log could NOT be checked — deliberately not the same as 14
+```
+
+The log is a hash chain: entries are appended, never rewritten, and an OTS
+timestamp covers the head rather than each submission. What a countersignature
+proves — and, just as importantly, what it does not — is written out in
+[`docs/COUNTERSIGN.md`](docs/COUNTERSIGN.md), together with what a leaked
+signing key would cost.
+
+⚠️ Conarium does not operate a public countersigning endpoint yet. Until it
+does, this is code you can run, not a service you can buy.
 
 ### Implementing the format yourself
 

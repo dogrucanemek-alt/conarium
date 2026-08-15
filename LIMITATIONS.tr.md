@@ -44,6 +44,21 @@ Bus factor 1.
 
 OpenTimestamps damgasının Bitcoin'de onaylanması saatler sürebilir. Makbuzda `pending` zaten görünür.
 
+## Karşı-imza, verinin doğruluğu hakkında bir beyan değildir
+
+Karşı-imza servisi şunu söyler: senden başka bir imzalayan bu zincir başını şu
+anda gördü ve üzerine eklenen, yeniden yazılmayan bir kütükte şu sıraya koydu.
+Kayıtların doğru olduğunu söylemez; karşı-imzalayanın dürüst olduğunu da
+iddia etmez — yalnızca kütüğün kendi geçmişinin sonradan sessizce yeniden
+dizilemeyeceğini söyler. İmza anahtarı sızarsa, o anahtarın attığı bütün
+imzalar anahtar kadar değerlidir: hiç.
+
+## Conarium henüz bir karşı-imza servisi işletmiyor
+
+Uç nokta bu pakette geliyor ve kendin çalıştırabilirsin. Conarium'un işlettiği
+halka açık bir tanesi yok; dolayısıyla "imzalayan sen değilsin" argümanına
+dayanan katman bugün bir servis değil, çalıştırabileceğin bir kod.
+
 ## Operatör sınırın içindedir
 
 Ürün asistan ↔ kapı yolunu korur. Kütüphaneyi import eden kod kapıyı,

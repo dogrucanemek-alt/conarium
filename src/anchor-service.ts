@@ -37,7 +37,7 @@ export type AnchorRecordType = 'submit' | 'upgrade' | 'stamp'
 export interface AnchorRecord {
   type: AnchorRecordType
   id: string
-  /** Customer-submitted digest (`sha256:…`). Public views expose this as `hash`. */
+  /** Customer-submitted digest (`sha256:…`). Public views expose this as `digest`. */
   digest: string
   /** Entry hash — same rule as audit-hash.ts (`hash`/`sig`/`anchor` excluded). */
   hash: string

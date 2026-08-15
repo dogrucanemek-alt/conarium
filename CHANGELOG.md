@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.2.16 — 2026-08-15
+
+Countersigning: a second party on your chain head, and a revocation fix that
+turned up while building it.
+
+- **The anchoring endpoint countersigns.** Every accepted submission is signed
+  with the service's own Ed25519 key, so the record carries a signature from
+  someone other than the party that produced the chain. Relaying a hash to a
+  public timestamp calendar was never worth paying for — the customer can do
+  that themselves, for free, and now the code says which of the two is the
+  point. The service refuses to start without a signing key, and refuses a key
+  file other users can read.
+
+- **The log is an append-only hash chain.** Records carry `seq`, `prevHash` and
+  their own entry hash, and a pending anchor that later confirms is appended as
+  a new row instead of rewriting the old one. The file previously carried a
+  comment promising append-only next to a function that rewrote the whole thing.
+  A tampered log now fails the chain check instead of being served.
+
+- **Inclusion proofs and an offline verifier.** `GET /anchor/:id` returns the
+  path from a record to the log head, and `conarium-countersign-verify` checks a
+  countersignature with zero imports from this package. "Could not check the
+  log" (15) stays distinct from "the proof is false" (14).
+
+- **The timestamp covers the log head, not each submission.** N submissions cost
+  one calendar request instead of N, and a slow calendar can no longer delay
+  accepting a submission — stamping is off the request path entirely.
+
+- **Public records name one thing per word.** The submitted value is `digest`
+  and the record's own link is `chainHash`. Both used to be reachable as `hash`
+  in a single document, next to a `prevHash` that chains only one of them.
+
+- **Token revocation could be silently ignored.** The token store reloaded only
+  when the file's mtime changed, and mtime resolution is filesystem dependent —
+  so a revocation written inside the same tick as an earlier edit never took
+  effect, and the revoked token kept resolving to its user. Staleness is now
+  decided by the file's content. This had been showing up as an intermittently
+  failing test and was read as flakiness rather than as the bug it was.
+
 ## 0.2.15 — 2026-08-15
 
 A rendering fix that only shows up when something else has gone wrong.
