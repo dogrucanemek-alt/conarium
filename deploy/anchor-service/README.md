@@ -5,8 +5,9 @@ This directory is the operator pack for self-hosting
 this tree.** Copy the files, fill `.env`, start it yourself.
 
 Conarium is not the timestamp authority. The OpenTimestamps calendars and
-Bitcoin are. This process is retention, a stable URL, and the upgrade job
-nobody remembers to run.
+Bitcoin are. This process countersigns each accepted hash, keeps an
+append-only log, and stamps the log head. What that does and does not
+prove: [`docs/COUNTERSIGN.md`](../../docs/COUNTERSIGN.md).
 
 ## What must be set
 
