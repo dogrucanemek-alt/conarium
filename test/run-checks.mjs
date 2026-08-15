@@ -54,6 +54,7 @@ export const CHECKS = [
   'test/gacs_import_fence.mjs',
   'test/gacs_case_schema.mjs',
   'test/gacs_regime.mjs',
+  'test/gacs_run.mjs',
 ]
 
 export function runChecks({ files = CHECKS, cwd = root, spawn = spawnSync } = {}) {

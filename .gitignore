@@ -87,6 +87,10 @@ fuzz/**/crash-*
 fuzz/**/timeout-*
 fuzz/**/oom-*
 
+# Generated GACS reports — a committed green report would be us grading ourselves.
+conformance/report.md
+conformance/report.json
+
 # npm pack ciktisi — paketleme artefakti, repoya girmez
 *.tgz
 

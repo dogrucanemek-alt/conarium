@@ -5,9 +5,9 @@
   "claim": "inference-control",
   "harness": "query",
   "policy": "policies/mask-email.json",
-  "query": "SELECT 1 FROM public.customers WHERE EXISTS (SELECT 1 FROM public.customers c WHERE c.email LIKE 'a%')",
+  "query": "SELECT id FROM public.customers WHERE id IN (SELECT id FROM public.customers WHERE email LIKE 'a%')",
   "expectedStatus": "NOT_COVERED",
   "expectedFail": true,
-  "rationale": "EXISTS on a masked column is the same 1/0 channel as a filtered count.",
-  "doesNotTest": "Timing; correlated subqueries that never name the column."
+  "rationale": "A filtered subquery on a masked column still answers whether any row matches. SQL EXISTS is already refused as an unknown function; this IN form is the remaining 1/0 path.",
+  "doesNotTest": "The EXISTS keyword itself; timing; a session-wide probe budget."
 }

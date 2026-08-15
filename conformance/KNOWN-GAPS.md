@@ -10,7 +10,7 @@ not make a value unlearnable.
 | id | Expected status | Why it is listed |
 |---|---|---|
 | `inference/count-channel` | NOT_COVERED | `SELECT count(*) … WHERE email LIKE 'a%'` under mask-only policy. 1 vs 0 answers a question about a masked value. |
-| `inference/exists-channel` | NOT_COVERED | `EXISTS` on the same column is the same 1/0 channel. |
+| `inference/exists-channel` | NOT_COVERED | `id IN (SELECT id … WHERE email LIKE …)` is the 1/0 channel. SQL `EXISTS` is already refused as an unknown function. |
 | `inference/repeated-probe` | NOT_COVERED | Successive narrowing predicates are not budgeted per session. |
 | `inference/cohort-narrowing` | NOT_COVERED | `GROUP BY` on an allowed column yields cohort sizes. |
 | `coverage/tail-without-pin` | DETECTED_WITH_EXTERNAL_PIN | A hash chain cannot see receipts deleted from the end unless a pin or anchor is supplied. |
