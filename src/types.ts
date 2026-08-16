@@ -122,6 +122,11 @@ export interface CustomPiiPattern {
   columns?: string[]
   /** Replacement. Default `[MASKED_PII]`. Must be `[MASKED_…]`. */
   label?: string
+  /**
+   * Optional example the doctor tries against the compiled pattern.
+   * Same sensitivity as `pattern` — never logged or printed.
+   */
+  sample?: string
 }
 
 /** See `GovernancePolicy.detectors`. */

@@ -362,6 +362,43 @@ test('custom pattern names appear; pattern text does not', async () => {
   assert.ok(!out.includes('DO-NOT-PRINT-PATTERN-9911'), 'pattern fragment leaked')
 })
 
+test('custom pattern without a sample is unseen, not a silent pass', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, {
+    ...HEALTHY,
+    policy: {
+      ...HEALTHY.policy,
+      customPatterns: [{ name: 'acct-iban', pattern: 'TR[0-9]{24}', label: '[MASKED_PII]' }],
+    },
+  })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, out)
+  assert.ok(/unseen/.test(out), out)
+  assert.ok(/acct-iban/.test(out) && /not tested/.test(out), out)
+})
+
+test('custom pattern sample match is ok; mismatch is warn; sample text stays hidden', async () => {
+  const dir = tmpdir()
+  const secretSample = 'XX-DO-NOT-PRINT-SAMPLE-9911'
+  writeConfig(dir, {
+    ...HEALTHY,
+    policy: {
+      ...HEALTHY.policy,
+      customPatterns: [
+        { name: 'hesap-ok', pattern: 'HSP-[0-9]{8}', sample: 'HSP-12345678', label: '[MASKED_PII]' },
+        { name: 'hesap-miss', pattern: 'HSP-[0-9]{8}', sample: secretSample, label: '[MASKED_PII]' },
+      ],
+    },
+  })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, `sample mismatch is a warning, not a fail:\n${out}`)
+  assert.ok(/hesap-ok/.test(out) && /matched its sample/.test(out), out)
+  assert.ok(/pattern hesap-miss compiled but did not match its own sample/.test(out), out)
+  assert.ok(!out.includes(secretSample), 'sample text leaked')
+  assert.ok(!out.includes('DO-NOT-PRINT-SAMPLE'), 'sample fragment leaked')
+  assert.ok(!out.includes('HSP-12345678'), 'matching sample leaked')
+})
+
 test('fake engine banner vs dialect: postgres banner is not oracle', () => {
   assert.strictEqual(familyFromBanner('PostgreSQL 16.2 on x86_64-pc-linux-gnu'), 'postgres')
   assert.strictEqual(familyFromBanner('Microsoft SQL Server 2022'), 'mssql')

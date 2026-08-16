@@ -19,6 +19,8 @@ const CustomPatternSchema = z.object({
   pattern: z.string().min(1),
   columns: z.array(z.string().min(1)).optional(),
   label: z.string().min(1).optional(),
+  // Doctor-only. The gateway ignores it. Same sensitivity as `pattern`.
+  sample: z.string().min(1).optional(),
 }).strict()
 
 export const GovernancePolicySchema = z.object({
@@ -163,9 +165,13 @@ export function assertCustomSqlDialect(cfg: ConariumConfig): void {
   )
 }
 
-/** Zod's default text can echo the received value. Pattern text must not leak. */
+/** Zod's default text can echo the received value. Pattern and sample must not leak. */
 function sanitizeCustomPatternZod(err: z.ZodError): Error {
-  const hit = err.issues.find((i) => i.path.includes('customPatterns') && i.path.includes('pattern'))
+  const hit = err.issues.find(
+    (i) =>
+      i.path.includes('customPatterns') &&
+      (i.path.includes('pattern') || i.path.includes('sample')),
+  )
   if (!hit) return err
   const nameIdx = hit.path.indexOf('customPatterns')
   const ruleIndex = hit.path[nameIdx + 1]

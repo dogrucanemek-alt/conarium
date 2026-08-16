@@ -405,8 +405,41 @@ if (config) {
     } else {
       try {
         const { compileCustomPatterns } = await import(pathToFileURL(compilerPath).href)
-        compileCustomPatterns(patterns)
-        ok('policy.customPatterns', `${patterns.length} compiled: ${patternNames.join(', ')}`)
+        const compiled = compileCustomPatterns(patterns)
+        const byName = new Map(compiled.map((c) => [c.name, c]))
+        for (const p of patterns) {
+          const name = p && typeof p.name === 'string' ? p.name : 'unnamed'
+          const sample = p && typeof p.sample === 'string' ? p.sample : ''
+          const rule = byName.get(name)
+          if (!sample) {
+            unseen(
+              'policy.customPatterns',
+              `pattern ${name} compiled but was not tested (no sample)`,
+              'Add a sample that the pattern should match. The doctor will not print the sample.',
+            )
+            continue
+          }
+          if (!rule?.re) {
+            unseen(
+              'policy.customPatterns',
+              `pattern ${name} compiled but was not tested (no compiled rule)`,
+              'Rebuild the package and rerun the doctor.',
+            )
+            continue
+          }
+          rule.re.lastIndex = 0
+          const hit = rule.re.test(sample)
+          rule.re.lastIndex = 0
+          if (hit) {
+            ok('policy.customPatterns', `pattern ${name} compiled and matched its sample`)
+          } else {
+            warn(
+              'policy.customPatterns',
+              `pattern ${name} compiled but did not match its own sample`,
+              'The pattern compiled. It did not match the sample you gave it. Fix the pattern or the sample. Neither is printed.',
+            )
+          }
+        }
       } catch (e) {
         fail(
           'policy.customPatterns',

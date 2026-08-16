@@ -567,8 +567,10 @@ scanner. This is not a second masking path and it does not replace
 `maskColumns`.
 
 Each rule needs a name (what the receipt records), a pattern, optional
-column globs, and a mask label. A broken or ReDoS-shaped pattern rejects
-the config; the pattern text is never written to logs or receipts.
+column globs, and a mask label. An optional `sample` is what `conarium-doctor`
+tries the compiled pattern against — compile success is not a catch. A
+broken or ReDoS-shaped pattern rejects the config; the pattern and the
+sample are never written to logs, receipts, or doctor output.
 
 ```json
 {

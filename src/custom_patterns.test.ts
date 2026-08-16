@@ -39,6 +39,20 @@ describe('customPatterns — compile fail-closed', () => {
     expect(() => compileCustomPatterns([TEB_HESAP])).not.toThrow()
   })
 
+  it('accepts an optional sample and still rejects unknown keys', () => {
+    const cfg = parseConariumConfig({
+      ...BASE,
+      policy: { customPatterns: [{ ...TEB_HESAP, sample: 'HSP-12345678' }] },
+    })
+    expect(cfg.policy?.customPatterns?.[0]?.sample).toBe('HSP-12345678')
+    expect(() =>
+      parseConariumConfig({
+        ...BASE,
+        policy: { customPatterns: [{ ...TEB_HESAP, probe: 'no' }] },
+      }),
+    ).toThrow(/Unrecognized key/)
+  })
+
   it('broken regex rejects the config and names the rule — not the pattern', () => {
     const started = Date.now()
     expect(() =>
