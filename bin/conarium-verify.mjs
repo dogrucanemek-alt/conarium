@@ -354,6 +354,9 @@ function schemaOk(r) {
       return 'disclosure.source must be measured|undeclared in v0.4'
     }
     if (d.source === 'undeclared') {
+      if (!('hash' in d) || !('bytes' in d)) {
+        return 'disclosure.hash and disclosure.bytes must be present and null when source is "undeclared"'
+      }
       if (d.hash !== null || d.bytes !== null) return 'disclosure.source is "undeclared" but carries values'
     } else {
       if (typeof d.hash !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(d.hash)) {
@@ -367,6 +370,9 @@ function schemaOk(r) {
       return 'destination.source must be operator-declared|undeclared in v0.4'
     }
     if (dest.source === 'undeclared') {
+      if (!('value' in dest)) {
+        return 'destination.value must be present and null when source is "undeclared"'
+      }
       if (dest.value !== null) return 'destination.source is "undeclared" but carries a value'
     } else if (typeof dest.value !== 'string' || dest.value.length === 0) {
       return 'destination.value is required when operator-declared'

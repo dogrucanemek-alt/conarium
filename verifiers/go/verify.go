@@ -557,7 +557,7 @@ func schemaOk(r map[string]any) string {
 		}
 		if ds == "undeclared" {
 			if !hasKey(d, "hash") || !hasKey(d, "bytes") {
-				return "disclosure.source is \"undeclared\" but carries values"
+				return "disclosure.hash and disclosure.bytes must be present and null when source is \"undeclared\""
 			}
 			if d["hash"] != nil || d["bytes"] != nil {
 				return "disclosure.source is \"undeclared\" but carries values"
@@ -584,7 +584,7 @@ func schemaOk(r map[string]any) string {
 		}
 		if ss == "undeclared" {
 			if !hasKey(dest, "value") {
-				return "destination.source is \"undeclared\" but carries a value"
+				return "destination.value must be present and null when source is \"undeclared\""
 			}
 			if dest["value"] != nil {
 				return "destination.source is \"undeclared\" but carries a value"

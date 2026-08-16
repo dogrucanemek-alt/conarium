@@ -376,4 +376,63 @@ describe('T5 verify scenarios', () => {
     expect(res.code).toBe(20)
     expect(res.stderr).toMatch(/disclosure/)
   })
+
+  it('undeclared disclosure with omitted keys says they must be present and null', () => {
+    const receipts = chainOf(1, key)
+    const omitted = structuredClone(receipts[0]) as Receipt & {
+      disclosure: { hash?: unknown; bytes?: unknown; source: string }
+    }
+    delete omitted.disclosure.hash
+    delete omitted.disclosure.bytes
+    const dir = mkdtempSync(join(tmpdir(), 'cnr-v04-omit-'))
+    const file = join(dir, 'receipts.jsonl')
+    writeFileSync(file, JSON.stringify(omitted) + '\n')
+    const res = runVerify([file, '--pubkey', publicPath])
+    expect(res.code).toBe(20)
+    expect(res.stderr).toContain(
+      'disclosure.hash and disclosure.bytes must be present and null when source is "undeclared"',
+    )
+    expect(res.stderr).not.toMatch(/carries values/)
+  })
+
+  it('undeclared disclosure that still carries values keeps the carries-values message', () => {
+    const receipts = chainOf(1, key)
+    const filled = structuredClone(receipts[0])
+    filled.disclosure = { hash: `sha256:${'ab'.repeat(32)}`, bytes: 4, source: 'undeclared' }
+    const dir = mkdtempSync(join(tmpdir(), 'cnr-v04-carry-'))
+    const file = join(dir, 'receipts.jsonl')
+    writeFileSync(file, JSON.stringify(filled) + '\n')
+    const res = runVerify([file, '--pubkey', publicPath])
+    expect(res.code).toBe(20)
+    expect(res.stderr).toContain('disclosure.source is "undeclared" but carries values')
+  })
+
+  it('undeclared destination with omitted value says it must be present and null', () => {
+    const receipts = chainOf(1, key)
+    const omitted = structuredClone(receipts[0]) as Receipt & {
+      destination: { value?: unknown; source: string }
+    }
+    delete omitted.destination.value
+    const dir = mkdtempSync(join(tmpdir(), 'cnr-v04-dest-omit-'))
+    const file = join(dir, 'receipts.jsonl')
+    writeFileSync(file, JSON.stringify(omitted) + '\n')
+    const res = runVerify([file, '--pubkey', publicPath])
+    expect(res.code).toBe(20)
+    expect(res.stderr).toContain(
+      'destination.value must be present and null when source is "undeclared"',
+    )
+    expect(res.stderr).not.toMatch(/carries a value/)
+  })
+
+  it('undeclared destination that still carries a value keeps the carries-a-value message', () => {
+    const receipts = chainOf(1, key)
+    const filled = structuredClone(receipts[0])
+    filled.destination = { value: 'openai/gpt-x', source: 'undeclared' }
+    const dir = mkdtempSync(join(tmpdir(), 'cnr-v04-dest-carry-'))
+    const file = join(dir, 'receipts.jsonl')
+    writeFileSync(file, JSON.stringify(filled) + '\n')
+    const res = runVerify([file, '--pubkey', publicPath])
+    expect(res.code).toBe(20)
+    expect(res.stderr).toContain('destination.source is "undeclared" but carries a value')
+  })
 })
