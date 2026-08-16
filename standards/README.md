@@ -18,8 +18,10 @@ registered as Signed Statements on a SCITT (RFC 9943) Transparency Service:
 The draft defines payloads only: no new receipt format, no new transparency
 mechanism, no new signature format.
 
-**Status:** individual draft, submitted to the IETF Datatracker on
-2026-08-15. Current revision:
+**Status:** individual submission. Not adopted by an IETF working group, and it
+carries no formal standing — an Internet-Draft is a dated public record, not a standard.
+It is published so the receipt format can be implemented without us.
+Submitted to the IETF Datatracker on 2026-08-15. Current revision:
 <https://datatracker.ietf.org/doc/draft-dogru-scitt-disclosure-evidence/>
 
 Source is kramdown-rfc markdown. To build txt/xml locally:

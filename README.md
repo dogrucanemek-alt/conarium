@@ -27,7 +27,10 @@ only copy; this repo does not keep a second one.
 ## Standards
 
 [draft-dogru-scitt-disclosure-evidence](https://datatracker.ietf.org/doc/draft-dogru-scitt-disclosure-evidence/)
-on the IETF Datatracker. Source files live in [`standards/`](standards/).
+is an individual submission. Not adopted by an IETF working group, and it
+carries no formal standing — an Internet-Draft is a dated public record, not a standard.
+It is published so the receipt format can be implemented without us.
+Source files live in [`standards/`](standards/).
 
 ## 👁️ The Problem
 
