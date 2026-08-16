@@ -128,6 +128,22 @@ Aşağıdaki ölçüm ihtiyatlı olsun diye 100 üzerinden.
 Tavanı yükseltmek serbest. 100'ün üstünde doctor ve boot uyarır.
 Sorgu reddedilmez.
 
+## Düşük entropili yükte disclosure hash'i doğrulama kehanetidir
+
+`disclosure.hash`, maskeleme ve satır tavanından sonra sınırdan çıkan
+baytların SHA-256'sıdır. Makbuzu elinde tutan biri "cevap `evet` miydi?"
+diye deneyip hash'in tutup tutmadığına bakabilir. Bu hash'in doğasıdır,
+gizli bir özellik değil. Nonce kapatmaz: nonce da aynı makbuzda durur.
+Yüksek entropili sonuç pratikte bu yolla tahmin edilmez. Tek satırlık
+evet/hayır sonucu edilir.
+
+## Hedef beyandır, doğrulanmaz
+
+`destination` operatörün config'e yazdığıdır. Conarium sonucun oraya
+gittiğini kontrol etmez. MCP model kimliği taşımaz, yani alan ölçülemez.
+Politika onu okumaz. Makbuzda `openai/gpt-x` yazması, baytları OpenAI'ın
+gördüğü anlamına gelmez.
+
 ## OpenTimestamps istemcisi
 
 Damgalama yerleşik takvim istemcisiyle yapılır (Node `crypto` + herkese açık takvimlere HTTPS).

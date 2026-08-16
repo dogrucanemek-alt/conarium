@@ -1,9 +1,10 @@
 # Conarium Receipt Spec
 
 Public specification for **verifiable access receipts**. Schema version
-**`conarium-receipt/0.3`** is canonical. The verifier also accepts `0.1` and
-`0.2` forever — published receipts keep their original `v` string; this document
-does not change it.
+**`conarium-receipt/0.4`** is canonical. The verifier also accepts `0.1`, `0.2`,
+and `0.3` forever — published receipts keep their original `v` string; this
+document does not change it. A 0.3 receipt is not rewritten, re-hashed, or
+re-signed when 0.4 fields appear.
 
 Implements the portable side of EU AI Act Articles 12 (logging) and 19 (content
 of logs) for Conarium's governed MCP gateway.
@@ -31,7 +32,7 @@ Sondan kesmeyi tek başına göremez.
 | | |
 |---|---|
 | Media type | `application/vnd.conarium.receipt+json` |
-| Single receipt | `.json` — one JSON object, schema `conarium-receipt/0.3` |
+| Single receipt | `.json` — one JSON object, schema `conarium-receipt/0.4` (verifiers also accept `0.1`–`0.3`) |
 | Chain (append-only) | `.jsonl` — one receipt object per line, same schema, `chain.seq` contiguous |
 
 The vendor tree is the stable identifier for tools that switch on type rather
@@ -40,19 +41,21 @@ with an outer sequence; there is no separate chain media type.
 
 ## Schema
 
-Version string: `conarium-receipt/0.3` (verifier also accepts `0.1` and `0.2` — forever)
+Version string: `conarium-receipt/0.4` (verifier also accepts `0.1`, `0.2`, and `0.3` — forever)
 
 | Field | Art. 19 role | Notes |
 |---|---|---|
 | `ts`, `period` | timestamp / usage period | ISO-8601 |
 | `model` | model identification | `source` + provider / name / version — see **Meta provenance** below |
 | `client` | calling client | `source` + name / version |
+| `destination` | where the result was sent | `value` + `source` — **0.4**. Operator declaration; Conarium does not verify it. Not a policy input. |
 | `dataRefs` | reference databases consulted | source + object + field *names* only |
 | `policy` | applied governance | decision + rule ids |
 | `flags` | triggered policy flags | strings (`denied`, `protected-column-denied`, …) — free list; schema string unchanged |
 | `masking` | counts by class | never raw values |
+| `disclosure` | bytes that left | **0.4**. Hash of the masked, row-capped payload that was sent — see **Disclosure** below |
 | `request.argsHash` | request fingerprint | `sha256:…` of args — not the query text |
-| `consentRef` | reserved | always `null` in `conarium-receipt/0.3` (and in 0.1/0.2). The field exists so a later schema can fill it without renaming. |
+| `consentRef` | reserved | always `null` in `conarium-receipt/0.4` (and in 0.1/0.2/0.3). The field exists so a later schema can fill it without renaming. |
 | `chain.seq` | coverage backbone | contiguous integer; required even before v0.2 coverage proofs |
 | `chain.prevHash` / `chain.hash` | integrity | JCS (RFC 8785 subset) → SHA-256 |
 | `sig` | Ed25519 over `chain.hash` | `{ alg, keyId, value }` |
@@ -63,21 +66,83 @@ stripped before hashing. Prefix: `sha256:` + hex.
 
 Raw data **never** enters a field — only numbers, class names, and hashes.
 
-`flags` is a free string array in `conarium-receipt/0.3`. A query refused
+`flags` is a free string array in `conarium-receipt/0.4` (and in 0.3). A query refused
 because a `protectedColumns` pattern appeared in a predicate carries
 `protected-column-denied` (and `denied`). The flag is a class name — it does
 not carry the column value.
 
-### Meta provenance (v0.3)
+`destination` and `disclosure` are **required on 0.4** and **not required on
+0.1/0.2/0.3**. An old receipt is not invalid because those fields are absent.
 
-`model` and `client` carry **where the value came from**, not just the value. A receipt
-never says *"the model was X"* — it says *"X was declared"* or *"not declared"*.
+### Meta provenance (one vocabulary)
 
-| `source` | meaning |
-|---|---|
-| `protocol` | measured during the connection (MCP `initialize` → `clientInfo`) |
-| `operator-declared` | the operator declared it in config; **Conarium did not verify it** |
-| `undeclared` | not declared — fields are `null`, nothing was invented |
+`model`, `client`, `destination`, and `disclosure` share **one** `source`
+vocabulary. There is no second set (`DECLARED` / `OBSERVED` / `VERIFIED` /
+`DERIVED`). There is no `verified` value. If attestation arrives later, the
+new value will be `attested` — not a boolean flag left empty today.
+
+A receipt never says *"the model was X"* — it says *"X was declared"* or
+*"not declared"*.
+
+| `source` | meaning | Who uses it |
+|---|---|---|
+| `protocol` | measured during the connection (MCP `initialize` → `clientInfo`) | `model`, `client` |
+| `measured` | Conarium computed it (a hash of bytes it held) | `disclosure` |
+| `operator-declared` | the operator declared it in config; **Conarium did not verify it** | `model`, `client`, `destination` |
+| `undeclared` | not declared — value fields are `null`, nothing was invented | all of the above |
+
+### Disclosure (v0.4)
+
+`request.argsHash` binds the request. It does not bind what left. `disclosure`
+binds the **exact UTF-8 bytes** sent to the client as the MCP tool
+`content[0].text` after masking and the row cap.
+
+```json
+"disclosure": {
+  "hash": "sha256:…",
+  "bytes": 4821,
+  "source": "measured"
+}
+```
+
+Reproduce the hash:
+
+1. Take the string that was returned (for `query`: `JSON.stringify({ rowCount, fields, rows: rows.slice(0, cap), truncated }, null, 2)`).
+2. Encode that string as UTF-8. Do **not** re-canonicalise with JCS — the wire bytes are the fact.
+3. `hash = "sha256:" + hex(SHA-256(bytes))`.
+4. `bytes` is the UTF-8 length.
+
+Same payload → same hash in any process. The raw payload is **not** stored on
+the receipt or in the audit JSONL.
+
+On deny or error, or when no payload was serialised:
+
+```json
+"disclosure": { "hash": null, "bytes": null, "source": "undeclared" }
+```
+
+Nothing is invented. A low-entropy payload (yes/no, a single row) makes the
+hash a **verification oracle** — anyone with the receipt can test a guess.
+That is a property of the hash, not a bug. It is written in LIMITATIONS. A
+nonce does not fix it: the nonce would sit on the receipt next to the hash.
+
+### Destination (v0.4)
+
+```json
+"destination": { "value": "openai/gpt-x", "source": "operator-declared" }
+```
+
+The value comes from operator config (`audit.receiptDestination`). Conarium
+does not verify it. MCP does not carry model identity. Absent:
+
+```json
+"destination": { "value": null, "source": "undeclared" }
+```
+
+Policy decisions are **not** bound to `destination` in this version.
+Binding access to an unverifiable field would present a declaration as
+enforcement. Destination-aware policy is a later job; it needs a verification
+path first.
 
 Why this exists: **model identity does not exist in the MCP protocol.** A connecting
 client never tells the server which model it is using. Writing a fixed value into config
@@ -133,7 +198,7 @@ Tracked remainder: unclassified network-shaped errors still share 14 with
 ## Conformance vectors
 
 A specification that cannot be implemented from the document alone is a blog
-post. [`test-vectors/`](../test-vectors/) is the difference: nine frozen cases,
+post. [`test-vectors/`](../test-vectors/) is the difference: twelve frozen cases,
 the public key, and a machine-readable manifest.
 
 ```

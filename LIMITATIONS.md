@@ -140,6 +140,22 @@ Measured (same SELECT, same row count, Postgres 16.14, WSL2, see
 Raising the cap is allowed. The doctor and boot log warn above 100.
 The query is not rejected.
 
+## A disclosure hash is a verification oracle on low-entropy payloads
+
+`disclosure.hash` is SHA-256 of the exact bytes that left the gateway after
+masking and the row cap. Anyone who holds the receipt can try a guess
+("was the answer `yes`?") and see if the hash matches. That is the nature
+of a hash, not a hidden property. A nonce does not close it: the nonce
+would be written on the same receipt. High-entropy results are not
+practically guessable this way. A one-row yes/no result is.
+
+## Destination is a declaration, not a verification
+
+`destination` is what the operator wrote in config. Conarium does not
+check that the result went there. MCP does not carry model identity, so
+the field cannot be measured. Policy does not read it. A receipt that
+says `openai/gpt-x` is not proof that OpenAI saw the bytes.
+
 ## OpenTimestamps client
 
 Stamping uses a built-in calendar client (Node `crypto` + HTTPS to the public calendars).
