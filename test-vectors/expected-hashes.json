@@ -19,6 +19,24 @@
       "seq": 3,
       "prevHash": "sha256:56937472179de1567fee9f0b863c7c5d16d8d6b7a8e613e9bf50fb321f82433c",
       "hash": "sha256:a06a30c3fb4bdbd46bb9400da0815fb3a7007b703cc9cb41208be08413e254c7"
+    },
+    {
+      "case": "010-disclosure-commitment",
+      "seq": 1,
+      "prevHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "sha256:a3dd969eea7eda0ae728cc994527e3f19f512d10ae655f85c58e8d5a31e25a88"
+    },
+    {
+      "case": "011-destination-declared",
+      "seq": 1,
+      "prevHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "sha256:7cdbfd0e131c1f5615c305f7908c136b19e25b7fbd96c7d48f0928f1df4c076e"
+    },
+    {
+      "case": "012-mixed-chain",
+      "seq": 2,
+      "prevHash": "sha256:dbbbd3139923cdf7f854283b495386526de0629a71dc4d5407a3a810ee3e1847",
+      "hash": "sha256:d34aba9928377dc233a90d8cb10c566ad0d35d0a05ef9e396a066e1b689426ee"
     }
   ]
 }

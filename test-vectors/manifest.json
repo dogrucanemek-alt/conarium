@@ -1,6 +1,6 @@
 {
   "format": "conarium-receipt",
-  "versionUnderTest": "conarium-receipt/0.3",
+  "versionUnderTest": "conarium-receipt/0.4",
   "keyId": "cnr-vectors",
   "publicKey": "keys/vector-key.pub.pem",
   "note": "Frozen conformance vectors. Run each case through your verifier and compare the exit code. KEYS/ in args resolves to the keys/ directory at the root of test-vectors.",
@@ -86,6 +86,33 @@
       "name": "009-unsigned-but-pubkey-given",
       "description": "The same unsigned receipt, but the caller asked for signature verification. Fail-closed: a missing signature is not a passing signature.",
       "exitCode": 13,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "010-disclosure-commitment",
+      "description": "0.4 receipt with a measured disclosure hash over the masked, row-capped payload. Verify exits 0.",
+      "exitCode": 0,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "011-destination-declared",
+      "description": "0.4 receipt with destination declared by the operator. source is operator-declared, not verified.",
+      "exitCode": 0,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
+    },
+    {
+      "name": "012-mixed-chain",
+      "description": "A 0.3 receipt followed by a 0.4 receipt. The chain verifies; old receipts are not rewritten.",
+      "exitCode": 0,
       "args": [
         "--pubkey",
         "KEYS/vector-key.pub.pem"

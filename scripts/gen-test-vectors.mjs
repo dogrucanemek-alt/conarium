@@ -11,6 +11,10 @@
  * so a second implementation can reproduce byte-identical output.
  *
  * Usage: npm run build && node scripts/gen-test-vectors.mjs
+ *
+ * 001–009 are frozen. If they already exist, this script refuses to run —
+ * regenerating them would rewrite published 0.3 receipts. New 0.4 cases
+ * are produced by scripts/gen-test-vectors-04.mjs.
  */
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs'
 import { join } from 'path'
@@ -19,6 +23,10 @@ import { generateKeyPair } from '../dist/keys.js'
 import { buildReceipt, RECEIPT_GENESIS_HASH } from '../dist/receipt.js'
 
 const ROOT = 'test-vectors'
+if (existsSync(join(ROOT, '001-single-receipt', 'receipts.jsonl'))) {
+  console.error('001–009 are frozen. Refusing to regenerate. For 0.4 cases: node scripts/gen-test-vectors-04.mjs')
+  process.exit(2)
+}
 const KEY_DIR = join(ROOT, 'keys')
 const KEY_ID = 'cnr-vectors'
 const PRIV = join(KEY_DIR, 'vector-key.SECRET-TEST-ONLY.pem')
