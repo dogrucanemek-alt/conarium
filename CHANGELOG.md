@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.2.21 — 2026-08-16
+
+Findings from an independent review that cloned the repository, installed it and ran
+the tests, the hardening checks and the conformance suite on its own machine. None of
+the four is a vulnerability: one is a claim this project stated less carefully than it
+states everything else, and three are places where a misconfiguration could stay quiet.
+
+- **The IETF draft is described as what it is.** The README said only that
+  `draft-dogru-scitt-disclosure-evidence` is "on the IETF Datatracker." A reader's
+  legal or security team can take that for a standards process; the Datatracker page
+  itself says the opposite. It now reads: individual submission, not adopted by a
+  working group, no formal standing — an Internet-Draft is a dated public record, not
+  a standard. Published so the receipt format can be implemented without us.
+
+- **The production profile announces what it changes.** Selecting
+  `profile: production` quietly turned on the OpenTimestamps anchor sink when none was
+  set, which means an outbound HTTPS connection, and quietly set
+  `CONARIUM_AUDIT_REQUIRE_SIG=1`. Both are documented and `conarium-doctor` reports
+  them, but an operator who does not run the doctor never saw it happen. Each implicit
+  change now prints one line to stderr — never stdout, which would corrupt the MCP
+  stream — and nothing is printed when the operator set the value themselves. This
+  README says elsewhere that a governance product making an undisclosed outbound
+  connection has already lost the argument; that sentence should apply to itself.
+
+- **`doctor` warns when a masked column is not a protected one.** A column in
+  `maskColumns` but not in `protectedColumns` leaves exactly the inference channel
+  LIMITATIONS describes: the value is hidden, and a predicate on it still answers
+  questions about it. That can be a deliberate choice, so this is a warning and not a
+  refusal — it exists to make sure it is a choice.
+
+- **`doctor` tests a custom pattern instead of only compiling it.** A rule may now
+  carry an optional `sample`. A pattern that compiles but does not match its own
+  sample is a warning; a pattern with no sample is reported as untested rather than
+  passing silently. Neither the pattern nor the sample is ever printed. Compiling is
+  not catching, and a typo in a customer-specific rule used to protect nothing while
+  looking healthy.
+
+- Contributing docs now carry the rule the four findings share: a setting that weakens
+  a protection has to be noisy — in the receipt, in the doctor, and at startup.
+
 ## 0.2.20 — 2026-08-16
 
 - **`policy.protectedColumns`: a column you may read but not ask about.**

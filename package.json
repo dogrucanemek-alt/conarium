@@ -1,6 +1,6 @@
 {
   "name": "@conarium-ai/core",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "mcpName": "io.github.dogrucanemek-alt/conarium",
   "//files-artefakt": "examples/ altindaki uretilmis dosyalar (ozel anahtar, makbuz/denetim JSONL) ELENIR. .gitignore npm'i baglamaz: izin listesinde 'examples' oldugu icin demoyu kosturmus bir makinede 'npm publish' _keys/audit-ed25519.pem'i (OZEL ANAHTAR) ve makbuzlari yayinliyordu. test/pack_artefakt.mjs bunu kilitler. Elemeler examples/ ile SINIRLI: test-vectors/ altindaki receipts.jsonl ve .pub.pem YAYINLANMAK ZORUNDA, yoksa ucuncu taraf konformans vektorlerini kosturamaz.",
   "//files": "Pakete NE gireceginin izin listesi. Liste olmadan npm her seyi gonderiyordu: 296 dosya / 1.5 MB — CI workflowlari, gitleaks ayari, 137 KB pazarlama gorseli, sitenin api/chat.js dosyasi. Bir bankanin guvenlik ekibi tarball'i acip bunlari gorur. scripts/ BILEREK var: conarium-reconcile calisirken scripts/pg-snapshot.sql'e atif yapiyor, olmazsa kullanici destek maili yazar.",
