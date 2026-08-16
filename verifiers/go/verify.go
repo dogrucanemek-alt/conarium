@@ -427,6 +427,11 @@ func asMap(v any) (map[string]any, bool) {
 	return m, ok
 }
 
+func hasKey(m map[string]any, k string) bool {
+	_, ok := m[k]
+	return ok
+}
+
 func asInt(v any) (int, bool) {
 	switch n := v.(type) {
 	case json.Number:
@@ -551,6 +556,9 @@ func schemaOk(r map[string]any) string {
 			return "disclosure.source must be measured|undeclared in v0.4"
 		}
 		if ds == "undeclared" {
+			if !hasKey(d, "hash") || !hasKey(d, "bytes") {
+				return "disclosure.source is \"undeclared\" but carries values"
+			}
 			if d["hash"] != nil || d["bytes"] != nil {
 				return "disclosure.source is \"undeclared\" but carries values"
 			}
@@ -575,6 +583,9 @@ func schemaOk(r map[string]any) string {
 			return "destination.source must be operator-declared|undeclared in v0.4"
 		}
 		if ss == "undeclared" {
+			if !hasKey(dest, "value") {
+				return "destination.source is \"undeclared\" but carries a value"
+			}
 			if dest["value"] != nil {
 				return "destination.source is \"undeclared\" but carries a value"
 			}
