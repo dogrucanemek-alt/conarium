@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.2.22 — 2026-08-16
+
+Two corrections, both to places where something was stated or shipped without
+anyone having gone back to check it.
+
+- **Reconciliation reports object attribution, not coverage.** A review on the IETF
+  SCITT list pointed out that `conarium-reconcile` printed "every DB query pattern in
+  the window is covered by receipts", and the specification asked "is every bit of it
+  receipted?" — while the procedure establishes neither. One receipt naming a table
+  clears any number of further statements against that table inside the window;
+  `test/reconcile_cli.test.mjs` is a deliberate positive case with a delta of five
+  calls and one receipt. Counts are still not compared 1:1 and will not be: one client
+  request can produce several source statements, and a 1:1 rule would report false
+  uncovered activity on any deployment behind a connection pooler. The error was not
+  refusing 1:1; it was treating existence as the alternative. A clean run now prints
+  what it establishes, and the limit is written in LIMITATIONS.md. The dogfood
+  transcript keeps the line it originally printed, with a correction beside it.
+
+- **A bare container answers instead of exiting at boot.** Conarium refuses to start
+  when it cannot sign audit entries, which is correct and unchanged. The image was not
+  prepared for its own rule: started with nothing mounted, it died before it could
+  answer a single MCP request — so a directory's health check, or anyone running the
+  image to see what the tools are, saw a crash. The entry point now mints a throwaway
+  Ed25519 key when none is configured, prefixed `ephemeral-container-` so a receipt
+  made with it says what it came from, and warns on stderr. Mounting a key skips the
+  path entirely. Nothing in CI built the Dockerfile before; a workflow now builds the
+  image and requires a bare container to list its tools.
+
 ## 0.2.21 — 2026-08-16
 
 Findings from an independent review that cloned the repository, installed it and ran
