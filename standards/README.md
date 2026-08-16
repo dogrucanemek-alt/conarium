@@ -28,7 +28,7 @@ Source is kramdown-rfc markdown. To build txt/xml locally:
 
 ```
 gem install kramdown-rfc
-kdrfc standards/draft-dogru-scitt-disclosure-evidence-01.md
+kdrfc standards/draft-dogru-scitt-disclosure-evidence-02.md
 ```
 
 or paste the file into <https://author-tools.ietf.org/>.
