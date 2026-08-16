@@ -105,6 +105,56 @@ describe('G4 production proof profile', () => {
     expect(process.env.CONARIUM_ANCHOR_SINK).toBe('opentimestamps')
   })
 
+  it('stderr announces only the production defaults the operator did not set', () => {
+    process.env.CONARIUM_AUDIT_SIGNING_KEY = 'x.pem'
+    process.env.CONARIUM_AUDIT_HMAC_KEY = 'hmac-secret'
+    const err: string[] = []
+    const out: string[] = []
+    const origErr = process.stderr.write.bind(process.stderr)
+    const origOut = process.stdout.write.bind(process.stdout)
+    process.stderr.write = ((chunk: unknown, ...rest: unknown[]) => {
+      err.push(String(chunk))
+      return true
+    }) as typeof process.stderr.write
+    process.stdout.write = ((chunk: unknown, ...rest: unknown[]) => {
+      out.push(String(chunk))
+      return origOut(chunk as string, ...(rest as []))
+    }) as typeof process.stdout.write
+    try {
+      enforceProductionProfile({ profile: 'production' })
+    } finally {
+      process.stderr.write = origErr
+      process.stdout.write = origOut
+    }
+    const stderr = err.join('')
+    expect(stderr).toMatch(
+      /\[conarium\] production profile: enabling CONARIUM_AUDIT_REQUIRE_SIG=1/,
+    )
+    expect(stderr).toMatch(
+      /\[conarium\] production profile: anchor sink not set → enabling opentimestamps \(outbound HTTPS to public calendars\)/,
+    )
+    expect(out.join('')).not.toMatch(/production profile/)
+  })
+
+  it('stderr stays quiet when the operator already set the production defaults', () => {
+    process.env.CONARIUM_AUDIT_SIGNING_KEY = 'x.pem'
+    process.env.CONARIUM_AUDIT_HMAC_KEY = 'hmac-secret'
+    process.env.CONARIUM_AUDIT_REQUIRE_SIG = '1'
+    process.env.CONARIUM_ANCHOR_SINK = 'opentimestamps'
+    const err: string[] = []
+    const origErr = process.stderr.write.bind(process.stderr)
+    process.stderr.write = ((chunk: unknown) => {
+      err.push(String(chunk))
+      return true
+    }) as typeof process.stderr.write
+    try {
+      enforceProductionProfile({ profile: 'production' })
+    } finally {
+      process.stderr.write = origErr
+    }
+    expect(err.join('')).not.toMatch(/production profile/)
+  })
+
   it('parseConariumConfig accepts profile production', () => {
     const cfg = parseConariumConfig({ ...BASE, profile: 'production' })
     expect(cfg.profile).toBe('production')

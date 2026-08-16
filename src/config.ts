@@ -102,10 +102,14 @@ export function enforceProductionProfile(cfg?: { profile?: string } | null): voi
   }
   if (process.env.CONARIUM_AUDIT_REQUIRE_SIG !== '1') {
     process.env.CONARIUM_AUDIT_REQUIRE_SIG = '1'
+    process.stderr.write('[conarium] production profile: enabling CONARIUM_AUDIT_REQUIRE_SIG=1\n')
   }
   const sink = (process.env.CONARIUM_ANCHOR_SINK || 'none').toLowerCase()
   if (sink === 'none' || sink === '' || sink === 'off') {
     process.env.CONARIUM_ANCHOR_SINK = 'opentimestamps'
+    process.stderr.write(
+      '[conarium] production profile: anchor sink not set → enabling opentimestamps (outbound HTTPS to public calendars)\n',
+    )
   }
 }
 
