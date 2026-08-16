@@ -121,6 +121,17 @@ On deny or error, or when no payload was serialised:
 "disclosure": { "hash": null, "bytes": null, "source": "undeclared" }
 ```
 
+Which tools write `measured`, and which do not:
+
+| Tool | `disclosure.source` | Why |
+|---|---|---|
+| `query` | `measured` | The receipt binds the masked, row-capped JSON that left as `content[0].text`. |
+| `search` | `measured` | Same: the serialised search result that left. |
+| `describe_table` | `measured` | Same: the serialised table description that left. |
+| `list_tables` | always `undeclared` | The receipt is cut **per connector**. The response the client sees is the **combined** JSON of every connector that was listed. Hashing that union into one connector's receipt would commit that receipt to bytes it does not cover. |
+
+`undeclared` here is not a fault. A second implementation that sees it on `list_tables` should not treat the receipt as broken.
+
 Nothing is invented. A low-entropy payload (yes/no, a single row) makes the
 hash a **verification oracle** — anyone with the receipt can test a guess.
 That is a property of the hash, not a bug. It is written in LIMITATIONS. A
