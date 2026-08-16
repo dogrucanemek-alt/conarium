@@ -357,4 +357,23 @@ describe('T5 verify scenarios', () => {
     const res = runVerify([path])
     expect(res.code).toBe(13)
   })
+
+  it('frozen 0.3 vector still verifies — missing 0.4 fields are not a failure', () => {
+    const frozen = join(HERE, '..', 'test-vectors', '001-single-receipt', 'receipts.jsonl')
+    const pub = join(HERE, '..', 'test-vectors', 'keys', 'vector-key.pub.pem')
+    const res = runVerify([frozen, '--pubkey', pub])
+    expect(res.code).toBe(0)
+  })
+
+  it('0.4 receipt missing disclosure is schema-invalid (20), not a hash mismatch', () => {
+    const receipts = chainOf(1, key)
+    const stripped = { ...receipts[0] }
+    delete (stripped as { disclosure?: unknown }).disclosure
+    const dir = mkdtempSync(join(tmpdir(), 'cnr-v04-'))
+    const file = join(dir, 'receipts.jsonl')
+    writeFileSync(file, JSON.stringify(stripped) + '\n')
+    const res = runVerify([file, '--pubkey', publicPath])
+    expect(res.code).toBe(20)
+    expect(res.stderr).toMatch(/disclosure/)
+  })
 })

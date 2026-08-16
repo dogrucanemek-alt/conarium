@@ -24,10 +24,11 @@ const (
 	receiptV1 = "conarium-receipt/0.1"
 	receiptV2 = "conarium-receipt/0.2"
 	receiptV3 = "conarium-receipt/0.3"
+	receiptV4 = "conarium-receipt/0.4"
 	genesis   = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 )
 
-var metaSources = map[string]bool{"protocol": true, "operator-declared": true, "undeclared": true}
+var metaV3 = map[string]bool{"protocol": true, "operator-declared": true, "undeclared": true}
 
 type options struct {
 	target          string
@@ -445,7 +446,7 @@ func schemaOk(r map[string]any) string {
 		return "not an object"
 	}
 	v, _ := asString(r["v"])
-	if v != receiptV1 && v != receiptV2 && v != receiptV3 {
+	if v != receiptV1 && v != receiptV2 && v != receiptV3 && v != receiptV4 {
 		return fmt.Sprintf("unsupported version %v", r["v"])
 	}
 	if id, ok := asString(r["id"]); !ok || id == "" {
@@ -516,14 +517,17 @@ func schemaOk(r map[string]any) string {
 			}
 		}
 	}
-	if v == receiptV3 {
+	if v == receiptV3 || v == receiptV4 {
 		for _, alan := range []string{"model", "client"} {
 			m, ok := asMap(r[alan])
 			if !ok {
 				return "missing " + alan
 			}
 			src, _ := asString(m["source"])
-			if !metaSources[src] {
+			if !metaV3[src] {
+				if v == receiptV4 {
+					return alan + ".source must be one of protocol|operator-declared|undeclared in v0.4"
+				}
 				return alan + ".source must be one of protocol|operator-declared|undeclared in v0.3"
 			}
 			if src == "undeclared" {
@@ -535,6 +539,47 @@ func schemaOk(r map[string]any) string {
 					return alan + ".source is \"undeclared\" but carries values"
 				}
 			}
+		}
+	}
+	if v == receiptV4 {
+		d, ok := asMap(r["disclosure"])
+		if !ok {
+			return "missing disclosure"
+		}
+		ds, _ := asString(d["source"])
+		if ds != "measured" && ds != "undeclared" {
+			return "disclosure.source must be measured|undeclared in v0.4"
+		}
+		if ds == "undeclared" {
+			if d["hash"] != nil || d["bytes"] != nil {
+				return "disclosure.source is \"undeclared\" but carries values"
+			}
+		} else {
+			h, ok := asString(d["hash"])
+			if !ok || !hashOK(h) {
+				return "disclosure.hash must be sha256:<64 hex> when measured"
+			}
+			if _, ok := asInt(d["bytes"]); !ok {
+				return "disclosure.bytes must be a non-negative integer when measured"
+			}
+			if n, _ := asInt(d["bytes"]); n < 0 {
+				return "disclosure.bytes must be a non-negative integer when measured"
+			}
+		}
+		dest, ok := asMap(r["destination"])
+		if !ok {
+			return "missing destination"
+		}
+		ss, _ := asString(dest["source"])
+		if ss != "operator-declared" && ss != "undeclared" {
+			return "destination.source must be operator-declared|undeclared in v0.4"
+		}
+		if ss == "undeclared" {
+			if dest["value"] != nil {
+				return "destination.source is \"undeclared\" but carries a value"
+			}
+		} else if val, ok := asString(dest["value"]); !ok || val == "" {
+			return "destination.value is required when operator-declared"
 		}
 	}
 	return ""

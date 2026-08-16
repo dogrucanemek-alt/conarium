@@ -1,6 +1,6 @@
 /**
  * P4 — a protected-column denial is visible on the receipt and in doctor.
- * Schema string stays conarium-receipt/0.3; flags is already a free string list.
+ * Schema string is conarium-receipt/0.4; flags is already a free string list.
  */
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'

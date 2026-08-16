@@ -30,10 +30,12 @@ import { join, extname } from 'path'
 const RECEIPT_V1 = 'conarium-receipt/0.1'
 const RECEIPT_V2 = 'conarium-receipt/0.2'
 const RECEIPT_V3 = 'conarium-receipt/0.3'
-const SURUMLER = [RECEIPT_V1, RECEIPT_V2, RECEIPT_V3]
-// v0.3 meta kaynaklari. Bilinmeyen bir kaynak sema hatasidir: "protocol" yazip
-// olcmemis olmak, dogrulayanin makbuza fazladan guvenmesi demek olurdu.
-const META_KAYNAKLARI = ['protocol', 'operator-declared', 'undeclared']
+const RECEIPT_V4 = 'conarium-receipt/0.4'
+const SURUMLER = [RECEIPT_V1, RECEIPT_V2, RECEIPT_V3, RECEIPT_V4]
+// Tek sozluk. v0.3 model/client uc degeri kullanir; v0.4 disclosure `measured`
+// ekler. DECLARED/VERIFIED ikinci set yoktur.
+const META_KAYNAKLARI = ['protocol', 'measured', 'operator-declared', 'undeclared']
+const META_V3 = ['protocol', 'operator-declared', 'undeclared']
 const GENESIS = 'sha256:0000000000000000000000000000000000000000000000000000000000000000'
 
 // ─── JCS subset (must match src/receipt.ts canonicalize) ─────────────────────
@@ -327,12 +329,14 @@ function schemaOk(r) {
   }
   // v0.3: model/client artik DEGERI ile birlikte KAYNAGINI da tasir.
   // "undeclared" gecerli bir makbuzdur — eksik degil, durustce bos.
-  if (r.v === RECEIPT_V3) {
+  // v0.4 ayni model/client kurallarini korur; disclosure/destination EKLER.
+  // Eski surumlerde bu alanlar zorunlu degil — eksik 0.3 makbuz 20 donmez.
+  if (r.v === RECEIPT_V3 || r.v === RECEIPT_V4) {
     for (const alan of ['model', 'client']) {
       const m = r[alan]
       if (!m || typeof m !== 'object') return `missing ${alan}`
-      if (!META_KAYNAKLARI.includes(m.source)) {
-        return `${alan}.source must be one of ${META_KAYNAKLARI.join('|')} in v0.3`
+      if (!META_V3.includes(m.source)) {
+        return `${alan}.source must be one of ${META_V3.join('|')} in ${r.v === RECEIPT_V4 ? 'v0.4' : 'v0.3'}`
       }
       // Bildirilmedi denip deger tasimak celiskidir: makbuz ya bilmiyordur ya bilir.
       if (m.source === 'undeclared') {
@@ -341,6 +345,31 @@ function schemaOk(r) {
           : [m.name, m.version].some((x) => x !== null)
         if (dolu) return `${alan}.source is "undeclared" but carries values`
       }
+    }
+  }
+  if (r.v === RECEIPT_V4) {
+    const d = r.disclosure
+    if (!d || typeof d !== 'object') return 'missing disclosure'
+    if (d.source !== 'measured' && d.source !== 'undeclared') {
+      return 'disclosure.source must be measured|undeclared in v0.4'
+    }
+    if (d.source === 'undeclared') {
+      if (d.hash !== null || d.bytes !== null) return 'disclosure.source is "undeclared" but carries values'
+    } else {
+      if (typeof d.hash !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(d.hash)) {
+        return 'disclosure.hash must be sha256:<64 hex> when measured'
+      }
+      if (!Number.isInteger(d.bytes) || d.bytes < 0) return 'disclosure.bytes must be a non-negative integer when measured'
+    }
+    const dest = r.destination
+    if (!dest || typeof dest !== 'object') return 'missing destination'
+    if (dest.source !== 'operator-declared' && dest.source !== 'undeclared') {
+      return 'destination.source must be operator-declared|undeclared in v0.4'
+    }
+    if (dest.source === 'undeclared') {
+      if (dest.value !== null) return 'destination.source is "undeclared" but carries a value'
+    } else if (typeof dest.value !== 'string' || dest.value.length === 0) {
+      return 'destination.value is required when operator-declared'
     }
   }
   return null

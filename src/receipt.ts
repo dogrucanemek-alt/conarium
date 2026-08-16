@@ -1,6 +1,7 @@
 /**
- * Conarium Receipt v0.3 — schema, canonicalize (JCS subset), hash, sign.
- * v0.1 ve v0.2 makbuzları sonsuza kadar doğrulanabilir kalır; doğrulayıcı üçünü de kabul eder.
+ * Conarium Receipt v0.4 — schema, canonicalize (JCS subset), hash, sign.
+ * v0.1 / v0.2 / v0.3 makbuzları sonsuza kadar doğrulanabilir kalır; eski makbuz
+ * yeniden hash'lenmez, yeniden imzalanmaz, alan eklenmez.
  * Spec: docs/superpowers/specs/2026-07-29-conarium-receipt-design.md §4
  *      + docs/superpowers/specs/2026-08-05-receipt-meta-provenance-design.md (v0.3)
  *
@@ -14,7 +15,7 @@ import { createHash, randomBytes } from 'crypto'
 import { type SigningKey, signHash } from './keys.js'
 import type { ActorAssurance } from './tokens.js'
 
-export const RECEIPT_VERSION = 'conarium-receipt/0.3' as const
+export const RECEIPT_VERSION = 'conarium-receipt/0.4' as const
 
 /** Tek kaynak sözlüğü. Sıra belgelenen anlam sırasıdır; yeni değer sona eklenir. */
 export const META_SOURCES = ['protocol', 'measured', 'operator-declared', 'undeclared'] as const

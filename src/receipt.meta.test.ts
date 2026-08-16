@@ -27,8 +27,8 @@ function temelInput(): ReceiptInput {
 }
 
 describe('makbuz v0.3 — meta provenance', () => {
-  it('sürüm 0.3', () => {
-    expect(RECEIPT_VERSION).toBe('conarium-receipt/0.3')
+  it('sürüm 0.4', () => {
+    expect(RECEIPT_VERSION).toBe('conarium-receipt/0.4')
   })
 
   it('tek sözlük: measured eklendi; verified / declared / observed ikinci set değil', () => {

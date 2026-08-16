@@ -97,7 +97,7 @@ describe('audit receipt — yapılandırma anında imza kontrolü (regresyon)', 
 
     expect(existsSync(receiptSink)).toBe(true)
     const makbuz = JSON.parse(readFileSync(receiptSink, 'utf-8').trim().split('\n')[0])
-    expect(makbuz.v).toBe('conarium-receipt/0.3')
+    expect(makbuz.v).toBe('conarium-receipt/0.4')
     expect(makbuz.model).toEqual({ source: 'undeclared', provider: null, name: null, version: null })
     expect(makbuz.client).toEqual({ source: 'undeclared', name: null, version: null })
     expect(makbuz.destination).toEqual({ value: null, source: 'undeclared' })
@@ -203,7 +203,7 @@ describe('audit receipt — mutlu yol', () => {
 
     const receipts = readReceipts(receiptSink)
     expect(receipts).toHaveLength(1)
-    expect(receipts[0].v).toBe('conarium-receipt/0.3')
+    expect(receipts[0].v).toBe('conarium-receipt/0.4')
     expect(receipts[0].flags).toContain('denied')
     expect(receipts[0].flags).toContain('protected-column-denied')
     expect(JSON.stringify(receipts[0].masking)).not.toMatch(/@/)

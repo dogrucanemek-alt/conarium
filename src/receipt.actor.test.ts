@@ -33,8 +33,8 @@ function sampleInput(): ReceiptInput {
 }
 
 describe('makbuz aktörü', () => {
-  it('sürüm 0.3', () => {
-    expect(RECEIPT_VERSION).toBe('conarium-receipt/0.3')
+  it('sürüm 0.4', () => {
+    expect(RECEIPT_VERSION).toBe('conarium-receipt/0.4')
   })
 
   it('aktör türü verilmezse service kalır ve shared-token beyan edilir', () => {
