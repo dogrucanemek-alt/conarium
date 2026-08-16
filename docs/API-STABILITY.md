@@ -108,11 +108,11 @@ Verifier accepts `0.1`–`0.4`. A `0.3` receipt is not rewritten.
 |---|---|
 | Media type `application/vnd.conarium.receipt+json` | **candidate** |
 | Required fields listed in RECEIPT-SPEC (`ts`, `chain`, `sig`, …) | **candidate** |
-| `consentRef` always `null` in 0.3 | **candidate** (field stays; value may change in a later `v`) |
+| `consentRef` always `null` in 0.4 (and 0.1–0.3) | **candidate** (field stays; value may change in a later `v`) |
 | `anchor` may be `null` / `pending` | **candidate** |
 | Hash / Ed25519 construction | **candidate** |
 | Adding optional fields in a new `v` | allowed |
-| Renaming or removing a field inside `0.3` | break |
+| Renaming or removing a field inside `0.4` | break |
 
 ---
 
