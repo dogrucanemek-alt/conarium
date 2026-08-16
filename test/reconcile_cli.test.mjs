@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const RECONCILE = fileURLToPath(new URL('../bin/conarium-reconcile.mjs', import.meta.url))
-const { extractTables, classifyPattern } = await import(RECONCILE)
+const { extractTables, classifyPattern, reconcile } = await import(RECONCILE)
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -124,6 +124,8 @@ describe('conarium-reconcile CLI', () => {
     // Sınır beyanı çıktıda GÖRÜNMEK zorunda — sadece LIMITATIONS'ta durması yetmez.
     expect(r.stdout).toContain('not per-statement coverage')
     expect(r.stdout).not.toContain('is covered by receipts')
+    expect(r.stdout).not.toContain('UNOBSERVED')
+    expect(r.stderr).not.toContain('UNOBSERVED')
   })
 
   it('normalizes receipt object prefixes: "zion.customers" covers "public"."customers"', () => {
@@ -286,5 +288,68 @@ describe('conarium-reconcile CLI', () => {
     const r = run(args)
     expect(r.code).toBe(0)
     expect(r.stderr).toContain('signatures are NOT checked here')
+    expect(r.stdout).not.toContain('UNOBSERVED')
+    expect(r.stderr).not.toContain('UNOBSERVED')
   })
 })
+
+describe('unobserved — receipt named an object the counters did not increment', () => {
+  function snap(ts, entries) {
+    return {
+      v: 'conarium-dbsnapshot/0.1',
+      ts,
+      role: 'conarium_c2',
+      source: 'pg_stat_statements',
+      entries: new Map(entries.map((e) => [e.queryid, e])),
+    }
+  }
+
+  it('lists the receipt and keeps exit 0 when the DB recorded no increase', () => {
+    const { args } = setup({
+      beforeEntries: [],
+      afterEntries: [],
+      receipts: [receipt({ objects: ['zion.customers'] })],
+    })
+    const r = run(args)
+    expect(r.code).toBe(0)
+    expect(r.stdout).toContain('UNOBSERVED: 1 receipt(s)')
+    expect(r.stdout).toContain('zion.customers')
+    expect(r.stdout).toContain('query')
+  })
+
+  it('is not unassigned: empty dataRefs stay in unassigned, not in unobserved', () => {
+    const { args } = setup({
+      beforeEntries: [],
+      afterEntries: [],
+      receipts: [receipt({ objects: [] })],
+    })
+    const r = run(args)
+    expect(r.code).toBe(0)
+    expect(r.stderr).toContain('NOT definitive')
+    expect(r.stdout).not.toContain('UNOBSERVED')
+    expect(r.stderr).not.toContain('UNOBSERVED')
+  })
+
+  it('reconcile() keeps unobserved off the verdict fields', () => {
+    const result = reconcile(
+      snap(T0, []),
+      snap(T1, []),
+      [receipt({ objects: ['zion.customers'] })],
+    )
+    expect(result.unobserved).toHaveLength(1)
+    expect(result.unobserved[0].objects).toEqual(['zion.customers'])
+    expect(result.unreconciled).toHaveLength(0)
+    expect(result.receipts.unassigned).toBe(0)
+  })
+
+  it('a covering counter increment removes the receipt from unobserved', () => {
+    const result = reconcile(
+      snap(T0, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }]),
+      snap(T1, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }]),
+      [receipt({ objects: ['zion.customers'] })],
+    )
+    expect(result.unobserved).toHaveLength(0)
+    expect(result.reconciled).toHaveLength(1)
+  })
+})
+

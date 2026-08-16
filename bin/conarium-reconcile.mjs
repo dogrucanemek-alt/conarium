@@ -224,6 +224,39 @@ export function receiptCoverage(receipts, fromMs, toMs) {
   return { covered, coveredRaw, inWindow, outOfWindow, unassigned }
 }
 
+/**
+ * Receipts in the window that name an object the database counters did not
+ * increment. Distinct from `unassigned` (receipt named nothing).
+ *
+ * Not a verdict. A stats reset at the window edge, a pooler, or a delayed
+ * count can produce the same shape. Reported, not failed — whether this
+ * should change the exit code is a later decision, not an omission.
+ */
+export function unobservedReceipts(receipts, fromMs, toMs, observedTables) {
+  const found = []
+  for (const r of receipts) {
+    const t = Date.parse(r.ts)
+    if (Number.isNaN(t) || t < fromMs || t > toMs) continue
+    const named = []
+    for (const ref of r.dataRefs || []) {
+      if (ref.object) named.push(String(ref.object))
+    }
+    if (r.request?.tool === 'describe_table' && r.request?.target) {
+      named.push(String(r.request.target))
+    }
+    if (named.length === 0) continue
+    const noneObserved = named.every((obj) => !observedTables.has(normalizeObject(obj)))
+    if (noneObserved) {
+      found.push({
+        objects: named,
+        tool: r.request?.tool || null,
+        ts: r.ts,
+      })
+    }
+  }
+  return found
+}
+
 // ─── reconciliation core ─────────────────────────────────────────────────────
 
 export function reconcile(before, after, receipts) {
@@ -290,6 +323,14 @@ export function reconcile(before, after, receipts) {
     }
   }
 
+  const observedTables = new Set()
+  for (const d of deltas) {
+    const cls = classifyPattern(d.query)
+    if (cls.kind !== 'data') continue
+    for (const t of cls.tables) observedTables.add(t.table)
+  }
+  const unobserved = unobservedReceipts(receipts, fromMs, toMs, observedTables)
+
   return {
     v: RECONCILE_V,
     window: { start: before.ts, end: after.ts },
@@ -306,6 +347,7 @@ export function reconcile(before, after, receipts) {
     unreconciled,
     unattributed,
     infrastructure,
+    unobserved,
   }
 }
 
@@ -407,6 +449,14 @@ async function main(argv = process.argv.slice(2)) {
         `warning: ${result.receipts.unassigned} receipt(s) in the window could not be attributed to a table — ` +
           `any "not receipted" finding below is NOT definitive`,
       )
+    }
+    if (result.unobserved.length > 0) {
+      console.log(
+        `UNOBSERVED: ${result.unobserved.length} receipt(s) named an object the database counters did not increment:`,
+      )
+      for (const u of result.unobserved) {
+        console.log(`  · [${u.objects.join(', ')}] ${u.tool || 'receipt'} @ ${u.ts}`)
+      }
     }
     if (problems === 0) {
       console.log('ok: every DB query pattern in the window is attributable to receipt(s) for the same table')

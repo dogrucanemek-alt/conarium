@@ -170,6 +170,14 @@ such deployment. The consequence is that a clean run establishes pattern and
 object overlap within the window. It does not establish that each recorded
 statement was itself receipted.
 
+A receipt that names an object while the database counters show no increase
+for that object is listed as UNOBSERVED. It is not a failure. The same
+shape appears when a counter was reset at the window edge, when a pooler
+collapses statements, or when the increment lands outside the snapshot
+pair. The category is counted and printed so the gap is visible; it does
+not change the exit code. `unassigned` is a different gap (the receipt
+named no object at all).
+
 ## OpenTimestamps client
 
 Stamping uses a built-in calendar client (Node `crypto` + HTTPS to the public calendars).

@@ -301,6 +301,12 @@ Rules that keep the verdict honest:
   instead of producing a verdict from bad data.
 - **Receipts with no attributable object make findings non-definitive** and the
   tool says so — same rule as the coverage declaration.
+- **A receipt that names an object the counters did not increment is
+  UNOBSERVED**, listed separately from `unassigned` (no object named) and from
+  UNRECONCILED (database recorded access, no covering receipt). It is
+  reported. It does not change the exit code: a window-edge reset, a pooler,
+  or a delayed count can produce the same shape, and treating every such
+  receipt as a failure has not been shown to be the right rule.
 - **A dedicated DB role is a prerequisite.** Reconciling a shared role's
   counters would blame the gateway for other clients' queries.
 - **Signatures are not re-checked here.** Run `conarium-verify` first;
