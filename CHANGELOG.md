@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.23 — 2026-08-17
+
+A property run found the first item at random; the second is a gap this project
+stated publicly before it closed it.
+
+- **A column literally named `__proto__` no longer breaks the request.** In
+  JavaScript, `obj["__proto__"] = value` does not create a field — it replaces the
+  object's prototype — and reading the same key returns the prototype rather than a
+  stored value. Both halves were in the masking path: the read made `redact` throw
+  (`aliases['__proto__']` resolved to `Object.prototype`, and a `.trim()` on it is a
+  TypeError), and the write dropped the field from nested masking and from console
+  redaction. A data source is free to return such a key: PostgreSQL accepts the
+  column name, and JSON from an OpenAPI or REST connector can carry it. Writes and
+  reads of caller-supplied field names now go through `setOwn` / `getOwn`
+  (`src/safe-object.ts`), so the field stays a field and the prototype is untouched.
+  There was no leak and no hash divergence — the request failed before producing
+  output — but a governance product that drops or chokes on a column contradicts
+  what it says about recording every access. Rows without such a key are byte-for-byte
+  unchanged, and a test pins that (same payload, same disclosure hash).
+
+- **Reconciliation reports receipts the counters never saw.** A receipt naming an
+  object while the database shows no increase for it is now listed as UNOBSERVED,
+  separately from `unassigned` (a receipt naming nothing at all) and from
+  UNRECONCILED (activity the database recorded with no covering receipt). It does
+  **not** change the exit code, and that is deliberate: a stats reset at the window
+  edge, a connection pooler, or a count landing outside the snapshot pair produces
+  the same shape, so treating every such receipt as a failure has not been shown to
+  be the right rule. The category was named in a review on the IETF SCITT list as
+  one our vocabulary lacked; this makes the gap visible rather than absent.
+
 ## 0.2.22 — 2026-08-16
 
 Two corrections, both to places where something was stated or shipped without
