@@ -27,7 +27,7 @@ author:
     asciiFullname: Emek Can Dogru
     organization: VERAX TEKNOLOJİ LİMİTED ŞİRKETİ
     asciiOrganization: VERAX TEKNOLOJI LIMITED SIRKETI
-    country: Turkey
+    country: TR
     email: e.dogru@conarium.dev
 
 normative:
