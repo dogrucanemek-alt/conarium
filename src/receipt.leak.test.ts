@@ -49,10 +49,21 @@ describe('T6 receipt leak regression', () => {
         rowCapApplied: true,
       },
       outcome: { status: 'complete', denied: false },
+      // Payload carries the secrets. The receipt must bind the bytes (hash)
+      // without reprinting them.
+      disclosurePayload: JSON.stringify({
+        email: secrets.email,
+        phone: secrets.phone,
+        tckn: secrets.tckn,
+        name: secrets.name,
+        apiKey: secrets.apiKey,
+      }),
     }
 
     const receipt = buildReceipt(input, nextChainState(null), key)
     const text = JSON.stringify(receipt)
+    expect(receipt.disclosure.source).toBe('measured')
+    expect(receipt.disclosure.hash?.startsWith('sha256:')).toBe(true)
 
     for (const [label, value] of Object.entries(secrets)) {
       expect(text.includes(value), `leak of ${label}: ${value}`).toBe(false)

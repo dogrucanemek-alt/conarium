@@ -336,6 +336,7 @@ describe('T5 verify scenarios', () => {
       policy: receipts[0].policy,
       flags: receipts[0].flags,
       masking: receipts[0].masking,
+      disclosure: receipts[0].disclosure,
       outcome: receipts[0].outcome,
       consentRef: receipts[0].consentRef,
     }

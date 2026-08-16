@@ -59,6 +59,20 @@ export interface ReceiptClient {
   version: string | null
 }
 
+/**
+ * Sınırdan geçen sonucun taahhüdü. Hash, istemciye giden maskelenmiş /
+ * satır-tavanı uygulanmış metnin UTF-8 baytları üzerindendir — istek hash'i
+ * (`request.argsHash`) çıkanı bağlamaz; bu alan bağlar.
+ *
+ * `measured`: Conarium o baytları hesapladı. `undeclared`: hata/ret yolu veya
+ * sonuç serileştirilmedi; hash/bytes null, uydurma yok.
+ */
+export interface ReceiptDisclosure {
+  hash: string | null
+  bytes: number | null
+  source: Extract<MetaSource, 'measured' | 'undeclared'>
+}
+
 export interface ReceiptRequest {
   tool: string
   target: string
@@ -122,6 +136,7 @@ export interface Receipt {
   policy: ReceiptPolicy
   flags: string[]
   masking: ReceiptMasking
+  disclosure: ReceiptDisclosure
   outcome: ReceiptOutcome
   consentRef: null
   chain: ReceiptChain
@@ -150,6 +165,12 @@ export interface ReceiptInput {
   policy: ReceiptPolicy
   flags: string[]
   masking: ReceiptMasking
+  /**
+   * İstemciye giden metnin ta kendisi (MCP `content[0].text`). Ham sonuç
+   * makbuza yazılmaz — yalnız hash ve bayt sayısı. Ret/hata yolunda verme;
+   * verilse bile yok sayılır (uydurma yok, `undeclared`).
+   */
+  disclosurePayload?: string
   outcome: ReceiptOutcome
 }
 
@@ -339,6 +360,7 @@ export function buildReceipt(
     policy: input.policy,
     flags: input.flags,
     masking: input.masking,
+    disclosure: buildDisclosure(input),
     outcome: input.outcome,
     consentRef: null,
     chain: {
@@ -370,6 +392,35 @@ export function buildReceipt(
 export function hashArgs(args: unknown): string {
   const payload = typeof args === 'string' ? args : canonicalize(args ?? null)
   return `sha256:${createHash('sha256').update(payload).digest('hex')}`
+}
+
+/**
+ * Disclosure commitment: SHA-256 of the exact UTF-8 bytes that left the
+ * boundary. Same string → same hash in any process. Not JCS — the wire
+ * bytes are the fact, not a re-canonicalised object.
+ */
+export function hashDisclosure(payload: string): { hash: string; bytes: number } {
+  const buf = Buffer.from(payload, 'utf8')
+  return {
+    hash: `sha256:${createHash('sha256').update(buf).digest('hex')}`,
+    bytes: buf.byteLength,
+  }
+}
+
+const DISCLOSURE_UNDECLARED: ReceiptDisclosure = {
+  hash: null,
+  bytes: null,
+  source: 'undeclared',
+}
+
+function buildDisclosure(input: ReceiptInput): ReceiptDisclosure {
+  if (input.outcome.denied || input.outcome.status !== 'complete') {
+    return DISCLOSURE_UNDECLARED
+  }
+  if (typeof input.disclosurePayload !== 'string') {
+    return DISCLOSURE_UNDECLARED
+  }
+  return { ...hashDisclosure(input.disclosurePayload), source: 'measured' }
 }
 
 export function nextChainState(prev: Receipt | null): ChainState {

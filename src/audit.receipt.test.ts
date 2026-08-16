@@ -152,6 +152,33 @@ describe('audit receipt — mutlu yol', () => {
     expect(receipts[0].policy.decision).toBe('allow')
     expect(receipts[1].policy.decision).toBe('deny')
     expect(receipts[1].flags).toContain('denied')
+    // Payload yok / ret → disclosure uydurulmaz.
+    expect(receipts[0].disclosure).toEqual({ hash: null, bytes: null, source: 'undeclared' })
+    expect(receipts[1].disclosure).toEqual({ hash: null, bytes: null, source: 'undeclared' })
+  })
+
+  it('disclosurePayload makbuza hash olarak yazılır, audit satırına sızmaz', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'conarium-receipt-disc-'))
+    const receiptSink = join(dir, 'receipts.jsonl')
+    const auditSink = join(dir, 'audit.jsonl')
+    const a = new Audit({ sink: auditSink, receiptSink, receiptMeta: RECEIPT_META })
+    const payload = JSON.stringify({ rows: [{ email: 'ayse@example.com' }] }, null, 2)
+
+    a.log({
+      tool: 'query',
+      target: 'public.users',
+      denied: false,
+      rowsReturned: 1,
+      disclosurePayload: payload,
+    })
+
+    const receipts = readReceipts(receiptSink)
+    expect(receipts[0].disclosure.source).toBe('measured')
+    expect(receipts[0].disclosure.bytes).toBe(Buffer.byteLength(payload, 'utf8'))
+    expect(JSON.stringify(receipts[0])).not.toContain('ayse@example.com')
+    const auditLine = readFileSync(auditSink, 'utf-8')
+    expect(auditLine).not.toContain('disclosurePayload')
+    expect(auditLine).not.toContain('ayse@example.com')
   })
 
   it('protected-column-denied is a receipt flag — names only, schema unchanged', () => {

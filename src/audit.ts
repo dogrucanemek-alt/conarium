@@ -52,6 +52,11 @@ export interface AuditEntry {
    * Config'teki beyanı EZER: ölçülmüş değer, beyan edilmiş değerden üstündür.
    */
   client?: { name: string; version: string; source?: MetaSource }
+  /**
+   * İstemciye giden metin. Makbuza yalnız hash yazılır. Audit JSONL'e
+   * ASLA yazılmaz — sonuç satırı denetim izine sızmasın.
+   */
+  disclosurePayload?: string
   prevHash?: string
   hash?: string
   signature?: string
@@ -138,6 +143,7 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
       rowsReturned: entry.rowsReturned ?? 0,
       rowCapApplied: Boolean(g.appliedRowCap),
     },
+    disclosurePayload: entry.denied ? undefined : entry.disclosurePayload,
     outcome: { status: entry.denied ? 'denied' : 'complete', denied: entry.denied },
   }
 }
@@ -414,9 +420,10 @@ export class Audit {
   ): AuditEntry {
     this.requireSigningCapability()
 
+    const { disclosurePayload, ...persistable } = entry
     const full: AuditEntry = {
       timestamp: new Date().toISOString(),
-      ...entry,
+      ...persistable,
       // Yayılımdan SONRA ve açıkça: eskiden `actor: this.consumer` yayılımın
       // ÖNÜNDEYDİ, yani çağıran aktörü sessizce ezebiliyordu (tipte yasak,
       // çalışma zamanında serbest). Varsayılan artık belirsizliğe bırakılmıyor.
@@ -472,8 +479,11 @@ export class Audit {
     }
 
     // Makbuz üretimi — opt-in (receiptSink yapılandırıldıysa).
+    // disclosurePayload audit satırına yazılmaz; yalnız makbuz hash'i için taşınır.
     if (this.receiptSink) {
-      this.writeReceipt(full)
+      this.writeReceipt(
+        disclosurePayload === undefined ? full : { ...full, disclosurePayload },
+      )
     }
 
     return full

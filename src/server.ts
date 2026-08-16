@@ -333,7 +333,13 @@ export function buildServer(
           })
           throw limitErr
         }
-        recordAccess({ tool: 'describe_table', target: a.table, args: a, denied: false })
+        recordAccess({
+          tool: 'describe_table',
+          target: a.table,
+          args: a,
+          denied: false,
+          disclosurePayload: responseJson,
+        })
         return {
           content: [{ type: 'text', text: responseJson }],
         }
@@ -449,6 +455,7 @@ export function buildServer(
           maskedCount: result.governance.maskedCount,
           denied: false,
           governance: result.governance,
+          disclosurePayload: responseJson,
         })
 
         return {
@@ -478,6 +485,7 @@ export function buildServer(
         const searchGovernance = searchTables.length
           ? { ...result.governance, accessedTables: searchTables }
           : result.governance
+        const searchJson = JSON.stringify(result, null, 2)
         recordAccess({
           tool: 'search',
           target: conn.name,
@@ -485,9 +493,10 @@ export function buildServer(
           rowsReturned: result.rowCount,
           denied: false,
           governance: searchGovernance,
+          disclosurePayload: searchJson,
         })
         return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: searchJson }],
         }
       }
 
