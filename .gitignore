@@ -116,3 +116,7 @@ DURUM.md
 # Box-side hand backups (conarium-proof: proof.js.bak-0210, .bak-20260814).
 *.bak
 *.bak-*
+
+# xml2rfc build artefacts
+standards/.refcache/
+standards/tracker.log
