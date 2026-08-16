@@ -73,7 +73,7 @@ hr{border:none;border-top:1px solid var(--line);margin:56px 0}
     <li class="yes"><b>PII masking before the model.</b> Emails, national IDs, phone numbers and card numbers are redacted in the response stream — plaintext <em>and</em> base64-encoded, so encode-tricks don't slip through. Non-PII text is left intact (no false positives).</li>
     <li class="yes"><b>Row caps.</b> A hard per-query limit (default 100) stops silent bulk exfiltration.</li>
     <li class="yes"><b>Tamper-evident, PII-safe audit.</b> Every access is appended to a hash-chained JSONL ledger — who, what, when, rows, decision. Alter one entry and the chain breaks on the next read. The audit itself is masked, so it never stores raw PII.</li>
-    <li class="yes"><b>Self-hosted.</b> Runs on your infrastructure. Your data never crosses your perimeter.</li>
+    <li class="yes"><b>Self-hosted.</b> Runs on your infrastructure. Raw protected values stay inside your perimeter; what reaches your AI client is the policy-approved disclosure, and the receipt records exactly which bytes those were.</li>
   </ul>
 
   <h2>Policy model</h2>

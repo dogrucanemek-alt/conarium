@@ -6,7 +6,7 @@ MCP made "connect an AI assistant to your data" a commodity. The durable value i
 
 1. **Ingestion** of messy internal sources (schemas today; docs, ADRs, APIs next).
 2. **Governance + audit** — what the AI may see, and a record of what it saw.
-3. **Self-hosting** — data never leaves the customer's network.
+3. **Self-hosting** — the gateway runs in the customer's network and transmits nothing outward on its own. Raw protected values stay there; the policy-approved disclosure is what reaches the customer's AI client, and `disclosure.hash` binds exactly which bytes those were.
 4. **Freshness** — incremental re-index so context never goes stale.
 
 Conarium owns this layer and stays **tool-agnostic**: it speaks MCP, so it plugs into Cursor, Copilot, Claude Code, Windsurf, Continue.dev — whatever wins.
