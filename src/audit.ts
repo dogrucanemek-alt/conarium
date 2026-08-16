@@ -76,6 +76,8 @@ export interface AuditEntry {
 export interface ReceiptMeta {
   model?: { provider: string; name: string; version: string }
   client?: { name: string; version: string; source?: MetaSource }
+  /** Operatör beyanı. Doğrulanmaz. Politika bunu okumaz. */
+  destination?: string
 }
 
 /**
@@ -119,6 +121,7 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
     model: meta.model,
     // Ölçülmüş (protokolden gelen) client, config'teki beyanı ezer.
     client: entry.client ?? meta.client,
+    destination: meta.destination,
     request: {
       tool: entry.tool,
       target: entry.target ?? '',

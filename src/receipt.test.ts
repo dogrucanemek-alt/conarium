@@ -331,6 +331,7 @@ describe('T5 verify scenarios', () => {
       actor: receipts[0].actor,
       model: receipts[0].model,
       client: receipts[0].client,
+      destination: receipts[0].destination,
       request: receipts[0].request,
       dataRefs: receipts[0].dataRefs,
       policy: receipts[0].policy,

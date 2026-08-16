@@ -175,6 +175,21 @@ describe('renderReceiptHtml', () => {
     expect(html).not.toMatch(/Çıpa:\s*bitcoin/)
   })
 
+  it('destination uses the same language as model.source — never verified/safe', () => {
+    const r = sampleReceipt(1, RECEIPT_GENESIS_HASH, 'allow')
+    r.destination = { value: 'openai/gpt-x', source: 'operator-declared' }
+    const html = renderReceiptHtml(receiptToView(r))
+    expect(html).toContain('openai/gpt-x')
+    expect(html).toContain('operatör beyan etti, doğrulanmadı')
+    expect(html).not.toMatch(/destination güvenli|destination safe|verified destination/i)
+  })
+
+  it('undeclared destination is named, not invented', () => {
+    const r = sampleReceipt(1, RECEIPT_GENESIS_HASH, 'allow')
+    const html = renderReceiptHtml(receiptToView(r))
+    expect(html).toContain('hedef bildirilmedi (undeclared).')
+  })
+
   it('G17: verified sidecar may print bitcoin', () => {
     const r = sampleReceipt(1, RECEIPT_GENESIS_HASH, 'allow')
     r.anchor = { log: 'opentimestamps', ref: r.chain.hash, state: 'bitcoin' }

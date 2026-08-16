@@ -73,6 +73,16 @@ export interface ReceiptDisclosure {
   source: Extract<MetaSource, 'measured' | 'undeclared'>
 }
 
+/**
+ * Hedef beyanı. MCP modeli taşımaz; değer operatör config'inden gelir.
+ * Conarium doğrulamaz. Politika kararı bu alana BAĞLANMAZ — doğrulanamayan
+ * bir alana erişim kararı bağlamak, beyanı zorlama gibi göstermek olur.
+ */
+export interface ReceiptDestination {
+  value: string | null
+  source: Extract<MetaSource, 'operator-declared' | 'undeclared'>
+}
+
 export interface ReceiptRequest {
   tool: string
   target: string
@@ -131,6 +141,7 @@ export interface Receipt {
   actor: ReceiptActor
   model: ReceiptModel
   client: ReceiptClient
+  destination: ReceiptDestination
   request: ReceiptRequest
   dataRefs: ReceiptDataRef[]
   policy: ReceiptPolicy
@@ -160,6 +171,8 @@ export interface ReceiptInput {
    * `source: 'protocol'` ile gelmelidir — ölçülmüş ile beyan edilmiş karışmasın.
    */
   client?: { name: string; version: string; source?: MetaSource }
+  /** Operatör beyanı (ör. "openai/gpt-x"). Doğrulanmaz. Yoksa undeclared. */
+  destination?: string
   request: ReceiptRequest
   dataRefs: ReceiptDataRef[]
   policy: ReceiptPolicy
@@ -324,6 +337,13 @@ function buildClient(c?: { name: string; version: string; source?: MetaSource })
   return { source: c.source ?? 'operator-declared', name: c.name, version: c.version }
 }
 
+function buildDestination(value?: string): ReceiptDestination {
+  if (typeof value !== 'string' || value.length === 0) {
+    return { value: null, source: 'undeclared' }
+  }
+  return { value, source: 'operator-declared' }
+}
+
 /**
  * Build a signed (or explicitly unsigned) receipt.
  * consentRef is always null — reserved for consent binding (ISO/IEC TS 27560),
@@ -355,6 +375,7 @@ export function buildReceipt(
     actor: buildActor(input.actor),
     model: buildModel(input.model),
     client: buildClient(input.client),
+    destination: buildDestination(input.destination),
     request: input.request,
     dataRefs: input.dataRefs,
     policy: input.policy,

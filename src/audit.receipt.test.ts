@@ -47,6 +47,7 @@ afterAll(() => {
 const RECEIPT_META = {
   model: { provider: 'test', name: 'test-model', version: '1.0' },
   client: { name: 'test-client', version: '1.0' },
+  destination: 'openai/gpt-x',
 }
 
 function readReceipts(sink: string): Receipt[] {
@@ -99,6 +100,7 @@ describe('audit receipt — yapılandırma anında imza kontrolü (regresyon)', 
     expect(makbuz.v).toBe('conarium-receipt/0.3')
     expect(makbuz.model).toEqual({ source: 'undeclared', provider: null, name: null, version: null })
     expect(makbuz.client).toEqual({ source: 'undeclared', name: null, version: null })
+    expect(makbuz.destination).toEqual({ value: null, source: 'undeclared' })
     // İmza hâlâ zorunlu — gevşetilen tek şey meta.
     expect(makbuz.sig?.alg).toBe('Ed25519')
   })
@@ -152,6 +154,8 @@ describe('audit receipt — mutlu yol', () => {
     expect(receipts[0].policy.decision).toBe('allow')
     expect(receipts[1].policy.decision).toBe('deny')
     expect(receipts[1].flags).toContain('denied')
+    expect(receipts[0].destination).toEqual({ value: 'openai/gpt-x', source: 'operator-declared' })
+    expect(receipts[1].destination).toEqual({ value: 'openai/gpt-x', source: 'operator-declared' })
     // Payload yok / ret → disclosure uydurulmaz.
     expect(receipts[0].disclosure).toEqual({ hash: null, bytes: null, source: 'undeclared' })
     expect(receipts[1].disclosure).toEqual({ hash: null, bytes: null, source: 'undeclared' })

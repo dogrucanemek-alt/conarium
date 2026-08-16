@@ -154,6 +154,8 @@ export interface AuditConfig {
   receiptModel?: { provider: string; name: string; version: string }
   /** Client identification for receipts (name/version). */
   receiptClient?: { name: string; version: string }
+  /** Operator-declared destination. Not verified. Not a policy input. */
+  receiptDestination?: string
 }
 
 export interface ConnectorConfig {

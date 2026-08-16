@@ -69,6 +69,8 @@ export const AuditConfigSchema = z.object({
     name: z.string().min(1),
     version: z.string().min(1),
   }).optional(),
+  /** Operator-declared destination (e.g. "openai/gpt-x"). Not verified. Not a policy input. */
+  receiptDestination: z.string().min(1).optional(),
 }).strict()
 
 export const ConnectorConfigSchema = z.object({

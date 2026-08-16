@@ -49,6 +49,8 @@ export interface ReceiptView {
   verify: string
   anchor: ReceiptViewAnchor | null
   jsonHref?: string
+  /** Presentation only. Same language as model.source — never "verified". */
+  destination?: { value: string | null; sourceNote: string }
 }
 
 /** Structural input for the demo /proof payload. Lives here so nexus does not keep a renderer. */
@@ -82,6 +84,10 @@ const PRESENTATION_TR: Record<string, string> = {
     'Sentetik demo verisi, gerçek müşteri verisi değil.',
   'actor is a service identity, not a natural person.':
     'aktör bir hizmet kimliği, gerçek kişi değil.',
+  'operator declared, not verified':
+    'operatör beyan etti, doğrulanmadı',
+  'destination not declared (undeclared).':
+    'hedef bildirilmedi (undeclared).',
   'Anchor may be pending — Bitcoin attestation takes hours.':
     'Çıpa pending olabilir — Bitcoin tasdiki saatler sürer.',
   'This demo is not anchored — the chain head was never sent to a calendar.':
@@ -149,6 +155,11 @@ export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}
   if (!extras.limitations) {
     if (receipt.model?.source === 'undeclared') limitations.push('model bildirmedi (undeclared).')
     if (receipt.client?.source === 'undeclared') limitations.push('istemci bildirmedi (undeclared).')
+    if (receipt.destination?.source === 'undeclared') {
+      limitations.push('hedef bildirilmedi (undeclared).')
+    } else if (receipt.destination?.source === 'operator-declared') {
+      limitations.push('hedef: operatör beyan etti, doğrulanmadı.')
+    }
     const display = resolveAnchorDisplay(receipt.anchor, { display: extras.anchorDisplay })
     if (!receipt.anchor) limitations.push('çıpa yok.')
     else if (display === 'pending') {
@@ -196,6 +207,15 @@ export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}
         }
       : null,
     jsonHref: extras.jsonHref,
+    destination: receipt.destination
+      ? {
+          value: receipt.destination.value,
+          sourceNote:
+            receipt.destination.source === 'operator-declared'
+              ? 'operatör beyan etti, doğrulanmadı'
+              : 'hedef bildirilmedi (undeclared).',
+        }
+      : undefined,
   }
 }
 
@@ -270,6 +290,13 @@ function innerHtml(view: ReceiptView, localId: string): string {
   </section>
 
   ${view.claim ? `<p>${esc(presentKnownText(view.claim))}</p>` : ''}
+
+  ${
+    view.destination
+      ? `<h2>Hedef</h2>
+  <p>${esc(view.destination.value ?? '—')} — ${esc(presentKnownText(view.destination.sourceNote))}</p>`
+      : ''
+  }
 
   <h2>İşlemler</h2>
   <table>

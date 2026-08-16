@@ -86,6 +86,7 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
     receiptMeta: {
       model: config.audit?.receiptModel,
       client: config.audit?.receiptClient,
+      destination: config.audit?.receiptDestination,
     },
     scanCharCap: config.policy?.scanCharCap,
     detectors: config.policy?.detectors,
