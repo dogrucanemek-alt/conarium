@@ -3,12 +3,21 @@
  * v0.1 ve v0.2 makbuzları sonsuza kadar doğrulanabilir kalır; doğrulayıcı üçünü de kabul eder.
  * Spec: docs/superpowers/specs/2026-07-29-conarium-receipt-design.md §4
  *      + docs/superpowers/specs/2026-08-05-receipt-meta-provenance-design.md (v0.3)
+ *
+ * Bilgi-durumu sözlüğü TEK: model / client / (ileride disclosure, destination)
+ * aynı `MetaSource` değerlerini kullanır. DECLARED / OBSERVED / VERIFIED / DERIVED
+ * diye ikinci bir set YOKTUR — aynı fikri iki kelimeyle anlatmak, okuyanı ve
+ * doğrulayıcıyı iki yola zorlar. `verified` bir değer de değildir; doğrulayabildiğimiz
+ * bir hedef yokken boş bir "verified" alanı ilerideki yalanın kabı olur.
  */
 import { createHash, randomBytes } from 'crypto'
 import { type SigningKey, signHash } from './keys.js'
 import type { ActorAssurance } from './tokens.js'
 
 export const RECEIPT_VERSION = 'conarium-receipt/0.3' as const
+
+/** Tek kaynak sözlüğü. Sıra belgelenen anlam sırasıdır; yeni değer sona eklenir. */
+export const META_SOURCES = ['protocol', 'measured', 'operator-declared', 'undeclared'] as const
 
 export type ActorType = 'service' | 'user'
 export type PolicyDecision = 'allow' | 'deny' | 'partial'
@@ -28,11 +37,14 @@ export interface ReceiptActor {
  * `ReceiptActor.assurance` ile aynı disiplin: değerin yanında, onu ne kadar
  * ciddiye alabileceğini söyleyen kanıt seviyesi taşınır.
  *
- *  - `protocol`           bağlantı sırasında ÖLÇÜLDÜ (MCP initialize → clientInfo)
+ *  - `protocol`           bağlantı sırasında ölçüldü (MCP initialize → clientInfo)
+ *  - `measured`           Conarium'un kendi hesapladığı (hash gibi) — uydurma yok
  *  - `operator-declared`  operatör config'te beyan etti; Conarium DOĞRULAMADI
  *  - `undeclared`         bildirilmedi; alanlar null, uydurulmadı
+ *
+ * `verified` / `attested` BUGÜN YOK. Attestation gelirse o zaman `attested` eklenir.
  */
-export type MetaSource = 'protocol' | 'operator-declared' | 'undeclared'
+export type MetaSource = (typeof META_SOURCES)[number]
 
 export interface ReceiptModel {
   source: MetaSource

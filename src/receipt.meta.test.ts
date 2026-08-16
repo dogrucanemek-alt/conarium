@@ -9,7 +9,7 @@
  * Spec: docs/superpowers/specs/2026-08-05-receipt-meta-provenance-design.md
  */
 import { describe, it, expect } from 'vitest'
-import { buildReceipt, nextChainState, RECEIPT_VERSION, type ReceiptInput } from './receipt.js'
+import { buildReceipt, META_SOURCES, nextChainState, RECEIPT_VERSION, type ReceiptInput } from './receipt.js'
 
 process.env.CONARIUM_AUDIT_UNSIGNED = '1'
 
@@ -29,6 +29,15 @@ function temelInput(): ReceiptInput {
 describe('makbuz v0.3 — meta provenance', () => {
   it('sürüm 0.3', () => {
     expect(RECEIPT_VERSION).toBe('conarium-receipt/0.3')
+  })
+
+  it('tek sözlük: measured eklendi; verified / declared / observed ikinci set değil', () => {
+    expect(META_SOURCES).toEqual(['protocol', 'measured', 'operator-declared', 'undeclared'])
+    expect(META_SOURCES).not.toContain('verified')
+    expect(META_SOURCES).not.toContain('attested')
+    expect(META_SOURCES).not.toContain('declared')
+    expect(META_SOURCES).not.toContain('observed')
+    expect(META_SOURCES).not.toContain('derived')
   })
 
   it('model verilmezse UYDURULMAZ: source=undeclared ve üç alan da null', () => {
