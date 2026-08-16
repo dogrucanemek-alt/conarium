@@ -95,7 +95,19 @@ function shuffleKeys(value: unknown, pick: () => number): unknown {
       entries[j] = tmp
     }
     const out: Record<string, unknown> = {}
-    for (const [k, v] of entries) out[k] = shuffleKeys(v, pick)
+    for (const [k, v] of entries) {
+      // NOT out[k] = …: assigning the literal key "__proto__" sets the object's
+      // prototype instead of creating an own property, so the field vanishes and
+      // the shuffled copy stops being a permutation of the input. The property
+      // run found this with {"__proto__":[]} — a defect in this helper, not in
+      // canonicalize, which renders that input correctly.
+      Object.defineProperty(out, k, {
+        value: shuffleKeys(v, pick),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      })
+    }
     return out
   }
   return value
@@ -241,6 +253,23 @@ describe('M1 property invariants', () => {
         },
       ),
     )
+  })
+
+  // The property run above found this case at random (seed -1563629269) and it must
+  // not depend on a seed to be found again: a literal "__proto__" key is an own
+  // property in parsed JSON, and any helper that rebuilds an object with plain
+  // assignment silently drops it. canonicalize itself is correct here — this pins
+  // both halves so a regression in either one is a red test rather than a coin flip.
+  it('JCS: a literal __proto__ key is preserved, by canonicalize and by the shuffle helper', () => {
+    const parsed = JSON.parse('{"__proto__":[],"a":1}')
+    expect(Object.keys(parsed)).toEqual(['__proto__', 'a'])
+    expect(canonicalize(parsed)).toBe('{"__proto__":[],"a":1}')
+
+    const shuffled = shuffleKeys(parsed, () => 0.5)
+    expect(Object.keys(shuffled as object)).toContain('__proto__')
+    expect(canonicalize(shuffled)).toBe(canonicalize(parsed))
+    expect(jcsHash(shuffled)).toBe(jcsHash(parsed))
+    expect(Object.getPrototypeOf(shuffled)).toBe(Object.prototype)
   })
 
   it('JCS: shuffled key order yields the same canonicalize and hash', () => {
