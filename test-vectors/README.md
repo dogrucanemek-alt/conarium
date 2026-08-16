@@ -1,7 +1,7 @@
 # Conarium Receipt — conformance vectors
 
 Frozen inputs and expected results for anyone implementing or checking a
-Conarium Receipt verifier. Twelve cases, one public key, one manifest.
+Conarium Receipt verifier. Thirteen cases, one public key, one manifest.
 
 A specification that cannot be implemented from the document alone is a blog
 post. These vectors are the difference.
@@ -44,6 +44,7 @@ exit code. Nothing else is required — no network, no server, no account.
 | 010-disclosure-commitment | 0.4 receipt, `disclosure` measured over the payload that left | 0 |
 | 011-destination-declared | 0.4 receipt, destination `operator-declared` | 0 |
 | 012-mixed-chain | One 0.3 receipt then one 0.4 receipt; the chain verifies | 0 |
+| 013-disclosure-keys-omitted | 0.4 receipt, `disclosure` is `undeclared` but `hash`/`bytes` are omitted, not `null` | 20 |
 
 Exit codes are the ones in [RECEIPT-SPEC.md](../docs/RECEIPT-SPEC.md); the
 drift guard in `test/spec_exitcode_drift.mjs` keeps the two in sync.
@@ -87,9 +88,10 @@ thing an interoperable receipt actually requires. Sign it with your own key.
 ## Regenerating — read before you do
 
 `scripts/gen-test-vectors.mjs` produced 001–009. It now refuses to run if those
-files exist. `scripts/gen-test-vectors-04.mjs` appended 010–012. Do not run
-either to make a failing test pass. If a change to this repository breaks a
-vector, the format changed, and that is the signal the vectors exist to raise.
+files exist. `scripts/gen-test-vectors-04.mjs` appended 010–012, then 013. Do
+not run either to make a failing test pass. If a change to this repository
+breaks a vector, the format changed, and that is the signal the vectors exist
+to raise.
 
 The frozen hash of case 001 is asserted separately in `test/vectors_run.mjs`
 for exactly this reason.

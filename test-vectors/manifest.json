@@ -117,6 +117,15 @@
         "--pubkey",
         "KEYS/vector-key.pub.pem"
       ]
+    },
+    {
+      "name": "013-disclosure-keys-omitted",
+      "description": "0.4 receipt whose disclosure is undeclared but omits hash and bytes entirely. Absence is not explicit null; verify exits 20.",
+      "exitCode": 20,
+      "args": [
+        "--pubkey",
+        "KEYS/vector-key.pub.pem"
+      ]
     }
   ]
 }

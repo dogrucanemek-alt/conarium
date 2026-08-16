@@ -1,41 +1,31 @@
 #!/usr/bin/env node
 /**
- * Append 0.4 conformance vectors. Does NOT rewrite 001–009.
- * Frozen cases stay frozen; this file only adds 010–012 and merges the manifest.
+ * Append 0.4 conformance vectors. Does NOT rewrite 001–012.
+ * 010–012 were written by an earlier revision of this file and are frozen.
+ * This revision only adds 013 and merges the manifest.
  *
  * Usage: npm run build && node scripts/gen-test-vectors-04.mjs
  */
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createPrivateKey } from 'crypto'
-import { buildReceipt, RECEIPT_GENESIS_HASH, hashDisclosure } from '../dist/receipt.js'
+import { buildReceipt, RECEIPT_GENESIS_HASH, receiptHash } from '../dist/receipt.js'
+import { signHash } from '../dist/keys.js'
 
 const ROOT = 'test-vectors'
 const KEY_DIR = join(ROOT, 'keys')
 const KEY_ID = 'cnr-vectors'
 const PRIV = join(KEY_DIR, 'vector-key.SECRET-TEST-ONLY.pem')
 
-if (!existsSync(join(ROOT, '001-single-receipt', 'receipts.jsonl'))) {
-  throw new Error('001-single-receipt missing — do not invent a new 0.3 chain here')
+if (!existsSync(join(ROOT, '010-disclosure-commitment', 'receipts.jsonl'))) {
+  throw new Error('010–012 missing — this script no longer creates them')
 }
-if (existsSync(join(ROOT, '010-disclosure-commitment', 'receipts.jsonl'))) {
-  throw new Error('010 already exists — refusing to overwrite a frozen vector')
+if (existsSync(join(ROOT, '013-disclosure-keys-omitted', 'receipts.jsonl'))) {
+  throw new Error('013 already exists — refusing to overwrite a frozen vector')
 }
 
 const privatePem = readFileSync(PRIV, 'utf-8').replace(/^#[^\n]*\n/gm, '')
 const key = { keyId: KEY_ID, privateKey: createPrivateKey(privatePem) }
-
-const payload = JSON.stringify(
-  {
-    rowCount: 1,
-    fields: [{ name: 'id' }],
-    rows: [{ id: 1 }],
-    truncated: false,
-  },
-  null,
-  2,
-)
-const disc = hashDisclosure(payload)
 
 function input04(n, overrides = {}) {
   return {
@@ -64,54 +54,30 @@ function input04(n, overrides = {}) {
 
 const line = (r) => JSON.stringify(r) + '\n'
 
-const r010 = buildReceipt(
-  input04(10, { disclosurePayload: payload }),
-  { seq: 1, prevHash: RECEIPT_GENESIS_HASH },
-  key,
-)
-if (r010.v !== 'conarium-receipt/0.4') throw new Error(`expected 0.4, got ${r010.v}`)
-if (r010.disclosure.source !== 'measured' || r010.disclosure.hash !== disc.hash) {
-  throw new Error('010 disclosure hash mismatch')
+// Signed with hash/bytes omitted — not stripped after the fact. Otherwise the
+// stored hash would fail first (exit 10) and the schema split would stay hidden.
+const r013 = buildReceipt(input04(13), { seq: 1, prevHash: RECEIPT_GENESIS_HASH }, key)
+if (r013.v !== 'conarium-receipt/0.4') throw new Error(`expected 0.4, got ${r013.v}`)
+if (r013.disclosure.source !== 'undeclared' || r013.disclosure.hash !== null || r013.disclosure.bytes !== null) {
+  throw new Error('013 base must be undeclared with explicit nulls before keys are omitted')
 }
-
-const r011 = buildReceipt(
-  input04(11, { destination: 'openai/gpt-x' }),
-  { seq: 1, prevHash: RECEIPT_GENESIS_HASH },
-  key,
-)
-if (r011.destination.source !== 'operator-declared' || r011.destination.value !== 'openai/gpt-x') {
-  throw new Error('011 destination not operator-declared')
+delete r013.disclosure.hash
+delete r013.disclosure.bytes
+if ('hash' in r013.disclosure || 'bytes' in r013.disclosure) {
+  throw new Error('013 must omit disclosure.hash and disclosure.bytes')
 }
-
-const frozen001 = JSON.parse(readFileSync(join(ROOT, '001-single-receipt', 'receipts.jsonl'), 'utf-8').trim())
-if (frozen001.v !== 'conarium-receipt/0.3') throw new Error('001 is no longer 0.3 — mixed-chain vector is invalid')
-const r012 = buildReceipt(
-  input04(12, { disclosurePayload: payload, destination: 'openai/gpt-x' }),
-  { seq: 2, prevHash: frozen001.chain.hash },
-  key,
-)
+const hash013 = receiptHash(r013)
+r013.chain.hash = hash013
+r013.sig = { alg: 'Ed25519', keyId: KEY_ID, value: signHash(key, hash013) }
 
 const cases = [
   {
-    name: '010-disclosure-commitment',
-    description: '0.4 receipt with a measured disclosure hash over the masked, row-capped payload. Verify exits 0.',
-    exitCode: 0,
+    name: '013-disclosure-keys-omitted',
+    description:
+      '0.4 receipt whose disclosure is undeclared but omits hash and bytes entirely. Absence is not explicit null; verify exits 20.',
+    exitCode: 20,
     args: ['--pubkey', 'KEYS/vector-key.pub.pem'],
-    body: line(r010),
-  },
-  {
-    name: '011-destination-declared',
-    description: '0.4 receipt with destination declared by the operator. source is operator-declared, not verified.',
-    exitCode: 0,
-    args: ['--pubkey', 'KEYS/vector-key.pub.pem'],
-    body: line(r011),
-  },
-  {
-    name: '012-mixed-chain',
-    description: 'A 0.3 receipt followed by a 0.4 receipt. The chain verifies; old receipts are not rewritten.',
-    exitCode: 0,
-    args: ['--pubkey', 'KEYS/vector-key.pub.pem'],
-    body: line(frozen001) + line(r012),
+    body: line(r013),
   },
 ]
 
@@ -119,7 +85,7 @@ for (const c of cases) {
   const dir = join(ROOT, c.name)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'receipts.jsonl'), c.body)
-  console.log(`  ${c.name} -> exit ${c.exitCode}  ${c.name === '012-mixed-chain' ? r012.chain.hash : ''}`)
+  console.log(`  ${c.name} -> exit ${c.exitCode}  ${hash013}`)
 }
 
 const manifestPath = join(ROOT, 'manifest.json')
@@ -134,16 +100,16 @@ for (const c of cases) {
     args: c.args,
   })
 }
-manifest.versionUnderTest = 'conarium-receipt/0.4'
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
 
 const hashesPath = join(ROOT, 'expected-hashes.json')
 const hashes = JSON.parse(readFileSync(hashesPath, 'utf-8'))
-hashes.receipts.push(
-  { case: '010-disclosure-commitment', seq: 1, prevHash: r010.chain.prevHash, hash: r010.chain.hash },
-  { case: '011-destination-declared', seq: 1, prevHash: r011.chain.prevHash, hash: r011.chain.hash },
-  { case: '012-mixed-chain', seq: 2, prevHash: r012.chain.prevHash, hash: r012.chain.hash },
-)
+hashes.receipts.push({
+  case: '013-disclosure-keys-omitted',
+  seq: 1,
+  prevHash: r013.chain.prevHash,
+  hash: r013.chain.hash,
+})
 writeFileSync(hashesPath, JSON.stringify(hashes, null, 2) + '\n')
 
-console.log('010–012 written. 001–009 untouched.')
+console.log('013 written. 001–012 untouched.')

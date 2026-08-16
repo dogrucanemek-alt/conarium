@@ -37,6 +37,12 @@
       "seq": 2,
       "prevHash": "sha256:dbbbd3139923cdf7f854283b495386526de0629a71dc4d5407a3a810ee3e1847",
       "hash": "sha256:d34aba9928377dc233a90d8cb10c566ad0d35d0a05ef9e396a066e1b689426ee"
+    },
+    {
+      "case": "013-disclosure-keys-omitted",
+      "seq": 1,
+      "prevHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "sha256:4c26d350a17659a4e1501a1c45e21dddae9833ffbc8bd8d335a6aa090fe85d49"
     }
   ]
 }
