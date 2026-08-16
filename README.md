@@ -256,7 +256,9 @@ npx conarium-coverage ./declaration.json --pubkey ./audit-ed25519.pub.pem --rece
 # Snapshots come from pg_stat_statements (scripts/pg-snapshot.sql), taken at
 # window start and window end with a dedicated DB role per gateway instance.
 npx conarium-reconcile --before before.json --after after.json --receipts ./receipts.jsonl
-# exit 0  = every DB query pattern in the window is covered by receipts
+# exit 0  = every DB query pattern in the window is attributable to a receipt for
+#           the same table (object attribution, not per-statement coverage —
+#           see LIMITATIONS.md)
 # exit 40 = the DB recorded activity no receipt covers — the gateway may have
 #           been bypassed, or the receipt sink failed
 ```

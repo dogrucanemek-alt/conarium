@@ -105,9 +105,11 @@ describe('classifyPattern', () => {
 // ─── CLI: temiz mutabakat ────────────────────────────────────────────────────
 
 describe('conarium-reconcile CLI', () => {
-  it('exit 0 when every DB pattern is covered by a receipt (pattern-level, not 1:1)', () => {
-    // +5 çağrı tek desen; pencerede o tabloyu kapsayan TEK makbuz var.
+  it('exit 0 when every DB pattern is attributable to a receipt (pattern-level, not 1:1)', () => {
+    // +5 çağrı tek desen; pencerede o tabloyu adlandıran TEK makbuz var.
     // Çağrı sayısı ≠ makbuz sayısı BİLEREK: PostgREST çarpanı hüküm değiştirmemeli.
+    // Bu vaka aynı zamanda SINIRIN kanıtı: tek makbuz, penceredeki ek ifadeleri
+    // temizliyor. Çıktı bu yüzden "covered" demez, kapsamı ayrıca yazar.
     const { args } = setup({
       beforeEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }],
       afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }],
@@ -115,8 +117,13 @@ describe('conarium-reconcile CLI', () => {
     })
     const r = run(args)
     expect(r.code).toBe(0)
-    expect(r.stdout).toContain('ok: every DB query pattern in the window is covered by receipts')
+    expect(r.stdout).toContain(
+      'ok: every DB query pattern in the window is attributable to receipt(s) for the same table',
+    )
     expect(r.stdout).toContain('never per call count')
+    // Sınır beyanı çıktıda GÖRÜNMEK zorunda — sadece LIMITATIONS'ta durması yetmez.
+    expect(r.stdout).toContain('not per-statement coverage')
+    expect(r.stdout).not.toContain('is covered by receipts')
   })
 
   it('normalizes receipt object prefixes: "zion.customers" covers "public"."customers"', () => {

@@ -4,11 +4,17 @@
  * counters against Conarium receipts over a time window.
  *
  * The question this answers is the one receipts alone cannot:
- *   "the database recorded query activity — is every bit of it receipted?"
- * A pattern the DB counted but no receipt covers means access was RECORDED by
+ *   "the database recorded query activity — is any of it not receipted at all?"
+ * A pattern the DB counted but no receipt names means access was RECORDED by
  * the data source but NOT RECEIPTED by Conarium — the gateway may have been
  * bypassed, or the receipt sink failed. The tool reports that fact; it does
  * not claim intent.
+ *
+ * What a clean run establishes is object attribution within the window: every
+ * counted pattern names a table for which a receipt exists in the same window.
+ * It does NOT establish that each recorded statement was itself receipted —
+ * one receipt naming a table clears any number of further statements against
+ * that table inside the window. See LIMITATIONS.md.
  *
  * ZERO imports from src/. A third party must be able to run this single file
  * without the Conarium package.
@@ -29,11 +35,15 @@
  *     call counts and receipt counts are NOT compared 1:1.
  *   - A pattern whose target table cannot be determined is NOT silently
  *     cleared — it fails the reconciliation with its own message.
+ *   - A clean result is stated as object attribution, never as "covered":
+ *     the procedure establishes overlap, not that every statement was
+ *     receipted. Claiming the latter would overstate what was checked.
  *   - Receipt signatures are NOT checked here. Run conarium-verify first;
  *     this tool assumes the receipts file is already verified.
  *
  * Exit codes (documented in docs/RECEIPT-SPEC.md):
- *   0   every DB query pattern in the window is covered by receipts
+ *   0   every DB query pattern in the window is attributable to receipt(s) for
+ *       the same table — object attribution, not per-statement coverage
  *   20  input invalid or window unreliable (schema error, role mismatch,
  *       counter regression — e.g. pg_stat_statements was reset mid-window)
  *   40  unreconciled DB activity: at least one pattern the DB recorded has no
@@ -390,7 +400,7 @@ async function main(argv = process.argv.slice(2)) {
       for (const d of result.infrastructure) console.log(`  ~ (+${d.delta}) ${truncate(d.query)}`)
     }
     for (const d of result.reconciled) {
-      console.log(`  = (+${d.delta}) covered by receipt(s) for [${d.tables.join(', ')}]: ${truncate(d.query)}`)
+      console.log(`  = (+${d.delta}) attributable to receipt(s) for [${d.tables.join(', ')}]: ${truncate(d.query)}`)
     }
     if (result.receipts.unassigned > 0) {
       console.warn(
@@ -399,7 +409,11 @@ async function main(argv = process.argv.slice(2)) {
       )
     }
     if (problems === 0) {
-      console.log('ok: every DB query pattern in the window is covered by receipts')
+      console.log('ok: every DB query pattern in the window is attributable to receipt(s) for the same table')
+      console.log(
+        'scope: this is object attribution within the window, not per-statement coverage — ' +
+          'one receipt naming a table clears further statements against that table. See LIMITATIONS.md.',
+      )
     } else {
       if (result.unreconciled.length > 0) {
         console.error(

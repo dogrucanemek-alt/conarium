@@ -59,6 +59,14 @@ ok: every DB query pattern in the window is covered by receipts
 EXIT=0
 ```
 
+> **Correction (2026-08-16).** The line `covered by receipts` in the transcript
+> above was an overclaim, found in review on the IETF SCITT list. The procedure
+> establishes object attribution within the window: one receipt naming a table
+> clears any number of further statements against that table. Current builds print
+> `attributable to receipt(s) for the same table` followed by an explicit scope
+> line. The transcript is left exactly as it ran — see `LIMITATIONS.md` for the
+> limit itself.
+
 Two things worth noting. PostgREST's session setup and `COMMIT` are listed as
 infrastructure rather than quietly dropped. And the data query is matched by
 *pattern and table*, not by call count — the receipt count and the call count do not

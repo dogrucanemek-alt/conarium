@@ -156,6 +156,20 @@ check that the result went there. MCP does not carry model identity, so
 the field cannot be measured. Policy does not read it. A receipt that
 says `openai/gpt-x` is not proof that OpenAI saw the bytes.
 
+## Reconciliation establishes object attribution, not per-statement coverage
+
+`conarium-reconcile` exits 0 when every query pattern the database counted
+names a table for which a receipt exists in the same window. One receipt
+naming a table clears any number of further statements against that table
+inside that window. `test/reconcile_cli.test.mjs` is a deliberate positive
+case: the counter delta is five calls on one pattern, one receipt names the
+table, and the run exits 0. Counts are not compared 1:1 on purpose — one
+client request can produce several source statements (PostgREST, a connection
+pooler, an ORM), and a 1:1 rule would report false uncovered activity on any
+such deployment. The consequence is that a clean run establishes pattern and
+object overlap within the window. It does not establish that each recorded
+statement was itself receipted.
+
 ## OpenTimestamps client
 
 Stamping uses a built-in calendar client (Node `crypto` + HTTPS to the public calendars).

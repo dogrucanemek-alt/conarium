@@ -286,6 +286,12 @@ Rules that keep the verdict honest:
 - **Per pattern and per table, never per call count.** One REST request can
   produce more than one SQL statement (PostgREST does), so call counts and
   receipt counts are not compared 1:1.
+- **A clean run means object attribution, not coverage.** Exit 0 says every
+  counted pattern names a table for which a receipt exists in the same window.
+  One receipt naming a table clears any number of further statements against
+  that table inside that window, so the result establishes pattern and object
+  overlap — not that each recorded statement was itself receipted. The limit is
+  stated in `LIMITATIONS.md` and printed by the tool on a clean run.
 - **Nothing is silently cleared.** A pattern whose target table cannot be
   determined is reported UNATTRIBUTED and fails the run. Session/catalog
   housekeeping (`SET`, `pg_catalog`, `information_schema`) is listed as
@@ -304,7 +310,7 @@ Rules that keep the verdict honest:
 
 | Exit | Meaning |
 |---|---|
-| 0 | Every DB query pattern in the window is covered by receipts |
+| 0 | Every DB query pattern in the window is attributable to receipt(s) for the same table — object attribution, not per-statement coverage |
 | 20 | Input invalid or window unreliable (schema error, counter regression) |
 | 40 | Unreconciled DB activity — recorded by the database, not receipted |
 
