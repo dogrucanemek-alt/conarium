@@ -98,6 +98,28 @@ test('a healthy config exits 0', async () => {
   assert.strictEqual(status, 0, `expected clean exit, got ${status}:\n${out}`)
 })
 
+test('maskColumns without protectedColumns is a warning, not a failure', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, HEALTHY)
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, `cross-check must not fail the doctor:\n${out}`)
+  assert.ok(/maskColumns/.test(out) && /protectedColumns/.test(out), out)
+  assert.ok(/\*\.email/.test(out), 'must name the uncovered column')
+  assert.ok(/unlearnable/.test(out), 'must cite the LIMITATIONS heading')
+  assert.ok(/valid choice — make sure it is a choice/.test(out), 'must keep the existing choice language')
+})
+
+test('maskColumns also listed in protectedColumns does not warn', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, {
+    ...HEALTHY,
+    policy: { ...HEALTHY.policy, protectedColumns: ['*.email'] },
+  })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, out)
+  assert.ok(!/valid choice — make sure it is a choice/.test(out), `matched lists must stay quiet:\n${out}`)
+})
+
 test('invalid JSON is named as invalid JSON', async () => {
   const dir = tmpdir()
   fs.writeFileSync(path.join(dir, 'conarium.config.json'), '{ "connectors": [ ')

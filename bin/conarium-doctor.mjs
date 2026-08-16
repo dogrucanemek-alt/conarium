@@ -288,6 +288,17 @@ if (config) {
   if (hasProtected) {
     ok('policy.protectedColumns', pol.protectedColumns.join(', '))
   }
+  if (hasMask) {
+    const protectedSet = new Set(hasProtected ? pol.protectedColumns : [])
+    for (const col of pol.maskColumns) {
+      if (protectedSet.has(col)) continue
+      warn(
+        'policy.maskColumns',
+        `${col} is in maskColumns but not in protectedColumns. Masking hides the value; LIMITATIONS.md ("Masking hides values; it does not make them unlearnable") still applies. That is a valid choice — make sure it is a choice.`,
+        'Add the column to protectedColumns if predicates on it must be refused. Leave it only in maskColumns if hiding the value is enough.',
+      )
+    }
+  }
 
   // 4b. Raised maxRows — performance warning, not a deny.
   // Threshold is measured (docs/benchmarks/masking-cost-threshold.json).
