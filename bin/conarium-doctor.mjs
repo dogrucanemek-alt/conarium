@@ -476,6 +476,19 @@ if (config) {
     )
   }
 
+  // New receipts are 0.4. Doctor does not import src/ (must run when the
+  // build is broken). Keep this string in lockstep with RECEIPT_VERSION.
+  ok('Receipt schema', 'conarium-receipt/0.4')
+  const dest = typeof config.audit?.receiptDestination === 'string' && config.audit.receiptDestination.length > 0
+  if (dest) {
+    ok(
+      'Receipt destination',
+      'declared (operator-declared, not verified)',
+    )
+  } else {
+    ok('Receipt destination', 'undeclared')
+  }
+
   // 7. Audit sink writability
   const sink = config.audit?.sink
   if (sink) {

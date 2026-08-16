@@ -317,6 +317,6 @@ why both run. CodeQL results are published to the repository's Security tab, so 
 can read them without taking our word for it.
 
 Conformance vectors in `test-vectors/` let you verify our receipts with your own
-implementation: nine frozen cases with expected exit codes, plus the public key and
+implementation: twelve frozen cases with expected exit codes, plus the public key and
 canonical hashes. If your verifier disagrees with ours, one of us has a bug, and the
 vectors are how we find out which.

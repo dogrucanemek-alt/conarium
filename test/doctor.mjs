@@ -458,6 +458,30 @@ test('custom-sql with declared dialect is visible and not a fail on that line', 
   assert.ok(!/FAIL\s+custom-sql dialect/.test(out), out)
 })
 
+test('receipt schema version and undeclared destination appear; never "destination safe"', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, HEALTHY)
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, out)
+  assert.ok(/Receipt schema/.test(out) && /conarium-receipt\/0\.4/.test(out), out)
+  assert.ok(/Receipt destination/.test(out) && /undeclared/.test(out), out)
+  assert.ok(!/destination güvenli|destination safe|destination verified/i.test(out), out)
+})
+
+test('declared destination is named as operator-declared, not verified', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, {
+    ...HEALTHY,
+    audit: { receiptDestination: 'openai/gpt-x' },
+  })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, out)
+  assert.ok(/Receipt destination/.test(out), out)
+  assert.ok(/operator-declared, not verified/.test(out), out)
+  assert.ok(!/openai\/gpt-x/.test(out), 'destination value must not be printed')
+  assert.ok(!/destination güvenli|destination safe/i.test(out), out)
+})
+
 // --- run ----------------------------------------------------------------------
 
 for (const { name, fn } of tests) {

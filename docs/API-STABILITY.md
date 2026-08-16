@@ -17,9 +17,9 @@ No dates. Shipping 1.0 is a decision, not a document.
 
 ## What 1.0 would promise
 
-- A receipt written as `conarium-receipt/0.3` still verifies with
-  `conarium-verify` after a 1.x upgrade. Older published `v` strings
-  (`0.1`, `0.2`) stay accepted.
+- A receipt written as `conarium-receipt/0.4` (or `0.3`, `0.2`, `0.1`) still
+  verifies with `conarium-verify` after a 1.x upgrade. Older published `v`
+  strings stay accepted.
 - Default-deny: missing or empty `policy.allowTables` permits no table.
   A deny list wins over an allow list.
 - The four MCP tools keep their names: `list_tables`, `describe_table`,
@@ -101,7 +101,8 @@ Identity detectors cannot be turned off from config. That rejection is
 
 ## Receipt JSON
 
-Canonical: `docs/RECEIPT-SPEC.md`. Schema string `conarium-receipt/0.3`.
+Canonical: `docs/RECEIPT-SPEC.md`. Schema string `conarium-receipt/0.4`.
+Verifier accepts `0.1`–`0.4`. A `0.3` receipt is not rewritten.
 
 | Piece | Label |
 |---|---|
