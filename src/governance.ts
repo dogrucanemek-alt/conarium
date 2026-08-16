@@ -15,6 +15,7 @@ import {
 import { maskIps } from './ip_detect.js'
 import { maskMrz } from './mrz.js'
 import { maskSplitTcknFields } from './tckn.js'
+import { getOwn, setOwn } from './safe-object.js'
 import {
   applyCustomPatterns,
   compileCustomPatterns,
@@ -435,7 +436,7 @@ export class Governance {
     for (const row of result.rows) {
       for (const key of Object.keys(row)) {
         if (!this.masksColumn(row, key, aliases, maskedFieldLookup)) continue
-        const value = row[key]
+        const value = getOwn(row, key)
         if (typeof value === 'string') declared.push(value)
       }
     }
@@ -446,7 +447,7 @@ export class Governance {
       const out: Record<string, unknown> = { ...row }
       for (const key of Object.keys(out)) {
         if (this.masksColumn(out, key, aliases, maskedFieldLookup)) {
-          out[key] = '[MASKED_PII]'
+          setOwn(out, key, '[MASKED_PII]')
           maskedFields.add(key)
           maskedCount++
           continue
@@ -454,18 +455,19 @@ export class Governance {
 
         const table = typeof out._table === 'string' ? out._table : ''
         const qualified = table ? `${table}.${key}` : key
-        const scanRes = this.maskPII(out[key], { column: qualified })
-        out[key] = scanRes.masked
+        const scanRes = this.maskPII(getOwn(out, key), { column: qualified })
+        setOwn(out, key, scanRes.masked)
         if (scanRes.count > 0) {
           maskedFields.add(key)
           maskedCount += scanRes.count
           mergeByClass(byClass, scanRes.byClass)
         }
 
-        if (typeof out[key] === 'string' && matchers.length > 0) {
-          const carried = redactKnownValues(out[key] as string, matchers)
+        const afterScan = getOwn(out, key)
+        if (typeof afterScan === 'string' && matchers.length > 0) {
+          const carried = redactKnownValues(afterScan, matchers)
           if (carried.count > 0) {
-            out[key] = carried.text
+            setOwn(out, key, carried.text)
             maskedFields.add(key)
             maskedCount += carried.count
           }
@@ -501,7 +503,7 @@ export class Governance {
 
     const masks = this.maskPatterns()
     const table = typeof row._table === 'string' ? row._table : ''
-    const sourceKey = aliases?.[keyLower] || key
+    const sourceKey = (aliases ? (getOwn(aliases, keyLower) as string | undefined) : undefined) || key
     const qualifiedSource = table ? `${table}.${sourceKey}` : sourceKey
 
     // Also mask by bare COLUMN NAME (last path segment of any mask rule). This
@@ -683,17 +685,17 @@ export class Governance {
         if (typeof v === 'string') {
           const named = maskByColumnName(childCtx.column)
           if (named) {
-            out[k] = named
+            setOwn(out, k, named)
             totalCount++
           } else {
             const res = this.maskPII(v, childCtx);
-            out[k] = res.masked;
+            setOwn(out, k, res.masked);
             totalCount += res.count;
             mergeByClass(byClass, res.byClass);
           }
         } else {
           const res = this.maskPII(v, childCtx);
-          out[k] = res.masked;
+          setOwn(out, k, res.masked);
           totalCount += res.count;
           mergeByClass(byClass, res.byClass);
         }
@@ -861,7 +863,7 @@ export class Governance {
       this.collectExpr(column.expr, state, scope, cteNames, cteOutputs)
 
       if (column.alias && column.expr.type === 'ref' && column.expr.name !== '*') {
-        aliases[this.normalizeIdentifier(column.alias.name)] = this.normalizeIdentifier(column.expr.name)
+        setOwn(aliases, this.normalizeIdentifier(column.alias.name), this.normalizeIdentifier(column.expr.name))
       }
 
       if (!this.expressionReferencesMasked(column.expr, scope, cteNames, cteOutputs)) return
@@ -1234,12 +1236,12 @@ export class ApiGovernance {
         if (typeof v === 'string') {
           const lowerKey = k.toLowerCase();
           if (lowerKey.includes('email') || lowerKey.includes('phone') || lowerKey.includes('tckn') || lowerKey.includes('card') || lowerKey.includes('iban')) {
-            out[k] = '[MASKED_PII]';
+            setOwn(out, k, '[MASKED_PII]');
           } else {
-            out[k] = this.applyRegexMasks(v);
+            setOwn(out, k, this.applyRegexMasks(v));
           }
         } else {
-          out[k] = this.maskPii(v);
+          setOwn(out, k, this.maskPii(v));
         }
       }
       return out;

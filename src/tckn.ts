@@ -9,6 +9,8 @@
  *
  * No combinatorial scan of every field × every field.
  */
+import { getOwn, setOwn } from './safe-object.js'
+
 export function tcknChecksumOk(digits: string): boolean {
   if (!/^[1-9]\d{10}$/.test(digits)) return false
   const n = Array.from(digits, (c) => c.charCodeAt(0) - 48)
@@ -51,13 +53,13 @@ export function maskSplitTcknFields(row: Record<string, unknown>): {
       const b = keys[j]
       if (used.has(a) || used.has(b)) continue
       if (tcknStem(a) !== tcknStem(b)) continue
-      const da = digitsOf(row[a])
-      const db = digitsOf(row[b])
+      const da = digitsOf(getOwn(row, a))
+      const db = digitsOf(getOwn(row, b))
       if (!da || !db) continue
       const hit = tcknChecksumOk(da + db) || tcknChecksumOk(db + da)
       if (!hit) continue
-      row[a] = '[MASKED_PII]'
-      row[b] = '[MASKED_PII]'
+      setOwn(row, a, '[MASKED_PII]')
+      setOwn(row, b, '[MASKED_PII]')
       used.add(a)
       used.add(b)
       maskedKeys.push(a, b)

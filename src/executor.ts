@@ -1,3 +1,5 @@
+import { setOwn } from './safe-object.js'
+
 export interface ExecutorConfig {
   baseUrl: string;
   authHeader?: string;
@@ -52,7 +54,7 @@ export async function executeOpenApiTool(req: ExecutorRequest, config: ExecutorC
         if (key === 'body') {
           body = value;
         } else {
-          body[key] = value;
+          setOwn(body, key, value);
         }
       }
     }

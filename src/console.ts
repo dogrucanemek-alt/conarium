@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import { timingSafeEqual } from 'crypto'
 import { z } from 'zod'
 import { Governance } from './governance.js'
+import { setOwn } from './safe-object.js'
 import { loadSqlGate, resolveSqlDialect } from './sql-gate/dispatch.js'
 import { Audit } from './audit.js'
 import { RateLimiter, clientKey } from './rate_limit.js'
@@ -101,9 +102,9 @@ export function redactSecretFields(value: unknown): unknown {
   const out: Record<string, unknown> = {}
   for (const [key, nested] of Object.entries(value)) {
     if (SECRET_FIELD_NAME.test(key)) {
-      out[key] = '[REDACTED]'
+      setOwn(out, key, '[REDACTED]')
     } else {
-      out[key] = redactSecretFields(nested)
+      setOwn(out, key, redactSecretFields(nested))
     }
   }
   return out
