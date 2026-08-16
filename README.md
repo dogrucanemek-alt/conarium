@@ -17,6 +17,34 @@
 
 The site lives at [conarium.dev](https://conarium.dev); this repository is the product.
 
+## Check it before you read the rest
+
+Nothing below has to be taken on trust. There is a live receipt chain; verify it
+against its public key on your own machine, with no account and no data of yours:
+
+```bash
+npm i @conarium-ai/core
+curl -fsS https://demo.conarium.dev/proof/chain.jsonl   -o chain.jsonl
+curl -fsS https://demo.conarium.dev/proof/key.pem       -o key.pem
+curl -fsS https://demo.conarium.dev/proof/key.pem.keyid -o key.pem.keyid
+npx conarium-verify chain.jsonl --pubkey key.pem
+```
+
+```
+note: tail truncation is not visible — this run did not see receipts deleted from the
+end of the file. Pin with --expect-count, --expect-last-hash, or --anchor-check.
+ok: 3 receipt(s) verified (3 with undeclared model, 3 with undeclared client)
+```
+
+Exit code 0. The three receipts are one ordinary read, one where five email addresses
+and a card number were masked before the model saw them, and one refusal. Change any
+field and the recomputed hash stops matching the stored one — exit 10. Change the
+signature instead — exit 13.
+
+The verifier is a single file that imports nothing from the package it is checking, so
+a compromised Conarium cannot talk it into a passing result. Note that it volunteers
+what it did *not* check, in the first line of its own output, before the good news.
+
 ## Limitations
 
 What this repository has **not** done is in [LIMITATIONS.md](LIMITATIONS.md)
