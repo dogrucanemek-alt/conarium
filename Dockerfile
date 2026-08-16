@@ -17,6 +17,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
+COPY bin/conarium-docker-entry.mjs ./bin/conarium-docker-entry.mjs
 
 # Conarium is an MCP stdio server. Your AI client launches it and speaks MCP
 # over stdio; mount your policy + config read-only at run time. It never needs
@@ -24,4 +25,10 @@ COPY --from=build /app/dist ./dist
 #   docker run --rm -i \
 #     -v "$PWD/conarium.config.json:/app/conarium.config.json:ro" \
 #     conarium --config /app/conarium.config.json
-ENTRYPOINT ["node", "dist/index.js"]
+#
+# Entry goes through conarium-docker-entry.mjs rather than dist/index.js
+# directly. Conarium refuses to start without an audit signing key, which is
+# correct and stays; the entry script mints a throwaway key when none is
+# mounted so a bare `docker run` can answer an introspection request instead of
+# exiting at boot. It warns on stderr and does nothing when you mount a key.
+ENTRYPOINT ["node", "bin/conarium-docker-entry.mjs"]

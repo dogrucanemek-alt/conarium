@@ -21,6 +21,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 export const CHECKS = [
   'test/doctor.mjs',
+  'test/docker_entry.mjs',
   'test/console_cli.mjs',
   'test/console_policy.mjs',
   'test/console_handoff.mjs',

@@ -1,0 +1,43 @@
+name: docker
+
+# The image was written and never run. Nothing in CI built it, and every test
+# in the suite either sets an audit key or reads source — so the one path a
+# stranger takes first (docker run, nothing mounted) was the only path never
+# exercised. A directory's health check found it before we did.
+#
+# This job is that check, run on our side: build the image, start a bare
+# container, and require it to answer an MCP introspection request.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bare-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t conarium:ci .
+
+      - name: A bare container must answer tools/list
+        run: |
+          set -euo pipefail
+          {
+            printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci-directory-check","version":"1.0"}}}'
+            printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+            printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+          } | docker run --rm -i conarium:ci > out.json 2> err.log || {
+            echo "container exited non-zero"; cat err.log; exit 1;
+          }
+          cat err.log
+          grep -q '"name":"query"' out.json || { echo "tools/list did not list the query tool"; cat out.json; exit 1; }
+          # The fail-closed rule is not relaxed to get here: the container mints
+          # its own key and says so. If this line ever disappears, the image is
+          # writing unsigned entries and the check must fail.
+          grep -q 'EPHEMERAL signing key' err.log || { echo "no ephemeral-key warning — is the entry point still in use?"; exit 1; }
