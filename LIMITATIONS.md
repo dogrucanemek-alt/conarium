@@ -4,7 +4,9 @@ What Conarium has not done. Measured. No dates.
 
 ## No certification
 
-No SOC 2. No ISO. No independent penetration test. On the roadmap.
+No SOC 2. No ISO. Neither is planned: they certify organisations that hold
+customer data, and the data Conarium governs never reaches us. No independent
+penetration test — that one is on the roadmap.
 
 ## Not 1.0
 

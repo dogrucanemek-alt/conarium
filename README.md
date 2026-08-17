@@ -669,8 +669,9 @@ per-user identity bound to an identity provider rather than an operator token ma
   probabilistic mask would make a probabilistic receipt, which is not a receipt.
 - **Hosted cloud console.** Self-hosted is the claim; a hosted console would put
   us in the data path we tell you we are not in.
-- **No SOC 2.** It audits organisations that hold customer data. We never receive
-  yours. If that ever stops being true, this line changes first.
+- **No SOC 2.** It audits organisations that hold customer data. The data
+  Conarium governs — your database and your customers' records — never reaches
+  us. If that ever stops being true, this line changes first.
 
 Known gaps: [LIMITATIONS.md](LIMITATIONS.md), the README above,
 [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md),
