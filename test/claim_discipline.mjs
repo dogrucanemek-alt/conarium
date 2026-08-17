@@ -94,6 +94,19 @@ const BANNED = [
     why: 'there is no SOC 2 audit; LIMITATIONS says so, and readiness is not ours to assert',
     use: 'name what exists — no SOC 2 audit, no independent penetration test',
   },
+  {
+    // Found on 2026-08-17 by a claim audit run over the surfaces this sweep had
+    // not read. Instructive because the file was already in SURFACES below: the
+    // guard was reading privacy.html and could not see this, because it only
+    // knows phrasings that were already caught. The policy asserted the sentence
+    // and then, four paragraphs later, itemised the waitlist email it stores,
+    // the chat it forwards to a third-party model, and the host logs it keeps.
+    // Read plainly, all three are the reader's data. terms.html asserted the
+    // same thing with no itemisation at all.
+    re: /never (?:receive,? see,? or store|see) your data/i,
+    why: 'the website stores a waitlist email, forwards chat to a third-party model, and keeps host logs',
+    use: 'scope it in the sentence — the data Conarium governs never reaches us',
+  },
 ]
 
 let checked = 0
