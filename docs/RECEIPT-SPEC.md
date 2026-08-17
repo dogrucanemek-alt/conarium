@@ -355,8 +355,11 @@ offset cannot support. 41 was never a silent pass, and is not one now; what
 changed is that the tool stops offering an excuse it cannot back.
 
 A declared `--skew` is the operator's own statement about their clocks and
-outranks the window rule — a five-second window with a six-second NTP step is a
-real case, and the operator is the one who knows it:
+outranks the window rule. A window shorter than a clock correction is possible —
+a five-second window and a six-second step would read as beyond the boundary
+while being exactly the case the class exists for — and the operator is the one
+who knows whether that is their deployment. We have not measured how often it
+happens; the flag exists so the answer does not have to come from us:
 
 ```
 INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no --skew bound was declared…
