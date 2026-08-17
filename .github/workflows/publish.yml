@@ -34,6 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Checkout fetches no tags by default — the run log for 32036864594
+          # reads `fetch-tags: false` and `--depth=1`. The tag steps below ask
+          # whether v<version> already exists, and in a clone with no tags that
+          # question was always answered "no", so the guard could not fire in
+          # the one case it was written for.
+          fetch-tags: true
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # Trusted Publishing needs npm >= 11.5, and current npm majors no
@@ -64,6 +71,30 @@ jobs:
       - name: Claims review gate
         if: ${{ github.event.inputs.confirm == 'publish' }}
         run: node test/denetci.mjs gate
+      # Whether the release tag is free is knowable before npm publish, and npm
+      # publish cannot be undone. Asking afterwards is how 0.2.25 ended up on npm
+      # with nothing in the repository recording it; asking here costs a second.
+      #
+      # A tag that already points at this commit is fine — a re-dispatch after a
+      # downstream failure lands there. A tag pointing at a different commit is
+      # not: publishing would put this tree on npm under a number the repository
+      # has already given to another one.
+      - name: The release tag must be free
+        if: ${{ github.event.inputs.confirm == 'publish' }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          SHA="$(git rev-parse HEAD)"
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            AT="$(git rev-parse "v${VERSION}^{commit}")"
+            if [ "${AT}" != "${SHA}" ]; then
+              echo "::error::v${VERSION} exists and points at ${AT}, not ${SHA}. Bump the version, or move the tag deliberately."
+              exit 1
+            fi
+            echo "v${VERSION} already points at ${SHA}"
+          else
+            echo "v${VERSION} is free"
+          fi
       # npm >= 11.5 exchanges the workflow's OIDC identity for a short-lived
       # publish credential. Nothing is stored in repo secrets.
       - run: npm install -g npm@latest
