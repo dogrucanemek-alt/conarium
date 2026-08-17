@@ -336,12 +336,27 @@ reported as `indeterminate` and exits 41. It is not a pass — 41 is a failure �
 but it is not the bypass sentence either, because this tool cannot tell a trailing
 clock from a late receipt.
 
-**Distance is reported, not judged, until you declare a bound.** Without `--skew`
-there is no number that makes one offset skew and another not, so *any* covering
-receipt outside the window puts its pattern here — three milliseconds out and six
-hours out both land at 41, and the report prints which one it is. Reading that
-number is the operator's job in the default mode; `--skew` is how you hand the
-judgement to the tool:
+**Distance is reported, and only the boundary reading is bounded.** Without
+`--skew`, *any* covering receipt outside the window puts its pattern at 41 — the
+tool still cannot say which access that receipt belongs to. What the distance
+decides is whether the boundary can be *offered as the explanation*:
+
+| Offset vs the window's own length | Class | What the report says |
+|---|---|---|
+| within | `indeterminate`, boundary-plausible | two clocks, cannot tell them apart, **not** reported as unreceipted access |
+| beyond | `indeterminate`, **not** boundary-plausible | a boundary artefact cannot explain an offset larger than the window itself; **not excused as a timing effect** |
+
+The threshold is the window's own length (`after.ts − before.ts`), derived from
+the input rather than chosen. It exists because the exculpation was attacked and
+went through: a legitimate receipt from the previous day, naming the same table,
+turned a real in-window bypass from 40 into 41 and the run then said the access
+was *"NOT reported as unreceipted access"* — a sentence twenty-three hours of
+offset cannot support. 41 was never a silent pass, and is not one now; what
+changed is that the tool stops offering an excuse it cannot back.
+
+A declared `--skew` is the operator's own statement about their clocks and
+outranks the window rule — a five-second window with a six-second NTP step is a
+real case, and the operator is the one who knows it:
 
 ```
 INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no --skew bound was declared…

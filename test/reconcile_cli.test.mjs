@@ -437,3 +437,73 @@ describe('clock skew — a receipt just outside the window must not manufacture 
     expect(result.unreconciled).toHaveLength(1)
   })
 })
+
+// Cursor attacked the indeterminate class on 2026-08-17 and got through: a
+// legitimate receipt from the previous day, naming the same table, turned a
+// real in-window bypass from 40 into 41 — and the run then said the access was
+// "NOT reported as unreceipted access". 41 was never a silent pass (CI stays
+// red), but that sentence is an exculpation twenty-three hours of offset cannot
+// support. The class stays; the exculpation is now bounded by the window's own
+// length, which is derived from the input rather than chosen.
+describe('an offset larger than the window is not a boundary artefact', () => {
+  function snap(ts, entries) {
+    return {
+      v: 'conarium-dbsnapshot/0.1',
+      ts,
+      role: 'conarium_c2',
+      source: 'pg_stat_statements',
+      entries: new Map(entries.map((e) => [e.queryid, e])),
+    }
+  }
+  const YESTERDAY = '2026-08-05T11:00:00.000Z' // 23h before T0; window is 2h
+
+  it('a receipt from the previous day is indeterminate but NOT boundary-plausible', () => {
+    const result = reconcile(
+      snap(T0, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }]),
+      snap(T1, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }]),
+      [receipt({ ts: YESTERDAY, objects: ['zion.customers'] })],
+    )
+    expect(result.indeterminate).toHaveLength(1)
+    expect(result.indeterminate[0].boundaryPlausible).toBe(false)
+    expect(result.clocks.windowMs).toBe(7_200_000)
+  })
+
+  it('a receipt inside the window length keeps the boundary reading', () => {
+    const result = reconcile(
+      snap(T0, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }]),
+      snap(T1, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }]),
+      [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    )
+    expect(result.indeterminate[0].boundaryPlausible).toBe(true)
+  })
+
+  // The edge Cursor named: a five-second window and a six-second NTP step. The
+  // window rule alone would refuse the boundary reading, and it would be wrong.
+  // A declared --skew is the operator's own statement about their clocks and
+  // outranks a threshold inferred from the window.
+  it('a declared --skew outranks the window length on a short window', () => {
+    const shortFrom = '2026-08-06T10:00:00.000Z'
+    const shortTo = '2026-08-06T10:00:05.000Z' // 5s window
+    const ntpStep = '2026-08-06T09:59:54.000Z' // 6s before the start
+    const args = [
+      snap(shortFrom, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }]),
+      snap(shortTo, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }]),
+      [receipt({ ts: ntpStep, objects: ['zion.customers'] })],
+    ]
+    expect(reconcile(...args).indeterminate[0].boundaryPlausible).toBe(false)
+    expect(reconcile(...args, { skewMs: 10_000 }).indeterminate[0].boundaryPlausible).toBe(true)
+  })
+
+  it('the CLI refuses to excuse a beyond-window offset', () => {
+    const { args } = setup({
+      beforeEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }],
+      receipts: [receipt({ ts: YESTERDAY, objects: ['zion.customers'] })],
+    })
+    const r = run(args)
+    expect(r.code).toBe(41)
+    expect(r.stderr).toContain('INDETERMINATE (not the boundary)')
+    expect(r.stderr).toContain('NOT excused as a timing effect')
+    expect(r.stderr).not.toContain('NOT reported as unreceipted access')
+  })
+})

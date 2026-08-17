@@ -393,7 +393,18 @@ export function reconcile(before, after, receipts, opts = {}) {
     const withinDeclared = declaredSkewMs === null || requiredSkewMs <= declaredSkewMs
 
     if (allExplained && withinDeclared) {
-      indeterminate.push({ ...d, uncoveredTables: names, requiredSkewMs })
+      // Whether the boundary can plausibly explain the gap at all. A receipt
+      // further outside than the window is long is not sitting at the boundary;
+      // it is in a different window. Attacked on 2026-08-17: a legitimate
+      // receipt from the previous day turned a real in-window bypass from 40
+      // into 41, and the run then said the access was "NOT reported as
+      // unreceipted access" — an exculpation 23 hours of offset cannot support.
+      //
+      // The threshold is the window's own length, so it is derived from the
+      // input rather than chosen. A declared --skew is the operator's own
+      // statement about their clocks and outranks it.
+      const boundaryPlausible = declaredSkewMs !== null || requiredSkewMs <= toMs - fromMs
+      indeterminate.push({ ...d, uncoveredTables: names, requiredSkewMs, boundaryPlausible })
     } else {
       unreconciled.push({ ...d, uncoveredTables: names })
     }
@@ -423,6 +434,7 @@ export function reconcile(before, after, receipts, opts = {}) {
       window: before.source,
       receipts: 'gateway',
       declaredSkewMs,
+      windowMs: toMs - fromMs,
     },
     reconciled,
     unreconciled,
@@ -572,25 +584,43 @@ async function main(argv = process.argv.slice(2)) {
       }
     }
     if (result.indeterminate.length > 0) {
-      const bound =
-        result.clocks.declaredSkewMs === null
-          ? 'no --skew bound was declared, so nothing here decides the question'
-          : `declared --skew is ${result.clocks.declaredSkewMs}ms`
-      console.error(
-        `INDETERMINATE: ${result.indeterminate.length} pattern(s) are uncovered only by the window boundary — ` +
-          `${bound}:`,
-      )
-      for (const d of result.indeterminate) {
+      const atBoundary = result.indeterminate.filter((d) => d.boundaryPlausible)
+      const beyond = result.indeterminate.filter((d) => !d.boundaryPlausible)
+      const line = (d) =>
+        `  ~ (+${d.delta}) table(s) [${d.uncoveredTables.join(', ')}] have a receipt ${d.requiredSkewMs}ms outside ` +
+        `the window: ${truncate(d.query)}`
+
+      if (atBoundary.length > 0) {
+        const bound =
+          result.clocks.declaredSkewMs === null
+            ? 'no --skew bound was declared, so the window\'s own length is the only reference'
+            : `declared --skew is ${result.clocks.declaredSkewMs}ms`
         console.error(
-          `  ~ (+${d.delta}) table(s) [${d.uncoveredTables.join(', ')}] have a receipt ${d.requiredSkewMs}ms outside ` +
-            `the window: ${truncate(d.query)}`,
+          `INDETERMINATE: ${atBoundary.length} pattern(s) are uncovered only by the window boundary — ${bound}:`,
+        )
+        for (const d of atBoundary) console.error(line(d))
+        console.error(
+          `the window comes from ${result.clocks.window} and receipt timestamps come from the ${result.clocks.receipts} — ` +
+            'two clocks. A receipt this close outside is either a trailing clock or a late receipt, and this tool ' +
+            'cannot tell them apart. It is NOT reported as unreceipted access.',
         )
       }
-      console.error(
-        `the window comes from ${result.clocks.window} and receipt timestamps come from the ${result.clocks.receipts} — ` +
-          'two clocks. A receipt this far outside is either a trailing clock or a late receipt, and this tool cannot ' +
-          'tell them apart. It is NOT reported as unreceipted access.',
-      )
+      // Never exculpated. The class stays indeterminate because this tool still
+      // cannot prove what happened, but a receipt further out than the window is
+      // long is not a boundary artefact, and saying otherwise would shield the
+      // exact case an attacker would arrange.
+      if (beyond.length > 0) {
+        console.error(
+          `INDETERMINATE (not the boundary): ${beyond.length} pattern(s) have their only covering receipt further ` +
+            `outside the window than the window is long (${result.clocks.windowMs}ms):`,
+        )
+        for (const d of beyond) console.error(line(d))
+        console.error(
+          'a boundary artefact cannot explain an offset larger than the window itself, so clock skew is not the ' +
+            'reading here. This is NOT excused as a timing effect; it is left undecided because the receipt exists ' +
+            'and this tool cannot say which access it belongs to. Declare --skew to make the question decidable.',
+        )
+      }
     }
     if (problems === 0 && undecided === 0) {
       console.log('ok: every DB query pattern in the window is attributable to receipt(s) for the same table')

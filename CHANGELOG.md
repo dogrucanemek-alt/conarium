@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.2.28 — 2026-08-17
+
+The `indeterminate` class added in 0.2.27 was attacked the same day, and the
+attack got through. A legitimate receipt from the previous day, naming the same
+table, turned a real in-window bypass from exit 40 into 41 — and the run then
+said the access was **"NOT reported as unreceipted access"**. 41 is not a silent
+pass, and was not one then: the run still fails and CI still goes red. The damage
+was the sentence. At three seconds it is true; at twenty-three hours it points
+the reader away from what happened.
+
+- **The exculpation is bounded by the window's own length.** An offset larger
+  than `after.ts − before.ts` cannot be a boundary artefact, so the boundary is
+  no longer offered as the explanation. The pattern stays `indeterminate` at 41,
+  because the tool still cannot say which access that receipt belongs to, and the
+  report says so in those terms: *"a boundary artefact cannot explain an offset
+  larger than the window itself … NOT excused as a timing effect."*
+
+- **The threshold is derived, not chosen.** It is the window the caller supplied.
+  A number picked by us would be the kind of number this tool exists to refuse.
+
+- **A declared `--skew` outranks it.** A five-second window with a six-second NTP
+  step is a real case, and the operator is the one who knows their clocks.
+
+- **The 0.2.27 fix is unchanged.** A genuinely skewed receipt three seconds
+  outside a two-hour window still reads as the boundary, still exits 41, and
+  still is not called a bypass. A pattern with even one table that has no receipt
+  anywhere still exits 40 with the bypass sentence.
+
+Found by an adversarial review commissioned after the fix shipped, on the ground
+that the fix had loosened a guard's default and its author should not be the one
+clearing it.
+
 ## 0.2.27 — 2026-08-17
 
 `conarium-reconcile` could accuse the gateway of being bypassed because two
