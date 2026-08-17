@@ -1,22 +1,29 @@
 name: node-matrix
 
-# package.json promises `engines: node >=18`. Until now CI verified one version
-# of that promise — Node 20 — and the promise covered four majors. A reviewer
-# running the suite on Node 24 pointed this out; nothing was broken, but nothing
-# was checked either, which is the same defect as a claim nobody re-read.
+# package.json used to declare `engines: node >=18` while CI verified exactly one
+# of the majors that range covers. A reviewer running the suite on Node 24 pointed
+# that out; nothing was broken, and nothing was checked either, which is the same
+# defect as a claim nobody re-reads.
 #
-# The promise is split because the tooling and the product have different floors:
+# Checking it produced two findings rather than none:
 #
-#   suite         Node 20 · 22 · 24   vitest 4 supports ^20 || ^22 || >=24, so the
-#                                     full test suite runs on exactly these
-#   runtime-floor Node 18             every RUNTIME dependency allows 18, and the
-#                                     published package ships prebuilt dist/, so a
-#                                     user on 18 never runs vitest or tsc. What they
-#                                     do run is checked here: the adversarial check
-#                                     scripts, which import no test framework
+#   1. Node 18 does not work. The MCP SDK's HTTP transport calls the global
+#      `crypto`, which is available without a flag only from Node 19. On 18 the
+#      gateway fails at `initialize` with `ReferenceError: crypto is not defined`.
+#      38 of 39 checks passed there; the one that failed is a real runtime
+#      failure, not a test artefact. `engines` was raised to >=20 rather than
+#      papered over with a polyfill for a dependency's requirement.
 #
-# If runtime-floor ever fails, the honest options are to fix it or to raise
-# `engines` — not to drop the job. A promise that is not checked is not a promise.
+#   2. Node 18 and Node 20 are both past end-of-life (2025-04-30 and 2026-04-30 in
+#      the nodejs/Release schedule). A product about governance should not quietly
+#      invite a runtime that no longer receives security patches. Node 20 is kept
+#      as the floor because it is verified to work and dropping it would break
+#      installations for a reason they did not ask for — but that it is EOL is
+#      stated in LIMITATIONS rather than left for the reader to discover.
+#
+# So the matrix is the versions the declared range covers, and every one of them
+# is actually exercised. If a version fails here, the honest options are to fix it
+# or to move the floor — not to narrow the matrix.
 
 on:
   push:
@@ -31,8 +38,8 @@ jobs:
     name: suite (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
-      # One version failing must not hide the others: the interesting result is
-      # which majors differ, and fail-fast would report only the first.
+      # One version failing must not hide the others: the useful result is which
+      # majors differ, and fail-fast would report only the first.
       fail-fast: false
       matrix:
         node: [20, 22, 24]
@@ -46,29 +53,13 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:checks
-
-  runtime-floor:
-    name: runtime floor (node 18, the engines promise)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: npm
-      # vitest declares ^20 || ^22 || >=24, so installing it here prints
-      # EBADENGINE. That is expected and is not a failure: it is a dev tool, and
-      # nothing below runs it.
-      - run: npm ci
-      - run: node --version
-      # The adversarial check scripts import no test framework, so they are the
-      # part of the suite a Node 18 user's runtime can actually be measured with.
-      - run: npm run test:checks
-      # The documented first-run path, exactly as the README prints it.
-      - name: Documented quickstart on the runtime floor
+      # The first-run path exactly as the README prints it. A suite that passes
+      # while `conarium-init` is broken would still leave a new user stuck at the
+      # first command, so the documented path is checked on every major too.
+      - name: Documented quickstart
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/floor" && cd "$RUNNER_TEMP/floor"
+          mkdir -p "$RUNNER_TEMP/quickstart" && cd "$RUNNER_TEMP/quickstart"
           node "$GITHUB_WORKSPACE/bin/conarium-init.mjs"
           test -f conarium.config.json
           test -f audit-ed25519.pem.keyid

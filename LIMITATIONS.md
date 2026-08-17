@@ -10,6 +10,21 @@ No SOC 2. No ISO. No independent penetration test. On the roadmap.
 
 Version is 0.2.x. The API can break.
 
+## Node 20 is the floor, and Node 20 is past end-of-life
+
+`engines` requires Node >=20 and CI runs the full suite on 20, 22 and 24. It said
+>=18 until 2026-08-17, and that was wrong rather than merely unverified: the MCP
+SDK's HTTP transport uses the global `crypto`, which is available without a flag
+only from Node 19, so on Node 18 the gateway fails at `initialize` with
+`ReferenceError: crypto is not defined`.
+
+Both Node 18 (2025-04-30) and Node 20 (2026-04-30) are past end-of-life in the
+nodejs/Release schedule, so a Node 20 install is running a runtime that no longer
+receives security patches. Node 20 is kept as the floor because it is verified to
+work and removing it would break installations for a reason their operators did not
+ask for. Node 22 or later is the version to run; if you are on 20, that choice is
+yours to make with this stated rather than hidden.
+
 ## SQL is Postgres, Microsoft SQL Server, and Oracle
 
 MySQL is not implemented.
