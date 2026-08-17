@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.2.27 — 2026-08-17
+
+`conarium-reconcile` could accuse the gateway of being bypassed because two
+clocks disagreed by three seconds. Raised by Walter Hawkins on the IETF SCITT
+list against `bin/conarium-reconcile.mjs` on main, and reproduced before it was
+changed.
+
+- **The window straddles two clocks, and the comparison was exact.** The window
+  is `[before.ts, after.ts]`, both from the database; a receipt's `ts` comes from
+  the gateway. A receipt three seconds early was counted `outOfWindow`, the table
+  it covered landed in `uncovered`, and the run exited 40 with "the gateway may
+  have been bypassed". The failure is asymmetric: skew manufactures the
+  accusation rather than any real gap, and the sub-second version is the
+  dangerous one, because it is believed.
+
+- **The missing piece was qualification, not observation.** The tool already
+  counted those receipts; nothing asked how far outside they were, so a receipt
+  three seconds early and one six hours early produced the same verdict. A
+  pattern whose uncovered tables all have a receipt just outside the boundary is
+  now `indeterminate`, exit **41**, and the report names the skew that would have
+  to be true for it. 41 is a failure, not a pass — what it is not is an
+  accusation.
+
+- **`--skew <duration>` declares the bound** (`500ms`, `5s`, `2m`, `1h`). Beyond
+  it, a receipt is not skew and its pattern stays unreconciled at 40. Without it
+  nothing decides the question, so nothing is asserted. An unreadable duration is
+  an error rather than a default: a tolerance nobody chose is the kind of number
+  this tool exists to refuse.
+
+- **A real gap stays a real gap.** If even one uncovered table has no receipt
+  anywhere, the pattern remains unreconciled. A genuine finding is not made
+  indeterminate by a neighbour's clock.
+
 ## 0.2.26 — 2026-08-17
 
 The claim list that `test/claim_discipline.mjs` enforces now ships in the

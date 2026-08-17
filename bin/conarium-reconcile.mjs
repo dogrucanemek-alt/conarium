@@ -48,6 +48,33 @@
  *       counter regression — e.g. pg_stat_statements was reset mid-window)
  *   40  unreconciled DB activity: at least one pattern the DB recorded has no
  *       covering receipt in the window (or could not be attributed to a table)
+ *   41  indeterminate: the only thing standing between a pattern and its
+ *       receipt is the window boundary, and two clocks decide that boundary
+ *
+ * Two clocks, one window:
+ *   The window is [before.ts, after.ts] and both come from the database. A
+ *   receipt's ts comes from the gateway. Admitting a receipt on an exact
+ *   comparison across those two clocks makes the failure asymmetric: a gateway
+ *   trailing the database turns a receipt that genuinely covers a table into an
+ *   out-of-window receipt, the table into an uncovered one, and the run into an
+ *   accusation of bypass. Skew then manufactures the accusation rather than any
+ *   real gap — and the sub-second version of that is the dangerous one, because
+ *   it is believed.
+ *
+ *   This tool already counted those receipts (`outOfWindow`). What was missing
+ *   was not the observation but its qualification: how far outside, and against
+ *   what declared bound. A pattern that is uncovered ONLY because a receipt sat
+ *   outside the boundary is now indeterminate, not an accusation, and the
+ *   report names the skew that would have to be true for it to be one.
+ *
+ *   `--skew` declares the bound. Without it nothing decides the question, so
+ *   nothing is asserted: the pattern is indeterminate and the report says the
+ *   bound was never declared. With it, a receipt further out than the bound is
+ *   not skew, and the pattern stays unreconciled.
+ *
+ *   Reported for the operator, not resolved for them: this tool cannot tell a
+ *   trailing clock from a receipt written late. That is why the class is
+ *   "indeterminate" and not "covered".
  */
 import { readFileSync, existsSync } from 'fs'
 
@@ -225,6 +252,33 @@ export function receiptCoverage(receipts, fromMs, toMs) {
 }
 
 /**
+ * For every table named by a receipt that fell OUTSIDE the window, the smallest
+ * distance from that receipt to the nearest window boundary.
+ *
+ * This is the qualification the tool was missing. `outOfWindow` counted these
+ * receipts; nothing asked how far outside they were, so a receipt three seconds
+ * early and one six hours early produced the same verdict.
+ */
+export function outsideBoundaryCoverage(receipts, fromMs, toMs) {
+  const byTable = new Map() // normalized table -> smallest offset in ms
+  for (const r of receipts) {
+    const t = Date.parse(r.ts)
+    if (Number.isNaN(t)) continue
+    if (t >= fromMs && t <= toMs) continue
+    const offset = t < fromMs ? fromMs - t : t - toMs
+    const named = []
+    for (const ref of r.dataRefs || []) if (ref.object) named.push(String(ref.object))
+    if (r.request?.tool === 'describe_table' && r.request?.target) named.push(String(r.request.target))
+    for (const obj of named) {
+      const key = normalizeObject(obj)
+      const prev = byTable.get(key)
+      if (prev === undefined || offset < prev) byTable.set(key, offset)
+    }
+  }
+  return byTable
+}
+
+/**
  * Receipts in the window that name an object the database counters did not
  * increment. Distinct from `unassigned` (receipt named nothing).
  *
@@ -259,7 +313,11 @@ export function unobservedReceipts(receipts, fromMs, toMs, observedTables) {
 
 // ─── reconciliation core ─────────────────────────────────────────────────────
 
-export function reconcile(before, after, receipts) {
+export function reconcile(before, after, receipts, opts = {}) {
+  const declaredSkewMs =
+    typeof opts.skewMs === 'number' && Number.isFinite(opts.skewMs) && opts.skewMs >= 0
+      ? opts.skewMs
+      : null
   if (before.role !== after.role) {
     return { error: `role mismatch: before=${before.role}, after=${after.role}` }
   }
@@ -301,8 +359,11 @@ export function reconcile(before, after, receipts) {
 
   const cov = receiptCoverage(receipts, fromMs, toMs)
 
+  const outside = outsideBoundaryCoverage(receipts, fromMs, toMs)
+
   const reconciled = []
   const unreconciled = []
+  const indeterminate = []
   const unattributed = []
   const infrastructure = []
   for (const d of deltas) {
@@ -318,8 +379,23 @@ export function reconcile(before, after, receipts) {
     const uncovered = cls.tables.filter((t) => !cov.covered.has(t.table))
     if (uncovered.length === 0) {
       reconciled.push({ ...d, tables: cls.tables.map((t) => t.table) })
+      continue
+    }
+    const names = uncovered.map((t) => (t.schema ? `${t.schema}.${t.table}` : t.table))
+
+    // A pattern moves out of the accusation only if the boundary is the ONLY
+    // thing missing: every uncovered table must have a receipt just outside.
+    // One table with no receipt anywhere is a real gap, and a real gap is not
+    // made indeterminate by a neighbour's clock.
+    const offsets = uncovered.map((t) => outside.get(t.table))
+    const allExplained = offsets.every((o) => o !== undefined)
+    const requiredSkewMs = allExplained ? Math.max(...offsets) : null
+    const withinDeclared = declaredSkewMs === null || requiredSkewMs <= declaredSkewMs
+
+    if (allExplained && withinDeclared) {
+      indeterminate.push({ ...d, uncoveredTables: names, requiredSkewMs })
     } else {
-      unreconciled.push({ ...d, uncoveredTables: uncovered.map((t) => (t.schema ? `${t.schema}.${t.table}` : t.table)) })
+      unreconciled.push({ ...d, uncoveredTables: names })
     }
   }
 
@@ -343,8 +419,14 @@ export function reconcile(before, after, receipts) {
       unassigned: cov.unassigned,
       coveredObjects: [...cov.coveredRaw].sort(),
     },
+    clocks: {
+      window: before.source,
+      receipts: 'gateway',
+      declaredSkewMs,
+    },
     reconciled,
     unreconciled,
+    indeterminate,
     unattributed,
     infrastructure,
     unobserved,
@@ -356,12 +438,35 @@ export function reconcile(before, after, receipts) {
 function usage(msg) {
   if (msg) console.error(msg)
   console.error(
-    'Usage: conarium-reconcile --before <snapshot.json> --after <snapshot.json> --receipts <receipts.jsonl> [--json]',
+    'Usage: conarium-reconcile --before <snapshot.json> --after <snapshot.json> --receipts <receipts.jsonl> [--skew <duration>] [--json]',
+  )
+  console.error(
+    '  --skew  how far the gateway clock may differ from the database clock (e.g. 500ms, 5s, 2m).',
+  )
+  console.error(
+    '          Receipts further outside the window than this are not skew. Without it, a pattern',
+  )
+  console.error(
+    '          uncovered only by the boundary is reported as indeterminate rather than decided.',
   )
 }
 
+/**
+ * `500ms`, `5s`, `2m`, `1h`, or a bare number of milliseconds. Declaring the
+ * bound is the point, so an unparseable one is an error rather than a default:
+ * a tolerance nobody chose is the kind of number this tool exists to refuse.
+ */
+export function parseDuration(text) {
+  const m = /^(\d+(?:\.\d+)?)(ms|s|m|h)?$/.exec(String(text).trim())
+  if (!m) return null
+  const n = Number(m[1])
+  const unit = m[2] || 'ms'
+  const scale = { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }[unit]
+  return Math.round(n * scale)
+}
+
 function parseArgs(argv) {
-  const out = { before: null, after: null, receiptsPath: null, json: false }
+  const out = { before: null, after: null, receiptsPath: null, json: false, skewMs: null }
   const args = [...argv]
   while (args.length) {
     const a = args.shift()
@@ -374,6 +479,12 @@ function parseArgs(argv) {
     } else if (a === '--receipts') {
       out.receiptsPath = args.shift() ?? null
       if (!out.receiptsPath) throw new Error('--receipts requires a path')
+    } else if (a === '--skew') {
+      const raw = args.shift() ?? null
+      if (!raw) throw new Error('--skew requires a duration (e.g. 500ms, 5s, 2m)')
+      const ms = parseDuration(raw)
+      if (ms === null) throw new Error(`--skew: cannot read "${raw}" as a duration (try 500ms, 5s, 2m, 1h)`)
+      out.skewMs = ms
     } else if (a === '--json') {
       out.json = true
     } else if (a === '--help' || a === '-h') {
@@ -417,13 +528,15 @@ async function main(argv = process.argv.slice(2)) {
   const rec = loadReceipts(opts.receiptsPath)
   if (rec.error) fail(20, rec.error, opts.json)
 
-  const result = reconcile(b.snapshot, a.snapshot, rec.receipts)
+  const result = reconcile(b.snapshot, a.snapshot, rec.receipts, { skewMs: opts.skewMs })
   if (result.error) fail(20, result.error, opts.json)
 
   const problems = result.unreconciled.length + result.unattributed.length
+  const undecided = result.indeterminate.length
+  const exitCode = problems > 0 ? 40 : undecided > 0 ? 41 : 0
 
   if (opts.json) {
-    console.log(JSON.stringify({ ok: problems === 0, code: problems === 0 ? 0 : 40, ...result }))
+    console.log(JSON.stringify({ ok: exitCode === 0, code: exitCode, ...result }))
   } else {
     console.log(
       `reconcile window: ${result.window.start} → ${result.window.end} ` +
@@ -458,13 +571,38 @@ async function main(argv = process.argv.slice(2)) {
         console.log(`  · [${u.objects.join(', ')}] ${u.tool || 'receipt'} @ ${u.ts}`)
       }
     }
-    if (problems === 0) {
+    if (result.indeterminate.length > 0) {
+      const bound =
+        result.clocks.declaredSkewMs === null
+          ? 'no --skew bound was declared, so nothing here decides the question'
+          : `declared --skew is ${result.clocks.declaredSkewMs}ms`
+      console.error(
+        `INDETERMINATE: ${result.indeterminate.length} pattern(s) are uncovered only by the window boundary — ` +
+          `${bound}:`,
+      )
+      for (const d of result.indeterminate) {
+        console.error(
+          `  ~ (+${d.delta}) table(s) [${d.uncoveredTables.join(', ')}] have a receipt ${d.requiredSkewMs}ms outside ` +
+            `the window: ${truncate(d.query)}`,
+        )
+      }
+      console.error(
+        `the window comes from ${result.clocks.window} and receipt timestamps come from the ${result.clocks.receipts} — ` +
+          'two clocks. A receipt this far outside is either a trailing clock or a late receipt, and this tool cannot ' +
+          'tell them apart. It is NOT reported as unreceipted access.',
+      )
+    }
+    if (problems === 0 && undecided === 0) {
       console.log('ok: every DB query pattern in the window is attributable to receipt(s) for the same table')
       console.log(
         'scope: this is object attribution within the window, not per-statement coverage — ' +
           'one receipt naming a table clears further statements against that table. See LIMITATIONS.md.',
       )
-    } else {
+    }
+    // Guarded on `problems`, not on "not clean": a run whose only finding is
+    // indeterminate must never print the bypass sentence. Reaching that
+    // sentence through a clock difference is the defect this class exists for.
+    if (problems > 0) {
       if (result.unreconciled.length > 0) {
         console.error(
           `UNRECONCILED: ${result.unreconciled.length} pattern(s) recorded by the database have no covering receipt in the window:`,
@@ -487,10 +625,13 @@ async function main(argv = process.argv.slice(2)) {
   }
   // Literal çıkışlar bilerek ayrı: spec_exitcode_drift bekçisi sadece
   // literal sayıları tarar, ternary içindeki kod görünmez kalırdı.
-  if (problems === 0) {
-    process.exit(0)
+  if (problems > 0) {
+    process.exit(40)
   }
-  process.exit(40)
+  if (undecided > 0) {
+    process.exit(41)
+  }
+  process.exit(0)
 }
 
 const isDirect =

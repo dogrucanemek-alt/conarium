@@ -65,7 +65,7 @@ No dates. Shipping 1.0 is a decision, not a document.
 | `conarium-doctor` | `--config` `--no-net` `--help` | experimental |
 | `conarium-verify` | `--pubkey` (repeatable) `--anchor-check` `--require-head-anchor` `--anchors` `--expect-seq-from` `--expect-count` `--expect-last-hash` `--strict` `--json` `--help` | **candidate** (exit codes + flags in RECEIPT-SPEC) |
 | `conarium-coverage` | `--pubkey` `--receipts` `--expect-seq-from` `--allow-gaps` `--json` `--help` | experimental |
-| `conarium-reconcile` | `--before` `--after` `--receipts` `--json` `--help` | experimental |
+| `conarium-reconcile` | `--before` `--after` `--receipts` `--skew` `--json` `--help` | experimental |
 | `conarium-stamp` | `--sidecar` `--json` `--help` | experimental |
 | `conarium-anchor-upgrade` | `<anchors.jsonl>` | experimental |
 | `conarium-console` | `--config` `--port` `--host` `--install-shortcut` `--uninstall-shortcut` `--launch` `--help` | experimental |

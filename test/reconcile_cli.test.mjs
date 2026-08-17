@@ -178,15 +178,47 @@ describe('conarium-reconcile CLI', () => {
     expect(r.stderr).toContain('does not by itself prove intent')
   })
 
-  it('a receipt OUTSIDE the window does not cover the pattern', () => {
+  // This test asserted exit 40 until 2026-08-17, which is the defect Walter
+  // Hawkins described on the SCITT list: the window is decided by two clocks,
+  // and an exact comparison across them lets skew produce the accusation. An
+  // out-of-window receipt still does not COVER the pattern — the pattern is not
+  // reconciled and the run still fails — but it is no longer reported as access
+  // the gateway never receipted. 41, not 40, and no bypass sentence.
+  it('a receipt OUTSIDE the window does not cover the pattern, and is not called a bypass', () => {
     const { args } = setup({
       beforeEntries: [],
       afterEntries: [{ queryid: '1', query: SQL_ORDERS, calls: 1 }],
       receipts: [receipt({ ts: BEFORE_WINDOW, objects: ['zion.orders'] })],
     })
     const r = run(args)
-    expect(r.code).toBe(40)
+    expect(r.code).toBe(41)
     expect(r.stdout).toContain('out of window: 1')
+    expect(r.stderr).toContain('INDETERMINATE')
+    expect(r.stderr).toContain('3600000ms outside')
+    expect(r.stderr).not.toContain('bypassed, or the receipt sink failed')
+  })
+
+  it('a declared --skew smaller than the offset keeps it an unreconciled finding', () => {
+    const { args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_ORDERS, calls: 1 }],
+      receipts: [receipt({ ts: BEFORE_WINDOW, objects: ['zion.orders'] })],
+    })
+    const r = run([...args, '--skew', '5s'])
+    expect(r.code).toBe(40)
+    expect(r.stderr).toContain('UNRECONCILED')
+    expect(r.stderr).toContain('bypassed, or the receipt sink failed')
+  })
+
+  it('--skew rejects a duration it cannot read rather than defaulting', () => {
+    const { args } = setup({
+      beforeEntries: [],
+      afterEntries: [],
+      receipts: [],
+    })
+    const r = run([...args, '--skew', 'soonish'])
+    expect(r.code).toBe(20)
+    expect(r.stderr).toContain('cannot read "soonish" as a duration')
   })
 
   it('exit 40 with UNATTRIBUTED when a data pattern has no extractable table (not silently cleared)', () => {
@@ -353,3 +385,55 @@ describe('unobserved — receipt named an object the counters did not increment'
   })
 })
 
+
+describe('clock skew — a receipt just outside the window must not manufacture an accusation', () => {
+  function snap(ts, entries) {
+    return {
+      v: 'conarium-dbsnapshot/0.1',
+      ts,
+      role: 'conarium_c2',
+      source: 'pg_stat_statements',
+      entries: new Map(entries.map((e) => [e.queryid, e])),
+    }
+  }
+
+  // The window comes from the database's snapshot timestamps; the receipt
+  // timestamp comes from the gateway. Two clocks. A gateway trailing the
+  // database turns a receipt that genuinely covers the table into an
+  // out-of-window receipt, and the table it would have covered into an
+  // accusation of bypass.
+  const JUST_BEFORE = '2026-08-06T09:59:57.000Z' // 3s before T0
+  const LONG_BEFORE = '2026-08-06T04:00:00.000Z' // 6h before T0
+
+  it('a covering receipt 3s outside the window is indeterminate, not unreconciled', () => {
+    const result = reconcile(
+      snap(T0, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }]),
+      snap(T1, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }]),
+      [receipt({ ts: JUST_BEFORE, objects: ['zion.customers'] })],
+    )
+    expect(result.unreconciled).toHaveLength(0)
+    expect(result.indeterminate).toHaveLength(1)
+    expect(result.indeterminate[0].requiredSkewMs).toBe(3000)
+  })
+
+  it('a covering receipt 6h outside the window stays unreconciled — that is not skew', () => {
+    const result = reconcile(
+      snap(T0, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }]),
+      snap(T1, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }]),
+      [receipt({ ts: LONG_BEFORE, objects: ['zion.customers'] })],
+      { skewMs: 60_000 },
+    )
+    expect(result.indeterminate).toHaveLength(0)
+    expect(result.unreconciled).toHaveLength(1)
+  })
+
+  it('a pattern no receipt covers at all is untouched by the skew path', () => {
+    const result = reconcile(
+      snap(T0, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }]),
+      snap(T1, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }]),
+      [receipt({ ts: JUST_BEFORE, objects: ['zion.orders'] })],
+    )
+    expect(result.indeterminate).toHaveLength(0)
+    expect(result.unreconciled).toHaveLength(1)
+  })
+})

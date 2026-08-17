@@ -319,6 +319,36 @@ Rules that keep the verdict honest:
 | 0 | Every DB query pattern in the window is attributable to receipt(s) for the same table — object attribution, not per-statement coverage |
 | 20 | Input invalid or window unreliable (schema error, counter regression) |
 | 40 | Unreconciled DB activity — recorded by the database, not receipted |
+| 41 | Indeterminate — a pattern is uncovered only by the window boundary, and two clocks decide that boundary |
+
+### The window straddles two clocks
+
+The window is `[before.ts, after.ts]` and both timestamps come from the database.
+A receipt's `ts` comes from the gateway. Admitting receipts on an exact comparison
+across those two clocks makes the failure **asymmetric**: a gateway trailing the
+database turns a receipt that genuinely covers a table into an out-of-window
+receipt, and the table into an accusation of bypass. Skew then manufactures the
+accusation rather than any real gap, and the sub-second version is the dangerous
+one, because it is believed.
+
+A pattern whose uncovered tables **all** have a receipt just outside the boundary
+is reported as `indeterminate` and exits 41. It is not a pass — 41 is a failure —
+but it is not the bypass sentence either, because this tool cannot tell a trailing
+clock from a late receipt. The report names the skew that would have to be true:
+
+```
+INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no --skew bound was declared…
+  ~ (+5) table(s) [public.customers] have a receipt 3000ms outside the window: SELECT …
+```
+
+`--skew <duration>` declares the bound (`500ms`, `5s`, `2m`, `1h`). A receipt
+further out than the bound is not skew, and its pattern stays unreconciled at 40.
+Without the flag nothing decides the question, so nothing is asserted. A pattern
+with even one table that has no receipt anywhere is a real gap and stays at 40:
+a genuine finding is not made indeterminate by a neighbour's clock.
+
+Credit: raised by Walter Hawkins on the IETF SCITT list, 2026-08-17, against
+`bin/conarium-reconcile.mjs` on main.
 
 ## Stamping a document (priority dates)
 
