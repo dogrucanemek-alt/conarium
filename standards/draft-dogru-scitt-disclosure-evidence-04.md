@@ -159,13 +159,16 @@ Protected Class:
 
 Window:
 : A time interval over which reconciliation is performed, bounded by two
-  snapshots of the Data Source's activity counters.
+  snapshots of the Data Source's activity counters. Both bounds are stamped by
+  the Data Source; whether a Receipt falls inside them is a question about a
+  second clock, the Gateway's ({{cr-procedure}}).
 
 Mapping Profile:
 : A versioned statement, declared by the operator, of the correspondence
   expected between one client-level operation and the source-level activity
-  it produces — including the bound on that multiplicity and the rules by
-  which activity is excluded from comparison. A Mapping Profile is a
+  it produces — including the bound on that multiplicity, the clock source on
+  each side and the skew bound between them, and the rules by which activity
+  is excluded from comparison. A Mapping Profile is a
   declaration about a deployment, not a measurement performed by the
   Gateway ({{cr-mapping}}).
 
@@ -332,12 +335,18 @@ Receipt that names the object out of the Window, and the object it would have
 accounted for becomes activity for which no Receipt exists. That outcome is the
 one whose semantics name gateway bypass ({{cr-semantics}}), so a clock
 difference of seconds can produce the accusation rather than any real gap. The
-sub-second case is the dangerous one, because nothing about it looks wrong.
+difference measured where this was found was three seconds; nothing in the
+procedure sets a floor below which it stops happening, and a smaller one is
+correspondingly harder for a reader to suspect.
 
 A Mapping Profile therefore declares the clock source on each side and the skew
-bound between them, as it declares multiplicity ({{cr-mapping}}). Where that
-bound is undeclared, the rule below applies and the affected items are
-`indeterminate` rather than absent evidence.
+bound between them, as it declares multiplicity ({{cr-mapping}}), and both are
+covered by the profile digest as every other part of it is. Where the bound is
+undeclared, the rule below applies and the affected items are `indeterminate`
+rather than absent evidence. Where it is declared and a Receipt falls further
+outside the Window than the bound allows, the boundary does not explain it: the
+item takes the outcome it would have had, and a reconciler MUST report which
+bound it applied to reach that.
 
 For each pattern whose counter increased during the Window, the
 reconciler attributes the pattern to the data objects it touches and
@@ -354,7 +363,12 @@ population receives exactly one of the following outcomes:
 
 `matched`:
 : The item corresponds to an item in the other population within the
-  bounds of the applicable Mapping Profile ({{cr-mapping}}).
+  bounds of the applicable Mapping Profile ({{cr-mapping}}), and within the
+  Window. The profile's two kinds of bound do not act alike here: a
+  multiplicity bound admits items to this outcome, and the skew bound does
+  not. A Receipt outside the Window is never `matched`, however small the
+  declared skew — the bound qualifies how far the boundary can be trusted, not
+  where the boundary is.
 
 `observed-without-receipt`:
 : The Data Source recorded activity against an object that no Receipt in
@@ -422,11 +436,13 @@ declares the multiplicity one: the operator knows it and the Gateway cannot
 measure it. It states the clock source on each side — the one the Data Source
 stamps snapshots with, and the one the Gateway stamps Receipts with — and the
 skew bound between them. Both are operator statements and carry that standing
-under the rule below; a deployment whose two sides read one clock declares that,
-and its skew bound is zero by construction rather than by assumption. The
-difference matters to a reader: zero because the sides are the same clock is a
-fact about the deployment, and zero because nobody looked is the assumption
-this document refuses.
+under the rule below, including a declaration that the two sides read one clock
+and the bound is therefore zero. That declaration is still a declaration: one
+clock read twice is not read at the same instant, and whether the residue
+matters is a judgement about the deployment. What the rule below forbids is
+presenting it as measured, and what this document refuses is the third case —
+zero because nobody looked, declared by nobody, and read by the reconciler as
+agreement.
 
 A reconciliation result computed against a Mapping Profile MUST bind that
 profile's digest, and MUST state, for each bound it relies on, whether the
@@ -451,9 +467,9 @@ finding.
 An undeclared skew bound is treated the same way, and for the same reason. An
 implementation MUST NOT substitute a default of zero: zero asserts that the two
 clocks agree, which is the assumption that produces the false accusation this
-document now guards against. Nor may it substitute a bound of its own choosing,
-which would decide the operator's question with a number the operator never
-saw. Absent the declaration, items whose only naming Receipt sits outside the
+document now guards against. It MUST NOT substitute a bound of its own choosing
+either, which would decide the operator's question with a number the operator
+never saw. Absent the declaration, items whose only naming Receipt sits outside the
 Window are `indeterminate` and the result reports the offset, leaving the
 reader to compare it against clocks the reader knows and the reconciler does
 not.
@@ -513,7 +529,8 @@ The reconciliation result is a JSON object:
 : The digest and version identifier of the Mapping Profile the comparison
   was computed against ({{cr-mapping}}), or `null` when none was declared.
   When `null`, every item whose outcome depends on a multiplicity bound is
-  `indeterminate`.
+  `indeterminate`, and so is every item whose only naming Receipt falls
+  outside the Window: with no profile there is no declared skew bound either.
 
 `bounds`:
 : For each bound the comparison relied on, its source: `protocol-defined`,
@@ -735,9 +752,14 @@ naming the same object, moved a real in-Window absence into the new outcome and
 the implementation offered the boundary as its explanation — an exculpation a
 twenty-three hour offset cannot support. 0.2.28 bounds what the implementation
 is willing to suggest, which is the reporting choice described in
-{{cr-mapping}}. Both defects were in the implementation before they were
-visible in this document, and the document is the reason the second one was
-found: the vocabulary made the wrong sentence sayable, so someone tried to say
+{{cr-mapping}}. Both defects were in the implementation before they were visible
+in this document, and neither was found by reading it. The first came from
+review of -03 on the mailing list; the second from an adversarial review of the
+implementation, commissioned because the fix had loosened a default and its
+author was not the party who should clear it. What made the second sentence
+sayable was the tool's own output, not this text, which did not yet exist. The
+document's part was smaller and later: it is where the correction has to be
+written down so the next implementation does not have to be attacked to learn
 it.
 
 --- back
