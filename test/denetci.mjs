@@ -87,7 +87,15 @@ const NOT_CLAIM_SURFACES = {
   'PROJECT_CONTEXT.md': 'internal orientation, not published to a reader',
 }
 
-const RECORD_DIR = 'docs/audit/denetci'
+/**
+ * Not docs/audit/. `.gitignore` carries `audit/` to keep receipt chains — which
+ * hold traces of customer data — out of the repository, and that pattern matches
+ * any directory of that name at any depth. A record written there is invisible
+ * to git, so CI checks out a tree without it and the gate fails on a review that
+ * exists on the author's disk. Records live beside the rule source instead,
+ * where the directory is unambiguously publishable.
+ */
+const RECORD_DIR = 'docs/claims/reviews'
 
 const git = (args) =>
   execFileSync('git', ['-C', root, ...args], {
