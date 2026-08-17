@@ -56,6 +56,13 @@ jobs:
       # The first-run path exactly as the README prints it. A suite that passes
       # while `conarium-init` is broken would still leave a new user stuck at the
       # first command, so the documented path is checked on every major too.
+      #
+      # The export is part of the path, not boilerplate: init writes the key and
+      # then prints the two exports and the doctor line, and doctor exits 1 when a
+      # receipt sink is configured with no signing key — correctly, since a gateway
+      # in that state cannot sign what it records. The first version of this step
+      # omitted the export and failed on all three majors, which is the check
+      # doing its job on the person who wrote it.
       - name: Documented quickstart
         run: |
           set -euo pipefail
@@ -63,4 +70,6 @@ jobs:
           node "$GITHUB_WORKSPACE/bin/conarium-init.mjs"
           test -f conarium.config.json
           test -f audit-ed25519.pem.keyid
+          export CONARIUM_AUDIT_SIGNING_KEY="$PWD/audit-ed25519.pem"
+          export CONARIUM_AUDIT_TRUST_PUBKEYS="$PWD/audit-ed25519.pub.pem"
           node "$GITHUB_WORKSPACE/bin/conarium-doctor.mjs" --config ./conarium.config.json --no-net
