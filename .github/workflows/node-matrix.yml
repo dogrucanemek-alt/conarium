@@ -111,10 +111,23 @@ jobs:
           npm init -y > /dev/null
           npm i "$RUNNER_TEMP"/conarium-ai-core-*.tgz
       - name: Every installed command resolves through npx
+        # The default step shell is `bash -e`, so the first non-zero exit ends the
+        # step. Here a non-zero exit is the expected answer for nearly every
+        # command — they refuse to run without configuration, which is the point —
+        # so errexit is off and the verdict comes from the output. Left on, this
+        # step died on the very first command having reported nothing at all,
+        # which is how it failed the first time it ran.
         run: |
           set -uo pipefail
-          cd "$RUNNER_TEMP/stranger"
+          set +e
+          # With errexit off, a failed cd would leave the loop checking whatever
+          # directory it happened to be in and still report every command ok.
+          cd "$RUNNER_TEMP/stranger" || { echo "::error::install directory missing"; exit 1; }
           names=$(node -e 'console.log(Object.keys(require("./node_modules/@conarium-ai/core/package.json").bin).join("\n"))')
+          if [ -z "$names" ]; then
+            echo "::error::no bin entries were read from the installed package"
+            exit 1
+          fi
           echo "checking: $(echo "$names" | tr '\n' ' ')"
           failed=0
           for n in $names; do
