@@ -12,7 +12,13 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type publish to release the version in package.json'
+        # `registry` exists because the two publishes are not one operation. The
+        # npm release is irreversible; the registry entry is metadata that can be
+        # retried. When 0.2.25 published to npm and then failed at the registry,
+        # re-running the whole workflow was impossible — npm refuses a duplicate
+        # version — so the only way to fix a metadata entry would have been to
+        # burn a version number on it.
+        description: 'publish = release the version in package.json; registry = MCP registry entry only'
         required: true
         type: string
 
@@ -24,7 +30,7 @@ permissions:
 
 jobs:
   npm:
-    if: ${{ github.event.inputs.confirm == 'publish' }}
+    if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'registry' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,7 +50,27 @@ jobs:
       # publish credential. Nothing is stored in repo secrets.
       - run: npm install -g npm@latest
       - name: Publish with provenance
+        if: ${{ github.event.inputs.confirm == 'publish' }}
         run: npm publish --access public --provenance
+      # The tag records the npm release, so it is written as soon as that release
+      # exists. It used to run last, behind the registry step, and on 0.2.25 that
+      # ordering lost it: npm published, the registry rejected a stale
+      # server.json, and the tag step never ran — leaving a version on npm that
+      # the repository had no tag for, which is the one thing this step exists to
+      # prevent. A metadata step failing downstream must not unrecord a release
+      # that already happened.
+      - name: Tag the release
+        if: ${{ github.event.inputs.confirm == 'publish' }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "tag v${VERSION} already exists, leaving it alone"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "v${VERSION}" -m "release ${VERSION}"
+            git push origin "v${VERSION}"
+          fi
       # The registry stores metadata, not artefacts, so it runs after npm has
       # the package: it checks that the published tarball's mcpName matches
       # server.json before it will accept the server. github-oidc reuses this
@@ -66,16 +92,3 @@ jobs:
           tar xzf mcp-publisher.tar.gz mcp-publisher
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish
-      # Every tag before 0.2.18 was made by hand after the fact. A publish that
-      # succeeds now records itself; a failed publish leaves no tag behind.
-      - name: Tag the release
-        run: |
-          VERSION="$(node -p "require('./package.json').version")"
-          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            echo "tag v${VERSION} already exists, leaving it alone"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "v${VERSION}" -m "release ${VERSION}"
-            git push origin "v${VERSION}"
-          fi

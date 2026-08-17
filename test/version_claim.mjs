@@ -21,7 +21,7 @@
  */
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -49,6 +49,34 @@ function npmPackFileList() {
 
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8')).version
 const tag = `v${version}`
+
+// ── the same number, declared a second time ──────────────────────────────────
+//
+// server.json carries the version twice for the MCP registry, and both were
+// hand-maintained. Releasing 0.2.25 on 2026-08-17 published to npm and then
+// failed at the registry with "cannot publish duplicate version", because
+// server.json still said 0.2.24 — the registry was being offered a number it
+// already had. The release step that writes the git tag ran after the registry
+// step, so it was skipped too: npm had the release, the repository had no tag
+// for it. Two declarations of one fact, neither derived from the other.
+
+const serverPath = join(root, 'server.json')
+if (existsSync(serverPath)) {
+  const raw = readFileSync(serverPath, 'utf-8')
+  const server = JSON.parse(raw)
+  const declared = [
+    ['version', server.version],
+    ...(server.packages ?? []).map((p, i) => [`packages[${i}].version`, p.version]),
+  ]
+  const wrong = declared.filter(([, v]) => v !== version)
+  assert.equal(
+    wrong.length,
+    0,
+    `server.json disagrees with package.json (${version}):\n` +
+      wrong.map(([where, v]) => `  ${where} = ${v}`).join('\n') +
+      '\n\nThe MCP registry rejects a version it already holds, and it reads server.json.\n',
+  )
+}
 
 let tagged = true
 try {
