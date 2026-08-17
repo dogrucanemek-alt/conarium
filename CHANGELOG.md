@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.2.25 — 2026-08-17
+
+A documented command was never installed. It was found by running the README on a
+machine that had never seen this package — the one path no test had walked, because
+every test walks it from the repository, where the paths resolve.
+
+- **`npx conarium-anchor-service` resolves.** The countersigning endpoint was
+  documented in the README, shipped in the tarball as
+  `bin/conarium-anchor-service.mjs`, correctly shebanged, and fail-closed on
+  missing configuration. It was never listed in package.json `bin`, so npm looked
+  for a package by that name in the registry and answered E404 — for as long as
+  the file had existed. It is registered now; starting it without a token file or
+  a signing key exits 2 and names what is missing, as the README says it does.
+
+- **Documented commands are checked against installed commands, both ways.**
+  `test/bin_claims.mjs` reads the `npx conarium-*` invocations out of README,
+  SECURITY, LIMITATIONS and `docs/` and fails when one of them is absent from
+  package.json `bin`; it also asserts every registered bin exists and carries a
+  shebang. Neither list is restated in the test. A `stranger-install` CI job
+  installs the packed tarball into an empty directory and checks the opposite
+  direction — that every registered command resolves without asking the registry.
+  A loop over `bin` cannot catch an unregistered name, and an offline test cannot
+  see how npm resolves after install, so both directions are needed.
+
+- **The README's commands run where the README puts them.** Four blocks were
+  command references written as if they were sequences. `conarium-init` writes keys
+  and config, not receipts, so three `conarium-verify` lines answered 20 on a file
+  that does not exist yet; `declaration.json` and the `pg_stat_statements`
+  snapshots are not generated either; the repository ships a
+  `conarium.config.json`, so `node bin/conarium-init.mjs` correctly refused to
+  overwrite it and exited 1; and `conarium-doctor` was placed before the step that
+  points the config at a DSN, so it reported the placeholder host unreachable. The
+  runnable commands now use the demo chain the reader downloaded in the section
+  above, and the exit codes are stated — including `--anchor-check` answering 14 on
+  a chain that ships without a sidecar, which is the intended answer, since an
+  absent anchor is not a verified one. The rest name their prerequisites instead
+  of implying they have none.
+
+- **Policy pages no longer assert past their own inventory.** `privacy.html` said
+  "We never receive, see, or store your data or your customers' data" and then
+  itemised the waitlist email it stores, the chat it forwards to a third-party
+  model, and the host logs it keeps; `terms.html` made the same claim with no
+  itemisation at all. The self-hosted claim is true and kept, now scoped to what
+  it covers: the data Conarium governs never reaches us. `test/claim_discipline.mjs`
+  had been reading both files and could not see this, because it only knows
+  phrasings already caught — the phrasing is in it now.
+
 ## 0.2.24 — 2026-08-17
 
 Documentation that shipped with 0.2.23 still carried claims this project had

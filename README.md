@@ -110,14 +110,21 @@ npx conarium-init
 
 export CONARIUM_AUDIT_SIGNING_KEY=./audit-ed25519.pem
 
+# init writes keys and config, not receipts: your own audit file does not exist
+# until the gateway has served a query. The three commands below therefore run
+# against the demo chain downloaded above, so they work as written — swap in
+# your own sink (conarium.config.json → audit.sink) once it has records.
+
 # Verify a receipt chain (exit 0 = the records *in the file* are intact)
-npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem
+npx conarium-verify chain.jsonl --pubkey key.pem
 
 # Pin length / last hash if you need to catch records dropped from the end
-npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --expect-count 3
+npx conarium-verify chain.jsonl --pubkey key.pem --expect-count 3
 
-# Optional: check OpenTimestamps sidecar (pending → exit 0 + warning; missing → 14)
-npx conarium-verify ./receipts.jsonl --pubkey ./audit-ed25519.pub.pem --anchor-check
+# Check the OpenTimestamps sidecar. The demo chain ships without one, so this
+# answers 14, deliberately not 0: an absent anchor is not a verified anchor.
+# A sidecar that exists but is not yet confirmed → exit 0 with a warning.
+npx conarium-verify chain.jsonl --pubkey key.pem --anchor-check
 ```
 
 A second verifier, Go and the standard library only, is in [`verifiers/go`](verifiers/go). `go build -o conarium-verify .` then the same arguments as `conarium-verify`; `test-vectors/` is the contract.
@@ -248,6 +255,12 @@ everywhere and would shred the output) and matches on Unicode word boundaries, s
 Receipts prove what went **through** the gateway. Reconciliation asks the database
 what it saw, and compares:
 
+Neither command invents its inputs and `conarium-init` does not create them, so
+both answer **20 (input missing)** until you have produced them: `declaration.json`
+is your own period-and-scope statement ([`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md)
+names the fields), and the two snapshots come from
+[`scripts/pg-snapshot.sql`](scripts/pg-snapshot.sql).
+
 ```bash
 # One-sided: signed coverage declaration over a period + declared scope
 npx conarium-coverage ./declaration.json --pubkey ./audit-ed25519.pub.pem --receipts ./receipts.jsonl
@@ -286,13 +299,17 @@ The service is in this package, so you can run your own and sign your own heads
 above. What makes it worth anything is that the signer is not you.
 
 ```bash
-# Run the endpoint (refuses to start without a signing key or a token file)
+# Run the endpoint. It refuses to start without a signing key or a token file:
+# with neither present the three lines below exit 2 and name what is missing,
+# which is the intended answer, not a failed install. Generating both is in
+# deploy/anchor-service/.
 CONARIUM_ANCHOR_TOKENS=./anchor.tokens.json \
 CONARIUM_ANCHOR_SIGNING_KEY=./anchor.pem \
 CONARIUM_ANCHOR_BASE_URL=https://anchor.example.com \
 npx conarium-anchor-service
 
-# Verify a countersignature you were given — offline, no network, no package
+# Verify a countersignature you were given — offline, no network, no package.
+# record.json is what the endpoint returned to you; without it, exit 20.
 npx conarium-countersign-verify ./record.json --pubkey ./anchor.pub.pem
 # exit 0  = signature valid (and inclusion valid if a proof or --log-url was given)
 # exit 13 = signature invalid / unknown keyId
@@ -438,7 +455,11 @@ npm i @conarium-ai/core
 npx conarium-init
 export CONARIUM_AUDIT_SIGNING_KEY="$PWD/audit-ed25519.pem"
 
-# 3. Check the install before trusting it
+# 3. Check the install before trusting it. Until step 4 points the config at a
+#    reachable DSN, doctor reports the placeholder host unreachable and exits 1.
+#    That FAIL is the check working, not the install being broken — it is the one
+#    thing a gateway must not be quiet about, because it keeps running with zero
+#    connectors and looks healthy while serving nothing.
 npx conarium-doctor
 
 # 4. Point the generated conarium.config.json at your read-only DSN,
@@ -459,7 +480,9 @@ its output is safe to paste into an issue.
 git clone https://github.com/dogrucanemek-alt/conarium.git
 cd conarium
 npm install && npm run build
-node bin/conarium-init.mjs
+# The repository already ships a conarium.config.json, so init refuses rather
+# than overwrite it (exit 1). Pass --force only if you want it regenerated.
+node bin/conarium-init.mjs --force
 node bin/conarium-doctor.mjs --no-net
 npm start
 ```

@@ -24,6 +24,7 @@ export const CHECKS = [
   'test/docker_entry.mjs',
   'test/claim_discipline.mjs',
   'test/version_claim.mjs',
+  'test/bin_claims.mjs',
   'test/console_cli.mjs',
   'test/console_policy.mjs',
   'test/console_handoff.mjs',

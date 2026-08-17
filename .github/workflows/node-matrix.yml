@@ -73,3 +73,62 @@ jobs:
           export CONARIUM_AUDIT_SIGNING_KEY="$PWD/audit-ed25519.pem"
           export CONARIUM_AUDIT_TRUST_PUBKEYS="$PWD/audit-ed25519.pub.pem"
           node "$GITHUB_WORKSPACE/bin/conarium-doctor.mjs" --config ./conarium.config.json --no-net
+
+  # Every step above runs the code from a checkout. A reader runs it from the
+  # tarball, and the two are not the same thing: a path that resolves in the
+  # repository can be absent, unexecutable, or unregistered in the package.
+  #
+  # This job installs the packed tarball into an empty directory, the way a
+  # stranger does, and asserts that every command the package says it installs
+  # can be resolved without asking the registry. The list is read from the
+  # installed package.json, because restating it here would recreate the drift.
+  #
+  # It is worth being exact about what this does and does not catch, since the
+  # defect that prompted it was the other direction. On 2026-08-17 the README
+  # documented `npx conarium-anchor-service`; the file was present, shipped, and
+  # correct, but the name was never listed in package.json "bin", so npm looked
+  # for a package by that name and answered E404. A loop over "bin" cannot see
+  # that — an unregistered name is not in the list it iterates. That direction
+  # (documented ⇒ registered) is checked offline by test/bin_claims.mjs. This job
+  # checks the opposite direction (registered ⇒ actually resolvable once
+  # installed), which no repository-local test can establish. Both are needed.
+  stranger-install:
+    name: stranger-install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack and install into an empty directory
+        run: |
+          set -euo pipefail
+          npm pack --pack-destination "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/stranger" && cd "$RUNNER_TEMP/stranger"
+          npm init -y > /dev/null
+          npm i "$RUNNER_TEMP"/conarium-ai-core-*.tgz
+      - name: Every installed command resolves through npx
+        run: |
+          set -uo pipefail
+          cd "$RUNNER_TEMP/stranger"
+          names=$(node -e 'console.log(Object.keys(require("./node_modules/@conarium-ai/core/package.json").bin).join("\n"))')
+          echo "checking: $(echo "$names" | tr '\n' ' ')"
+          failed=0
+          for n in $names; do
+            # Servers block by design, so the run is bounded. The verdict is not
+            # the exit code — a command that refuses to start without its key is
+            # behaving correctly — it is whether npx had to ask the registry.
+            timeout 20 npx --no-install "$n" --help > out.txt 2>&1
+            code=$?
+            if grep -qE "E404|is not in this registry|could not determine executable" out.txt; then
+              echo "::error::npx could not resolve '$n' — missing from package.json \"bin\"?"
+              head -5 out.txt
+              failed=1
+            else
+              echo "  ok  $n (exit $code, resolved locally)"
+            fi
+          done
+          exit $failed
