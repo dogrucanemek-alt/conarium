@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.2.24 — 2026-08-17
+
+Documentation that shipped with 0.2.23 still carried claims this project had
+already retracted, and the reason it could is now checked rather than remembered.
+
+- **The published claims match the repository's.** 0.2.23 went to npm, and README,
+  SECURITY, LIMITATIONS and the architecture note were corrected afterwards on the
+  same version number. Anyone installing 0.2.23 received the corrected code with
+  the uncorrected wording: "Immutable Audit Ledger", "never sees your secrets",
+  "without exposing a single secret", "every access is logged". This release
+  carries the corrections. `README` now says what the mechanism establishes —
+  the ledger is tamper-evident rather than immutable, because a hash chain makes
+  alteration and mid-chain removal detectable and does not make the file
+  impossible to delete; masking hides a value and does not make it unlearnable,
+  which is what `protectedColumns` narrows and `LIMITATIONS` states.
+
+- **A version number is a claim, so it is checked.** `test/version_claim.mjs`
+  fails when a release tag exists for the version in package.json and any file npm
+  would ship differs from that tag. The file list comes from `npm pack --dry-run`
+  rather than a second copy of the `files` array, because a restated list is one
+  more hand-written claim that can drift. This is the check that would have caught
+  both 0.2.21 and 0.2.23 the same day instead of a day later.
+
+- **`engines` is Node >=20, and every major it covers is exercised.** It said >=18,
+  which was wrong rather than unverified: the MCP SDK's HTTP transport uses the
+  global `crypto`, available without a flag only from Node 19, so on Node 18 the
+  gateway failed at `initialize`. CI now runs the suite on 20, 22 and 24, plus the
+  documented first-run path on each. Node 18 and Node 20 are both past end-of-life;
+  20 is kept because it is verified to work, and LIMITATIONS says so and names 22+.
+
+- **SECURITY.md no longer contradicts LIMITATIONS** about whether a
+  Conarium-operated countersigning endpoint exists. It has since 2026-08-15; one
+  document was updated and the other was not, and `test/claim_discipline.mjs` now
+  fails on that specific pair of statements.
+
 ## 0.2.23 — 2026-08-17
 
 A property run found the first item at random; the second is a gap this project
