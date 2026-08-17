@@ -4,7 +4,9 @@ Conarium'un yapmadıkları. Ölçülmüş. Tarih yok.
 
 ## Sertifikasyon yok
 
-SOC 2 yok. ISO yok. Bağımsız sızma testi yok. Yol haritasında.
+SOC 2 yok. ISO yok. İkisi de planlanmıyor: bu denetimler müşteri verisini
+elinde tutan kuruluşu denetler, Conarium'un yönettiği veri ise bize hiç
+ulaşmıyor. Bağımsız sızma testi de yok — o yol haritasında.
 
 ## 1.0 değil
 
@@ -150,3 +152,19 @@ Damgalama yerleşik takvim istemcisiyle yapılır (Node `crypto` + herkese açı
 `javascript-opentimestamps` bağımlılık değil. `web3` / `elliptic` / `crypto-js` / `request` / `lodash` ağacı kurulmaz.
 Bitcoin onayı yine saatler sürebilir; makbuz `pending` gösterir.
 Bitcoin blok doğrulaması `blockstream.info`'ya sorar. O host yoksa doğrulayıcı "kontrol edemedim" der, "geçerli" demez.
+
+## Mutabakat, kayan saatle geç yazılmış makbuzu ayıramaz
+
+Pencerenin iki ucu veritabanının snapshot damgalarından, makbuzun damgası ise
+gateway'den geliyor. Yani sınıra iki ayrı saat karar veriyor. Bir deseni
+kapsayacak olan makbuz pencerenin dışına düşerse sonuç `indeterminate` olur
+(çıkış 41) — "makbuzsuz erişim" denmez, çünkü araç ikisinden hangisinin olduğunu
+bilemez. Bu bir hüküm değil, bir sınır: 41 başarısızlıktır, koşu geçmez, ama
+hiçbir yön kanıtlanmış olmaz.
+
+Aklama, pencerenin kendi uzunluğuyla sınırlı: pencereden uzun bir fark sınır
+etkisiyle açıklanamaz ve rapor bunu mazeret göstermek yerine açıkça yazar.
+`--skew` ile operatör kendi saatlerinin ne kadar kayabileceğini beyan eder ve o
+beyan, araçtan çıkarılan sınırı ezer. İki kipte de makbuzun, sayaçların
+kaydettiği erişime ait olduğu kanıtlanmış olmaz. Bu sınır, sınıf yayına
+çıktıktan sonra **saldırıyla** bulundu; okumayla değil.

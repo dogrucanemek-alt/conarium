@@ -187,6 +187,23 @@ such deployment. The consequence is that a clean run establishes pattern and
 object overlap within the window. It does not establish that each recorded
 statement was itself receipted.
 
+## Reconciliation cannot tell a trailing clock from a late receipt
+
+The window comes from the database's snapshot timestamps and a receipt's
+timestamp comes from the gateway, so the boundary is decided by two clocks.
+A receipt that would have covered a pattern but falls outside the window is
+reported as `indeterminate` (exit 41) rather than as unreceipted access,
+because this tool has no way to know which of the two happened. That is a
+limit, not a verdict: 41 is a failure and the run does not pass, but nothing
+is proven either way.
+
+The exculpation is bounded by the window's own length — an offset larger than
+the window cannot be a boundary artefact, and the report says so instead of
+excusing it. `--skew` lets an operator declare what their clocks can do, and
+that declaration outranks the inference. Neither mode establishes that the
+receipt belongs to the access the counters recorded. This limit was found by
+attack after the class shipped, not by reading it.
+
 A receipt that names an object while the database counters show no increase
 for that object is listed as UNOBSERVED. It is not a failure. The same
 shape appears when a counter was reset at the window edge, when a pooler
