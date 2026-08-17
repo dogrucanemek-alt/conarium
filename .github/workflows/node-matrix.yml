@@ -1,0 +1,75 @@
+name: node-matrix
+
+# package.json promises `engines: node >=18`. Until now CI verified one version
+# of that promise — Node 20 — and the promise covered four majors. A reviewer
+# running the suite on Node 24 pointed this out; nothing was broken, but nothing
+# was checked either, which is the same defect as a claim nobody re-read.
+#
+# The promise is split because the tooling and the product have different floors:
+#
+#   suite         Node 20 · 22 · 24   vitest 4 supports ^20 || ^22 || >=24, so the
+#                                     full test suite runs on exactly these
+#   runtime-floor Node 18             every RUNTIME dependency allows 18, and the
+#                                     published package ships prebuilt dist/, so a
+#                                     user on 18 never runs vitest or tsc. What they
+#                                     do run is checked here: the adversarial check
+#                                     scripts, which import no test framework
+#
+# If runtime-floor ever fails, the honest options are to fix it or to raise
+# `engines` — not to drop the job. A promise that is not checked is not a promise.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: suite (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      # One version failing must not hide the others: the interesting result is
+      # which majors differ, and fail-fast would report only the first.
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:checks
+
+  runtime-floor:
+    name: runtime floor (node 18, the engines promise)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+      # vitest declares ^20 || ^22 || >=24, so installing it here prints
+      # EBADENGINE. That is expected and is not a failure: it is a dev tool, and
+      # nothing below runs it.
+      - run: npm ci
+      - run: node --version
+      # The adversarial check scripts import no test framework, so they are the
+      # part of the suite a Node 18 user's runtime can actually be measured with.
+      - run: npm run test:checks
+      # The documented first-run path, exactly as the README prints it.
+      - name: Documented quickstart on the runtime floor
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/floor" && cd "$RUNNER_TEMP/floor"
+          node "$GITHUB_WORKSPACE/bin/conarium-init.mjs"
+          test -f conarium.config.json
+          test -f audit-ed25519.pem.keyid
+          node "$GITHUB_WORKSPACE/bin/conarium-doctor.mjs" --config ./conarium.config.json --no-net
