@@ -46,6 +46,24 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:checks
+      # A judgment gate, not a test. The checks above lock phrasings that were
+      # already caught, and none of them can see a new overclaim: on 2026-08-17
+      # privacy.html asserted "we never receive, see, or store your data" four
+      # paragraphs above its own inventory of the waitlist email it stores, with
+      # claim_discipline.mjs reading that very file and finding nothing.
+      #
+      # This step never fails because of what a review found — findings print as
+      # warnings and the release carries them. It fails when no review covers the
+      # text about to ship, when the claim surfaces changed after the review was
+      # written, or when the reviewer wrote `verdict: blocked`. Judgment wired to
+      # an automatic red gets switched off at the first arguable finding, and the
+      # findings worth having are arguable.
+      #
+      # confirm=registry is exempt: it corrects a metadata entry and publishes no
+      # new claim.
+      - name: Claims review gate
+        if: ${{ github.event.inputs.confirm == 'publish' }}
+        run: node test/denetci.mjs gate
       # npm >= 11.5 exchanges the workflow's OIDC identity for a short-lived
       # publish credential. Nothing is stored in repo secrets.
       - run: npm install -g npm@latest
