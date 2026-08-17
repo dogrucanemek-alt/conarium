@@ -331,10 +331,17 @@ receipt, and the table into an accusation of bypass. Skew then manufactures the
 accusation rather than any real gap, and the sub-second version is the dangerous
 one, because it is believed.
 
-A pattern whose uncovered tables **all** have a receipt just outside the boundary
-is reported as `indeterminate` and exits 41. It is not a pass — 41 is a failure —
+A pattern whose uncovered tables **all** have a receipt outside the window is
+reported as `indeterminate` and exits 41. It is not a pass — 41 is a failure —
 but it is not the bypass sentence either, because this tool cannot tell a trailing
-clock from a late receipt. The report names the skew that would have to be true:
+clock from a late receipt.
+
+**Distance is reported, not judged, until you declare a bound.** Without `--skew`
+there is no number that makes one offset skew and another not, so *any* covering
+receipt outside the window puts its pattern here — three milliseconds out and six
+hours out both land at 41, and the report prints which one it is. Reading that
+number is the operator's job in the default mode; `--skew` is how you hand the
+judgement to the tool:
 
 ```
 INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no --skew bound was declared…
@@ -342,10 +349,13 @@ INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no --s
 ```
 
 `--skew <duration>` declares the bound (`500ms`, `5s`, `2m`, `1h`). A receipt
-further out than the bound is not skew, and its pattern stays unreconciled at 40.
-Without the flag nothing decides the question, so nothing is asserted. A pattern
-with even one table that has no receipt anywhere is a real gap and stays at 40:
-a genuine finding is not made indeterminate by a neighbour's clock.
+further out than the bound is not skew, and its pattern goes back to unreconciled
+at 40 with the bypass sentence. An unreadable duration is an error, not a default:
+a tolerance nobody chose is the kind of number this tool exists to refuse.
+
+A pattern with even one table that has no receipt anywhere is a real gap and stays
+at 40 in either mode: a genuine finding is not made indeterminate by a neighbour's
+clock.
 
 Credit: raised by Walter Hawkins on the IETF SCITT list, 2026-08-17, against
 `bin/conarium-reconcile.mjs` on main.
