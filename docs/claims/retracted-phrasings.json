@@ -1,0 +1,70 @@
+{
+  "_comment": "Single source for claim_discipline.mjs in this repo and in nexus. test/ is not published; docs/ is. Do not copy this list into another file.",
+  "rules": [
+    {
+      "id": "immutable",
+      "re": "\\bimmutable\\b",
+      "flags": "i",
+      "why": "a hash chain is tamper-evident, not immutable: the file can still be deleted or truncated",
+      "use": "tamper-evident"
+    },
+    {
+      "id": "never-sees-secrets",
+      "re": "never sees your secrets",
+      "flags": "i",
+      "why": "masking hides a value; a predicate over a protected column can still answer questions about it",
+      "use": "the values your policy protects are masked before they reach it"
+    },
+    {
+      "id": "without-exposing-secret",
+      "re": "without exposing a single secret",
+      "flags": "i",
+      "why": "absolute, and contradicted by the inference channel this project documents itself",
+      "use": "protected values masked before they leave"
+    },
+    {
+      "id": "every-access-logged",
+      "re": "every access is logged",
+      "flags": "i",
+      "why": "only access through the gateway is logged — the reason conarium-reconcile exists at all",
+      "use": "every access through Conarium is logged"
+    },
+    {
+      "id": "never-crosses-perimeter",
+      "re": "(?<!raw )(?:data|it) never (?:leaves|crosses) (?:your|the) perimeter",
+      "flags": "i",
+      "why": "releasing a policy-approved disclosure to an AI client is what the product does",
+      "use": "raw values stay in your perimeter — only policy-approved disclosure leaves"
+    },
+    {
+      "id": "covered-by-receipts",
+      "re": "covered by receipts",
+      "flags": "i",
+      "why": "one receipt naming an object clears further statements against it: that is object attribution",
+      "use": "attributable to receipt(s) for the same table"
+    },
+    {
+      "id": "proof-of-applied-transformation",
+      "re": "proof of applied transformation",
+      "flags": "i",
+      "why": "the payload is a signed assertion by the issuer, not proof the transformation ran",
+      "use": "a signed assertion by the Issuer that the transformation was applied"
+    },
+    {
+      "id": "soc2",
+      "re": "SOC\\s?2",
+      "flags": "i",
+      "why": "there is no SOC 2 audit; LIMITATIONS says so, and readiness is not ours to assert",
+      "use": "name what exists — no SOC 2 audit, no independent penetration test",
+      "allow": "(?:(?:no|not|without)\\s+soc\\s?2|soc\\s?2\\s+yok|do(?:es)?\\s+not\\s+have\\s+soc\\s?2|has\\s+no\\s+soc\\s?2|is\\s+not\\s+soc\\s?2|kein\\s+soc\\s?2|pas\\s+de\\s+soc\\s?2|sin\\s+soc\\s?2|nessun\\s+soc\\s?2|нет\\s+soc\\s?2|无\\s*soc\\s?2|soc\\s?2\\s+नहीं|no\\s+third-party\\s+security\\s+certification\\s*\\(\\s*soc\\s?2|<(?:th|td)[^>]*>\\s*soc\\s?2\\s*<|soc\\s?2\\s+type\\s+ii[\\s\\S]{0,220}(?:we never receive|has no soc|class=\"(?:us )?no\")|[\"']SOC\\s?2\\s+Type\\s+II[\"'])",
+      "allowFlags": "i"
+    },
+    {
+      "id": "never-see-your-data",
+      "re": "never (?:receive,? see,? or store|see) your data",
+      "flags": "i",
+      "why": "the website stores a waitlist email, forwards chat to a third-party model, and keeps host logs",
+      "use": "scope it in the sentence — the data Conarium governs never reaches us"
+    }
+  ]
+}

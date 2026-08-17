@@ -669,7 +669,7 @@ per-user identity bound to an identity provider rather than an operator token ma
   probabilistic mask would make a probabilistic receipt, which is not a receipt.
 - **Hosted cloud console.** Self-hosted is the claim; a hosted console would put
   us in the data path we tell you we are not in.
-- **SOC 2.** It audits organisations that hold customer data. We never receive
+- **No SOC 2.** It audits organisations that hold customer data. We never receive
   yours. If that ever stops being true, this line changes first.
 
 Known gaps: [LIMITATIONS.md](LIMITATIONS.md), the README above,

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.26 — 2026-08-17
+
+The claim list that `test/claim_discipline.mjs` enforces now ships in the
+package, because the live site is a different repository and `test/` is not
+published. Copying the list into the site would have been a second source;
+the next overclaim would have been the two lists drifting.
+
+- **Retracted phrasings are a published file.**
+  `docs/claims/retracted-phrasings.json` is the only list. The test reads it.
+  The site repository reads the same file from
+  `node_modules/conarium-core/docs/claims/`. If the installed package does not
+  carry it, the site check is red and says to update the package. It does not
+  skip.
+
+- **SOC 2 is the word, not an English suffix.** The previous pattern looked
+  for `ready|compliant|certified` within twelve characters. The live site
+  said `SOC2 & DSGVO-konform`, `SOC2 et RGPD`, `SOC2和GDPR要求` — and the
+  check was green. The honest sentence is still allowed: `No SOC 2`,
+  `SOC 2 yok`, and the same denial in the languages the site speaks.
+
 ## 0.2.25 — 2026-08-17
 
 A documented command was never installed. It was found by running the README on a
