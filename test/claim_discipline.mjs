@@ -85,6 +85,15 @@ const BANNED = [
     why: 'the payload is a signed assertion by the issuer, not proof the transformation ran',
     use: 'a signed assertion by the Issuer that the transformation was applied',
   },
+  {
+    // Found on 2026-08-17 in the site repository's README, which had not been read
+    // since the claim sweep. It is a harder line than the others: LIMITATIONS says
+    // there is no SOC 2 audit, so "SOC2-ready" is not an overstatement of a
+    // mechanism, it is a statement about an audit that has not happened.
+    re: /SOC\s?2[^.\n]{0,12}(ready|compliant|certified)/i,
+    why: 'there is no SOC 2 audit; LIMITATIONS says so, and readiness is not ours to assert',
+    use: 'name what exists — no SOC 2 audit, no independent penetration test',
+  },
 ]
 
 let checked = 0
