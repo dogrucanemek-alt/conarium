@@ -1,7 +1,7 @@
 <div align="center">
   <h1>Conarium</h1>
   <p><strong>The Third Eye for Your Company's Data.</strong></p>
-  <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data—without exposing a single secret—and hands you a signed, independently verifiable receipt of every access.</p>
+  <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data under a policy you write—protected values masked before they leave—and hands you a signed, independently verifiable receipt of every access it mediates.</p>
   
   <p>
     <a href="https://www.npmjs.com/package/@conarium-ai/core"><img src="https://img.shields.io/npm/v/@conarium-ai/core?style=for-the-badge" alt="npm" /></a>
@@ -68,14 +68,14 @@ Point Cursor or Copilot at a production database and it drinks the raw stream—
 
 Conarium acts as a high-performance **MCP (Model Context Protocol) Proxy**. It sits directly between the AI Assistant and your databases, evaluating policies in milliseconds to enforce row limits and mask PII (Personally Identifiable Information) on the wire.
 
-The AI gets the context it needs to write code, but never sees your secrets.
+The AI gets the context it needs to write code; the values your policy protects are masked before they reach it. Masking hides a value — it does not make it unlearnable, and where a request language allows predicates over a protected column, an allowed query can still answer questions about one. `protectedColumns` is the narrower answer to that, and the limit is stated in [LIMITATIONS.md](LIMITATIONS.md) rather than left for you to discover.
 
 ### Key Features
 
 - **Inline PII Masking:** Emails, IDs, cards, and secrets are redacted in the response stream (`[MASKED_PII]` / `[MASKED_SECRET]`) before the model sees a single character.
 - **Allow / Deny Lists:** Whitelist what AI can access. Your `secrets` and `financials` tables stay invisible.
 - **Row Caps:** Hard per-query limits. Prevent the silent exfiltration of millions of rows. 
-- **Immutable Audit Ledger:** Every access is logged (who, what, when, rows, decision). Hash-chained and PII-safe — no raw PII ever written to the logs.
+- **Tamper-Evident Audit Ledger:** Every access *through Conarium* is logged (who, what, when, rows, decision). Hash-chained, which makes alteration and mid-chain removal detectable — not impossible: a file on disk can still be deleted or truncated, and catching truncation needs a pin from outside the file (see Coverage & Reconciliation below). PII-safe: no raw PII is written to the logs.
 - **Verifiable Receipts:** Ed25519-signed, independently verifiable receipts — see below.
 - **Per-person masking profiles:** what to mask for an AI agent is not what to mask for the data controller. A named profile relaxes masking for one identified person, and the receipt records which profile applied — see below.
 - **Coverage & Reconciliation:** a signed coverage declaration over the receipt chain (`conarium-coverage`), plus two-sided reconciliation against the database's own query counters (`conarium-reconcile`) — DB-recorded activity that no receipt covers is surfaced instead of staying invisible.
@@ -424,7 +424,7 @@ graph LR
 
 1. **The Gateway:** A proxy that speaks fluently to LLM assistants.
 2. **The Engine:** Evaluates JSON policies, regex scans, and row caps in milliseconds.
-3. **The Ledger:** An immutable audit log recording every query and decision.
+3. **The Ledger:** A tamper-evident audit log recording every query and decision it mediates.
 
 ---
 
@@ -629,7 +629,7 @@ Conarium is **early access** — and honest about what's real:
 
 **Shipping now:** governed MCP gateway (stdio + HTTP) · deterministic PII masking,
 including labelled names in free text · allow/deny + row caps · per-person masking
-profiles · immutable hash-chained audit ledger · Ed25519-signed receipt per access
+profiles · tamper-evident hash-chained audit ledger · Ed25519-signed receipt per access
 with an offline verifier · signed coverage declarations · two-sided reconciliation
 against the database's own counters · OpenTimestamps anchoring and an optional
 anchoring service · conformance vectors · SQL gate: Postgres, Microsoft SQL Server, Oracle

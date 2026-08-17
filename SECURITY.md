@@ -52,8 +52,10 @@ rather than served.
 What the key protects is the whole product: a leaked signing key makes every
 countersignature it ever produced worthless, including past ones. Custody,
 rotation, and what a compromise costs are in
-[`docs/COUNTERSIGN.md`](docs/COUNTERSIGN.md). Conarium does not operate a
-public countersigning endpoint yet.
+[`docs/COUNTERSIGN.md`](docs/COUNTERSIGN.md). Since 2026-08-15 a
+Conarium-operated endpoint does exist (`demo.conarium.dev/anchor`, keyId
+`verax-cs-20260815`), on one server with the key on disk and no HSM; it is not
+open to customers. The limits are in [`LIMITATIONS.md`](LIMITATIONS.md).
 
 The tester pack is [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md)
 and [`docs/security/PENTEST-SCOPE.md`](docs/security/PENTEST-SCOPE.md).
