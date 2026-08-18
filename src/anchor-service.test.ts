@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import request from 'supertest'
-import { createAnchorService, validateAnchorLog, verifyInclusionProof } from './anchor-service.js'
+import { createHash } from 'crypto'
+import { createAnchorService, loadTokensFile, readTokensSnapshot, validateAnchorLog, verifyInclusionProof } from './anchor-service.js'
 import { GENESIS_HASH } from './audit-hash.js'
 import { verifyAnchorRecord } from './anchor-sign.js'
 import { generateKeyPair, type SigningKey, type VerifyKey } from './keys.js'
@@ -335,6 +336,29 @@ describe('anchor service', () => {
     const lines = readFileSync(path, 'utf-8').trim().split('\n')
     writeFileSync(path, lines[1] + '\n')
     expect((await request(app).get(`/anchor/${created.body.id}`)).status).not.toBe(200)
+  })
+
+  it('accepts sha256: token keys and legacy raw keys in the same file', async () => {
+    const raw = 'hashed-customer-token'
+    const sha = createHash('sha256').update(raw).digest('hex')
+    const tokens = new Map([
+      [`sha256:${sha}`, 'hashed-owner'],
+      ['tok-a', 'acme'],
+    ])
+    const { app } = svc({ tokens })
+    expect((await request(app).post('/anchor').set('authorization', `Bearer ${raw}`).send({ hash: HASH })).status).toBe(201)
+    expect((await request(app).post('/anchor').set('authorization', 'Bearer tok-a').send({ hash: HASH2 })).status).toBe(201)
+    expect((await request(app).post('/anchor').set('authorization', 'Bearer nope').send({ hash: HASH })).status).toBe(401)
+  })
+
+  it('loadTokensFile skips _meta and treats _conarium_sync as authoritative empty', () => {
+    const p = join(dir, 'tokens.json')
+    writeFileSync(p, JSON.stringify({ _conarium_sync: 't', 'sha256:ab': 'o' }))
+    expect(loadTokensFile(p).get('sha256:ab')).toBe('o')
+    writeFileSync(p, JSON.stringify({ _conarium_sync: 't' }))
+    const snap = readTokensSnapshot(p)
+    expect(snap.authoritative).toBe(true)
+    expect(snap.tokens.size).toBe(0)
   })
 
   it('404s an unknown id instead of leaking whether it ever existed', async () => {

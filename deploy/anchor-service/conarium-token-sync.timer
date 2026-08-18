@@ -1,0 +1,11 @@
+[Unit]
+Description=Pull Conarium token hashes every 60 seconds
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

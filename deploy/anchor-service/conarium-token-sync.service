@@ -1,0 +1,14 @@
+[Unit]
+Description=Conarium token hash pull from Supabase
+Documentation=https://github.com/dogrucanemek-alt/conarium/blob/main/deploy/anchor-service/README.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=conarium
+Group=conarium
+WorkingDirectory=/opt/conarium
+EnvironmentFile=/opt/conarium/deploy/anchor-service/.env
+ExecStart=/usr/bin/node /opt/conarium/bin/conarium-token-sync.mjs
+# A failed pull must not look like success. The timer keeps retrying.
+SuccessExitStatus=0

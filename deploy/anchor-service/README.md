@@ -57,6 +57,9 @@ It asserts:
 2. Edit `WorkingDirectory`, `User`, and `EnvironmentFile`
 3. Copy `env.example` to `.env` and fill it
 4. `systemctl daemon-reload && systemctl enable --now conarium-anchor`
+5. Copy `conarium-token-sync.service` and `conarium-token-sync.timer`, then
+   `systemctl enable --now conarium-token-sync.timer` (pulls hashes every 60s).
+   A failed pull leaves the token file untouched.
 
 ## pm2
 
