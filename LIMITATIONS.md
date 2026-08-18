@@ -4,7 +4,7 @@ What Conarium has not done. Measured. No dates.
 
 ## No certification
 
-No SOC 2. No ISO/IEC 27001. Neither is planned: at this stage the budget goes to
+No SOC 2. No ISO/IEC 27001. Neither is planned: at this stage the priority is
 independent penetration testing and implementation-level assurance rather than
 organisational certification. No independent penetration test yet — that one is
 on the roadmap.

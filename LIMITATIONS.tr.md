@@ -4,9 +4,9 @@ Conarium'un yapmadıkları. Ölçülmüş. Tarih yok.
 
 ## Sertifikasyon yok
 
-SOC 2 yok. ISO/IEC 27001 yok. İkisi de planlanmıyor: bu aşamada bütçe,
-kurumsal sertifikasyon yerine bağımsız sızma testine ve uygulama düzeyinde
-güvenceye gidiyor. Bağımsız sızma testi de henüz yok — o yol haritasında.
+SOC 2 yok. ISO/IEC 27001 yok. İkisi de planlanmıyor: bu aşamada öncelik,
+kurumsal sertifikasyon değil, bağımsız sızma testi ve uygulama düzeyinde
+güvence. Bağımsız sızma testi de henüz yok — o yol haritasında.
 
 ## 1.0 değil
 
