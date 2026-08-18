@@ -131,3 +131,34 @@ describe('carry-over corpus — product matches frozen reference', () => {
     })
   }
 })
+
+describe('carry-over — unique-email bench shape stays bit-identical', () => {
+  it('80 distinct emails: notes without the value stay verbatim; a planted leak is still carried', () => {
+    const n = 80
+    const emails = Array.from({ length: n }, (_, i) =>
+      i === 0 ? 'bench-secret-user@example.com' : `user-${i + 1}@example.com`,
+    )
+    const gov = new Governance({ maskColumns: ['*.email'], maxRows: 100 })
+    const rows = emails.map((email, i) => ({
+      id: i + 1,
+      name: `user-${i + 1}`,
+      email,
+      note: i === 7 ? `contact ${email} please` : `note ${i + 1}`,
+    }))
+    const out = gov.redact({
+      rows,
+      rowCount: n,
+      fields: ['id', 'name', 'email', 'note'],
+    })
+    expect(out.governance.maskedCount).toBe(n + 1)
+    expect(out.governance.byClass ?? {}).toEqual({})
+    expect(out.governance.maskedFields).toEqual(['email', 'note'])
+    expect(out.rows[7].note).toBe('contact [MASKED_PII] please')
+    expect(out.rows[7].note).toBe(referenceRedact(String(rows[7].note), emails))
+    for (let i = 0; i < n; i++) {
+      if (i === 7) continue
+      expect(out.rows[i].note).toBe(`note ${i + 1}`)
+      expect(out.rows[i].email).toBe('[MASKED_PII]')
+    }
+  })
+})

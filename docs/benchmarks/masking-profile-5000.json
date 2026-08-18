@@ -1,0 +1,22 @@
+{
+  "n": 5000,
+  "node": "v24.5.0",
+  "compileMatchersMs": 697.0434,
+  "matcherCount": 5000,
+  "oneRowTwoFieldsCarryMs": 1807.2923,
+  "allRowsCarryOnlyMs": 8234.3677,
+  "carryHits": 0,
+  "fullRedactPartialMs": 9188.780600000002,
+  "fullRedactAllowMs": 8780.109500000006,
+  "impliedCarryPerRowMs": 1.64687354,
+  "impliedIfLinearFrom100": 164.687354,
+  "quadraticSignature": {
+    "matchers": 5000,
+    "fieldsPerRow": 2,
+    "replaceCalls": 50000000
+  },
+  "maskedCountPartial": 5000,
+  "maskedCountAllow": 5000,
+  "byClassPartial": {},
+  "byClassAllow": {}
+}
