@@ -15,8 +15,8 @@ describe('masking-cost warning', () => {
   it('default and omitted stay silent; raised cap warns', () => {
     expect(maxRowsWarns(undefined)).toBe(false)
     expect(maxRowsWarns(100)).toBe(false)
-    expect(maxRowsWarns(101)).toBe(true)
-    expect(maxRowsWarns(500)).toBe(true)
+    expect(maxRowsWarns(MASKING_COST_WARN_ABOVE)).toBe(false)
+    expect(maxRowsWarns(MASKING_COST_WARN_ABOVE + 1)).toBe(true)
   })
 
   it('text names distinct values, not table size, and does not reject', () => {
@@ -30,9 +30,9 @@ describe('masking-cost warning', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     const cfg = parseConariumConfig({
       connectors: [],
-      policy: { maxRows: 500, allowTables: ['public.t'] },
+      policy: { maxRows: 1000, allowTables: ['public.t'] },
     })
-    expect(cfg.policy?.maxRows).toBe(500)
+    expect(cfg.policy?.maxRows).toBe(1000)
     expect(err).toHaveBeenCalled()
     expect(err.mock.calls[0][0]).toMatch(/distinct/)
     err.mockRestore()

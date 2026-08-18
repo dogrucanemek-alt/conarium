@@ -1,0 +1,66 @@
+{
+  "label": "before",
+  "node": "v24.5.0",
+  "sizes": {
+    "100": {
+      "sha256": "663aa1ac732db6cec31bf49f76eda41ade4dd92be1b02d4d029a2dd768b02db1",
+      "maskedCount": 100,
+      "byClass": {},
+      "maskedFields": [
+        "email"
+      ],
+      "sampleRow": {
+        "id": 1,
+        "name": "user-1",
+        "email": "[MASKED_PII]",
+        "note": "note 1"
+      },
+      "lastRow": {
+        "id": 100,
+        "name": "user-100",
+        "email": "[MASKED_PII]",
+        "note": "note 100"
+      }
+    },
+    "500": {
+      "sha256": "cc40a1d21354aac1ecee7aeee680481fad3cfa9181494471c5cfd5ea91338a09",
+      "maskedCount": 500,
+      "byClass": {},
+      "maskedFields": [
+        "email"
+      ],
+      "sampleRow": {
+        "id": 1,
+        "name": "user-1",
+        "email": "[MASKED_PII]",
+        "note": "note 1"
+      },
+      "lastRow": {
+        "id": 500,
+        "name": "user-500",
+        "email": "[MASKED_PII]",
+        "note": "note 500"
+      }
+    },
+    "5000": {
+      "sha256": "66271d594c206667b32656913e4595c4df4247786316c814212cf99016045453",
+      "maskedCount": 5000,
+      "byClass": {},
+      "maskedFields": [
+        "email"
+      ],
+      "sampleRow": {
+        "id": 1,
+        "name": "user-1",
+        "email": "[MASKED_PII]",
+        "note": "note 1"
+      },
+      "lastRow": {
+        "id": 5000,
+        "name": "user-5000",
+        "email": "[MASKED_PII]",
+        "note": "note 5000"
+      }
+    }
+  }
+}

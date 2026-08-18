@@ -1,0 +1,25 @@
+{
+  "before": {
+    "file": "docs/benchmarks/masking-5000-partial.cpuprofile",
+    "command": "node --cpu-prof scripts/profile-masking-once.mjs partial 5000",
+    "wallMs": 17346,
+    "totalHits": 10949,
+    "top": [
+      { "hits": 4555, "pct": 41.6, "fn": "redactKnownValues", "at": "src/governance.ts:143 → dist/governance.js:71" },
+      { "hits": 471, "pct": 4.3, "fn": "knownValueMatchers map new RegExp", "at": "src/governance.ts:140 → dist/governance.js:69" },
+      { "hits": 50, "pct": 0.5, "fn": "maskPII", "at": "dist/governance.js:387" }
+    ],
+    "note": "Individual RegExp:(?<![\\p{L}\\p{N}])user-NNNN@example\\.com(?![\\p{L}\\p{N}]) frames also appear. carry hits = 0."
+  },
+  "after": {
+    "file": "docs/benchmarks/masking-5000-partial-after.cpuprofile",
+    "command": "node --cpu-prof scripts/profile-masking-once.mjs partial 5000",
+    "wallMs": 90.1,
+    "totalHits": 125,
+    "top": [
+      { "hits": 9, "pct": 7.2, "fn": "maskPII", "at": "dist/governance.js:430" },
+      { "hits": 5, "pct": 4.0, "fn": "masksColumn / match", "at": "dist/governance.js:414 / :22" }
+    ],
+    "note": "redactKnownValues is absent from the top 25. Hottest product frame is maskPII."
+  }
+}

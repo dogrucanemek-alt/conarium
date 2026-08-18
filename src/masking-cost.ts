@@ -9,7 +9,7 @@
  * (measured, not invented). Keep the number here in sync; test/masking_cost_warn.test.ts
  * checks both.
  */
-export const MASKING_COST_WARN_ABOVE = 100
+export const MASKING_COST_WARN_ABOVE = 500
 
 export function maxRowsWarns(maxRows: number | undefined): boolean {
   if (maxRows == null) return false
@@ -20,9 +20,9 @@ export function maskingCostWarning(maxRows: number): string {
   return (
     `policy.maxRows is ${maxRows} (measured warning above ${MASKING_COST_WARN_ABOVE}). ` +
     `Masking cost grows with the number of distinct values this policy already masked, ` +
-    `not with table size. The row cap bounds that set. Default ${MASKING_COST_WARN_ABOVE} ` +
-    `stayed in the low-millisecond band on the published bench; 500 distinct emails ` +
-    `were tens of milliseconds; 1 000 were hundreds. This is a performance warning. ` +
+    `not with table size. The row cap bounds that set. Default 100 stays silent. ` +
+    `${MASKING_COST_WARN_ABOVE} stayed in the low-millisecond band on the published bench; ` +
+    `5 000 distinct emails were about 93 ms. This is a performance warning. ` +
     `The query is not rejected.`
   )
 }
