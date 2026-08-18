@@ -7,7 +7,6 @@ Headline numbers are **p50 / p95 / p99**. Mean is not reported.
 Replay:
 
 ```
-# temporary Postgres (WSL Docker on this machine)
 docker run -d --name conarium-bench-pg \
   -e POSTGRES_USER=conarium -e POSTGRES_PASSWORD=demo-not-a-secret \
   -e POSTGRES_DB=conarium_bench -p 54329:5432 postgres:16-alpine
@@ -18,8 +17,15 @@ CONARIUM_BENCH_DSN=postgres://conarium:demo-not-a-secret@127.0.0.1:54329/conariu
 docker rm -f conarium-bench-pg
 ```
 
-Raw JSON: [`benchmarks/latest.json`](benchmarks/latest.json)
-(this run: [`benchmarks/overhead-20260814T1346Z-linux.json`](benchmarks/overhead-20260814T1346Z-linux.json)).
+Raw JSON (this run, current code `46acd75`):
+[`benchmarks/overhead-20260818T2145Z-win32-46acd75.json`](benchmarks/overhead-20260818T2145Z-win32-46acd75.json)
+and [`benchmarks/latest.json`](benchmarks/latest.json).
+
+Same environment, previous tag `09b2100`:
+[`benchmarks/overhead-20260818T2120Z-win32-09b2100.json`](benchmarks/overhead-20260818T2120Z-win32-09b2100.json).
+
+Historical other-environment archive (do not quote next to these cells):
+[`benchmarks/overhead-20260814T1346Z-linux.json`](benchmarks/overhead-20260814T1346Z-linux.json).
 
 No competitor numbers. n=15 cells have a thin tail (p95 = p99).
 
@@ -30,12 +36,13 @@ No competitor numbers. n=15 cells have a thin tail (p95 = p99).
 | | |
 |---|---|
 | CPU | Intel Core Ultra 9 275HX × 24 |
-| RAM visible | 16 GB (WSL2) |
-| OS | WSL2 Ubuntu, linux 6.18.33.2 |
-| Node | v18.19.1 |
-| Postgres | 16.14 (postgres:16-alpine) |
+| RAM | 32 GB |
+| OS | win32 10.0.26200 |
+| Node | v24.5.0 |
+| Postgres | 16.15 (`postgres:16-alpine` on `127.0.0.1:54329`) |
 | Dataset | 5 000 rows, distinct email per row |
-| When | 2026-08-14T13:46Z |
+| Before | `09b2100` at 2026-08-18T20:43:32Z |
+| After | `46acd75` at 2026-08-18T20:44:13Z |
 
 `maxRows` falls back to **100** in code when the policy leaves it unset; the
 `conarium.config.json` shipped with the package sets **50**. A fresh install
@@ -51,6 +58,9 @@ Two series, same user SQL both sides:
 
 Deny must not hit Postgres. It did not.
 
+The tables below are **after** (`46acd75`). The before/after pair for the
+masked cliff is under Warning threshold.
+
 ---
 
 ## same-limit (same row count) — the number to quote
@@ -59,29 +69,32 @@ Deny must not hit Postgres. It did not.
 
 | maxRows | direct p50 | conarium p50 | overhead p50 / p95 / p99 | n |
 |---|---|---|---|---|
-| 100 | 0.427 ms | 3.798 ms | **2.850 / 3.731 / 4.191** | 50 |
-| 500 | 1.069 ms | 9.257 ms | **7.973 / 11.117 / 11.545** | 50 |
-| 5 000 | 5.660 ms | 73.885 ms | **69.242 / 85.116 / 85.116** | 15 |
+| 100 | 1.157 ms | 3.789 ms | **2.392 / 3.183 / 3.594** | 50 |
+| 500 | 1.863 ms | 9.944 ms | **7.832 / 14.539 / 15.034** | 50 |
+| 5 000 | 7.328 ms | 94.699 ms | **88.884 / 119.527 / 119.527** | 15 |
 
 ### partial (email masked)
 
 | maxRows | direct p50 | conarium p50 | overhead p50 / p95 / p99 | n |
 |---|---|---|---|---|
-| 100 | 0.577 ms | 5.968 ms | **5.006 / 6.730 / 7.099** | 50 |
-| 500 | 0.950 ms | 88.363 ms | **86.615 / 112.802 / 341.147** | 50 |
-| 5 000 | 4.828 ms | 21787 ms | **21770 / 25581 / 25581** | 15 |
+| 100 | 1.162 ms | 4.092 ms | **2.670 / 4.395 / 4.740** | 50 |
+| 500 | 1.633 ms | 10.967 ms | **8.801 / 16.200 / 16.692** | 50 |
+| 5 000 | 7.646 ms | 99.731 ms | **92.929 / 125.204 / 125.204** | 15 |
 
-Conservative default (100 rows, masked): **about 5 ms added**. The shipped
+Conservative default (100 rows, masked): **about 3 ms added**. The shipped
 config caps at 50, so a fresh install stays below this figure.
-500 distinct emails: **about 87 ms**. 5 000: **about 22 s**.
+500 distinct emails: **about 9 ms**. 5 000: **about 93 ms**.
+
+On the same machine, `09b2100` same-limit partial overhead was
+5.6 ms / 83 ms / **14.1 s**. That 14 s cell is the cost that `46acd75` removed.
 
 ### deny
 
 | maxRows | conarium p50 | query ran |
 |---|---|---|
-| 100 | 0.432 ms | no |
-| 500 | 0.404 ms | no |
-| 5 000 | 0.396 ms | no |
+| 100 | 0.786 ms | no |
+| 500 | 0.646 ms | no |
+| 5 000 | 0.630 ms | no |
 
 ---
 
@@ -91,27 +104,28 @@ Direct always returns 5 000 rows. Conarium returns `maxRows`.
 
 | scenario | maxRows | direct p50 | conarium p50 | overhead p50 | rows in / out |
 |---|---|---|---|---|---|
-| allow | 100 | 4.023 | 3.444 | **−1.592** | 5000 → 100 |
-| allow | 500 | 4.411 | 9.147 | 3.943 | 5000 → 500 |
-| allow | 5 000 | 4.511 | 78.854 | 73.775 | 5000 → 5000 |
-| partial | 100 | 5.862 | 6.926 | 1.824 | 5000 → 100 |
-| partial | 500 | 6.177 | 90.215 | 84.854 | 5000 → 500 |
-| partial | 5 000 | 5.856 | 19301 | 19289 | 5000 → 5000 |
+| allow | 100 | 4.920 | 3.479 | **−0.919** | 5000 → 100 |
+| allow | 500 | 3.882 | 5.820 | 1.451 | 5000 → 500 |
+| allow | 5 000 | 3.617 | 38.852 | 32.992 | 5000 → 5000 |
+| partial | 100 | 5.413 | 3.492 | **−1.610** | 5000 → 100 |
+| partial | 500 | 4.515 | 5.874 | 0.802 | 5000 → 500 |
+| partial | 5 000 | 7.142 | 93.473 | 85.634 | 5000 → 5000 |
 
-The −1.6 ms cell is the row cap doing less I/O. It is not a claim that
+The negative cells are the row cap doing less I/O. They are not a claim that
 masking is free.
 
 ---
 
-## In-process redact (WSL, unique email per row)
+## In-process redact (win32, unique email per row)
 
-Not a substitute for the table above. Shows the same cliff without a socket.
+Not a substitute for the table above. Same environment; only 50 / 100 / 500
+are timed in-process when a DSN is set (5 000 lives in the Postgres table).
 
 | distinct emails | p50 | p95 | p99 | n |
 |---|---|---|---|---|
-| 50 | 1.137 ms | 2.018 | 3.066 | 50 |
-| 100 | 2.678 ms | 5.821 | 8.998 | 50 |
-| 500 | 76.381 ms | 113.928 | 123.534 | 50 |
+| 50 | 0.790 ms | 1.192 | 1.460 | 50 |
+| 100 | 1.195 ms | 1.811 | 2.181 | 50 |
+| 500 | 4.066 ms | 10.756 | 12.308 | 50 |
 
 ---
 

@@ -126,28 +126,106 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function knownValueMatchers(values: string[]): RegExp[] {
+const ASCII_ONLY = /^[\x00-\x7F]*$/
+
+/**
+ * One declared value, with everything the per-cell loop would otherwise
+ * recompute for it. `re` is compiled at most once per `redact()` — the
+ * pre-fix code compiled the whole list once and reused it, so a matcher
+ * built per (value, cell) pair would be a regression on any data that
+ * cannot take the ASCII reject: Turkish text never can.
+ */
+type KnownValue = {
+  value: string
+  lower: string
+  len: number
+  ascii: boolean
+  re: RegExp | null
+}
+
+type KnownValues = {
+  values: string[]
+  allAscii: boolean
+  minLen: number
+  entries: KnownValue[]
+}
+
+function knownValues(values: string[]): KnownValues {
   const unique = new Set<string>()
   for (const value of values) {
     const trimmed = value.trim()
     if (trimmed.length >= MIN_KNOWN_VALUE_LENGTH) unique.add(trimmed)
   }
-  return [...unique]
-    .sort((a, b) => b.length - a.length)
-    // Unicode-aware boundaries: \b is wrong for Turkish (it treats "ş" as a
-    // boundary), so "Ali" must not match inside "Kalite" but must match at
-    // "Ali," or "(Ali)".
-    .map(v => new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(v)}(?![\\p{L}\\p{N}])`, 'giu'))
+  const list = [...unique].sort((a, b) => b.length - a.length)
+  let allAscii = true
+  let minLen = 0
+  if (list.length > 0) {
+    minLen = list[list.length - 1].length
+    for (const value of list) {
+      if (!ASCII_ONLY.test(value)) {
+        allAscii = false
+        break
+      }
+    }
+  }
+  const entries: KnownValue[] = list.map(value => ({
+    value,
+    lower: value.toLowerCase(),
+    len: value.length,
+    ascii: ASCII_ONLY.test(value),
+    re: null,
+  }))
+  return { values: list, allAscii, minLen, entries }
 }
 
-function redactKnownValues(text: string, matchers: RegExp[]): { text: string; count: number } {
+function knownValueMatcher(value: string): RegExp {
+  // Unicode-aware boundaries: \b is wrong for Turkish (it treats "ş" as a
+  // boundary), so "Ali" must not match inside "Kalite" but must match at
+  // "Ali," or "(Ali)".
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(value)}(?![\\p{L}\\p{N}])`, 'giu')
+}
+
+/**
+ * Same sequential longest-first replacements as the old "compile every
+ * value, run every regex on every field" loop. The quadratic cost was
+ * compiling and executing a Unicode lookbehind regex per declared value
+ * per free-text cell — including when the value cannot appear (longer
+ * than the cell, or absent as a substring).
+ *
+ * ASCII cells get a case-folded `includes` reject before compile. Mixed
+ * / non-ASCII text only uses the length reject, because JS `i` folding
+ * is not `toLowerCase()` and a false skip would leak.
+ *
+ * The reject is what got cheaper, not the matcher: a value that survives
+ * it is still compiled once per `redact()` and reused across cells.
+ */
+function redactKnownValues(
+  text: string,
+  known: KnownValues,
+): { text: string; count: number } {
+  if (known.values.length === 0 || text.length < MIN_KNOWN_VALUE_LENGTH) {
+    return { text, count: 0 }
+  }
+  // Precomputed once per redact(): ASCII values cannot match a shorter cell.
+  if (known.allAscii && known.minLen > text.length) {
+    return { text, count: 0 }
+  }
   let out = text
   let count = 0
-  for (const matcher of matchers) {
-    out = out.replace(matcher, () => {
+  const asciiHay = ASCII_ONLY.test(out)
+  let lower = asciiHay ? out.toLowerCase() : ''
+  for (const entry of known.entries) {
+    if (entry.ascii && entry.len > out.length) continue
+    if (asciiHay && entry.ascii && !lower.includes(entry.lower)) continue
+    if (entry.re === null) entry.re = knownValueMatcher(entry.value)
+    const next = out.replace(entry.re, () => {
       count++
       return '[MASKED_PII]'
     })
+    if (next !== out) {
+      out = next
+      if (asciiHay) lower = out.toLowerCase()
+    }
   }
   return { text: out, count }
 }
@@ -430,7 +508,7 @@ export class Governance {
     const byClass: Record<string, number> = { ...(metadata?.byClass ?? {}) }
 
     // PASS 1 — collect the raw values this policy has already declared to be PII.
-    // See `knownValueMatchers`: the same name that gets masked in `customer_name`
+    // See `redactKnownValues`: the same name that gets masked in `customer_name`
     // was leaving verbatim inside a free-text `note` on the very same row.
     const declared: string[] = []
     for (const row of result.rows) {
@@ -440,7 +518,7 @@ export class Governance {
         if (typeof value === 'string') declared.push(value)
       }
     }
-    const matchers = knownValueMatchers(declared)
+    const carriedValues = knownValues(declared)
 
     // PASS 2 — mask.
     const rows = result.rows.map(row => {
@@ -464,8 +542,8 @@ export class Governance {
         }
 
         const afterScan = getOwn(out, key)
-        if (typeof afterScan === 'string' && matchers.length > 0) {
-          const carried = redactKnownValues(afterScan, matchers)
+        if (typeof afterScan === 'string' && carriedValues.values.length > 0) {
+          const carried = redactKnownValues(afterScan, carriedValues)
           if (carried.count > 0) {
             setOwn(out, key, carried.text)
             maskedFields.add(key)
