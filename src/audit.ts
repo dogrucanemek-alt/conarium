@@ -106,9 +106,21 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
   for (const t of g.accessedTables ?? []) {
     if (seenObjects.has(t)) continue
     seenObjects.add(t)
-    const prefix = `${t}.`
-    const fields = (g.maskedFields ?? []).filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length))
-    dataRefs.push({ source: entry.source ?? 'unknown', object: t, fieldsRequested: fields })
+    // BOŞ, ve `rulesApplied` ile aynı sebepten. Bu alan `g.maskedFields`'ten
+    // dolduruluyordu: adı "istenen alanlar", içeriği "maskelenen alanlar". Bir
+    // denetçi makbuza bakıp "şu kolonlar istendi" diye okur — yanlış okur, ve
+    // okuduğu şey imzalıdır.
+    //
+    // Doğru içerik (sorgunun gerçekten seçtiği kolonlar) SQL AST'sinden
+    // çıkarılabilir — `outputNamesForColumn` güvenilirlik bayrağını zaten
+    // üretiyor — ama tablo-kolon nitelemesi governance içinde iki ayrı yerde
+    // kuruluyor (SELECT çıktısı ve nested JSON) ve yanlış eşleme, düzeltmeye
+    // çalıştığımız kusurun aynısını üretir. Doğrusunu yazana kadar boş.
+    //
+    // Kaybedilen: alan bazında maskeleme detayı. `masking.byClass` sınıf bazında
+    // duruyor. Bu bir gerileme ve saklanmıyor — imzalı bir belgede yanlış adla
+    // dolu bir alan, eksik bir alandan daha pahalıdır.
+    dataRefs.push({ source: entry.source ?? 'unknown', object: t, fieldsRequested: [] })
   }
   if (entry.tool === 'describe_table' && entry.target && !seenObjects.has(entry.target)) {
     seenObjects.add(entry.target)
@@ -117,7 +129,23 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
 
   return {
     period: { start: entry.timestamp, end: entry.timestamp },
-    actor: { id: entry.actor, type: 'service', assurance: entry.actorAssurance ?? 'shared-token' },
+    // `type` sabit 'service' idi. Kişi bazlı token'la bağlanan bir insan, kendi
+    // e-postasıyla adlandırılmış ama `type: "service"` damgalı imzalı bir kanıt
+    // üretiyordu — makbuz aktörün NE olduğu konusunda yanlış, ve imzalı.
+    //
+    // Ayrı bir `isUser` alanı taşımak yerine assurance'tan türetiliyor: resolveActor
+    // tek kaynak (src/tokens.ts) ve orada isUser === (assurance === 'per-user-token').
+    // İkinci bir alan, aynı gerçeğin iki elle yazılmış beyanı olurdu; zamanla ayrışan
+    // tam olarak budur.
+    //
+    // Doğrulayıcı bu ayrımı zaten biliyordu (bin/conarium-verify.mjs: type "service"
+    // ya da "user" olmalı, ve "user" + "shared-token" reddedilir). Üretim tarafı hiç
+    // 'user' yazmadığı için o kural bugüne kadar hiç tetiklenmedi.
+    actor: {
+      id: entry.actor,
+      type: (entry.actorAssurance ?? 'shared-token') === 'per-user-token' ? 'user' : 'service',
+      assurance: entry.actorAssurance ?? 'shared-token',
+    },
     model: meta.model,
     // Ölçülmüş (protokolden gelen) client, config'teki beyanı ezer.
     client: entry.client ?? meta.client,
@@ -134,7 +162,14 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
       id: entry.policyProfile ? `conarium.policy/${entry.policyProfile}` : 'conarium.policy',
       version: '1',
       decision,
-      rulesApplied: g.accessedFunctions ?? [],
+      // BOŞ, ve bilerek. Bu alan `g.accessedFunctions` ile doldurulmuştu — yani
+      // adı "uygulanan politika kuralları" derken içeriği "erişilen fonksiyonlar"
+      // taşıyordu. Bir denetçi bunu politika kural kimlikleri diye okur ve inanır.
+      //
+      // İmzalı bir belgede yanlış adla dolu bir alan, boş alandan kötüdür: boş alan
+      // "bilmiyoruz" der, yanlış dolu alan "biliyoruz" der ve yalan söyler. Gerçek
+      // kural kimliği bugün üretilmiyor; üretilene kadar burası boş kalır.
+      rulesApplied: [],
     },
     flags: [
       ...(g.denyReason ? ['denied'] : []),
