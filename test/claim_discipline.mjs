@@ -47,6 +47,7 @@ const SURFACES = [
   'privacy.html',
   'docs/ARCHITECTURE.md',
   'docs/RECEIPT-SPEC.md',
+  'docs/PRICING.md',
 ]
 
 const SOURCE_MISSING =
