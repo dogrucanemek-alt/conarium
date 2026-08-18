@@ -47,6 +47,24 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:checks
+      # Denetci, PR'da: yayin kapisi son savunmadir, ilk savunma degil. 0.2.29'da
+      # yayin `Claims review gate` yuzunden kirmizi yandi — kapi dogru davrandi ama
+      # o noktada dal zaten merge edilmisti ve iddia metni gozden gecirilmemisti.
+      # Burada koserse degisen iddia yuzeyi PR'i inceleyenin onune gelir.
+      #
+      # `input` yargilamaz, degisen yuzeylerin diff'ini ve okuma yontemini basar.
+      # Kirmizi yakmaz: bir yargi otomatik kirmiziya baglanirsa ilk tartismali
+      # bulguda ya yayin durur ya kapi kapatilir (2026-08-17 karari, degismedi).
+      # `|| true` bilerek: burasi bir kapi degil, bir okuma daveti.
+      - name: Claims review (PR advisory)
+        if: github.event_name == 'pull_request'
+        run: |
+          out=$(node test/denetci.mjs input "origin/${{ github.base_ref }}" HEAD 2>&1 || true)
+          printf '%s\n' "$out"
+          n=$(printf '%s\n' "$out" | grep -c '^diff --git' || true)
+          if [ "$n" -gt 0 ]; then
+            echo "::warning title=Claims review::$n claim surface(s) changed in this PR. The diff is in this step's log — read it before merging, and record the review in docs/claims/reviews/ if this ships a version."
+          fi
       # Bagimlilik kapisi. 2026-08-12'de uretim agacinda 6 KRITIK acik vardi ve
       # hicbir test bunu gormedi — testler kodu olcer, bagimlilik agacini olcmez.
       # Hepsi tek kaynaktan geliyordu: javascript-opentimestamps -> request (SSRF,
