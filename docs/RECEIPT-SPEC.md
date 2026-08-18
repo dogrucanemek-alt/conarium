@@ -26,6 +26,7 @@ Design source: `docs/superpowers/specs/2026-07-29-conarium-receipt-design.md`.
 değiştirilmediğini, **ortadan** silinmediğini, yeniden sıralanmadığını ve geriye
 dönük tarihlenmediğini kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
 Sondan kesmeyi tek başına göremez.
+*(/TR)*
 
 ## Media type
 

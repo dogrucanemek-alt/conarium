@@ -2,7 +2,7 @@
 
 The live cards are on [conarium.dev](https://conarium.dev/#pricing). This file
 exists so the public repository does not drift from the site the way `docs.html`
-did. Teslim edilemeyen bir madde karta girmez.
+did. A card line that cannot be delivered does not go on the card.
 
 | Tier | Price | Button |
 |---|---|---|
@@ -13,11 +13,11 @@ did. Teslim edilemeyen bir madde karta girmez.
 
 ## Pro (sold)
 
-- Hosted countersignature: someone other than you signs the chain head.
+- Hosted countersignature: someone other than you signs the chain head. Shipped in the package since 0.2.16; the VERAX-operated endpoint is not open to customers yet.
 - Fair use — 60 submissions per minute.
 - No monthly quota.
-- 14-day no-questions refund. VAT added where applicable.
-- Cancel at period end; no partial refunds after day 14.
+- **One period, not a subscription.** It does not renew by itself — when the period ends, access ends and you can buy it again. 14-day no-questions refund; after that, no partial refunds.
+- VAT added where applicable.
 
 ## Business (waitlist)
 

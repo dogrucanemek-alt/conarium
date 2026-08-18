@@ -101,6 +101,7 @@ the database's own counters.
 değiştirilmediğini, **ortadan** silinmediğini, yeniden sıralanmadığını ve geriye
 dönük tarihlenmediğini kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
 Sondan kesmeyi tek başına göremez: kalan zincir tutarlıdır, yalnızca kısadır.
+*(/TR)*
 
 ```bash
 # Generate an Ed25519 keypair (private PEM + .pub.pem + .keyid sidecars).
@@ -324,10 +325,13 @@ proves — and, just as importantly, what it does not — is written out in
 signing key would cost.
 
 Pro is the hosted countersignature — someone other than you signs the chain
-head. **$20/month or $200/year — save $40.** Fair use: 60 submissions per
-minute. 14-day no-questions refund. VAT added where applicable. Buy at
+head. **$20/month or $200/year — save $40.** **One period, not a subscription.**
+It does not renew by itself — when the period ends, access ends and you can
+buy it again. 14-day no-questions refund; after that, no partial refunds.
+VAT added where applicable. Buy at
 [conarium.dev/buy](https://conarium.dev/buy). The binary above is what you
-run yourself; Pro is the second signer. Business stays on the waitlist:
+run yourself; Pro is the second signer. Shipped in the package since 0.2.16;
+the VERAX-operated endpoint is not open to customers yet. Business stays on the waitlist:
 scheduled reconciliation, coverage alerts and the signed period report are
 in the contract, **not shipped yet**.
 
