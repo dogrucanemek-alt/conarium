@@ -1,6 +1,6 @@
 {
-  "warnAbove": 100,
+  "warnAbove": 500,
   "unit": "maxRows",
-  "source": "docs/BENCHMARK.md 2026-08-14T1346Z same-limit partial: maxRows 100 overhead p50=5.006ms; 500=86.615ms; 5000=21770ms. Default maxRows is 100, so the default does not warn.",
+  "source": "docs/BENCHMARK.md 2026-08-18T2145Z win32/Node 24/Postgres 16.15 same-limit partial: maxRows 100 overhead p50=2.670ms; 500=8.801ms; 5000=92.929ms. 500 is the last measured cap still in the low-millisecond band. Default maxRows is 100, so the default does not warn.",
   "notASecurityGate": true
 }

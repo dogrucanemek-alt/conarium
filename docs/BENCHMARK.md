@@ -117,10 +117,10 @@ Not a substitute for the table above. Shows the same cliff without a socket.
 
 ## Warning threshold
 
-`docs/benchmarks/masking-cost-threshold.json` → **warn above 100**.
+`docs/benchmarks/masking-cost-threshold.json` → **warn above 500**.
 
-100 is the last measured point still in the low-millisecond band
-(same-limit partial overhead p50 = 5.0 ms). 500 is already 87 ms.
+500 is the last measured cap still in the low-millisecond band
+(same-limit partial overhead p50 = 8.8 ms). 5 000 is 93 ms.
 The doctor and `parseConariumConfig` warn. They do not reject the query.
 
 ---

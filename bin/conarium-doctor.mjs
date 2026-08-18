@@ -302,35 +302,45 @@ if (config) {
 
   // 4b. Raised maxRows — performance warning, not a deny.
   // Threshold is measured (docs/benchmarks/masking-cost-threshold.json).
-  // Doctor does not import dist/; the number is read from that file, or 100.
-  const thresholdPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'benchmarks', 'masking-cost-threshold.json')
-  let warnAbove = 100
+  // Doctor does not import dist/. No invented fallback number.
+  const thresholdPath =
+    process.env.CONARIUM_MASKING_COST_THRESHOLD ||
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'benchmarks', 'masking-cost-threshold.json')
+  let warnAbove = null
   try {
     if (existsSync(thresholdPath)) {
       const t = JSON.parse(readFileSync(thresholdPath, 'utf8'))
       if (Number.isFinite(t.warnAbove)) warnAbove = t.warnAbove
     }
-  } catch { /* keep 100 */ }
+  } catch { /* treat as missing */ }
   const maxRows = pol.maxRows
-  if (typeof maxRows === 'number' && maxRows > warnAbove) {
-    warn(
+  if (warnAbove == null) {
+    unseen(
       'policy.maxRows',
-      `maxRows is ${maxRows} (measured warning above ${warnAbove}). Masking cost grows with the number of distinct values this policy already masked, not with table size. The row cap bounds that set. The query is not rejected.`,
-      'Leave the default if you do not need more rows. If you raise it, expect carry-over cost to grow with unique masked values.',
+      'threshold file missing, maxRows not evaluated',
+      'Restore docs/benchmarks/masking-cost-threshold.json from the package.',
     )
-  } else if (typeof maxRows === 'number') {
-    ok('policy.maxRows', `maxRows is ${maxRows} (at or below the measured threshold ${warnAbove})`)
   } else {
-    ok('policy.maxRows', `maxRows is 100 (default — policy.maxRows omitted; threshold ${warnAbove})`)
-  }
-  for (const [name, profile] of Object.entries(pol.profiles || {})) {
-    const pMax = profile && typeof profile === 'object' ? profile.maxRows : undefined
-    if (typeof pMax === 'number' && pMax > warnAbove) {
+    if (typeof maxRows === 'number' && maxRows > warnAbove) {
       warn(
-        `policy.profiles.${name}.maxRows`,
-        `profile maxRows is ${pMax} (measured warning above ${warnAbove}). Same cost: distinct masked values, not table size. Not rejected.`,
-        'A profile can only raise the cap for one identified person. The cost still grows with unique masked values.',
+        'policy.maxRows',
+        `maxRows is ${maxRows} (measured warning above ${warnAbove}). Masking cost grows with the number of distinct values this policy already masked, not with table size. The row cap bounds that set. The query is not rejected.`,
+        'Leave the default if you do not need more rows. If you raise it, expect carry-over cost to grow with unique masked values.',
       )
+    } else if (typeof maxRows === 'number') {
+      ok('policy.maxRows', `maxRows is ${maxRows} (at or below the measured threshold ${warnAbove})`)
+    } else {
+      ok('policy.maxRows', `maxRows is 100 (default — policy.maxRows omitted; threshold ${warnAbove})`)
+    }
+    for (const [name, profile] of Object.entries(pol.profiles || {})) {
+      const pMax = profile && typeof profile === 'object' ? profile.maxRows : undefined
+      if (typeof pMax === 'number' && pMax > warnAbove) {
+        warn(
+          `policy.profiles.${name}.maxRows`,
+          `profile maxRows is ${pMax} (measured warning above ${warnAbove}). Same cost: distinct masked values, not table size. Not rejected.`,
+          'A profile can only raise the cap for one identified person. The cost still grows with unique masked values.',
+        )
+      }
     }
   }
 
