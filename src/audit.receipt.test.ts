@@ -236,9 +236,64 @@ describe('audit receipt — mutlu yol', () => {
     expect(receipts[0].masking.maskedCount).toBe(2)
     expect(receipts[0].masking.rowsReturned).toBe(5)
     expect(receipts[0].masking.rowCapApplied).toBe(true)
-    // dataRefs sadece alan adı taşır — ham değer yok.
+    // dataRefs nesneyi adlandırır, ham değer taşımaz.
     expect(receipts[0].dataRefs[0].object).toBe('public.users')
-    expect(receipts[0].dataRefs[0].fieldsRequested).toContain('email')
+    // Bu satır eskiden `toContain('email')` idi ve YANLIŞ olanı sabitliyordu:
+    // girdideki `maskedFields: ['public.users.email']` doğrudan `fieldsRequested`'a
+    // yazılıyordu, yani "istenen alanlar" adı altında "maskelenen alanlar". Test
+    // kusuru görmedi çünkü kusurun kendisini bekliyordu.
+    //
+    // Alan artık boş: maskelenen alan istenen alan değildir ve sorgunun gerçekten
+    // seçtiği kolonlar bu katmanda çıkarılmıyor. Boş bırakmak "bilmiyoruz" der;
+    // maskelenenleri yazmak "biliyoruz" der ve imzalı bir belgede yanlış söyler.
+    expect(receipts[0].dataRefs[0].fieldsRequested).toEqual([])
+    // Maskeleme gerçeği kaybolmuyor, doğru yerde duruyor.
+    expect(receipts[0].masking.maskedCount).toBe(2)
+    // `rulesApplied` da boş: eskiden `accessedFunctions` yazılıyordu, yani
+    // "uygulanan politika kuralları" adı altında "erişilen fonksiyonlar".
+    expect(receipts[0].policy.rulesApplied).toEqual([])
+  })
+
+  it('kişi bazlı token ile bağlanan aktör makbuzda `user`, paylaşılanla `service`', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'conarium-receipt-actor-'))
+    const receiptSink = join(dir, 'receipts.jsonl')
+    const a = new Audit({ sink: join(dir, 'audit.jsonl'), receiptSink, receiptMeta: RECEIPT_META })
+
+    // Kişi bazlı token: resolveActor bunu `isUser: true` ile çözer ve makbuz
+    // artık kişiyi kişi olarak adlandırır. Eskiden `type` sabit 'service' idi,
+    // yani ayşe@sirket.com adına imzalı bir belge onun bir servis olduğunu
+    // söylüyordu. Doğrulayıcı bu ayrımı zaten biliyordu (conarium-verify.mjs:
+    // "user" + "shared-token" reddedilir) ama üretim tarafı hiç 'user' yazmadığı
+    // için o kural bugüne kadar hiç tetiklenmedi.
+    a.log({
+      tool: 'query',
+      target: 'public.users',
+      denied: false,
+      actor: 'ayse@sirket.com',
+      actorAssurance: 'per-user-token',
+      governance: { accessedTables: ['public.users'], maskedFields: [], accessedFunctions: [], denied: false },
+    })
+    a.log({
+      tool: 'query',
+      target: 'public.users',
+      denied: false,
+      actor: 'conarium_c2',
+      actorAssurance: 'shared-token',
+      governance: { accessedTables: ['public.users'], maskedFields: [], accessedFunctions: [], denied: false },
+    })
+
+    const receipts = readReceipts(receiptSink)
+    expect(receipts).toHaveLength(2)
+    expect(receipts[0].actor).toEqual({
+      id: 'ayse@sirket.com',
+      type: 'user',
+      assurance: 'per-user-token',
+    })
+    expect(receipts[1].actor).toEqual({
+      id: 'conarium_c2',
+      type: 'service',
+      assurance: 'shared-token',
+    })
   })
 })
 
