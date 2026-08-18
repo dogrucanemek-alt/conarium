@@ -128,7 +128,29 @@ function escapeRegExp(value: string): string {
 
 const ASCII_ONLY = /^[\x00-\x7F]*$/
 
-function knownValues(values: string[]): { values: string[]; allAscii: boolean; minLen: number } {
+/**
+ * One declared value, with everything the per-cell loop would otherwise
+ * recompute for it. `re` is compiled at most once per `redact()` — the
+ * pre-fix code compiled the whole list once and reused it, so a matcher
+ * built per (value, cell) pair would be a regression on any data that
+ * cannot take the ASCII reject: Turkish text never can.
+ */
+type KnownValue = {
+  value: string
+  lower: string
+  len: number
+  ascii: boolean
+  re: RegExp | null
+}
+
+type KnownValues = {
+  values: string[]
+  allAscii: boolean
+  minLen: number
+  entries: KnownValue[]
+}
+
+function knownValues(values: string[]): KnownValues {
   const unique = new Set<string>()
   for (const value of values) {
     const trimmed = value.trim()
@@ -146,7 +168,14 @@ function knownValues(values: string[]): { values: string[]; allAscii: boolean; m
       }
     }
   }
-  return { values: list, allAscii, minLen }
+  const entries: KnownValue[] = list.map(value => ({
+    value,
+    lower: value.toLowerCase(),
+    len: value.length,
+    ascii: ASCII_ONLY.test(value),
+    re: null,
+  }))
+  return { values: list, allAscii, minLen, entries }
 }
 
 function knownValueMatcher(value: string): RegExp {
@@ -166,10 +195,13 @@ function knownValueMatcher(value: string): RegExp {
  * ASCII cells get a case-folded `includes` reject before compile. Mixed
  * / non-ASCII text only uses the length reject, because JS `i` folding
  * is not `toLowerCase()` and a false skip would leak.
+ *
+ * The reject is what got cheaper, not the matcher: a value that survives
+ * it is still compiled once per `redact()` and reused across cells.
  */
 function redactKnownValues(
   text: string,
-  known: { values: string[]; allAscii: boolean; minLen: number },
+  known: KnownValues,
 ): { text: string; count: number } {
   if (known.values.length === 0 || text.length < MIN_KNOWN_VALUE_LENGTH) {
     return { text, count: 0 }
@@ -182,10 +214,11 @@ function redactKnownValues(
   let count = 0
   const asciiHay = ASCII_ONLY.test(out)
   let lower = asciiHay ? out.toLowerCase() : ''
-  for (const value of known.values) {
-    if (ASCII_ONLY.test(value) && value.length > out.length) continue
-    if (asciiHay && ASCII_ONLY.test(value) && !lower.includes(value.toLowerCase())) continue
-    const next = out.replace(knownValueMatcher(value), () => {
+  for (const entry of known.entries) {
+    if (entry.ascii && entry.len > out.length) continue
+    if (asciiHay && entry.ascii && !lower.includes(entry.lower)) continue
+    if (entry.re === null) entry.re = knownValueMatcher(entry.value)
+    const next = out.replace(entry.re, () => {
       count++
       return '[MASKED_PII]'
     })

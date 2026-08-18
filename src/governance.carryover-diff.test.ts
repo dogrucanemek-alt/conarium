@@ -162,3 +162,49 @@ describe('carry-over — unique-email bench shape stays bit-identical', () => {
     }
   })
 })
+
+/**
+ * The carry-over reject is an ASCII shortcut. Turkish text can never take it,
+ * so on Turkish data every declared value reaches the matcher — and if the
+ * matcher is built there, it is built once per (value, cell) pair instead of
+ * once per value. Measured on 2 000 rows that was 2 294 ms → 9 357 ms, i.e.
+ * the optimisation made the language this product is written for slower.
+ *
+ * Timing is not assertable; the compile count is.
+ */
+describe('carry-over — non-ASCII values are compiled once, not once per cell', () => {
+  it('a Turkish corpus compiles at most one matcher per declared value', () => {
+    const n = 40
+    const rows = Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      musteri: `Müşteri Şölen ${i + 1}`,
+      not: `Sipariş ${i + 1} için üçüncü kata teslimat istendi, asansör yok.`,
+    }))
+    const gov = new Governance({ maskColumns: ['*.musteri'], maxRows: 100 })
+
+    const OriginalRegExp = globalThis.RegExp
+    let carryOverCompiles = 0
+    globalThis.RegExp = new Proxy(OriginalRegExp, {
+      construct(target, args: unknown[]) {
+        if (typeof args[0] === 'string' && args[0].startsWith('(?<![\\p{L}\\p{N}])')) {
+          carryOverCompiles++
+        }
+        return Reflect.construct(target, args)
+      },
+    })
+    let out
+    try {
+      out = gov.redact({ rows, rowCount: n, fields: ['id', 'musteri', 'not'] })
+    } finally {
+      globalThis.RegExp = OriginalRegExp
+    }
+
+    // Guard against the assertion passing because nothing was compiled at all.
+    expect(carryOverCompiles).toBeGreaterThan(0)
+    expect(carryOverCompiles).toBeLessThanOrEqual(n)
+    for (let i = 0; i < n; i++) {
+      expect(out.rows[i].musteri).toBe('[MASKED_PII]')
+      expect(out.rows[i].not).toBe(`Sipariş ${i + 1} için üçüncü kata teslimat istendi, asansör yok.`)
+    }
+  })
+})
