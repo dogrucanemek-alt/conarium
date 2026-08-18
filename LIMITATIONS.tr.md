@@ -118,16 +118,16 @@ bir tarama kurar. `maxRows` o kümeyi sınırlar. Politika boş bırakırsa kod 
 düşer; pakette gelen `conarium.config.json` 50 yazar. Taze kurulum 50'de çalışır.
 Aşağıdaki ölçüm ihtiyatlı olsun diye 100 üzerinden.
 
-Ölçülmüş (aynı SELECT, aynı satır sayısı, Postgres 16.14, WSL2, bakınız
+Ölçülmüş (aynı SELECT, aynı satır sayısı, Postgres 16.15, win32/Node 24, bakınız
 [`docs/BENCHMARK.md`](docs/BENCHMARK.md)):
 
 | maxRows | ek yük p50 (maskeli) |
 |---|---|
-| 100 (varsayılan) | 5,0 ms |
-| 500 | 87 ms |
-| 5 000 | 22 s |
+| 100 (varsayılan) | 2,7 ms |
+| 500 | 8,8 ms |
+| 5 000 | 93 ms |
 
-Tavanı yükseltmek serbest. 100'ün üstünde doctor ve boot uyarır.
+Tavanı yükseltmek serbest. 500'ün üstünde doctor ve boot uyarır.
 Sorgu reddedilmez.
 
 ## Düşük entropili yükte disclosure hash'i doğrulama kehanetidir

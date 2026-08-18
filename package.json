@@ -10,6 +10,7 @@
     "scripts",
     "docs",
     "!docs/reviews",
+    "!docs/benchmarks/*.cpuprofile",
     "public",
     "assets",
     "examples",

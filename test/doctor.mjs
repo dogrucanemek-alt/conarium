@@ -75,12 +75,50 @@ test('connectors without an allow list are reported fail-closed', async () => {
 
 test('maxRows above the measured threshold is a warning, not a failure', async () => {
   const dir = tmpdir()
-  writeConfig(dir, { ...HEALTHY, policy: { ...HEALTHY.policy, maxRows: 500 } })
+  writeConfig(dir, { ...HEALTHY, policy: { ...HEALTHY.policy, maxRows: 1000 } })
   const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
   assert.strictEqual(status, 0, `warning must not fail the doctor:\n${out}`)
   assert.ok(/maxRows/.test(out), 'must name maxRows')
   assert.ok(/distinct/.test(out), 'must say cost grows with distinct masked values')
   assert.ok(/not rejected/.test(out), 'must say the query is not rejected')
+})
+
+test('threshold file present evaluates maxRows against the measured number', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, { ...HEALTHY, policy: { ...HEALTHY.policy, maxRows: 1000 } })
+  const { status, out } = runDoctor(dir, { env: { CONARIUM_AUDIT_UNSIGNED: '1' } })
+  assert.strictEqual(status, 0, out)
+  assert.ok(/measured warning above/.test(out), out)
+  assert.ok(!/threshold file missing/.test(out), out)
+})
+
+test('threshold file missing does not invent a number', async () => {
+  const dir = tmpdir()
+  writeConfig(dir, { ...HEALTHY, policy: { ...HEALTHY.policy, maxRows: 1000 } })
+  const { status, out } = runDoctor(dir, {
+    env: {
+      CONARIUM_AUDIT_UNSIGNED: '1',
+      CONARIUM_MASKING_COST_THRESHOLD: path.join(dir, 'no-such-threshold.json'),
+    },
+  })
+  assert.strictEqual(status, 0, out)
+  assert.ok(/threshold file missing, maxRows not evaluated/.test(out), out)
+  const maxLines = out.split('\n').filter((l) => /policy\.maxRows/.test(l)).join('\n')
+  assert.ok(!/\b100\b/.test(maxLines), `missing path must not mention 100:\n${maxLines}`)
+})
+
+test('corrupt threshold JSON does not invent a number', async () => {
+  const dir = tmpdir()
+  const bad = path.join(dir, 'threshold.json')
+  fs.writeFileSync(bad, '{not-json')
+  writeConfig(dir, { ...HEALTHY, policy: { ...HEALTHY.policy, maxRows: 1000 } })
+  const { status, out } = runDoctor(dir, {
+    env: { CONARIUM_AUDIT_UNSIGNED: '1', CONARIUM_MASKING_COST_THRESHOLD: bad },
+  })
+  assert.strictEqual(status, 0, out)
+  assert.ok(/threshold file missing, maxRows not evaluated/.test(out), out)
+  const maxLines = out.split('\n').filter((l) => /policy\.maxRows/.test(l)).join('\n')
+  assert.ok(!/\b100\b/.test(maxLines), `corrupt path must not mention 100:\n${maxLines}`)
 })
 
 test('default maxRows does not warn', async () => {

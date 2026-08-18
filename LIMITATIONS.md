@@ -146,16 +146,16 @@ masked. `maxRows` bounds that set. When the policy leaves it unset the code fall
 back to 100; the `conarium.config.json` shipped with the package sets 50, so a
 fresh install runs at 50. The figures below use 100 as the conservative case.
 
-Measured (same SELECT, same row count, Postgres 16.14, WSL2, see
+Measured (same SELECT, same row count, Postgres 16.15, win32/Node 24, see
 [`docs/BENCHMARK.md`](docs/BENCHMARK.md)):
 
 | maxRows | overhead p50 (masked) |
 |---|---|
-| 100 (default) | 5.0 ms |
-| 500 | 87 ms |
-| 5 000 | 22 s |
+| 100 (default) | 2.7 ms |
+| 500 | 8.8 ms |
+| 5 000 | 93 ms |
 
-Raising the cap is allowed. The doctor and boot log warn above 100.
+Raising the cap is allowed. The doctor and boot log warn above 500.
 The query is not rejected.
 
 ## A disclosure hash is a verification oracle on low-entropy payloads
