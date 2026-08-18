@@ -669,12 +669,12 @@ per-user identity bound to an identity provider rather than an operator token ma
   probabilistic mask would make a probabilistic receipt, which is not a receipt.
 - **Hosted cloud console.** Self-hosted is the claim; a hosted console would put
   us in the data path we tell you we are not in.
-- **No SOC 2 for us.** It audits organisations that hold customer data, and the
-  data Conarium governs — your database and your customers' records — never
-  reaches us. This is about our certification, not yours: the signed receipts
+- **No SOC 2 for us.** At this stage the budget goes to independent penetration
+  testing and implementation-level assurance rather than organisational
+  certification. This is about our certification, not yours: the signed receipts
   and coverage declarations are yours to show your own auditor, and whether they
-  satisfy a given audit is between you and that auditor. If your data ever does
-  reach us, this line changes first.
+  satisfy a given audit is between you and that auditor. If we ever hold your
+  data, or an engagement turns on the certificate itself, this line changes first.
 
 Known gaps: [LIMITATIONS.md](LIMITATIONS.md), the README above,
 [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md),

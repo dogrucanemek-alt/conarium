@@ -153,8 +153,20 @@ function staleGap(c, status) {
   return false
 }
 
+function implementationVersion(claimsFile) {
+  const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'))
+  if (Object.hasOwn(claimsFile, 'version')) {
+    throw new Error(
+      'conformance/claims must not declare version — it is derived from package.json. ' +
+        'A second hand-written copy is how 0.2.20 sat next to 0.2.28.',
+    )
+  }
+  return { implementation: claimsFile.implementation, version: pkg.version }
+}
+
 function renderMd(claimsFile, rows) {
-  const lines = [`# GACS report for ${claimsFile.implementation} ${claimsFile.version}`, '']
+  const { implementation, version } = implementationVersion(claimsFile)
+  const lines = [`# GACS report for ${implementation} ${version}`, '']
   const profiles = ['GACS-D1', 'GACS-E1', 'GACS-C1', 'GACS-I1']
   for (const profile of profiles) {
     const slice = rows.filter((r) => r.profile === profile)
@@ -179,12 +191,13 @@ function main(argv = process.argv.slice(2)) {
   const opts = parseArgv(argv)
   const adapter = resolve(REPO, opts.adapter)
   const claimsFile = JSON.parse(readFileSync(resolve(REPO, opts.claims), 'utf8'))
+  const ident = implementationVersion(claimsFile)
   const cases = loadCases(opts.only)
   const rows = cases.map((c) => evaluate(c, claimsFile, adapter))
   const report = {
-    implementation: claimsFile.implementation,
-    version: claimsFile.version,
-    title: `GACS report for ${claimsFile.implementation} ${claimsFile.version}`,
+    implementation: ident.implementation,
+    version: ident.version,
+    title: `GACS report for ${ident.implementation} ${ident.version}`,
     results: rows,
   }
   noScore(report)

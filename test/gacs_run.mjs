@@ -26,6 +26,10 @@ const r = spawnSync(
 const md = r.stdout || ''
 const report = JSON.parse(readFileSync(join(out, 'report.json'), 'utf8'))
 
+const claimsManifest = JSON.parse(readFileSync('conformance/claims/conarium.json', 'utf8'))
+assert.ok(!Object.hasOwn(claimsManifest, 'version'), 'claims.version must be derived from package.json, not written')
+assert.equal(report.version, JSON.parse(readFileSync('package.json', 'utf8')).version, 'GACS report version must match package.json')
+
 assert.ok(!Object.hasOwn(report, 'score'), 'report has score')
 assert.ok(!Object.hasOwn(report, 'percent'), 'report has percent')
 assert.ok(!Object.hasOwn(report, 'grade'), 'report has grade')

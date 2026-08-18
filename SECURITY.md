@@ -104,8 +104,8 @@ eight digits" pattern is not shipped.
 **We do not have** SOC 2, an external penetration test, or a formal security
 certification. We are one person. That is not a footnote we would rather you missed;
 it is the reason the code is MIT-licensed and runs entirely inside your own
-infrastructure. The data Conarium governs never reaches us, so there is no
-vendor holding your records to certify.
+infrastructure. At this stage the budget goes to independent penetration testing
+and implementation-level assurance rather than organisational certification.
 
 ## Audit of 2026-08-12 — what we found and fixed
 
