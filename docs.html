@@ -70,7 +70,7 @@ hr{border:none;border-top:1px solid var(--line);margin:56px 0}
   <ul>
     <li class="yes"><b>Read-only by default.</b> Only <code>SELECT</code>/<code>WITH</code> queries pass. <code>DROP, DELETE, UPDATE, INSERT, ALTER, CREATE, TRUNCATE</code> are blocked — including when smuggled inside comments or stacked queries (<code>SELECT 1; DROP …</code>).</li>
     <li class="yes"><b>Fail-closed.</b> If a query cannot be parsed, if a masked column's output cannot be safely redacted, or if a table/connector isn't allowed by policy, the request is <b>denied</b> (a <code>PolicyError</code> is thrown) — never passed through. Uncertainty resolves to refusal, not leakage.</li>
-    <li class="yes"><b>PII masking before the model.</b> Emails, national IDs, phone numbers and card numbers are redacted in the response stream — plaintext <em>and</em> base64-encoded, so encode-tricks don't slip through. Non-PII text is left intact (no false positives).</li>
+    <li class="yes"><b>PII masking before the model.</b> Emails, national IDs, phone numbers and card numbers are redacted in the response stream — plaintext <em>and</em> base64-encoded, so encode-tricks don't slip through. A field longer than <code>policy.scanCharCap</code> (default 16&nbsp;384) is replaced whole with <code>[MASKED_PII]</code>, even when it contains no identifier.</li>
     <li class="yes"><b>Row caps.</b> A hard per-query limit (default 100) stops silent bulk exfiltration.</li>
     <li class="yes"><b>Tamper-evident, PII-safe audit.</b> Every access is appended to a hash-chained JSONL ledger — who, what, when, rows, decision. Alter one entry and the chain breaks on the next read. The audit itself is masked, so it never stores raw PII.</li>
     <li class="yes"><b>Self-hosted.</b> Runs on your infrastructure. Raw protected values stay inside your perimeter; what reaches your AI client is the policy-approved disclosure, and the receipt records exactly which bytes those were.</li>
@@ -116,7 +116,7 @@ hr{border:none;border-top:1px solid var(--line);margin:56px 0}
   </ul>
 
   <h2>Run it yourself</h2>
-  <p>Conarium runs as a single service inside your infrastructure (local, VPC, or air-gapped). It's a standard MCP stdio server — your assistant launches it and speaks MCP over stdio. It needs no inbound port and never phones home.</p>
+  <p>Conarium runs as a single service inside your infrastructure (local or VPC). It's a standard MCP stdio server — your assistant launches it and speaks MCP over stdio. It needs no inbound port. The only outbound call is an npm version check at startup, disabled with <code>CONARIUM_NO_UPDATE_CHECK=1</code>.</p>
 
   <h3>Get the code</h3>
   <pre>git clone https://github.com/dogrucanemek-alt/conarium.git
@@ -128,7 +128,7 @@ docker run --rm -i \
   -v "$PWD/conarium.config.json:/app/conarium.config.json:ro" \
   conarium --config /app/conarium.config.json</pre>
 
-  <h3>With Node (≥18)</h3>
+  <h3>With Node (≥20)</h3>
   <pre>npm ci
 npm run build          # tsc → dist/
 node dist/index.js --config ./conarium.config.json</pre>
@@ -147,7 +147,7 @@ node dist/index.js --config ./conarium.config.json</pre>
   <p style="color:var(--faint);font-size:13.5px">Source: <a href="https://github.com/dogrucanemek-alt/conarium">github.com/dogrucanemek-alt/conarium</a> — MIT-licensed. Read it, run it, fork it. Questions: <a href="mailto:e.dogru@conarium.dev">e.dogru@conarium.dev</a>.</p>
 
   <h2>Status &amp; maturity — honestly</h2>
-  <p>Conarium is <b>early</b>. It is pre-1.0, built and run by a solo founder, with <b>one</b> production deployment so far (the author's own company ERP: 121,374 records, 121,366 identities masked, zero leaked to the model — the figure cannot be verified from outside). It has <b>no</b> third-party security certification (SOC 2 / ISO) yet — those are on the roadmap, to be earned as the company matures, not claimed before. If you need a certified, multi-customer, enterprise-hardened vendor today, Conarium isn't there yet, and we'd rather tell you than pretend. What we offer right now is a genuinely self-hosted, inspectable governance layer and a direct line to the person who built it.</p>
+  <p>Conarium is <b>early</b>. It is pre-1.0, built and run by a solo founder, with <b>one</b> production deployment so far (the author's own company ERP: 121,374 records, 121,366 identities masked, zero leaked to the model — the figure cannot be verified from outside). It has <b>no</b> third-party security certification (SOC 2 / ISO). Neither is planned. No independent penetration test — that one is on the roadmap. If you need a certified, multi-customer, enterprise-hardened vendor today, Conarium isn't there yet, and we'd rather tell you than pretend. What we offer right now is a genuinely self-hosted, inspectable governance layer and a direct line to the person who built it.</p>
 
   <h2>Continuity — what if the founder disappears?</h2>
   <p>A fair concern for a solo-founder tool in your data path, and the answer is the license: Conarium is <b>MIT-licensed</b>. You can read the source, run it, fork it and maintain it yourself — forever, no permission needed. If the project stops tomorrow, you're not left with an orphaned black box; you keep a governance layer you fully control. That's the whole point of self-hosted + open-core: <b>your risk isn't tied to our survival.</b> Need a formal source-escrow arrangement on top of that for procurement? Just ask.</p>

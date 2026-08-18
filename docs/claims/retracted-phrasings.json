@@ -65,6 +65,37 @@
       "flags": "i",
       "why": "the website stores a waitlist email, forwards chat to a third-party model, and keeps host logs",
       "use": "scope it in the sentence — the data Conarium governs never reaches us"
+    },
+    {
+      "id": "cert-on-roadmap",
+      "re": "(?:SOC\\s?2|ISO(?:/IEC)?(?:\\s*27001)?)[^\\n]{0,160}(?:on the roadmap|yol haritasında|sur la (?:feuille de )?route|auf der (?:Roadmap|Agenda)|en la hoja de ruta|nella roadmap|на дорожной карте|在路线图|रोडमैप पर)",
+      "flags": "i",
+      "why": "SOC 2 and ISO are not planned; LIMITATIONS says so. A pentest on the roadmap is a different sentence and must not share a line with SOC 2 / ISO",
+      "use": "Neither is planned",
+      "allow": "(?:neither is (?:currently )?planned|not (?:currently )?planned|planlanmıyor|ikis[iı] de planlanmıyor)"
+    },
+    {
+      "id": "phones-home",
+      "re": "(?:never |does not |doesn't )?(?:phones? home|telefoniert nach hause|appelle (?:jamais )?maison|eve (?:hiç )?telefon|no llama a casa|non chiama casa)",
+      "flags": "i",
+      "why": "startup asks the public npm registry whether a newer version exists; disable with CONARIUM_NO_UPDATE_CHECK=1",
+      "use": "no inbound port; the only outbound call is an npm version check at startup, disabled with CONARIUM_NO_UPDATE_CHECK=1",
+      "allow": "npm version check"
+    },
+    {
+      "id": "no-false-positives",
+      "re": "no false positives|yanlış pozitif yok|keine false.?positiv|aucun faux positif|nessun falso positivo|sin falsos positivos|ложных срабатываний нет|无误报|कोई गलत सकारात्मक नहीं",
+      "flags": "i",
+      "why": "scanCharCap replaces a whole field with [MASKED_PII] even when it contains no identifier",
+      "use": "a field longer than policy.scanCharCap is replaced whole with [MASKED_PII], even when it contains no identifier"
+    },
+    {
+      "id": "node-18-floor",
+      "re": "(?:with\\s+)?node\\s*\\(?\\s*(?:≥|>=)\\s*18\\s*\\)?|engines[^\\n]{0,40}>=\\s*18\\b",
+      "flags": "i",
+      "why": "engines is >=20; on Node 18 the gateway fails at initialize with crypto is not defined",
+      "use": "Node >=20. Node 18 fails at initialize (crypto is not defined)",
+      "allow": "(?:said\\s+>=\\s*18|until\\s+2026|wrong rather|on node 18|node 18.{0,80}(?:fails|fail|not defined|end-of-life)|engines already)"
     }
   ]
 }

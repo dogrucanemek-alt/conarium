@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { allowedOn, CLAIMS_SOURCE, loadRules, scanSurfaces } from './claim_discipline.mjs'
 
 const rules = loadRules(CLAIMS_SOURCE)
-assert.equal(rules.length, 9, 'the published list must stay at the nine already-caught phrasings')
+assert.equal(rules.length, 13, 'the published list is the nine already-caught phrasings plus the four docs.html overclaims of 2026-08-18')
 
 const src = readFileSync(fileURLToPath(new URL('./claim_discipline.mjs', import.meta.url)), 'utf8')
 assert.equal(
@@ -45,10 +45,9 @@ for (const line of hits) {
 }
 
 const honest = [
-  'No SOC 2. No ISO. No independent penetration test. On the roadmap.',
+  'No SOC 2. No ISO. Neither is planned.',
   'We do not have SOC 2, an external penetration test, or a formal security',
-  'SOC 2 yok. ISO yok. Bağımsız sızma testi yok. Yol haritasında.',
-  'It has no third-party security certification (SOC 2 / ISO) yet — those are on the roadmap',
+  'SOC 2 yok. ISO yok. İkisi de planlanmıyor.',
   'There is no SOC 2 audit and no independent penetration test',
   'Kein SOC 2 — siehe LIMITATIONS',
   'Pas de SOC 2 — voir LIMITATIONS',
@@ -58,7 +57,7 @@ const honest = [
   '无SOC 2 — 见 LIMITATIONS',
   'SOC 2 नहीं — LIMITATIONS देखें',
   '**We do not have** SOC 2, an external penetration test, or a formal security',
-  'It has <b>no</b> third-party security certification (SOC 2 / ISO) yet — those are on the roadmap',
+  'It has <b>no</b> third-party security certification (SOC 2 / ISO). Neither is planned.',
 ]
 for (const line of honest) {
   assert.equal(soc2.re.test(line), true, `SOC 2 word is present: ${line}`)
@@ -78,4 +77,41 @@ assert.equal(failures.length, 0, `honest LIMITATIONS / docs.html must not trip:\
 const missing = join(dir, 'no-such.json')
 assert.throws(() => loadRules(missing), /kural kaynağı yok — paketi güncelle/)
 
-console.log('claim source: 9 rules, one file, SOC 2 language-independent, honest denial allowed, missing source red')
+const byId = Object.fromEntries(rules.map((r) => [r.id, r]))
+for (const id of ['cert-on-roadmap', 'phones-home', 'no-false-positives', 'node-18-floor']) {
+  assert.ok(byId[id], `${id} missing from the published list`)
+}
+
+const certHits = [
+  'It has no third-party security certification (SOC 2 / ISO) yet — those are on the roadmap',
+  'SOC 2 yok. ISO yok. Bağımsız sızma testi yok. Yol haritasında.',
+  'SOC2-konform — on the roadmap',
+]
+for (const line of certHits) {
+  assert.equal(byId['cert-on-roadmap'].re.test(line), true, `cert-on-roadmap must see: ${line}`)
+  assert.equal(allowedOn(line, byId['cert-on-roadmap'].allow), false, `cert-on-roadmap must not excuse: ${line}`)
+}
+for (const line of [
+  'No SOC 2. No ISO. Neither is planned: they certify organisations that hold',
+  'SOC 2 yok. ISO yok. İkisi de planlanmıyor.',
+  'No independent penetration test — that one is on the roadmap.',
+]) {
+  assert.equal(
+    byId['cert-on-roadmap'].re.test(line) && !allowedOn(line, byId['cert-on-roadmap'].allow),
+    false,
+    `cert-on-roadmap must pass honest: ${line}`,
+  )
+}
+
+assert.equal(byId['phones-home'].re.test('It needs no inbound port and never phones home.'), true)
+assert.equal(allowedOn('The only outbound call is an npm version check at startup.', byId['phones-home'].allow), true)
+
+assert.equal(byId['no-false-positives'].re.test('Non-PII text is left intact (no false positives).'), true)
+assert.equal(byId['no-false-positives'].re.test('others were false positives and are dismissed'), false)
+
+assert.equal(byId['node-18-floor'].re.test('With Node (≥18)'), true)
+assert.equal(byId['node-18-floor'].re.test('With Node (≥20)'), false)
+assert.equal(allowedOn('It said >=18 until 2026-08-17, and that was wrong rather than merely unverified', byId['node-18-floor'].allow), true)
+assert.equal(allowedOn('on Node 18 the gateway fails at initialize', byId['node-18-floor'].allow), true)
+
+console.log('claim source: 13 rules, one file, SOC 2 language-independent, four 08-18 overclaims locked, honest denial allowed, missing source red')

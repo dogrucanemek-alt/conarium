@@ -17,6 +17,8 @@ telegram_dump.json
 temp_*.py
 *.tmp
 audit.log.jsonl
+audit.test.jsonl
+audit.log.jsonl.legacy-*
 src/scripts/*.py
 
 # NEO red-team çıktısı
@@ -105,8 +107,17 @@ __pycache__/
 # .mcp_token hicbir desene girmiyordu — orada "git add ." diyen biri TOKEN'i
 # public repoya sokardi. Ayni sinif olay 07-31'de ozel anahtarla yasandi.
 # audit/ makbuz ve denetim zinciri: musteri verisinin izini tasir, asla commit'lenmez.
+#
+# docs/reviews/: dis inceleme raporlari. 2026-08-18'de olculdu — bu dizin git'te YOK
+# ama diskte var, ve "files" listesindeki "docs" onu npm tarball'ina SOKUYOR
+# (npm pack diskten alir, git checkout'undan degil). Bugune dek girmemis olmasinin
+# tek sebebi yayinin CI'da git checkout'undan uretilmesi; elle "npm publish" diyen
+# biri kapatilmamis bir guvenlik bulgusunu ("/upgrade rate limit yok", dosya:satir ile)
+# kamuya yayinlardi. Koruma tesadufi olmasin diye iki tarafli: burada + package.json
+# "files" icinde "!docs/reviews".
 .mcp_token
 audit/
+docs/reviews/
 DURUM.md
 .demo_keepalive_state
 .demo_watch_state
