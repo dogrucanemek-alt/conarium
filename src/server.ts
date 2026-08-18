@@ -209,7 +209,7 @@ export function buildServer(
       },
       {
         name: 'search',
-        description: 'Full-text search across governed company data scopes',
+        description: 'Find rows by a search term in governed scopes (not SQL). Use when the user wants to look up text across allowed tables. Use query when they already have a SELECT. The same policy, masking, and row cap apply.',
         inputSchema: {
           type: 'object',
           required: ['query'],
