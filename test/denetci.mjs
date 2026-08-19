@@ -83,6 +83,13 @@ const SURFACES = [
   // the Button column pointing at a checkout route that redirects to the
   // waitlist form — a promise surface that no reader was assigned.
   'docs/PRICING.md',
+  // Ships in the tarball and tells a reader how to check where the package came
+  // from. Unlisted until 0.2.33, by which point it had gone stale in the worst
+  // direction: it said "this is not a published release" inside eight published
+  // releases, and pointed at a verification command that answers 404 for npm
+  // provenance. A page about how to distrust us is one a reader must be able to
+  // trust.
+  'docs/security/NPM-PROVENANCE.md',
 ]
 
 /** Documents that changed and are deliberately not read as promises. */
