@@ -22,3 +22,17 @@ updates:
         dependency-type: production
       development:
         dependency-type: development
+  # Both Dockerfiles name their base image by digest. That is only an
+  # improvement while something advances the digest — an unwatched pin is a base
+  # image frozen at whatever CVEs it shipped with. This is that watcher.
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /.clusterfuzzlite
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      base-images:
+        patterns:
+          - '*'
