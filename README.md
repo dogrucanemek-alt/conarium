@@ -421,11 +421,15 @@ is verifiable without trusting us; this particular figure is our own measurement
 and [Governance Report 001](https://conarium.dev/report-001.html) lists its limits.
 
 That claim is hedged on purpose, and [`docs/PRIOR-ART.md`](docs/PRIOR-ART.md) is the
-evidence behind it: ten projects checked on 6 August 2026, what each one has, the
-closest academic prior art ([Sello / *Notarized Agents*](https://arxiv.org/html/2606.04193v1),
-which names this gap better than we did), and nine things we could **not** verify. If
-you know of an implementation combining all three, open an issue and it will be
-corrected.
+evidence behind it: eleven projects — ten checked on 6 August 2026 and Vaara added
+on 19 August — what each one has, the closest academic prior art
+([Sello / *Notarized Agents*](https://arxiv.org/html/2606.04193v1), which names this
+gap better than we did), and nine things we could **not** verify. If you know of an
+implementation combining all three, open an issue and it will be corrected.
+
+⚠️ The Vaara row narrowed this claim rather than confirming it: that project
+reconciles too, so the combination is what is unshared, not part three on its own.
+The file says so above its own table.
 
 ---
 

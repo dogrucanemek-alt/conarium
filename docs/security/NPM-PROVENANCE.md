@@ -57,6 +57,40 @@ two commands above.
 If a version has **no** attestation, it was not published through this workflow
 (or predates it). Treat that as undeclared origin — not as "verified".
 
+## What a release page carries
+
+The publish workflow is **configured** to attach three files to the GitHub
+release. Those steps have not run yet — 0.2.34 is the first release that will
+execute them — so read the list below as what the workflow is set up to produce,
+and the release page as the answer to whether it did:
+
+| Asset | What it is |
+|---|---|
+| `conarium-ai-core-<version>.tgz` | the published tarball, **downloaded from the registry**, not rebuilt |
+| `conarium-ai-core-<version>.cdx.json` | CycloneDX bill of materials, read from the lockfile the release was built against |
+| `conarium-ai-core-<version>.tgz.intoto.jsonl` | a build attestation over that tarball, also written to GitHub's attestation store |
+
+The tarball is fetched rather than packed again on purpose. `npm pack` is not
+byte-reproducible across environments — file modes, line endings and the gzip
+implementation differ — so a rebuilt asset can be a lookalike of the release
+rather than the release. Its sha512 is checked against the registry's
+`dist.integrity` before anything is attested or uploaded.
+
+⛔ **The `gh` command below works only for versions whose release page actually
+carries that `.intoto.jsonl` asset** — check the page first, do not assume from
+the version number. That attestation is a second one, written to GitHub's store;
+it does not replace npm's, and every version published so far has only npm's.
+For those, the 404 explanation above still applies.
+
+```bash
+# only for a version whose release page lists the .intoto.jsonl asset
+gh attestation verify conarium-ai-core-<version>.tgz --repo dogrucanemek-alt/conarium
+```
+
+Two attestations over the same bytes are not redundancy for its own sake: one is
+checkable without GitHub, the other without npm, and the bill of materials is
+checkable without either.
+
 ## Publisher configuration
 
 Auth is **npm Trusted Publishing (OIDC)**, not a stored token. npm hands the

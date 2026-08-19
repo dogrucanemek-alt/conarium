@@ -7,6 +7,10 @@ We make one comparative claim about Conarium:
 > enforcement, and (3) coverage reconciliation against the data source's own
 > query counters.
 
+⚠️ **Read that as a claim about the combination, not about part 3.** Since
+19 August one project in this file also reconciles — see the Vaara row and the
+note under the table. Part 3 is no longer something only we do.
+
 A claim like that is unfalsifiable if we just assert it, so this file is the
 evidence behind it: what we searched, on what date, what we found, and — the part
 most comparison pages leave out — **what we could not verify.** If you know of an
@@ -15,6 +19,12 @@ implementation that does all three, open an issue and this file will be correcte
 **Scan date: 6 August 2026.** Method: fetched each project's README, docs and
 official site, plus targeted web searches. **Source-code-level search was not
 performed on any repository** — see Limitations.
+
+**Amended 19 August 2026.** Vaara was added after its author raised a related
+mechanism on the SCITT mailing list. It is the one row scored from source rather
+than from documentation: the repository was cloned at `befdced`, its contiguity
+tests were run, and the sections cited below were read. It is also the row that
+narrowed the claim above — see the note under the table.
 
 ## What the three parts mean
 
@@ -47,11 +57,33 @@ perfectly intact.
 | [lasso-security/mcp-gateway](https://github.com/lasso-security/mcp-gateway) | **Yes** — Presidio PII masking, injection filters | No — no signing mechanism documented | No |
 | [h33.ai](https://h33.ai/) | **Yes, and further** — FHE; the model never sees plaintext | **Yes** — ZK-STARK + Dilithium, verifiable "years later, offline, without the original vendor" | No |
 | [CertNode](https://certnode.io/solutions/ai-agents) | Weak — no blocking gate | **Yes** — ES256 JWS + RFC 3161 | No |
+| [vaaraio/vaara](https://github.com/vaaraio/vaara) | Partial — `CredentialGateway` authorizes each tool call against a brokered credential and refuses without one; no value masking found. Its redaction is GDPR Art. 17 erasure inside the audit store, which is a different guarantee | **Yes** — signed decision record (ES256/HS256/RS256) over JCS-canonical blocks, evidence pinned by `evidenceRef.digest`, standalone checkers under `tests/vectors` that import none of their code | **Yes — the only other one here.** `docs/design/credential-broker-spec.md` §D joins each used credential to a receipt on `attestationDigest`; a used credential with no matching receipt, or a provider action with no credential at all, is read as a bypassed broker. Their §E states the limit themselves: *"detection of a defeated broker, not a mathematical-completeness claim"* |
 
 The landscape splits cleanly. One camp enforces well but issues no portable evidence
 (hoop.dev, Lasso). The other issues excellent portable evidence but does not enforce
 before the model (Signet, Circe, Acta, agentreceipts, Handshake, CertNode). Two
 projects do both — Microsoft's toolkit and h33.ai — and neither does the third.
+
+### What the Vaara row cost the claim, stated rather than buried
+
+Until 19 August this file said no project in it reconciled at all, and the claim
+above leaned on that. That is no longer true, and the sentence it supported has to
+be read more narrowly than it was.
+
+Vaara reconciles. Its join is not against a counter the data source keeps for its
+own reasons — it is between credentials its broker minted and the receipts those
+credentials should have produced — but it is a second population compared against
+the chain to surface a bypass, which is what the third column asks. The remaining
+difference is what the second account depends on: `pg_stat_statements` exists
+whether or not Conarium was ever installed and cannot be written by the gateway,
+while a credential-usage enumeration has to be produced by the provider and covers
+only actions that carried a credential. Their §E says the same in their own words.
+
+So the combined claim survives on the first column, not the third. What is left of
+it is narrow and worth saying in that form: **we have not found another
+implementation that masks values before the model sees them and then reconciles
+what it disclosed against the source's own bookkeeping.** Anyone quoting this file
+should quote that sentence, not "nobody else reconciles".
 
 ### Two near misses worth naming precisely
 
