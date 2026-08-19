@@ -28,6 +28,7 @@ export const CHECKS = [
   'test/threshold_source.mjs',
   'test/claim_source.mjs',
   'test/version_claim.mjs',
+  'test/release_record.mjs',
   'test/bin_claims.mjs',
   'test/console_cli.mjs',
   'test/console_policy.mjs',
