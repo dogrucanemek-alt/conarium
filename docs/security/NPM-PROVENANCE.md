@@ -57,6 +57,38 @@ two commands above.
 If a version has **no** attestation, it was not published through this workflow
 (or predates it). Treat that as undeclared origin — not as "verified".
 
+## What a release page carries
+
+From 0.2.34 the publish workflow attaches three files to the GitHub release, and
+whether a given version has them is answered by looking at its release page
+rather than by this paragraph:
+
+| Asset | What it is |
+|---|---|
+| `conarium-ai-core-<version>.tgz` | the published tarball, **downloaded from the registry**, not rebuilt |
+| `conarium-ai-core-<version>.cdx.json` | CycloneDX bill of materials, read from the lockfile the release was built against |
+| `conarium-ai-core-<version>.tgz.intoto.jsonl` | a build attestation over that tarball, also written to GitHub's attestation store |
+
+The tarball is fetched rather than packed again on purpose. `npm pack` is not
+byte-reproducible across environments — file modes, line endings and the gzip
+implementation differ — so a rebuilt asset can be a lookalike of the release
+rather than the release. Its sha512 is checked against the registry's
+`dist.integrity` before anything is attested or uploaded.
+
+⛔ **The `gh` command above works only for versions whose release page carries
+that `.intoto.jsonl` asset.** That attestation is a second one, written to
+GitHub's store; it does not replace npm's, and versions published before 0.2.34
+have only npm's. For those, the 404 explanation above still applies.
+
+```bash
+# only for a version whose release page lists the .intoto.jsonl asset
+gh attestation verify conarium-ai-core-<version>.tgz --repo dogrucanemek-alt/conarium
+```
+
+Two attestations over the same bytes are not redundancy for its own sake: one is
+checkable without GitHub, the other without npm, and the bill of materials is
+checkable without either.
+
 ## Publisher configuration
 
 Auth is **npm Trusted Publishing (OIDC)**, not a stored token. npm hands the

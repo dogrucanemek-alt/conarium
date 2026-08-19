@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.2.34 — 2026-08-19 — the prior-art claim that got narrower
+
+A comparative claim in this package was too strong, and the correction came from
+reading a competitor's source rather than from a gate of ours catching it.
+
+- **`docs/PRIOR-ART.md` no longer says nobody else reconciles.** Vaara
+  (`vaaraio/vaara`, AGPL-3.0) does. Its credential broker joins each used
+  credential to the receipt that credential should have produced and reads a
+  mismatch as a bypassed broker — a second population compared against the chain,
+  which is what our third column asks for. The row is scored from source, not from
+  documentation: the repository was cloned at `befdced` and the cited sections
+  read.
+- **What survives is stated in the narrower form.** The combination still appears
+  to be unshared, because that project authorizes tool calls without masking
+  values, but part three is no longer ours alone. Anyone quoting the file should
+  quote *"masks values before the model sees them and then reconciles what it
+  disclosed"*, not *"nobody else reconciles"*. The warning sits above the table
+  rather than in a footnote.
+- **`README.md` says eleven projects, and says which way the eleventh moved the
+  claim.** A comparison page that only ever gains rows it wins is not evidence.
+- **`docs/security/NPM-PROVENANCE.md` documents the release artefacts** that
+  releases now carry: the published tarball, a CycloneDX bill of materials, and a
+  build attestation written to GitHub's attestation store. It also stops being the
+  only page that describes verification, because `gh attestation verify` now has
+  something to answer for versions carrying that asset.
+- **This changelog stops one version short of the package again.** The 0.2.33
+  entry below was written today, after the fact. The publish workflow now refuses
+  a version whose section does not exist, so the next occurrence is a red gate
+  rather than a discovery.
+
+## 0.2.33 — 2026-08-19
+
+Written on 2026-08-19, after 0.2.33 had already shipped without it. The gap is
+recorded rather than backdated.
+
+- **The provenance page stopped saying there was nothing to verify.**
+  `docs/security/NPM-PROVENANCE.md` still read *"This is not a published
+  release"* eight releases after the first one, and pointed readers at
+  `gh attestation verify`, which answers `404` for a package published with npm
+  provenance — that command reads GitHub's attestation store, while
+  `npm publish --provenance` writes to the npm registry and its transparency log.
+  A reader checking the honest way would have read that 404 as "no attestation",
+  which is the opposite of the truth.
+- The working commands replaced it: `npm view … dist --json`, which returns the
+  `attestations` block naming `slsa.dev/provenance/v1`, and `npm audit
+  signatures`. The `gh` command stayed on the page as a warning with its reason,
+  because a reader who tries it deserves to know why it fails.
+- Found by an external review, not by our own claim gate. The gate locks phrasings
+  already caught; this file was never in the list of surfaces it reads.
+
 ## 0.2.32 — 2026-08-19
 
 Tool descriptions now say what the tools do to the world, not just what they are
