@@ -59,10 +59,9 @@ If a version has **no** attestation, it was not published through this workflow
 
 ## What a release page carries
 
-The publish workflow is **configured** to attach three files to the GitHub
-release. Those steps have not run yet — 0.2.34 is the first release that will
-execute them — so read the list below as what the workflow is set up to produce,
-and the release page as the answer to whether it did:
+The publish workflow is configured to attach three files to the GitHub release.
+Which of them a given version actually carries is answered by its release page,
+not by this table:
 
 | Asset | What it is |
 |---|---|
@@ -76,11 +75,20 @@ implementation differ — so a rebuilt asset can be a lookalike of the release
 rather than the release. Its sha512 is checked against the registry's
 `dist.integrity` before anything is attested or uploaded.
 
+**What has actually run.** The artefact path first executed on 19 August 2026 in
+the workflow's `artefacts` mode — a dispatch that attaches files to a version
+already on npm and skips publishing, tagging and the registry entirely. It was
+run against **0.2.33**, whose release page had been left empty when that version
+shipped. So 0.2.33 carries the tarball and the attestation and **no bill of
+materials**: that step is skipped in artefacts mode, because the lockfile in the
+tree belongs to a later version. The full publish path, producing all three, has
+not run yet.
+
 ⛔ **The `gh` command below works only for versions whose release page actually
-carries that `.intoto.jsonl` asset** — check the page first, do not assume from
-the version number. That attestation is a second one, written to GitHub's store;
-it does not replace npm's, and every version published so far has only npm's.
-For those, the 404 explanation above still applies.
+carries the `.intoto.jsonl` asset** — check the page, do not assume from the
+version number. That attestation is a second one, written to GitHub's store; it
+does not replace npm's. For a version without it, the 404 explanation above still
+applies.
 
 ```bash
 # only for a version whose release page lists the .intoto.jsonl asset

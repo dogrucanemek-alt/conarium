@@ -427,9 +427,11 @@ on 19 August — what each one has, the closest academic prior art
 gap better than we did), and nine things we could **not** verify. If you know of an
 implementation combining all three, open an issue and it will be corrected.
 
-⚠️ The Vaara row narrowed this claim rather than confirming it: that project
-reconciles too, so the combination is what is unshared, not part three on its own.
-The file says so above its own table.
+⚠️ The Vaara row narrowed this claim rather than confirming it. That project
+*specifies* a coverage reconciliation in its design documents; a search of its
+tree found no code running it, so the row reads "specified, not found
+implemented". The idea is not ours alone — the running code, as far as this scan
+reaches, still is, and the file says so above its own table.
 
 ---
 
