@@ -157,16 +157,21 @@ jobs:
       # ── the release artefact ─────────────────────────────────────────────
       #
       # A release page that offers a tarball is only useful if that tarball is
-      # the one on npm. `npm pack` rebuilds it from this tree, which is a claim,
-      # not a fact — so the claim is checked against the registry's own integrity
-      # digest before anything is attested or uploaded. A mismatch means this
-      # tree is not what was published and the step stops; it does not upload a
-      # near-miss under the release's name.
+      # the one on npm, so the asset is fetched from the registry rather than
+      # rebuilt here.
       #
-      # The digest is read back from npm rather than computed twice here: two
-      # hand-made copies of one fact drift, and the copy that matters is the
-      # registry's.
-      - name: Pack the artefact and prove it is the published one
+      # Rebuilding was the first attempt and it is wrong. `npm pack` is not
+      # byte-reproducible across environments — file modes, line endings and the
+      # gzip implementation all differ — and packing this repository at 0.2.33 on
+      # a second machine produced a different sha512 from the published one while
+      # every shipped file matched the tag. A rebuilt asset would therefore be a
+      # lookalike of the release, published under the release's name, with an
+      # attestation covering the lookalike. Downloading removes the assumption
+      # instead of testing it.
+      #
+      # The digest is still checked, because a download can be truncated or
+      # intercepted, and it is read from the registry rather than restated here.
+      - name: Fetch the published artefact and check its digest
         id: artefact
         if: ${{ github.event.inputs.confirm == 'publish' }}
         run: |
@@ -175,39 +180,44 @@ jobs:
           VERSION="$(node -p "require('./package.json').version")"
           SLUG="$(node -p "require('./package.json').name.replace('@','').replace('/','-')")"
           TARBALL="${RUNNER_TEMP}/${SLUG}-${VERSION}.tgz"
-          npm pack --pack-destination "$RUNNER_TEMP" > /dev/null
-          test -f "$TARBALL"
-          LOCAL="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | base64 -w0)"
           # The registry needs a moment to serve a version it has just accepted.
-          REMOTE=""
+          URL=""; EXPECTED=""
           for _ in 1 2 3 4 5; do
-            REMOTE="$(npm view "${PKG}@${VERSION}" dist.integrity 2>/dev/null || true)"
-            [ -n "$REMOTE" ] && break
+            URL="$(npm view "${PKG}@${VERSION}" dist.tarball 2>/dev/null || true)"
+            EXPECTED="$(npm view "${PKG}@${VERSION}" dist.integrity 2>/dev/null || true)"
+            [ -n "$URL" ] && [ -n "$EXPECTED" ] && break
             sleep 5
           done
-          if [ -z "$REMOTE" ]; then
-            echo "::error::npm did not report an integrity digest for ${PKG}@${VERSION}"
+          if [ -z "$URL" ] || [ -z "$EXPECTED" ]; then
+            echo "::error::npm did not report a tarball and integrity digest for ${PKG}@${VERSION}"
             exit 1
           fi
-          if [ "$LOCAL" != "$REMOTE" ]; then
-            echo "::error::the tarball built here is not the one npm is serving"
-            echo "  built:     $LOCAL"
-            echo "  published: $REMOTE"
+          curl -sSLf -o "$TARBALL" "$URL"
+          ACTUAL="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | base64 -w0)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::the downloaded tarball does not match the digest npm reports"
+            echo "  downloaded: $ACTUAL"
+            echo "  published:  $EXPECTED"
             exit 1
           fi
           echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
           echo "sbom=${RUNNER_TEMP}/${SLUG}-${VERSION}.cdx.json" >> "$GITHUB_OUTPUT"
           echo "provenance=${RUNNER_TEMP}/${SLUG}-${VERSION}.tgz.intoto.jsonl" >> "$GITHUB_OUTPUT"
-          echo "the release asset is byte-identical to the published package (${REMOTE})"
+          echo "the release asset is the published package (${EXPECTED})"
       # A governance product that cannot say what it is built from is asking its
-      # buyers for more trust than it gives. `npm sbom` reads the installed tree
-      # rather than re-resolving the manifest, so the bill of materials names the
-      # versions this release was actually built and tested against.
+      # buyers for more trust than it gives.
+      #
+      # Read from the lockfile rather than the installed tree. `npm ci` installs
+      # exactly the lockfile, so on this runner the two agree and the bill of
+      # materials names the versions this release was built and tested against —
+      # but the tree mode refuses to emit anything at all when an installed
+      # version drifts from its declared range, which turns a documentation step
+      # into a way to fail a release that has already published.
       - name: Software bill of materials
         if: ${{ github.event.inputs.confirm == 'publish' }}
         run: |
           set -euo pipefail
-          npm sbom --sbom-format cyclonedx --sbom-type library --omit dev \
+          npm sbom --sbom-format cyclonedx --sbom-type library --omit dev --package-lock-only \
             > "${{ steps.artefact.outputs.sbom }}"
           node -e "
             const s = require(process.argv[1])
