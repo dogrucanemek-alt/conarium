@@ -18,8 +18,18 @@ on:
         # re-running the whole workflow was impossible — npm refuses a duplicate
         # version — so the only way to fix a metadata entry would have been to
         # burn a version number on it.
-        description: 'publish = release the version in package.json; registry = MCP registry entry only'
+        # `artefacts` exists because the steps that attach a tarball, an
+        # attestation and a release page all run *after* npm publish, so the
+        # first release to use them is also the first test of them, and a
+        # failure there lands on a version that is already out. This mode runs
+        # that half alone against a version already on npm: nothing is
+        # published, nothing is tagged, and a mistake costs a red run.
+        description: 'publish = release the version in package.json; registry = MCP registry entry only; artefacts = attach release artefacts to an already-published version'
         required: true
+        type: string
+      version:
+        description: 'artefacts mode only — the already-published version to attach artefacts to (e.g. 0.2.33)'
+        required: false
         type: string
 
 # Read at the top of the file, write only inside the job that needs it. The
@@ -30,7 +40,7 @@ permissions:
 
 jobs:
   npm:
-    if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'registry' }}
+    if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'registry' || github.event.inputs.confirm == 'artefacts' }}
     runs-on: ubuntu-latest
     permissions:
       # write, not read: a successful publish pushes its own v<version> tag and
@@ -63,6 +73,30 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:checks
+      # Every step below that names a version reads it from here, so `publish`
+      # and `artefacts` cannot disagree about which release they are handling.
+      # In artefacts mode the version is an input and must already be on npm;
+      # in the other modes it is what package.json says.
+      - name: Resolve the version being handled
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.inputs.confirm }}" = "artefacts" ]; then
+            V="${{ github.event.inputs.version }}"
+            if [ -z "$V" ]; then
+              echo "::error::artefacts mode needs the version input (e.g. 0.2.33)"
+              exit 1
+            fi
+            PKG="$(node -p "require('./package.json').name")"
+            if ! npm view "${PKG}@${V}" version > /dev/null 2>&1; then
+              echo "::error::${PKG}@${V} is not on npm — artefacts mode attaches to an existing release, it does not create one"
+              exit 1
+            fi
+          else
+            V="$(node -p "require('./package.json').version")"
+          fi
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+          echo "handling ${V} in ${{ github.event.inputs.confirm }} mode"
       # A judgment gate, not a test. The checks above lock phrasings that were
       # already caught, and none of them can see a new overclaim: on 2026-08-17
       # privacy.html asserted "we never receive, see, or store your data" four
@@ -115,10 +149,10 @@ jobs:
       # required before anything irreversible happens, and the same text becomes
       # the GitHub release below, so the two cannot describe different releases.
       - name: The release must have a note
-        if: ${{ github.event.inputs.confirm == 'publish' }}
+        if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'artefacts' }}
         run: |
           set -euo pipefail
-          VERSION="$(node -p "require('./package.json').version")"
+          VERSION="${{ steps.ver.outputs.version }}"
           node .github/scripts/release-notes.mjs "$VERSION" --body > "$RUNNER_TEMP/notes.md"
           node .github/scripts/release-notes.mjs "$VERSION" --title > "$RUNNER_TEMP/title.txt"
           echo "release note: $(wc -l < "$RUNNER_TEMP/notes.md") lines, titled $(cat "$RUNNER_TEMP/title.txt")"
@@ -173,11 +207,11 @@ jobs:
       # intercepted, and it is read from the registry rather than restated here.
       - name: Fetch the published artefact and check its digest
         id: artefact
-        if: ${{ github.event.inputs.confirm == 'publish' }}
+        if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'artefacts' }}
         run: |
           set -euo pipefail
           PKG="$(node -p "require('./package.json').name")"
-          VERSION="$(node -p "require('./package.json').version")"
+          VERSION="${{ steps.ver.outputs.version }}"
           SLUG="$(node -p "require('./package.json').name.replace('@','').replace('/','-')")"
           TARBALL="${RUNNER_TEMP}/${SLUG}-${VERSION}.tgz"
           # The registry needs a moment to serve a version it has just accepted.
@@ -213,6 +247,14 @@ jobs:
       # but the tree mode refuses to emit anything at all when an installed
       # version drifts from its declared range, which turns a documentation step
       # into a way to fail a release that has already published.
+      #
+      # Publish mode only, and not by oversight. The lockfile in this tree is the
+      # one the version in package.json was built from. In artefacts mode the
+      # version being attached is an older one, so an SBOM generated here would
+      # describe a different tree than the tarball it sits beside — the same
+      # lookalike problem the fetch above exists to avoid, one file over. An
+      # artefacts run therefore leaves this step untested, which is stated in the
+      # release step's output rather than left for a reader to notice.
       - name: Software bill of materials
         if: ${{ github.event.inputs.confirm == 'publish' }}
         run: |
@@ -233,35 +275,39 @@ jobs:
       # also be checked offline, without either service.
       - name: Attest the release artefact
         id: attest
-        if: ${{ github.event.inputs.confirm == 'publish' }}
+        if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'artefacts' }}
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ steps.artefact.outputs.tarball }}
       - name: Create the GitHub release
-        if: ${{ github.event.inputs.confirm == 'publish' }}
+        if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'artefacts' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          VERSION="$(node -p "require('./package.json').version")"
+          VERSION="${{ steps.ver.outputs.version }}"
           cp "${{ steps.attest.outputs.bundle-path }}" "${{ steps.artefact.outputs.provenance }}"
+          # The bill of materials is not produced in artefacts mode — see the
+          # comment on that step — so the upload list is built from what exists
+          # rather than from what the publish path would have written.
+          ASSETS=("${{ steps.artefact.outputs.tarball }}" "${{ steps.artefact.outputs.provenance }}")
+          if [ -f "${{ steps.artefact.outputs.sbom }}" ]; then
+            ASSETS+=("${{ steps.artefact.outputs.sbom }}")
+          else
+            echo "::warning::no bill of materials in this run — the release carries the tarball and its attestation only"
+          fi
           # A re-dispatch after a downstream failure must not fail here on a
           # release that already exists — it should complete it.
           if gh release view "v${VERSION}" > /dev/null 2>&1; then
             gh release edit "v${VERSION}" \
               --title "$(cat "$RUNNER_TEMP/title.txt")" \
               --notes-file "$RUNNER_TEMP/notes.md"
-            gh release upload "v${VERSION}" --clobber \
-              "${{ steps.artefact.outputs.tarball }}" \
-              "${{ steps.artefact.outputs.sbom }}" \
-              "${{ steps.artefact.outputs.provenance }}"
+            gh release upload "v${VERSION}" --clobber "${ASSETS[@]}"
           else
             gh release create "v${VERSION}" \
               --title "$(cat "$RUNNER_TEMP/title.txt")" \
               --notes-file "$RUNNER_TEMP/notes.md" \
-              "${{ steps.artefact.outputs.tarball }}" \
-              "${{ steps.artefact.outputs.sbom }}" \
-              "${{ steps.artefact.outputs.provenance }}"
+              "${ASSETS[@]}"
           fi
           gh release view "v${VERSION}" --json assets \
             --jq '.assets[] | "  asset: \(.name) (\(.size) bytes)"'
@@ -274,7 +320,10 @@ jobs:
       # it: the publisher is pinned to a release and its digest is checked
       # before extraction, the same discipline the Actions above get from SHA
       # pinning. `latest` would let a replaced asset execute here.
+      # Not in artefacts mode: that mode attaches files to a release and makes no
+      # metadata claim, and the registry refuses a version it already holds.
       - name: Publish to the MCP Registry
+        if: ${{ github.event.inputs.confirm != 'artefacts' }}
         env:
           MCP_PUBLISHER_VERSION: v1.8.1
           MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
