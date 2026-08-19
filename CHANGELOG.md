@@ -5,30 +5,40 @@
 A comparative claim in this package was too strong, and the correction came from
 reading a competitor's source rather than from a gate of ours catching it.
 
-- **`docs/PRIOR-ART.md` no longer says nobody else reconciles.** Vaara
-  (`vaaraio/vaara`, AGPL-3.0) does. Its credential broker joins each used
-  credential to the receipt that credential should have produced and reads a
-  mismatch as a bypassed broker — a second population compared against the chain,
-  which is what our third column asks for. The row is scored from source, not from
-  documentation: the repository was cloned at `befdced` and the cited sections
-  read.
-- **What survives is stated in the narrower form.** The combination still appears
-  to be unshared, because that project authorizes tool calls without masking
-  values, but part three is no longer ours alone. Anyone quoting the file should
-  quote *"masks values before the model sees them and then reconciles what it
-  disclosed"*, not *"nobody else reconciles"*. The warning sits above the table
-  rather than in a footnote.
+- **`docs/PRIOR-ART.md` no longer says nobody else has arrived at the idea.**
+  Vaara (`vaaraio/vaara`, AGPL-3.0) specifies a coverage reconciliation in
+  `credential-broker-spec.md` §D — joining each used credential to the receipt it
+  should have produced, and reading a mismatch as a bypassed broker — with its
+  limits stated in §E. The row is scored from source: the tree at `befdced` was
+  cloned, its contiguity tests run, and searched for code implementing that
+  design. None was found, so the column reads **"specified, not found
+  implemented"** rather than yes.
+- **That row was scored twice, and the first scoring is left on the page.** It
+  first read "Yes", on the strength of the design section alone — scoring a
+  specification as behaviour, which is the confusion this file's own column
+  definitions warn about two sections above. The correction is recorded where the
+  row is, not quietly.
+- **What survives is stated in the narrower form.** The claim stands on
+  implementation, which is what every other row is scored on. What it can no
+  longer carry is that nobody else has had the idea. Anyone quoting the file
+  should quote *"we have not found another implementation that masks values
+  before the model sees them and then reconciles what it disclosed"* — not
+  *"nobody else reconciles"* and not *"none of the ten has the third column"*.
+- **The Microsoft row said "Merkle-chained" and their tutorial describes a linear
+  `parent_receipt_hash`.** Overstating a competitor's mechanism is the same defect
+  as overstating our own, so it is corrected in the same pass.
 - **`README.md` says eleven projects, and says which way the eleventh moved the
   claim.** A comparison page that only ever gains rows it wins is not evidence.
-- **`docs/security/NPM-PROVENANCE.md` documents the release artefacts** that
-  releases now carry: the published tarball, a CycloneDX bill of materials, and a
-  build attestation written to GitHub's attestation store. It also stops being the
-  only page that describes verification, because `gh attestation verify` now has
-  something to answer for versions carrying that asset.
-- **This changelog stops one version short of the package again.** The 0.2.33
-  entry below was written today, after the fact. The publish workflow now refuses
-  a version whose section does not exist, so the next occurrence is a red gate
-  rather than a discovery.
+- **`docs/security/NPM-PROVENANCE.md` documents the three release artefacts the
+  full publish path is configured to produce** — the published tarball, a
+  CycloneDX bill of materials, and a build attestation written to GitHub's
+  attestation store — and says which of them any given release actually carries.
+  The artefact path first ran on 19 August in `artefacts` mode against 0.2.33,
+  which now carries the tarball and the attestation but no bill of materials.
+- **The changelog had stopped one version short of the package again**: 0.2.33
+  shipped before its entry was written, and that entry is below. The publish
+  workflow now refuses a version whose section does not exist, so the next
+  occurrence is a red gate rather than a discovery.
 
 ## 0.2.33 — 2026-08-19
 

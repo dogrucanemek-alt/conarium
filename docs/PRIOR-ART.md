@@ -7,9 +7,10 @@ We make one comparative claim about Conarium:
 > enforcement, and (3) coverage reconciliation against the data source's own
 > query counters.
 
-⚠️ **Read that as a claim about the combination, not about part 3.** Since
-19 August one project in this file also reconciles — see the Vaara row and the
-note under the table. Part 3 is no longer something only we do.
+⚠️ **Read that as a claim about implementations.** Since 19 August this file
+carries a project that *specifies* part 3 without our finding it implemented —
+see the Vaara row and the note under the table. The idea is not ours alone; the
+running code, as far as this scan reaches, still is.
 
 A claim like that is unfalsifiable if we just assert it, so this file is the
 evidence behind it: what we searched, on what date, what we found, and — the part
@@ -23,8 +24,10 @@ performed on any repository** — see Limitations.
 **Amended 19 August 2026.** Vaara was added after its author raised a related
 mechanism on the SCITT mailing list. It is the one row scored from source rather
 than from documentation: the repository was cloned at `befdced`, its contiguity
-tests were run, and the sections cited below were read. It is also the row that
-narrowed the claim above — see the note under the table.
+tests were run (`PYTHONPATH=src python -m pytest tests/credential/test_contiguity.py`
+→ 18 passed), the cited design sections were read, and the tree was searched for
+code implementing them. That search is why the row was rescored the same day —
+see the note under the table.
 
 ## What the three parts mean
 
@@ -47,7 +50,7 @@ perfectly intact.
 
 | Project | Enforcement | Portable signed receipt | Coverage reconciliation |
 |---|---|---|---|
-| [microsoft/agent-governance-toolkit](https://github.com/microsoft/agent-governance-toolkit) | Partial — Cedar allow/deny, DLP attribute ratchets; PII masking not documented | **Yes** — Ed25519, Merkle-chained, `verify_receipt_chain()` | No |
+| [microsoft/agent-governance-toolkit](https://github.com/microsoft/agent-governance-toolkit) | Partial — Cedar allow/deny, DLP attribute ratchets; PII masking not documented | **Yes** — Ed25519, hash-chained (`parent_receipt_hash`), `verify_receipt_chain()`. This said "Merkle-chained" until 19 August; their tutorial describes a linear parent hash, and overstating a competitor's mechanism is the same defect as overstating our own | No |
 | [Signet](https://github.com/Prismer-AI/signet) | Partial — policy bound into the receipt; no masking | **Yes** — Ed25519, hash-chained, offline | No |
 | [Handshake.AI](https://handshake.ai/) | No | **Yes** — signed action receipts, DID-issued, offline | No |
 | [hoophq/hoop](https://github.com/hoophq/hoop) | **Yes — strongest here.** ML-based masking before bytes leave the gateway | No — session recording/replay, no signed offline-verifiable artifact found | No |
@@ -57,33 +60,42 @@ perfectly intact.
 | [lasso-security/mcp-gateway](https://github.com/lasso-security/mcp-gateway) | **Yes** — Presidio PII masking, injection filters | No — no signing mechanism documented | No |
 | [h33.ai](https://h33.ai/) | **Yes, and further** — FHE; the model never sees plaintext | **Yes** — ZK-STARK + Dilithium, verifiable "years later, offline, without the original vendor" | No |
 | [CertNode](https://certnode.io/solutions/ai-agents) | Weak — no blocking gate | **Yes** — ES256 JWS + RFC 3161 | No |
-| [vaaraio/vaara](https://github.com/vaaraio/vaara) | Partial — `CredentialGateway` authorizes each tool call against a brokered credential and refuses without one; no value masking found. Its redaction is GDPR Art. 17 erasure inside the audit store, which is a different guarantee | **Yes** — signed decision record (ES256/HS256/RS256) over JCS-canonical blocks, evidence pinned by `evidenceRef.digest`, standalone checkers under `tests/vectors` that import none of their code | **Yes — the only other one here.** `docs/design/credential-broker-spec.md` §D joins each used credential to a receipt on `attestationDigest`; a used credential with no matching receipt, or a provider action with no credential at all, is read as a bypassed broker. Their §E states the limit themselves: *"detection of a defeated broker, not a mathematical-completeness claim"* |
+| [vaaraio/vaara](https://github.com/vaaraio/vaara) | Partial — `CredentialGateway` authorizes each tool call against a brokered credential and refuses without one; no value masking found. Its redaction is GDPR Art. 17 erasure inside the audit store, which is a different guarantee | **Yes** — signed decision record (ES256/HS256/RS256) over JCS-canonical blocks, evidence pinned by `evidenceRef.digest`, standalone checkers under `tests/vectors` that import none of their code | **Specified, not found implemented.** `docs/design/credential-broker-spec.md` §D designs the join — each used credential to a receipt on `attestationDigest`, a used credential with no matching receipt read as a bypassed broker — and §E states its limit: *"detection of a defeated broker, not a mathematical-completeness claim"*. At `befdced` we found no collector, join, CLI or test implementing it; `gateway.py` points at the design document for that residual rather than at code. **This is the only design for it we have found outside our own** |
 
 The landscape splits cleanly. One camp enforces well but issues no portable evidence
 (hoop.dev, Lasso). The other issues excellent portable evidence but does not enforce
-before the model (Signet, Circe, Acta, agentreceipts, Handshake, CertNode). Two
-projects do both — Microsoft's toolkit and h33.ai — and neither does the third.
+before the model (Signet, Circe, Acta, agentreceipts, Handshake, CertNode). Three
+projects do the first two — Microsoft's toolkit, h33.ai and Vaara — and none of
+them was found running the third.
 
-### What the Vaara row cost the claim, stated rather than buried
+### What the Vaara row cost the claim, and what it did not
 
-Until 19 August this file said no project in it reconciled at all, and the claim
-above leaned on that. That is no longer true, and the sentence it supported has to
-be read more narrowly than it was.
+This row was scored twice on 19 August, and the first scoring was wrong in a way
+worth leaving on the page.
 
-Vaara reconciles. Its join is not against a counter the data source keeps for its
-own reasons — it is between credentials its broker minted and the receipts those
-credentials should have produced — but it is a second population compared against
-the chain to surface a bypass, which is what the third column asks. The remaining
-difference is what the second account depends on: `pg_stat_statements` exists
-whether or not Conarium was ever installed and cannot be written by the gateway,
-while a credential-usage enumeration has to be produced by the provider and covers
-only actions that carried a credential. Their §E says the same in their own words.
+It first read **Yes** on coverage reconciliation, on the strength of
+`credential-broker-spec.md` §D. That section designs the join and states its own
+limit honestly, and reading it is enough to see that someone else has had this
+idea and thought it through. It is not enough to see it run. A search of the tree
+at `befdced` for a collector of used credentials, a join, a CLI or a test found
+none, and `gateway.py` refers that residual to the design document rather than to
+code. Scoring a specification as behaviour is the same confusion this file's own
+column definitions warn about two sections above — *"not that the log records that
+it happened, but that the value never left"* — committed by the person who wrote
+them.
 
-So the combined claim survives on the first column, not the third. What is left of
-it is narrow and worth saying in that form: **we have not found another
-implementation that masks values before the model sees them and then reconciles
-what it disclosed against the source's own bookkeeping.** Anyone quoting this file
-should quote that sentence, not "nobody else reconciles".
+So the combined claim stands on implementation, which is what every other row in
+this table is scored on. What it can no longer carry is the suggestion that
+nobody else has arrived at the idea. Someone has, in public, with the limits
+stated. The honest form:
+
+> **We have not found another implementation that masks values before the model
+> sees them and then reconciles what it disclosed against the source's own
+> bookkeeping. One other project specifies such a reconciliation; we did not find
+> it implemented.**
+
+Anyone quoting this file should quote that, not "nobody else reconciles" and not
+"none of the ten has the third column".
 
 ### Two near misses worth naming precisely
 
