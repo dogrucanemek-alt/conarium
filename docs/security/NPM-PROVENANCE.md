@@ -79,10 +79,17 @@ rather than the release. Its sha512 is checked against the registry's
 the workflow's `artefacts` mode — a dispatch that attaches files to a version
 already on npm and skips publishing, tagging and the registry entirely. It was
 run against **0.2.33**, whose release page had been left empty when that version
-shipped. So 0.2.33 carries the tarball and the attestation and **no bill of
+shipped. So **0.2.33 carries the tarball and the attestation and no bill of
 materials**: that step is skipped in artefacts mode, because the lockfile in the
-tree belongs to a later version. The full publish path, producing all three, has
-not run yet.
+tree belongs to a later version.
+
+The full path, producing all three, first ran for **0.2.34** later the same day.
+Its release page carries the tarball, the CycloneDX bill of materials and the
+attestation, and the tarball's sha512 matches the registry's `dist.integrity`.
+
+Which means the table above describes two different histories depending on the
+version you are holding, and the release page — not this document — is what
+answers for any particular one.
 
 ⛔ **The `gh` command below works only for versions whose release page actually
 carries the `.intoto.jsonl` asset** — check the page, do not assume from the

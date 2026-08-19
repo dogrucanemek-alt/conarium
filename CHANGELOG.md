@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.35 — 2026-08-20 — two sentences that our own actions made false
+
+Nothing in the engine changed. This release exists because publishing 0.2.34
+invalidated a paragraph inside 0.2.34, which is a small thing that says something
+about how documentation ages here.
+
+- **`docs/security/NPM-PROVENANCE.md` said the full publish path had not run
+  yet.** It ran a few hours later, publishing 0.2.34 itself. The page now
+  separates the two histories: 0.2.33 carries a tarball and an attestation and no
+  bill of materials, because its artefacts were attached by the mode that skips
+  that step; 0.2.34 carries all three because the full path produced them. The
+  paragraph ends by pointing at the release page rather than at itself, which is
+  the only version of this sentence that does not expire.
+- **The OpenSSF Best Practices badge is in the README, with what it is not.**
+  The project earned the passing badge on 2026-08-19 (project 14160, 64 of 67
+  criteria met, 3 not applicable and stated as such). The README says in the same
+  breath that this is self-certification rather than an audit, that the answers
+  are public and checkable, and that the Scorecard badge beside it carries a
+  `Code-Review` score of 0 because pull requests here are merged without a second
+  approver. A badge added without that sentence would be the kind of claim this
+  package spends its time refusing.
+- One criterion was corrected before it was submitted rather than after: the
+  first answer for "the test suite covers most of the code" asserted coverage
+  that had never been measured. It now describes what is exercised and says the
+  ratio is not reported.
+
 ## 0.2.34 — 2026-08-19 — the prior-art claim that got narrower
 
 A comparative claim in this package was too strong, and the correction came from

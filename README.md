@@ -7,6 +7,7 @@
     <a href="https://www.npmjs.com/package/@conarium-ai/core"><img src="https://img.shields.io/npm/v/@conarium-ai/core?style=for-the-badge" alt="npm" /></a>
     <a href="https://github.com/dogrucanemek-alt/conarium/actions/workflows/security.yml"><img src="https://img.shields.io/github/actions/workflow/status/dogrucanemek-alt/conarium/security.yml?branch=main&style=for-the-badge&label=CI" alt="CI" /></a>
     <a href="https://securityscorecards.dev/viewer/?uri=github.com/dogrucanemek-alt/conarium"><img src="https://api.securityscorecards.dev/projects/github.com/dogrucanemek-alt/conarium/badge" alt="OpenSSF Scorecard" /></a>
+    <a href="https://www.bestpractices.dev/projects/14160"><img src="https://www.bestpractices.dev/projects/14160/badge" alt="OpenSSF Best Practices" /></a>
     <a href="https://conarium.dev"><img src="https://img.shields.io/badge/Website-conarium.dev-5a8cff?style=for-the-badge" alt="Website" /></a>
     <a href="https://github.com/dogrucanemek-alt/conarium/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-f2d79a?style=for-the-badge" alt="License" /></a>
     <img src="https://img.shields.io/badge/Status-Early%20Access-ff6f80?style=for-the-badge" alt="Early Access" />
@@ -692,6 +693,14 @@ per-user identity bound to an identity provider rather than an operator token ma
   and coverage declarations are yours to show your own auditor, and whether they
   satisfy a given audit is between you and that auditor. If we ever hold your
   data, or an engagement turns on the certificate itself, this line changes first.
+- **The OpenSSF Best Practices badge above is self-certification, not an audit.**
+  We answered its 67 questions and published the answers; anyone can read them at
+  [project 14160](https://www.bestpractices.dev/projects/14160) and check each one
+  against this repository. That is worth something — the answers are falsifiable —
+  and it is not the same thing as someone independent having looked. Three of the
+  67 are marked not-applicable and say why. The Scorecard badge beside it is
+  machine-measured and includes a `Code-Review` score of 0, because pull requests
+  here are merged without a second approver.
 
 Known gaps: [LIMITATIONS.md](LIMITATIONS.md), the README above,
 [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md),
