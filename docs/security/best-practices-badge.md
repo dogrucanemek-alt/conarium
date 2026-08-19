@@ -1,8 +1,10 @@
 # OpenSSF Best Practices — draft answers
 
-Filing at <https://www.bestpractices.dev/> is a separate decision. These
-answers are what the public tree supports today. Do not submit until they
-have been read once by a human.
+These were the answers prepared before filing. They were filed, and the filed
+copy is the one that counts: <https://www.bestpractices.dev/projects/14160>.
+Read that page for the current answers and the badge's current level — this
+file is kept for provenance, is not updated when an answer changes there, and
+says nothing about what the badge shows today.
 
 Project: Conarium (`@conarium-ai/core`)
 Homepage: https://conarium.dev

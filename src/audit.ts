@@ -232,6 +232,25 @@ function sleepSync(ms: number): void {
 
 const LOCK_WAIT_MS = 10_000
 const LOCK_POLL_MS = 15
+// `wx` creates the lock file and the body lands in a second syscall, so a
+// reader can catch it existing and empty. That reader cannot name an owner,
+// and "owner unknown" is not "owner gone" — stealing there hands one sink to
+// two live writers. Only age separates mid-creation (sub-millisecond) from a
+// process that died inside that window, so an unreadable lock is honoured
+// until it is this old. The cost is bounded: such a crash blocks the sink for
+// LOCK_STALE_MS and, being fail-closed, blocks access with it.
+const LOCK_STALE_MS = 30_000
+
+// A lock that vanished between the failed create and this call reads as
+// infinitely old, which sends the caller down the retry path — the same place
+// an expired lock lands, and the next create attempt is the one that decides.
+function lockAgeMs(lockPath: string): number {
+  try {
+    return Date.now() - statSync(lockPath).mtimeMs
+  } catch {
+    return Number.POSITIVE_INFINITY
+  }
+}
 
 function acquireSinkLockOnce(sink: string): string | undefined {
   if (!existsSync(dirname(sink))) return undefined
@@ -266,6 +285,9 @@ function acquireSinkLockOnce(sink: string): string | undefined {
       }
       if (otherPid != null && pidAlive(otherPid)) {
         throw new Error(`another process holds the audit sink lock (pid ${otherPid})`)
+      }
+      if (otherPid == null && lockAgeMs(lockPath) < LOCK_STALE_MS) {
+        throw new Error('another process holds the audit sink lock (pid unreadable)')
       }
       try { unlinkSync(lockPath) } catch { /* stale steal */ }
     }

@@ -107,9 +107,13 @@ Pending OpenTimestamps is disclosed as `pending`. Bitcoin upgrade is hours later
   reloads the receipt tail under that lock (see `src/audit.ts`). In-process
   concurrent `log()` is still synchronous (measured: 50 queries, 0 `prevHash`
   breaks). Cross-process writers of the same file are serialized; a lock wait
-  that times out throws and fail-closes. Same-file writers that do not go
-  through `Audit.log` (a hand-edited append, a second implementation) are
-  still unsupported.
+  that times out throws and fail-closes. A lock file whose owner pid cannot be
+  read is honoured, not stolen, until it is 30s old — the window between
+  creating a lock and writing the pid into it is otherwise long enough for two
+  live writers to claim one sink. The bounded cost is the inverse case: a
+  process that dies inside that same window blocks its sink, and therefore
+  access, for those 30s. Same-file writers that do not go through `Audit.log`
+  (a hand-edited append, a second implementation) are still unsupported.
 
 ## Out of scope — the operator
 

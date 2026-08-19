@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.36 — 2026-08-20 — the lock that could be taken twice
+
+The receipt sink had no lock of its own. `Audit` took one on the audit sink at
+construct time, and receipts were written to a different path — so a receipt-only
+install took no lock at all, and two processes with different audit sinks sharing
+one receipt file took two locks over one file. Both configurations forked `seq`
+and `prevHash`, and a forked chain does not verify. `log()` now takes every sink
+path it is about to write, in lexicographic path order (one fixed order, so two
+locks cannot deadlock), and re-reads the receipt tail under that lock instead of
+trusting what the instance loaded at startup.
+
+Fixing that exposed an older defect in the lock itself. The lock file is created
+and the owner pid is written into it a syscall later; a second process arriving
+inside that gap saw the file exist with an empty body, could not read an owner,
+and treated it as abandoned — so it deleted a live process's lock and took the
+sink. The guard added on 15 August to "reject a second OS process" therefore
+rejected it most of the time, not always, and its test never landed in the gap.
+An unreadable lock is now honoured rather than stolen until it is 30s old, which
+still reclaims a lock whose owner died, and a lock naming a dead pid is still
+reclaimed at once. The bounded cost is stated in the threat model: a process that
+dies inside that same gap blocks its sink, and access with it, for those 30s.
+
+Also: a check that compares what `standards/README.md` says about the draft with
+what the IETF Datatracker says — unreachable is a printed SKIP, a mismatch is
+red. Three sentences that had gone stale were rewritten to point at what holds
+the state instead of restating it: outbound connections are now named with the
+variables that disable them, draft status defers to the Datatracker, and the
+receipt claim in `README.md` and in the package description says when receipts
+are written rather than implying always.
+
 ## 0.2.35 — 2026-08-20 — two sentences that our own actions made false
 
 Nothing in the engine changed. This release exists because publishing 0.2.34

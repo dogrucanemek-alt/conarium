@@ -78,6 +78,18 @@ const SURFACES = [
   'docs/BENCHMARK.md',
   'docs/PRIOR-ART.md',
   'docs/CONSENT-BINDING-SPEC.md',
+  // Two levels down, and for five days that was enough to hide it. The sentence
+  // "two OS processes … have no file lock" stayed in the tree after the audit
+  // sink got a lock, because `unlistedDocs` only looked one level under docs/
+  // and nothing ever asked why this file was absent from both lists.
+  'docs/security/THREAT-MODEL.md',
+  // States that no independent pentest is on file. That is a claim with an
+  // expiry date attached to an event we intend to cause.
+  'docs/security/PENTEST-SCOPE.md',
+  // Not in the tarball, public on GitHub, and the place a reader checks what we
+  // say our IETF standing is. It carried "-04 has not been submitted" for two
+  // days after -04 was posted.
+  'standards/README.md',
   // Ships in the tarball and states a price, a refund window and what each tier
   // delivers. It arrived in 0.2.31 unlisted, and the review that listed it found
   // the Button column pointing at a checkout route that redirects to the
@@ -97,7 +109,29 @@ const NOT_CLAIM_SURFACES = {
   'CHANGELOG.md': 'a record of what happened, not a promise about what the product does',
   'AGENTS.md': 'instructions to a contributor, not published to a reader',
   'PROJECT_CONTEXT.md': 'internal orientation, not published to a reader',
+  'CONTRIBUTING.md': 'instructions to a contributor, not a promise about the product',
+  'docs/security/best-practices-badge.md':
+    'draft answers kept for provenance; the filed answers live at bestpractices.dev/projects/14160',
+  'docs/security/scorecard-repo-settings.md':
+    'a task list for someone with repo admin, not a statement about the product',
 }
+
+/**
+ * Working records: written to be superseded. A promise does not live here.
+ * Named as directories rather than inferred from depth — the depth rule is what
+ * let `docs/security/THREAT-MODEL.md` sit in neither list.
+ */
+const WORKING_RECORD_DIRS = [
+  'docs/audit/',
+  'docs/benchmarks/',
+  'docs/claims/',
+  'docs/dogfood/',
+  'docs/plans/',
+  'docs/releases/',
+  'docs/reviews/',
+  'docs/specs/',
+  'docs/superpowers/',
+]
 
 /**
  * Not docs/audit/. `.gitignore` carries `audit/` to keep receipt chains — which
@@ -161,9 +195,16 @@ function surfaceHash(rev) {
 }
 
 /**
- * A changed document that nobody decided about. Depth does the filtering, not a
- * second list: a promise lives at the top level or one level down in docs/,
- * while docs/plans, docs/specs and docs/audit are working records.
+ * A changed document that nobody decided about.
+ *
+ * Depth used to do the filtering — top level, or one level under docs/. That
+ * rule reads as a description of where promises live, but it is a description
+ * of where this function happens to look, and the two came apart in
+ * `docs/security/`: `NPM-PROVENANCE.md` was on the surface list because someone
+ * put it there by hand, and `THREAT-MODEL.md` beside it was on neither list
+ * with nothing to say so. A file cannot fall out of the review by being stored
+ * one directory deeper. Working records are named instead, so a new document
+ * anywhere under docs/ (or a new standards claim) has to be decided about.
  */
 function unlistedDocs(base, head) {
   const changed = git(['diff', '--name-only', base, head])
@@ -175,7 +216,11 @@ function unlistedDocs(base, head) {
     (p) =>
       !listed.has(p) &&
       !(p in NOT_CLAIM_SURFACES) &&
-      (/^[^/]+\.(md|html)$/.test(p) || /^docs\/[^/]+\.md$/.test(p)),
+      !WORKING_RECORD_DIRS.some((d) => p.startsWith(d)) &&
+      // A posted Internet-Draft is immutable; its text is reviewed at
+      // submission, and the repo copy exists so the two can be compared.
+      !/^standards\/draft-/.test(p) &&
+      (/^[^/]+\.(md|html)$/.test(p) || /^docs\/.+\.md$/.test(p) || /^standards\/.+\.md$/.test(p)),
   )
 }
 
