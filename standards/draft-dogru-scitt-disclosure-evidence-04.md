@@ -500,6 +500,19 @@ what was compared does not cover the step that decided what was compared.
 Session or catalog housekeeping is a legitimate exclusion; the requirement
 is not that exclusions be rare, but that they be visible and pinned.
 
+The boundary of what pinning achieves is worth stating, because it is easy to
+read as more. Carrying the rule identifier makes the exclusion *reproducible*:
+a reader can see which rule removed each item and confirm that the rule was in
+the profile the digest covers. It does not establish that the exclusion was
+*correct*. A rule that removes session housekeeping and a rule that removes the
+very statements an auditor came to examine are pinned identically and verify
+identically; the mechanism reproduces the decision, it does not judge it.
+Consumers MUST NOT read a pinned exclusion as a justified one, and a result
+statement MUST NOT present the digest as evidence that the exclusions were
+appropriate. This is the same distinction this document draws between a
+declared bound and a measured one ({{cr-mapping}}), applied to the step that
+decides what is compared at all.
+
 ## Result statement {#cr-result}
 
 The reconciliation result is a JSON object:
@@ -777,4 +790,18 @@ the source activity, and that Transformation Evidence proved the
 transformation rather than the Issuer's assertion of it. Both are corrected
 in this revision. The outcome vocabulary of {{cr-procedure}} and the
 requirement that a declared bound cannot yield an outcome stronger than the
-declaration follow from that exchange.
+declaration follow from that exchange. Reviewing -03, the same reviewer
+established that an item whose classification rule does not resolve under the
+pinned profile is `indeterminate` rather than excluded — the rule this revision
+applies one layer up, to bounds.
+
+Walter Hawkins read the reconciliation implementation and found the temporal
+defect this revision exists to correct: that Window membership is decided
+across two clocks, that admitting Receipts on an exact comparison between them
+manufactures an accusation where no gap exists, and that the failure is
+asymmetric in the direction that produces false findings rather than missed
+ones. The observation that the sub-second case is the dangerous one — being the
+one a reader will believe — is his, and it is why {{cr-procedure}} sets no floor
+below which the problem is assumed to stop. The requirement that a source
+population declare its own completeness on the same standing ladder as every
+other bound is also his.
