@@ -175,7 +175,8 @@ export function buildServer(
     tools: [
       {
         name: 'list_tables',
-        description: 'List all database tables available in the company data connectors',
+        description:
+          'List the database tables this gateway is allowed to expose. Read-only. Returns one entry per table with its connector, schema-qualified name and description; tables the policy denies are absent rather than marked, so this is the authoritative list of what any other tool here can reach. Call it before describe_table or query when the table names are not already known. Every call is written to the audit ledger, and to a signed receipt as well when a receipt sink is configured.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -185,7 +186,8 @@ export function buildServer(
       },
       {
         name: 'describe_table',
-        description: 'Get the schema and column descriptions of a specific table',
+        description:
+          'Get the columns of one table: name, type and description. Read-only, and it returns structure only — no row is read, so nothing here is masked. Use it to write a correct query; use list_tables first if the table name is not known. A table the policy denies returns an error rather than an empty result. Every call is written to the audit ledger, and to a signed receipt as well when a receipt sink is configured.',
         inputSchema: {
           type: 'object',
           required: ['table'],
@@ -197,7 +199,8 @@ export function buildServer(
       },
       {
         name: 'query',
-        description: 'Run a read-only SQL query against the company database. Only SELECT is allowed.',
+        description:
+          'Run one read-only SELECT against the company database. Only SELECT is allowed; anything else is refused before it reaches the database. Rows come back capped by the policy (maxRows, often lower than any LIMIT you write) and protected values arrive already replaced with [MASKED_PII] or [MASKED_SECRET] — the raw values never leave the gateway, so do not plan on receiving them. A refusal is a normal outcome, not a fault. Use search instead when there is no SELECT yet and the goal is to find text. Every call is written to the audit ledger, and to a signed receipt as well when a receipt sink is configured.',
         inputSchema: {
           type: 'object',
           required: ['sql'],
@@ -209,7 +212,8 @@ export function buildServer(
       },
       {
         name: 'search',
-        description: 'Find rows by a search term in governed scopes (not SQL). Use when the user wants to look up text across allowed tables. Use query when they already have a SELECT. The same policy, masking, and row cap apply.',
+        description:
+          'Find rows by a search term across the allowed tables — no SQL required. Read-only. Use it when the goal is to look up text and there is no SELECT yet; use query when a SELECT already exists. Returns matching rows under the same policy as query: capped by maxRows, with protected values already replaced by [MASKED_PII] or [MASKED_SECRET]. The policy decides which scopes are searchable at all. Every call is written to the audit ledger, and to a signed receipt as well when a receipt sink is configured.',
         inputSchema: {
           type: 'object',
           required: ['query'],
