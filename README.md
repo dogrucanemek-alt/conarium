@@ -101,6 +101,7 @@ the database's own counters.
 değiştirilmediğini, **ortadan** silinmediğini, yeniden sıralanmadığını ve geriye
 dönük tarihlenmediğini kanıtlar. **Oluşturma anında doğru olduğunu kanıtlamaz.**
 Sondan kesmeyi tek başına göremez: kalan zincir tutarlıdır, yalnızca kısadır.
+*(/TR)*
 
 ```bash
 # Generate an Ed25519 keypair (private PEM + .pub.pem + .keyid sidecars).
@@ -323,8 +324,16 @@ proves — and, just as importantly, what it does not — is written out in
 [`docs/COUNTERSIGN.md`](docs/COUNTERSIGN.md), together with what a leaked
 signing key would cost.
 
-⚠️ Conarium does not operate a public countersigning endpoint yet. Until it
-does, this is code you can run, not a service you can buy.
+Pro is the hosted countersignature — someone other than you signs the chain
+head. **$20/month or $200/year — save $40.** **One period, not a subscription.**
+It does not renew by itself — when the period ends, access ends and you can
+buy it again. 14-day no-questions refund; after that, no partial refunds.
+VAT added where applicable. Buy at
+[conarium.dev/buy](https://conarium.dev/buy). The binary above is what you
+run yourself; Pro is the second signer. Shipped in the package since 0.2.16;
+the VERAX-operated endpoint is not open to customers yet. Business stays on the waitlist:
+scheduled reconciliation, coverage alerts and the signed period report are
+in the contract, **not shipped yet**.
 
 ### Implementing the format yourself
 
@@ -684,5 +693,7 @@ Known gaps: [LIMITATIONS.md](LIMITATIONS.md), the README above,
 ## 📜 License
 
 MIT — all of it, including the verifier, the reconciliation tooling and the
-anchoring service. There is no feature held back for a paid tier; what
-[conarium.dev](https://conarium.dev) sells is support, not access to code.
+anchoring service. There is no feature held back for a paid tier; the code
+is MIT. What [conarium.dev](https://conarium.dev) sells is a second signer
+(Pro) and, later, operated coverage (Business — not shipped yet) — not
+access to code.

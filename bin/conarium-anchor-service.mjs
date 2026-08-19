@@ -22,8 +22,8 @@
  * accepts anonymous writes — an anchoring service anyone can write to is a disk
  * filling up, not a service. A countersign service without a key is not one.
  */
-import { existsSync } from 'fs'
-import { createAnchorService, loadTokensFile } from '../dist/anchor-service.js'
+import { existsSync, statSync } from 'fs'
+import { createAnchorService, loadTokensFile, readTokensSnapshot } from '../dist/anchor-service.js'
 import { loadAnchorSigningKey } from '../dist/keys.js'
 
 function need(name) {
@@ -44,10 +44,28 @@ if (!existsSync(tokensPath)) {
   process.exit(2)
 }
 
-const tokens = loadTokensFile(tokensPath)
+let tokens = loadTokensFile(tokensPath)
 if (tokens.size === 0) {
   console.error(`token file ${tokensPath} defines no tokens — refusing to start`)
   process.exit(2)
+}
+let lastMtime = statSync(tokensPath).mtimeMs
+
+function currentTokens() {
+  try {
+    const st = statSync(tokensPath)
+    if (st.mtimeMs === lastMtime) return tokens
+    const snap = readTokensSnapshot(tokensPath)
+    if (!snap.authoritative) {
+      console.error('token reload not authoritative — keeping previous set')
+      return tokens
+    }
+    tokens = snap.tokens
+    lastMtime = st.mtimeMs
+  } catch {
+    console.error('token reload failed — keeping previous set')
+  }
+  return tokens
 }
 
 if (!existsSync(signingKeyPath)) {
@@ -72,6 +90,7 @@ const upgradeMinutes = Number(process.env.CONARIUM_ANCHOR_UPGRADE_MINUTES ?? 60)
 const { app, runUpgrade, runStamp } = createAnchorService({
   storePath,
   tokens,
+  getTokens: currentTokens,
   publicBaseUrl: baseUrl,
   submitsPerMinute,
   signingKey,

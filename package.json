@@ -79,6 +79,7 @@
     "conarium-stamp": "bin/conarium-stamp.mjs",
     "conarium-anchor-service": "bin/conarium-anchor-service.mjs",
     "conarium-anchor-upgrade": "bin/conarium-anchor-upgrade.mjs",
+    "conarium-token-sync": "bin/conarium-token-sync.mjs",
     "conarium-console": "bin/conarium-console.mjs",
     "conarium-suggest-policy": "bin/conarium-suggest-policy.mjs"
   },

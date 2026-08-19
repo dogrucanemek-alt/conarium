@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 export const CLAIMS_SOURCE = join(root, 'docs/claims/retracted-phrasings.json')
 
-const SURFACES = [
+export const SURFACES = [
   'README.md',
   'README.tr.md',
   'SECURITY.md',
@@ -47,6 +47,7 @@ const SURFACES = [
   'privacy.html',
   'docs/ARCHITECTURE.md',
   'docs/RECEIPT-SPEC.md',
+  'docs/PRICING.md',
 ]
 
 const SOURCE_MISSING =
@@ -109,6 +110,79 @@ export function snippetsOnLine(line, re) {
     if (out.length >= 8) break
   }
   return out
+}
+
+/**
+ * English public surfaces must not carry Turkish-specific letters, or an
+ * internal note written in Turkish. `*.tr.md` is the legitimate Turkish copy.
+ * `çöü` are not used — they are legal in German and French.
+ *
+ * README is scanned. Measured PII examples are stripped from the line, then
+ * the residue is scanned (not a whole-line pardon). `*(TR)*` … `*(/TR)*` is
+ * an explicit closed block; a lone `*(TR)*` line is exempt by itself.
+ */
+const LOCALE_LETTER_RE = /[ğĞşŞıİ]/
+const LOCALE_PROSE_RE = /Teslim edilemeyen|karta girmez/
+const EXAMPLE_ALLOW = [
+  /Ayşe Demir/,
+  /Ahmet Yılmaz/,
+  /Ali onayladı/,
+  /Güneş/,
+  /Atatürk Barajı/,
+  /zincir sağlam/,
+  /kırık \(satır/,
+]
+
+function lineExemptFromLocale(line) {
+  if (/\*\(TR\)\*/.test(line) || /\*\(\/TR\)\*/.test(line)) return true
+  return false
+}
+
+/** Strip measured PII examples, then scan what remains — same idea as /Doğru/. */
+export function localeResidue(line) {
+  let text = line
+  for (const re of EXAMPLE_ALLOW) {
+    const flags = re.flags.includes('g') ? re.flags : `${re.flags}g`
+    text = text.replace(new RegExp(re.source, flags), '')
+  }
+  return text.replace(/Doğru/g, '')
+}
+
+export function localeResidueFails(line) {
+  if (lineExemptFromLocale(line)) return false
+  const text = localeResidue(line)
+  return LOCALE_LETTER_RE.test(text) || LOCALE_PROSE_RE.test(text)
+}
+
+export function scanLocaleLetters({ surfaces, rootDir }) {
+  const failures = []
+  const skipped = []
+  for (const rel of surfaces) {
+    if (/\.tr\.md$/i.test(rel)) {
+      skipped.push(rel)
+      continue
+    }
+    const path = join(rootDir, rel)
+    if (!existsSync(path)) continue
+    const lines = readFileSync(path, 'utf8').split('\n')
+    let inTrBlock = false
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i]
+      if (/\*\(TR\)\*/.test(raw)) {
+        const rest = lines.slice(i).join('\n')
+        // Closed block only. A lone *(TR)* exempts this line via lineExemptFromLocale.
+        if (/\*\(\/TR\)\*/.test(rest)) inTrBlock = true
+      }
+      const closed = /\*\(\/TR\)\*/.test(raw)
+      const exempt = inTrBlock || lineExemptFromLocale(raw)
+      if (closed) inTrBlock = false
+      if (exempt) continue
+      if (localeResidueFails(raw)) {
+        failures.push(`${rel}:${i + 1}`)
+      }
+    }
+  }
+  return { failures, skipped }
 }
 
 export function scanSurfaces({ surfaces, rootDir, rules }) {
@@ -181,7 +255,15 @@ if (invokedDirectly()) {
       'SECURITY.md says none is operated. One of them is stale.',
   )
 
+  const locale = scanLocaleLetters({ surfaces: SURFACES, rootDir: root })
+  assert.equal(
+    locale.failures.length,
+    0,
+    `Turkish-specific letters on an English surface:\n${locale.failures.join('\n')}`,
+  )
+
   console.log(
     `claim discipline: ${checked} surfaces, ${rules.length} previously-published overclaims, no drift`,
   )
+  console.log(`locale letters: ${locale.skipped.join(',') || '(none)'} file-exempt, English surfaces clean`)
 }

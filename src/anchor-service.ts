@@ -23,7 +23,7 @@
  */
 import express from 'express'
 import type { Request, Response } from 'express'
-import { createPublicKey, randomBytes, timingSafeEqual } from 'crypto'
+import { createHash, createPublicKey, randomBytes, timingSafeEqual } from 'crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs'
 import { dirname } from 'path'
 import { hashPrefixToBuffer } from './anchor.js'
@@ -62,6 +62,8 @@ export interface AnchorServiceOptions {
   storePath: string
   /** token -> owner id. Anonymous writes would let anyone fill the disk. */
   tokens: Map<string, string>
+  /** Live lookup. Used so the process can reload the token file without a restart. */
+  getTokens?: () => Map<string, string>
   /** Public base URL, used to build the permanent verification address. */
   publicBaseUrl: string
   /** Required. A countersign service that can start without a key is not one. */
@@ -227,22 +229,47 @@ function alreadyUpgraded(rows: AnchorRecord[], seq: number): boolean {
 }
 
 export function loadTokensFile(path: string): Map<string, string> {
+  return readTokensSnapshot(path).tokens
+}
+
+/**
+ * `_conarium_sync` marks a successful pull. A missing/unreadable file is not
+ * authoritative — the running process keeps the last good set.
+ */
+export function readTokensSnapshot(path: string): { tokens: Map<string, string>; authoritative: boolean } {
   const tokens = new Map<string, string>()
-  if (!existsSync(path)) return tokens
-  const parsed = JSON.parse(readFileSync(path, 'utf-8')) as Record<string, string>
-  for (const [token, owner] of Object.entries(parsed)) {
+  if (!existsSync(path)) return { tokens, authoritative: false }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf-8'))
+  } catch {
+    return { tokens, authoritative: false }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { tokens, authoritative: false }
+  }
+  const rec = parsed as Record<string, unknown>
+  for (const [token, owner] of Object.entries(rec)) {
+    if (token.startsWith('_')) continue
     if (typeof token === 'string' && typeof owner === 'string' && token && owner) {
       tokens.set(token, owner)
     }
   }
-  return tokens
+  const authoritative = typeof rec._conarium_sync === 'string' || tokens.size > 0
+  return { tokens, authoritative }
 }
 
 /** Constant-time lookup: a token map compared with === leaks length by timing. */
 function resolveOwner(tokens: Map<string, string>, presented: string): string | null {
   const presentedBuf = Buffer.from(presented)
+  const presentedHashHex = Buffer.from(createHash('sha256').update(presented).digest('hex'))
   let found: string | null = null
   for (const [token, owner] of tokens) {
+    if (token.startsWith('sha256:')) {
+      const known = Buffer.from(token.slice(7))
+      if (known.length === presentedHashHex.length && timingSafeEqual(known, presentedHashHex)) found = owner
+      continue
+    }
     const known = Buffer.from(token)
     if (known.length === presentedBuf.length && timingSafeEqual(known, presentedBuf)) found = owner
   }
@@ -287,7 +314,7 @@ export function createAnchorService(opts: AnchorServiceOptions) {
       res.status(401).json({ error: 'missing bearer token' })
       return null
     }
-    const owner = resolveOwner(opts.tokens, token)
+    const owner = resolveOwner(opts.getTokens ? opts.getTokens() : opts.tokens, token)
     if (!owner) {
       res.status(401).json({ error: 'unknown token' })
       return null
