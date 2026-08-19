@@ -328,8 +328,10 @@ Pro is the hosted countersignature — someone other than you signs the chain
 head. **$20/month or $200/year — save $40.** **One period, not a subscription.**
 It does not renew by itself — when the period ends, access ends and you can
 buy it again. 14-day no-questions refund; after that, no partial refunds.
-VAT added where applicable. Buy at
-[conarium.dev/buy](https://conarium.dev/buy). The binary above is what you
+VAT added where applicable. Checkout is not open yet:
+[conarium.dev/buy](https://conarium.dev/buy) redirects to the waitlist form
+until the payment path goes live, so these terms are the published price
+rather than something you can pay for today. The binary above is what you
 run yourself; Pro is the second signer. Shipped in the package since 0.2.16;
 the VERAX-operated endpoint is not open to customers yet. Business stays on the waitlist:
 scheduled reconciliation, coverage alerts and the signed period report are
