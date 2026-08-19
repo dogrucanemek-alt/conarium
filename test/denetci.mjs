@@ -78,6 +78,11 @@ const SURFACES = [
   'docs/BENCHMARK.md',
   'docs/PRIOR-ART.md',
   'docs/CONSENT-BINDING-SPEC.md',
+  // Ships in the tarball and states a price, a refund window and what each tier
+  // delivers. It arrived in 0.2.31 unlisted, and the review that listed it found
+  // the Button column pointing at a checkout route that redirects to the
+  // waitlist form — a promise surface that no reader was assigned.
+  'docs/PRICING.md',
 ]
 
 /** Documents that changed and are deliberately not read as promises. */
