@@ -1,5 +1,77 @@
 # Changelog
 
+## 0.2.32 — 2026-08-19
+
+Tool descriptions now say what the tools do to the world, not just what they are
+for. A client picks a tool from its description, and all four of ours left out
+the three things a caller needs before making the call: that the operation is
+read-only, what shape comes back, and that the result has already been altered by
+policy.
+
+- **`query` and `search` state that values arrive masked.** A caller that plans
+  on receiving a raw column and gets `[MASKED_PII]` has been surprised by the
+  product working correctly. Both now say so up front, along with the row cap
+  being the policy's rather than the one written into the SQL.
+- **`describe_table` states that it reads no rows**, so nothing it returns is
+  masked — a distinction that was invisible from the outside.
+- **`list_tables` states that denied tables are absent rather than flagged**, so
+  its output is the authoritative list of what the other tools can reach.
+- Each description now names the sibling to prefer, in the direction the mistake
+  actually gets made: `query` points to `search` when there is no SELECT yet.
+- Added `glama.json`, which is how the directory listing is claimed by its
+  maintainer.
+
+This changelog also stops three versions short of the package. Entries for
+0.2.29, 0.2.30 and 0.2.31 are below, written from their release notes. A file
+that ships in the tarball and describes a state the package left two releases ago
+is worse than no file: the reader has no way to know it is stale.
+
+## 0.2.31 — 2026-08-19
+
+- **A masking fix that was five times slower outside ASCII.** Both of its
+  fast-path conditions were guarded on an ASCII test, so Turkish data satisfied
+  neither and the regex recompiled for every (value, cell) pair. The regression
+  test counts compilations through a `RegExp` proxy rather than measuring time,
+  because a millisecond threshold passes or fails on the machine that runs it.
+  Output is byte-identical across all four measured shapes.
+- **Benchmark figures re-measured and the environment named beside them.** The
+  masking warning threshold moved from 100 to 500 rows, read from
+  `docs/benchmarks/masking-cost-threshold.json` rather than a second copy.
+- **The published IETF `-04` and the repository `-04` are the same text again.**
+  The repository copy predated the submission by two paragraphs, including the
+  acknowledgement a reviewer had asked for.
+- **The package stopped telling readers to buy something they cannot buy.**
+  `/buy` redirects to the waitlist form while checkout is closed; README and
+  `docs/PRICING.md` now say that, and each edit names the condition that reverses
+  it. `docs/PRICING.md` was added to the claim surface list — it states a price
+  and a refund window and had no assigned reader.
+
+## 0.2.30 — 2026-08-18
+
+Three fields in the signed receipt were named for something other than their
+contents, found by an external review of 0.2.28.
+
+- **`actor.type` was the constant `service`.** A person connecting with their own
+  per-user token produced a receipt naming them and stamping them a service. The
+  type is now derived from `assurance` in one place rather than carried twice.
+- **`dataRefs[].fieldsRequested` and `policy.rulesApplied` are now empty.** They
+  were filled from the masked-field list and from the SQL functions a query
+  touched — neither is what the name says, and both were signed. In a signed
+  document a field filled with the wrong thing is worse than one left empty.
+- The cost is stated rather than absorbed: per-field masking detail leaves
+  `dataRefs`; `masking.byClass` still carries the per-class counts.
+
+## 0.2.29 — 2026-08-18
+
+- **`docs.html` said two different things about the same engine.** The site
+  described behaviour the engine denies; the wording was brought back to what the
+  code does, and the retracted phrasings moved to a single source
+  (`docs/claims/retracted-phrasings.json`) that ships with the package.
+- **The SOC 2 answer reached the Turkish surface.** `LIMITATIONS.tr.md` still
+  said the audit was on the roadmap after that had been retracted everywhere
+  else — the guard could not see it because the sentence was in another language.
+- `docs/reviews` excluded from the tarball; GACS drift check added.
+
 ## 0.2.28 — 2026-08-17
 
 The `indeterminate` class added in 0.2.27 was attacked the same day, and the
