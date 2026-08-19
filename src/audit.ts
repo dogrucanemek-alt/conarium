@@ -226,7 +226,14 @@ function ensureLockExitHook(): void {
   })
 }
 
-function acquireSinkLock(sink: string): string | undefined {
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+const LOCK_WAIT_MS = 10_000
+const LOCK_POLL_MS = 15
+
+function acquireSinkLockOnce(sink: string): string | undefined {
   if (!existsSync(dirname(sink))) return undefined
   const lockPath = `${sink}.lock`
   const already = heldLocks.get(lockPath) ?? 0
@@ -264,6 +271,48 @@ function acquireSinkLock(sink: string): string | undefined {
     }
   }
   throw new Error('another process holds the audit sink lock (pid unknown)')
+}
+
+function acquireSinkLock(sink: string, opts: { wait?: boolean } = {}): string | undefined {
+  if (!opts.wait) return acquireSinkLockOnce(sink)
+  const deadline = Date.now() + LOCK_WAIT_MS
+  for (;;) {
+    try {
+      return acquireSinkLockOnce(sink)
+    } catch (err) {
+      const msg = (err as Error).message
+      if (!msg.includes('another process holds')) throw err
+      if (Date.now() >= deadline) {
+        throw new Error(`Audit sink lock wait timed out: ${msg}`)
+      }
+      sleepSync(LOCK_POLL_MS)
+    }
+  }
+}
+
+/**
+ * Lock order is lexicographic on the sink *paths*, never declaration order.
+ * Taking audit then receipt on one path and receipt then audit on another
+ * deadlocks; a gateway that fail-closes on a held lock then admits nothing.
+ * Two locks, one global order. A single digest of "this process's sinks"
+ * would not serialize two processes that share only the receipt file.
+ */
+function writeLockSinks(sink?: string, receiptSink?: string): string[] {
+  return [...new Set([sink, receiptSink].filter((p): p is string => Boolean(p)))].sort()
+}
+
+function acquireWriteLocks(sinks: string[]): string[] {
+  const acquired: string[] = []
+  try {
+    for (const sink of sinks) {
+      const lockPath = acquireSinkLock(sink, { wait: true })
+      if (lockPath) acquired.push(lockPath)
+    }
+    return acquired
+  } catch (err) {
+    for (let i = acquired.length - 1; i >= 0; i--) releaseSinkLock(acquired[i])
+    throw err
+  }
 }
 
 function releaseSinkLock(lockPath: string): void {
@@ -482,49 +531,54 @@ export class Audit {
       full.governance = this.maskArgs(full.governance)
     }
 
-    this.syncLastHashIfStale()
-    full.prevHash = this.lastHash
-    // Strip sig/signature before hashing (mirrors exclusions in audit-hash).
-    delete full.sig
-    delete full.signature
-    full.hash = computeEntryHash(full as unknown as Record<string, unknown>)
-    if (this.hmacKey) {
-      full.signature = createHmac('sha256', this.hmacKey).update(full.hash).digest('hex')
-    }
-    if (this.signingKey) {
-      full.sig = {
-        alg: 'Ed25519',
-        keyId: this.signingKey.keyId,
-        value: signHash(this.signingKey, full.hash),
+    const writeLocks = acquireWriteLocks(writeLockSinks(this.sink, this.receiptSink))
+    try {
+      this.syncLastHashIfStale()
+      full.prevHash = this.lastHash
+      // Strip sig/signature before hashing (mirrors exclusions in audit-hash).
+      delete full.sig
+      delete full.signature
+      full.hash = computeEntryHash(full as unknown as Record<string, unknown>)
+      if (this.hmacKey) {
+        full.signature = createHmac('sha256', this.hmacKey).update(full.hash).digest('hex')
       }
-    }
-
-    const line = JSON.stringify(full)
-    console.error(`[conarium:audit] ${line}`)
-
-    if (this.sink) {
-      try {
-        appendFileSync(this.sink, line + '\n')
-        this.lastHash = full.hash
-        this.sinkSize = this.currentSinkSize()
-      } catch (err) {
-        if (this.failClosed) {
-          throw new Error(`Audit sink write failed: ${(err as Error).message}`)
+      if (this.signingKey) {
+        full.sig = {
+          alg: 'Ed25519',
+          keyId: this.signingKey.keyId,
+          value: signHash(this.signingKey, full.hash),
         }
       }
-    } else {
-      this.lastHash = full.hash
-    }
 
-    // Makbuz üretimi — opt-in (receiptSink yapılandırıldıysa).
-    // disclosurePayload audit satırına yazılmaz; yalnız makbuz hash'i için taşınır.
-    if (this.receiptSink) {
-      this.writeReceipt(
-        disclosurePayload === undefined ? full : { ...full, disclosurePayload },
-      )
-    }
+      const line = JSON.stringify(full)
+      console.error(`[conarium:audit] ${line}`)
 
-    return full
+      if (this.sink) {
+        try {
+          appendFileSync(this.sink, line + '\n')
+          this.lastHash = full.hash
+          this.sinkSize = this.currentSinkSize()
+        } catch (err) {
+          if (this.failClosed) {
+            throw new Error(`Audit sink write failed: ${(err as Error).message}`)
+          }
+        }
+      } else {
+        this.lastHash = full.hash
+      }
+
+      // Makbuz üretimi — opt-in (receiptSink yapılandırıldıysa).
+      // disclosurePayload audit satırına yazılmaz; yalnız makbuz hash'i için taşınır.
+      if (this.receiptSink) {
+        this.writeReceipt(
+          disclosurePayload === undefined ? full : { ...full, disclosurePayload },
+        )
+      }
+
+      return full
+    } finally {
+      for (let i = writeLocks.length - 1; i >= 0; i--) releaseSinkLock(writeLocks[i])
+    }
   }
 
   /** AuditEntry'den makbuz üret, zincire ekle, receiptSink'e yaz. */
@@ -538,6 +592,9 @@ export class Audit {
           'receipts require CONARIUM_AUDIT_SIGNING_KEY (HMAC is not sufficient).',
       )
     }
+    // Another process may have appended since this instance loaded the tail.
+    // Reload under the write lock so seq/prevHash continue that file, not memory.
+    this.loadReceiptChainState()
     const chain = {
       seq: this.receiptSeq + 1,
       prevHash: this.receiptLastHash,
