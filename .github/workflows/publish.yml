@@ -22,16 +22,26 @@ on:
         required: true
         type: string
 
+# Read at the top of the file, write only inside the job that needs it. The
+# difference is not cosmetic: a top-level grant is handed to every job the file
+# grows later, including one added by a pull request that nobody read closely.
 permissions:
-  # write, not read: a successful publish pushes its own v<version> tag below.
-  # The job is manual-dispatch only and gated by the confirm input.
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
   npm:
     if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'registry' }}
     runs-on: ubuntu-latest
+    permissions:
+      # write, not read: a successful publish pushes its own v<version> tag and
+      # creates the release below. The job is manual-dispatch only and gated by
+      # the confirm input.
+      contents: write
+      # npm Trusted Publishing and sigstore both exchange this identity for a
+      # short-lived credential. Nothing is stored in repo secrets.
+      id-token: write
+      # Writes the build attestation for the release tarball.
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -95,9 +105,33 @@ jobs:
           else
             echo "v${VERSION} is free"
           fi
+      # A published version with no release note is not a smaller release, it is
+      # an unrecorded one. 0.2.33 went to npm on 2026-08-19 with a git tag, no
+      # GitHub release, and a tarball whose newest changelog entry was 0.2.32 —
+      # which is the very defect the 0.2.32 entry announced as fixed, recurring
+      # one release later because the fix was an edit and not a mechanism.
+      #
+      # This is the mechanism. The release note is the changelog section, it is
+      # required before anything irreversible happens, and the same text becomes
+      # the GitHub release below, so the two cannot describe different releases.
+      - name: The release must have a note
+        if: ${{ github.event.inputs.confirm == 'publish' }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          node .github/scripts/release-notes.mjs "$VERSION" --body > "$RUNNER_TEMP/notes.md"
+          node .github/scripts/release-notes.mjs "$VERSION" --title > "$RUNNER_TEMP/title.txt"
+          echo "release note: $(wc -l < "$RUNNER_TEMP/notes.md") lines, titled $(cat "$RUNNER_TEMP/title.txt")"
       # npm >= 11.5 exchanges the workflow's OIDC identity for a short-lived
       # publish credential. Nothing is stored in repo secrets.
-      - run: npm install -g npm@latest
+      #
+      # Pinned rather than `latest`, because `latest` means "whatever was
+      # published to npm minutes ago, executed inside the one job that can
+      # publish this package". Dependabot does not read version numbers out of a
+      # run: script, so this one is bumped by hand — deliberately, since
+      # dispatching a release is already a deliberate act and this file is part
+      # of what gets read when it happens.
+      - run: npm install -g npm@12.0.2
       - name: Publish with provenance
         if: ${{ github.event.inputs.confirm == 'publish' }}
         run: npm publish --access public --provenance
@@ -120,6 +154,117 @@ jobs:
             git tag -a "v${VERSION}" -m "release ${VERSION}"
             git push origin "v${VERSION}"
           fi
+      # ── the release artefact ─────────────────────────────────────────────
+      #
+      # A release page that offers a tarball is only useful if that tarball is
+      # the one on npm, so the asset is fetched from the registry rather than
+      # rebuilt here.
+      #
+      # Rebuilding was the first attempt and it is wrong. `npm pack` is not
+      # byte-reproducible across environments — file modes, line endings and the
+      # gzip implementation all differ — and packing this repository at 0.2.33 on
+      # a second machine produced a different sha512 from the published one while
+      # every shipped file matched the tag. A rebuilt asset would therefore be a
+      # lookalike of the release, published under the release's name, with an
+      # attestation covering the lookalike. Downloading removes the assumption
+      # instead of testing it.
+      #
+      # The digest is still checked, because a download can be truncated or
+      # intercepted, and it is read from the registry rather than restated here.
+      - name: Fetch the published artefact and check its digest
+        id: artefact
+        if: ${{ github.event.inputs.confirm == 'publish' }}
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+          SLUG="$(node -p "require('./package.json').name.replace('@','').replace('/','-')")"
+          TARBALL="${RUNNER_TEMP}/${SLUG}-${VERSION}.tgz"
+          # The registry needs a moment to serve a version it has just accepted.
+          URL=""; EXPECTED=""
+          for _ in 1 2 3 4 5; do
+            URL="$(npm view "${PKG}@${VERSION}" dist.tarball 2>/dev/null || true)"
+            EXPECTED="$(npm view "${PKG}@${VERSION}" dist.integrity 2>/dev/null || true)"
+            [ -n "$URL" ] && [ -n "$EXPECTED" ] && break
+            sleep 5
+          done
+          if [ -z "$URL" ] || [ -z "$EXPECTED" ]; then
+            echo "::error::npm did not report a tarball and integrity digest for ${PKG}@${VERSION}"
+            exit 1
+          fi
+          curl -sSLf -o "$TARBALL" "$URL"
+          ACTUAL="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | base64 -w0)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::the downloaded tarball does not match the digest npm reports"
+            echo "  downloaded: $ACTUAL"
+            echo "  published:  $EXPECTED"
+            exit 1
+          fi
+          echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
+          echo "sbom=${RUNNER_TEMP}/${SLUG}-${VERSION}.cdx.json" >> "$GITHUB_OUTPUT"
+          echo "provenance=${RUNNER_TEMP}/${SLUG}-${VERSION}.tgz.intoto.jsonl" >> "$GITHUB_OUTPUT"
+          echo "the release asset is the published package (${EXPECTED})"
+      # A governance product that cannot say what it is built from is asking its
+      # buyers for more trust than it gives.
+      #
+      # Read from the lockfile rather than the installed tree. `npm ci` installs
+      # exactly the lockfile, so on this runner the two agree and the bill of
+      # materials names the versions this release was built and tested against —
+      # but the tree mode refuses to emit anything at all when an installed
+      # version drifts from its declared range, which turns a documentation step
+      # into a way to fail a release that has already published.
+      - name: Software bill of materials
+        if: ${{ github.event.inputs.confirm == 'publish' }}
+        run: |
+          set -euo pipefail
+          npm sbom --sbom-format cyclonedx --sbom-type library --omit dev --package-lock-only \
+            > "${{ steps.artefact.outputs.sbom }}"
+          node -e "
+            const s = require(process.argv[1])
+            if (!s.components?.length) { console.error('sbom has no components'); process.exit(1) }
+            console.log('sbom:', s.components.length, 'components,', s.bomFormat, s.specVersion)
+          " "${{ steps.artefact.outputs.sbom }}"
+      # npm's own provenance is written to the registry and its transparency log
+      # by `npm publish --provenance` above, and is verified with `npm audit
+      # signatures`. This is a second, separate attestation over the same bytes,
+      # written to GitHub's attestation store — which is the store `gh
+      # attestation verify` reads, and the reason that command used to answer 404
+      # for this package. The bundle is attached to the release so the claim can
+      # also be checked offline, without either service.
+      - name: Attest the release artefact
+        id: attest
+        if: ${{ github.event.inputs.confirm == 'publish' }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.artefact.outputs.tarball }}
+      - name: Create the GitHub release
+        if: ${{ github.event.inputs.confirm == 'publish' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          cp "${{ steps.attest.outputs.bundle-path }}" "${{ steps.artefact.outputs.provenance }}"
+          # A re-dispatch after a downstream failure must not fail here on a
+          # release that already exists — it should complete it.
+          if gh release view "v${VERSION}" > /dev/null 2>&1; then
+            gh release edit "v${VERSION}" \
+              --title "$(cat "$RUNNER_TEMP/title.txt")" \
+              --notes-file "$RUNNER_TEMP/notes.md"
+            gh release upload "v${VERSION}" --clobber \
+              "${{ steps.artefact.outputs.tarball }}" \
+              "${{ steps.artefact.outputs.sbom }}" \
+              "${{ steps.artefact.outputs.provenance }}"
+          else
+            gh release create "v${VERSION}" \
+              --title "$(cat "$RUNNER_TEMP/title.txt")" \
+              --notes-file "$RUNNER_TEMP/notes.md" \
+              "${{ steps.artefact.outputs.tarball }}" \
+              "${{ steps.artefact.outputs.sbom }}" \
+              "${{ steps.artefact.outputs.provenance }}"
+          fi
+          gh release view "v${VERSION}" --json assets \
+            --jq '.assets[] | "  asset: \(.name) (\(.size) bytes)"'
       # The registry stores metadata, not artefacts, so it runs after npm has
       # the package: it checks that the published tarball's mcpName matches
       # server.json before it will accept the server. github-oidc reuses this

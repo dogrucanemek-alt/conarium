@@ -29,6 +29,7 @@ export const CHECKS = [
   'test/claim_source.mjs',
   'test/version_claim.mjs',
   'test/release_record.mjs',
+  'test/release_notes.mjs',
   'test/bin_claims.mjs',
   'test/console_cli.mjs',
   'test/console_policy.mjs',
@@ -67,7 +68,7 @@ export const CHECKS = [
   'test/gacs_case_schema.mjs',
   'test/gacs_regime.mjs',
   'test/gacs_run.mjs',
-  'test/gacs_ci_pin.mjs',
+  'test/workflow_pins.mjs',
   'test/standards_claim.mjs',
 ]
 

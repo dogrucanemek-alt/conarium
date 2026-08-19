@@ -1,8 +1,18 @@
 # Conarium — self-hosted MCP governance server
 # Multi-stage: build with the full toolchain, ship only the runtime.
+#
+# The base image is pinned by digest, not by tag. `node:20-slim` is a moving
+# reference: the same Dockerfile built twice can produce two different images,
+# so what a reader verified is not necessarily what they ran. A digest names one
+# image and nothing else.
+#
+# A pin that nobody advances is a stale base image with unpatched CVEs, which is
+# worse than the tag it replaced. The digest is therefore an update channel, not
+# a freeze: .github/dependabot.yml watches the `docker` ecosystem for this file
+# and opens the bump as a reviewable pull request.
 
 # --- build stage ---
-FROM node:20-slim AS build
+FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -11,7 +21,7 @@ COPY src ./src
 RUN npm run build            # tsc -> dist/
 
 # --- runtime stage ---
-FROM node:20-slim AS runtime
+FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package*.json ./
