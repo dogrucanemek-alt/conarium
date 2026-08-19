@@ -59,9 +59,10 @@ If a version has **no** attestation, it was not published through this workflow
 
 ## What a release page carries
 
-From 0.2.34 the publish workflow attaches three files to the GitHub release, and
-whether a given version has them is answered by looking at its release page
-rather than by this paragraph:
+The publish workflow is **configured** to attach three files to the GitHub
+release. Those steps have not run yet — 0.2.34 is the first release that will
+execute them — so read the list below as what the workflow is set up to produce,
+and the release page as the answer to whether it did:
 
 | Asset | What it is |
 |---|---|
@@ -75,10 +76,11 @@ implementation differ — so a rebuilt asset can be a lookalike of the release
 rather than the release. Its sha512 is checked against the registry's
 `dist.integrity` before anything is attested or uploaded.
 
-⛔ **The `gh` command above works only for versions whose release page carries
-that `.intoto.jsonl` asset.** That attestation is a second one, written to
-GitHub's store; it does not replace npm's, and versions published before 0.2.34
-have only npm's. For those, the 404 explanation above still applies.
+⛔ **The `gh` command below works only for versions whose release page actually
+carries that `.intoto.jsonl` asset** — check the page first, do not assume from
+the version number. That attestation is a second one, written to GitHub's store;
+it does not replace npm's, and every version published so far has only npm's.
+For those, the 404 explanation above still applies.
 
 ```bash
 # only for a version whose release page lists the .intoto.jsonl asset
