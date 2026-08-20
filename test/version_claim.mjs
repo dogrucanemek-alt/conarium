@@ -78,19 +78,49 @@ if (existsSync(serverPath)) {
   )
 }
 
-let tagged = true
+function originHasTag(tagName) {
+  const out = execFileSync('git', ['ls-remote', '--tags', 'origin', `refs/tags/${tagName}`], {
+    cwd: root,
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim()
+  if (!out) return false
+  return out.split('\n').some((line) => {
+    const ref = line.split(/[\t ]/).pop()
+    return ref === `refs/tags/${tagName}` || ref === `refs/tags/${tagName}^{}`
+  })
+}
+
+let taggedOnOrigin
+try {
+  taggedOnOrigin = originHasTag(tag)
+} catch {
+  // Asking the remote is the question. If the network is down, we did not
+  // answer it — print SKIP rather than look like a pass.
+  console.log(`SKIP version claim: origin unreachable — cannot ask whether ${tag} exists`)
+  process.exit(0)
+}
+
+if (!taggedOnOrigin) {
+  // Nothing has been published under this number, so the number contradicts
+  // nothing. This is the normal state while a release is being prepared.
+  console.log(`version claim: ${version} is not tagged on origin — nothing published to contradict`)
+  process.exit(0)
+}
+
+let taggedLocally = true
 try {
   run('git', ['rev-parse', '--verify', `refs/tags/${tag}`])
 } catch {
-  tagged = false
+  taggedLocally = false
 }
 
-if (!tagged) {
-  // Nothing has been published under this number, so the number contradicts
-  // nothing. This is the normal state while a release is being prepared.
-  console.log(`version claim: ${version} is not tagged yet — nothing published to contradict`)
-  process.exit(0)
-}
+assert.ok(
+  taggedLocally,
+  `origin has ${tag}, but this clone does not.\n` +
+    `  A missing local tag used to look like an unpublished version.\n` +
+    `  Fetch the tag before asking whether ${version} still matches what was shipped.\n`,
+)
 
 // What npm would actually ship, asked of npm rather than restated here.
 const shipped = new Set(npmPackFileList())
