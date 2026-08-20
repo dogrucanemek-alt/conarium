@@ -1,7 +1,7 @@
 <div align="center">
   <h1>Conarium</h1>
   <p><strong>The Third Eye for Your Company's Data.</strong></p>
-  <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data under a policy you write—protected values masked before they leave—and hands you a signed, independently verifiable receipt of every access it mediates.</p>
+  <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data under a policy you write—protected values masked before they leave. When a receipt sink is configured it writes a signed, independently verifiable receipt of every access it mediates; <code>conarium-init</code> sets that sink, so the default layout does.</p>
   
   <p>
     <a href="https://www.npmjs.com/package/@conarium-ai/core"><img src="https://img.shields.io/npm/v/@conarium-ai/core?style=for-the-badge" alt="npm" /></a>

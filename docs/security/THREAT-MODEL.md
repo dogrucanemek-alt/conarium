@@ -100,10 +100,20 @@ Pending OpenTimestamps is disclosed as `pending`. Bitcoin upgrade is hours later
 - A shorter leftover chain still verifies. That is structural, not a bug.
 - Anchor calendars and `blockstream.info` are third parties. Unreachable →
   exit 15 ("could not check"), not exit 0.
-- Two OS processes writing the same audit/receipt sink have no file lock.
-  In-process concurrent `log()` is synchronous and keeps the chain (measured:
-  50 queries, 0 `prevHash` breaks). Same-millisecond writers across processes
-  can fork the chain. Single-process installs are the supported shape.
+- The audit sink lock is taken at construct when `sink` is set. The receipt
+  sink was not: receipt-only installs, and two processes with different audit
+  sinks sharing one receipt file, could fork `seq` / `prevHash`. `log()` now
+  takes every sink path it will write, in lexicographic path order, and
+  reloads the receipt tail under that lock (see `src/audit.ts`). In-process
+  concurrent `log()` is still synchronous (measured: 50 queries, 0 `prevHash`
+  breaks). Cross-process writers of the same file are serialized; a lock wait
+  that times out throws and fail-closes. A lock file whose owner pid cannot be
+  read is honoured, not stolen, until it is 30s old — the window between
+  creating a lock and writing the pid into it is otherwise long enough for two
+  live writers to claim one sink. The bounded cost is the inverse case: a
+  process that dies inside that same window blocks its sink, and therefore
+  access, for those 30s. Same-file writers that do not go through `Audit.log`
+  (a hand-edited append, a second implementation) are still unsupported.
 
 ## Out of scope — the operator
 

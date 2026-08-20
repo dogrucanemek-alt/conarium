@@ -71,6 +71,7 @@ export const CHECKS = [
   'test/workflow_pins.mjs',
   'test/publish_modes.mjs',
   'test/standards_claim.mjs',
+  'test/datatracker_draft_status.mjs',
 ]
 
 export function runChecks({ files = CHECKS, cwd = root, spawn = spawnSync } = {}) {
