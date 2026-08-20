@@ -1,0 +1,12 @@
+{
+  "step2": {
+    "attributed": ["invoices", "labs", "patients"],
+    "observed-without-receipt": ["vitals"],
+    "indeterminate": []
+  },
+  "step3": {
+    "attributed": ["invoices"],
+    "observed-without-receipt": ["vitals"],
+    "indeterminate": ["labs", "patients"]
+  }
+}
