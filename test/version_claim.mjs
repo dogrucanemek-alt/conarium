@@ -47,7 +47,9 @@ function npmPackFileList() {
   return entry.files.map((f) => f.path.replace(/\\/g, '/'))
 }
 
-const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8')).version
+const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'))
+const version = pkg.version
+const pkgName = pkg.name
 const tag = `v${version}`
 
 // ── the same number, declared a second time ──────────────────────────────────
@@ -91,6 +93,23 @@ function originHasTag(tagName) {
   })
 }
 
+function npmHasVersion(name, ver) {
+  try {
+    const out = execFileSync(`npm view --silent "${name}@${ver}" version`, {
+      cwd: root,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: true,
+      timeout: 15_000,
+    }).trim()
+    return out === ver
+  } catch (err) {
+    const text = `${err.stderr || ''}\n${err.message || ''}`
+    if (/E404|404 Not Found|not found/i.test(text)) return false
+    throw err
+  }
+}
+
 let taggedOnOrigin
 try {
   taggedOnOrigin = originHasTag(tag)
@@ -99,6 +118,22 @@ try {
   // answer it — print SKIP rather than look like a pass.
   console.log(`SKIP version claim: origin unreachable — cannot ask whether ${tag} exists`)
   process.exit(0)
+}
+
+let onNpm
+try {
+  onNpm = npmHasVersion(pkgName, version)
+} catch {
+  console.log(`SKIP version claim: npm registry unreachable — cannot ask whether ${version} is published`)
+  process.exit(0)
+}
+
+if (onNpm && !taggedOnOrigin) {
+  assert.fail(
+    `npm has ${pkgName}@${version}, and origin has no ${tag}.\n` +
+      `  The number is already a published package. A missing repository tag is how\n` +
+      `  a later commit kept the same number and nobody could see it.\n`,
+  )
 }
 
 if (!taggedOnOrigin) {
