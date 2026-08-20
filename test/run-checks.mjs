@@ -75,6 +75,7 @@ export const CHECKS = [
   'test/workflow_pins.mjs',
   'test/publish_modes.mjs',
   'test/standards_claim.mjs',
+  'test/implementation_status.mjs',
   'test/datatracker_draft_status.mjs',
   'test/proof_route_error_body.mjs',
   'test/proof_anchor_atomic_write.mjs',
