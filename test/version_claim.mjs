@@ -100,6 +100,7 @@ function npmHasVersion(name, ver) {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: true,
+      timeout: 15_000,
     }).trim()
     return out === ver
   } catch (err) {
