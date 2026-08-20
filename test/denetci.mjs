@@ -46,7 +46,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { SURFACES } from './claim_surfaces.mjs'
+import { SURFACES, isUnlistedDoc } from './claim_surfaces.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -58,34 +58,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
  * for documents that changed and are deliberately not read as promises.
  */
 
-/** Documents that changed and are deliberately not read as promises. */
-const NOT_CLAIM_SURFACES = {
-  'CHANGELOG.md': 'a record of what happened, not a promise about what the product does',
-  'AGENTS.md': 'instructions to a contributor, not published to a reader',
-  'PROJECT_CONTEXT.md': 'internal orientation, not published to a reader',
-  'CONTRIBUTING.md': 'instructions to a contributor, not a promise about the product',
-  'docs/security/best-practices-badge.md':
-    'draft answers kept for provenance; the filed answers live at bestpractices.dev/projects/14160',
-  'docs/security/scorecard-repo-settings.md':
-    'a task list for someone with repo admin, not a statement about the product',
-}
-
 /**
- * Working records: written to be superseded. A promise does not live here.
- * Named as directories rather than inferred from depth — the depth rule is what
- * let `docs/security/THREAT-MODEL.md` sit in neither list.
+ * NOT_CLAIM_SURFACES, WORKING_RECORD_DIRS and isUnlistedDoc live in
+ * claim_surfaces.mjs beside the surface list itself. What counts as a claim
+ * surface is one question; answering half of it here and half there is the
+ * shape that produced the drift that file exists to end.
  */
-const WORKING_RECORD_DIRS = [
-  'docs/audit/',
-  'docs/benchmarks/',
-  'docs/claims/',
-  'docs/dogfood/',
-  'docs/plans/',
-  'docs/releases/',
-  'docs/reviews/',
-  'docs/specs/',
-  'docs/superpowers/',
-]
 
 /**
  * Not docs/audit/. `.gitignore` carries `audit/` to keep receipt chains — which
@@ -148,34 +126,14 @@ function surfaceHash(rev) {
   return { hash: `sha256:${h.digest('hex')}`, present, absent }
 }
 
-/**
- * A changed document that nobody decided about.
- *
- * Depth used to do the filtering — top level, or one level under docs/. That
- * rule reads as a description of where promises live, but it is a description
- * of where this function happens to look, and the two came apart in
- * `docs/security/`: `NPM-PROVENANCE.md` was on the surface list because someone
- * put it there by hand, and `THREAT-MODEL.md` beside it was on neither list
- * with nothing to say so. A file cannot fall out of the review by being stored
- * one directory deeper. Working records are named instead, so a new document
- * anywhere under docs/ (or a new standards claim) has to be decided about.
- */
+/** The changed documents nobody decided about. The rule is in claim_surfaces.mjs. */
 function unlistedDocs(base, head) {
   const changed = git(['diff', '--name-only', base, head])
     .split('\n')
     .map((p) => p.trim().split('\\').join('/'))
     .filter(Boolean)
   const listed = new Set(SURFACES)
-  return changed.filter(
-    (p) =>
-      !listed.has(p) &&
-      !(p in NOT_CLAIM_SURFACES) &&
-      !WORKING_RECORD_DIRS.some((d) => p.startsWith(d)) &&
-      // A posted Internet-Draft is immutable; its text is reviewed at
-      // submission, and the repo copy exists so the two can be compared.
-      !/^standards\/draft-/.test(p) &&
-      (/^[^/]+\.(md|html)$/.test(p) || /^docs\/.+\.md$/.test(p) || /^standards\/.+\.md$/.test(p)),
-  )
+  return changed.filter((p) => isUnlistedDoc(p, listed))
 }
 
 const PROMPT = `
