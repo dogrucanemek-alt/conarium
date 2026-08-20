@@ -1,0 +1,7 @@
+{
+  "v": "conarium-mapping-profile/0.1",
+  "version": "1",
+  "exclusions": [
+    { "id": "infra-query", "version": "1" }
+  ]
+}

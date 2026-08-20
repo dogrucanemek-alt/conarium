@@ -535,18 +535,24 @@ export function projectResultV2(result, ctx) {
     if (outcome !== 'matched') items.push({ outcome, ...extra })
   }
 
-  const exclusionIds = new Set((profile?.exclusions || []).map((e) => e.id))
+  const declaredExclusions = profile?.exclusions || []
+  const exclusionIds = new Set(declaredExclusions.map((e) => e.id))
+  const exclusionBoundDeclared = declaredExclusions.length > 0
 
   for (const d of result.infrastructure) {
     const id = infraRuleId(d.query)
-    if (profile && !exclusionIds.has(id)) {
+    if (!profile) {
+      push('indeterminate', { pattern: patternDigest(d.query), reason: 'exclusion-undeclared' })
+      continue
+    }
+    if (!exclusionIds.has(id)) {
       push('indeterminate', { pattern: patternDigest(d.query), reason: 'exclusion-not-in-profile' })
       continue
     }
-    const declared = profile?.exclusions.find((e) => e.id === id)
+    const declared = declaredExclusions.find((e) => e.id === id)
     push('excluded', {
       pattern: patternDigest(d.query),
-      rule: { id, version: declared?.version ?? 'hardcoded' },
+      rule: { id, version: declared.version },
     })
   }
 
@@ -612,7 +618,7 @@ export function projectResultV2(result, ctx) {
     bounds: {
       multiplicity: max != null ? 'operator-declared' : 'undeclared',
       skew: result.clocks.declaredSkewMs !== null ? 'operator-declared' : 'undeclared',
-      exclusion: profile ? 'operator-declared' : 'undeclared',
+      exclusion: exclusionBoundDeclared ? 'operator-declared' : 'undeclared',
     },
     outcome: exceptions ? 'exceptions' : 'no-exceptions',
     items,

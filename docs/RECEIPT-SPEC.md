@@ -332,9 +332,11 @@ SCITT registration of the `/2` object are out of scope for this version.
 Without a Mapping Profile (`--profile`), `/2` sets `profile` to `null`.
 Every item whose outcome depends on a multiplicity bound is then
 `indeterminate`, an unattributed pattern is `indeterminate` rather than
-`observed-without-receipt`, hard-coded infrastructure exclusions are
-declared `undeclared` in `bounds`, and `receipted-without-observation`
-makes `outcome` `exceptions`.
+`observed-without-receipt`, an infrastructure pattern is `indeterminate`
+rather than `excluded` (`bounds.exclusion` is `undeclared` — an undeclared
+bound does not decide), and `receipted-without-observation` makes
+`outcome` `exceptions`. `bounds.exclusion` is `operator-declared` only
+when the profile lists at least one exclusion rule.
 
 ### The window straddles two clocks
 

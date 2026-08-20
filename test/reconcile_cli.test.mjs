@@ -576,17 +576,64 @@ describe('coverage-reconciliation/2 projection', () => {
     expect(v2.outcome).toBe('exceptions')
   })
 
-  it('infrastructure is excluded; without a profile the bound is undeclared', () => {
+  it('profile null: infrastructure is indeterminate, not excluded', () => {
     const result = reconcile(
       snap(T0, []),
       snap(T1, [{ queryid: '1', query: 'SET search_path TO public', calls: 1 }]),
       [],
     )
     const v2 = projectResultV2(result, ctx)
-    expect(v2.counts.excluded).toBe(1)
-    expect(v2.items[0].rule.id).toBe('infra-query')
+    expect(v2.profile).toBeNull()
+    expect(v2.counts.excluded).toBe(0)
+    expect(v2.counts.indeterminate).toBe(1)
+    expect(v2.items[0].outcome).toBe('indeterminate')
+    expect(v2.items[0].reason).toBe('exclusion-undeclared')
+    expect(v2.items[0].rule).toBeUndefined()
     expect(v2.bounds.exclusion).toBe('undeclared')
+    expect(v2.outcome).toBe('exceptions')
+  })
+
+  it('a declared exclusion rule can produce excluded / no-exceptions', () => {
+    const result = reconcile(
+      snap(T0, []),
+      snap(T1, [{ queryid: '1', query: 'SET search_path TO public', calls: 1 }]),
+      [],
+    )
+    const v2 = projectResultV2(result, {
+      ...ctx,
+      profile: {
+        version: '1',
+        maxStatementsPerReceipt: null,
+        exclusions: [{ id: 'infra-query', version: '1' }],
+      },
+    })
+    expect(v2.counts.excluded).toBe(1)
+    expect(v2.items[0].outcome).toBe('excluded')
+    expect(v2.items[0].rule).toEqual({ id: 'infra-query', version: '1' })
+    expect(v2.bounds.exclusion).toBe('operator-declared')
     expect(v2.outcome).toBe('no-exceptions')
+  })
+
+  it('profile with no exclusion rules leaves the exclusion bound undeclared', () => {
+    const result = reconcile(
+      snap(T0, []),
+      snap(T1, [{ queryid: '1', query: 'SET search_path TO public', calls: 1 }]),
+      [],
+    )
+    const v2 = projectResultV2(result, {
+      ...ctx,
+      profile: {
+        version: '1',
+        maxStatementsPerReceipt: 8,
+        exclusions: [],
+      },
+    })
+    expect(v2.bounds.exclusion).toBe('undeclared')
+    expect(v2.bounds.multiplicity).toBe('operator-declared')
+    expect(v2.items[0].outcome).toBe('indeterminate')
+    expect(v2.items[0].reason).toBe('exclusion-not-in-profile')
+    expect(v2.counts.excluded).toBe(0)
+    expect(v2.outcome).toBe('exceptions')
   })
 
   it('a declared multiplicity bound can produce matched / no-exceptions', () => {

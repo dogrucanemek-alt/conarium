@@ -1,0 +1,16 @@
+{
+  "id": "reconciliation/v2-neg-undeclared-exclusion",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-set.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-empty.jsonl",
+  "expectOutcome": "exceptions",
+  "expectCounts": { "excluded": 0, "indeterminate": 1 },
+  "expectItemOutcomes": ["indeterminate"],
+  "forbidItemOutcomes": ["excluded"],
+  "rationale": "Negative: session housekeeping with no Mapping Profile. /2 must not exclude — the exclusion bound was never declared. The item is indeterminate; outcome is exceptions.",
+  "doesNotTest": "A profile that does declare the exclusion rule. That is v2-excluded."
+}
