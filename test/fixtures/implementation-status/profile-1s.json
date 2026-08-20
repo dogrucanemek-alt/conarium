@@ -1,0 +1,1 @@
+{"v":"conarium-mapping-profile/0.1","version":"1","multiplicity":{"maxStatementsPerReceipt":8},"exclusions":[{"id":"infra-query","version":"1"}],"clocks":{"observation":"pg_stat_statements","receipt":"gateway","skew":"1s"}}

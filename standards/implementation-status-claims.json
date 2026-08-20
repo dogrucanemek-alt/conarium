@@ -1,0 +1,66 @@
+{
+  "_": [
+    "Every behavioural sentence in the Implementation Status section of the current",
+    "draft, written as something that can be run.",
+    "",
+    "This file is a second declaration of a fact the code already holds, which is",
+    "normally the thing to avoid. It is deliberate here: the draft is a third",
+    "declaration and cannot be executed, so this table exists to be compared against",
+    "both. test/implementation_status.mjs runs each claim against the tool and then",
+    "checks that the sentence in the draft still contains what the run produced.",
+    "",
+    "A red here has two honest fixes: change the code back, or write the revision",
+    "that says what the code now does. Editing a posted draft is not one of them."
+  ],
+  "fixtures": "test/fixtures/implementation-status",
+  "section": "Implementation Status",
+  "bulletsFollow": "The behaviour below was observed on one fixture:",
+  "claims": [
+    {
+      "id": "no-profile",
+      "args": [],
+      "expect": {
+        "profile": null,
+        "bounds": { "multiplicity": "undeclared", "skew": "undeclared", "exclusion": "undeclared" },
+        "itemOutcomes": ["indeterminate", "indeterminate"]
+      },
+      "tokens": ["`profile`", "`null`", "`bounds`", "`undeclared`", "`indeterminate`"]
+    },
+    {
+      "id": "exclusions-without-clocks",
+      "args": ["--profile", "profile-noclocks.json"],
+      "expect": {
+        "bounds": { "skew": "undeclared", "exclusion": "operator-declared" },
+        "itemOutcomes": ["excluded", "indeterminate"],
+        "excludedByRule": "infra-query"
+      },
+      "tokens": ["`bounds.exclusion`", "`operator-declared`", "`bounds.skew`", "`undeclared`"]
+    },
+    {
+      "id": "declared-skew-larger-than-offset",
+      "args": ["--profile", "profile-5s.json"],
+      "expect": {
+        "bounds": { "skew": "operator-declared" },
+        "itemOutcomes": ["excluded", "indeterminate"]
+      },
+      "tokens": ["`clocks.skew`", "`bounds.skew`", "`operator-declared`", "`indeterminate`"]
+    },
+    {
+      "id": "declared-skew-smaller-than-offset",
+      "args": ["--profile", "profile-1s.json"],
+      "expect": {
+        "bounds": { "skew": "operator-declared" },
+        "itemOutcomes": ["excluded", "observed-without-receipt"]
+      },
+      "tokens": ["`clocks.skew`", "`observed-without-receipt`"]
+    },
+    {
+      "id": "conflicting-and-unknown-clock-members",
+      "runs": [
+        { "args": ["--profile", "profile-5s.json", "--skew", "1s"], "exitCode": 20 },
+        { "args": ["--profile", "profile-drift.json"], "exitCode": 20, "mentions": "drift" }
+      ],
+      "tokens": ["`clocks`"]
+    }
+  ]
+}
