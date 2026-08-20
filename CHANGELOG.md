@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.2.37 — 2026-08-20 — a claim with no call site, and the bound that decided anyway
+
+`docs/RECEIPT-SPEC.md` said "Receipts are anchored automatically." Nothing in
+`src/` or `bin/` called the anchor scheduler: `Audit.writeReceipt` emits
+`anchor: null`, and `createAnchorSinkFromEnv`, `maybeAnchor` and
+`appendAnchorSidecar` had no production caller outside their own definitions.
+Anchoring is a manual step — `conarium-stamp` for a document,
+`conarium-anchor-service` for a chain head — and the sentence now says so, in
+`README.md`, `LIMITATIONS.md`, `docs/ARCHITECTURE.md` and the stamp tool's own
+header, which repeated it. The scheduler was not wired: adding an outbound hop to
+the receipt path is a product decision, not a way to make a sentence true.
+`test/anchor_wiring.mjs` refuses an automatic-anchoring claim on a claim surface
+unless a write call exists in `src/` or `bin/`.
+
+`conarium-reconcile` now emits `coverage-reconciliation/2` as a separate object
+(`--json-v2`, `--result-v2 <path>`), alongside the `/1` body and the exit codes,
+which are unchanged. The `/2` object carries `profile`, `bounds`, `outcome`,
+`items` and `counts` as the published draft defines them, and it stops treating
+undeclared bounds as decisions: with no Mapping Profile, a multiplicity-dependent
+item is `indeterminate` rather than `matched`, an unattributed pattern is
+`indeterminate` rather than `observed-without-receipt`, an infrastructure pattern
+is `indeterminate` rather than `excluded`, and a `receipted-without-observation`
+item makes the outcome `exceptions`. A `/1` result is not a `/2` result and the
+two cannot share a body; asking for both at once is an error.
+
+A Mapping Profile (`conarium-mapping-profile/0.1`, `--profile`) declares the
+multiplicity bound, the exclusion rules, and the two clocks: which clock stamps
+the observation window, which stamps receipts, and how far they may differ.
+`clocks.skew` uses the same duration grammar as `--skew` — there is not a second
+one — and if both are present and disagree the run fails rather than picking one,
+because which bound won would be invisible on the result. The field list and its
+encoding are written out in `docs/RECEIPT-SPEC.md` so another specification can
+adopt the shape instead of inventing a second.
+
+The claim-surface list lived in two hand-maintained copies, which is the shape
+that produced most of 0.2.36. It is one file now, `docs/claims/surfaces.json`,
+read by both the review gate and the retracted-phrasing scan, with a stated
+reason per entry and no silent exemptions. `LIMITATIONS.tr.md` was three sections
+short of `LIMITATIONS.md`; the sections were written and a check now compares the
+two by section key, so a limitation cannot reach one language and not the other.
+
 ## 0.2.36 — 2026-08-20 — the lock that could be taken twice
 
 The receipt sink had no lock of its own. `Audit` took one on the audit sink at

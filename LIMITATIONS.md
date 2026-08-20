@@ -246,5 +246,5 @@ named no object at all).
 
 Stamping uses a built-in calendar client (Node `crypto` + HTTPS to the public calendars).
 `javascript-opentimestamps` is not a dependency. The `web3` / `elliptic` / `crypto-js` / `request` / `lodash` tree is not installed.
-Bitcoin confirmation still takes hours; receipts still show `pending` until upgrade.
+Bitcoin confirmation still takes hours; a submitted stamp stays `pending` until upgrade.
 Bitcoin-block verification talks to `blockstream.info`. If that host is unreachable the verifier reports "could not check", not "valid".

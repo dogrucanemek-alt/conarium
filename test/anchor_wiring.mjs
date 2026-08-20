@@ -60,8 +60,11 @@ const AUTOMATIC_CLAIM = [
     why: 'the write path does not stamp; conarium-stamp / conarium-anchor-service do',
   },
   {
-    id: 'receipts-already-pending',
-    re: /receipts already show\s+`?pending`?/i,
+    // "already" was the word this rule was written against, and one file down
+    // the same claim was written with "still" and went out unread. A rule
+    // pinned to a single adverb pins one sentence, not the claim it makes.
+    id: 'receipts-show-pending',
+    re: /receipts?\s+(?:already|still|are)\s+shown?\s+`?pending`?/i,
     why: 'receipts are born with anchor:null; pending appears only after a stamp is submitted',
   },
   {
