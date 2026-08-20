@@ -20,14 +20,32 @@ const listed = new Set(SURFACES)
 const unlisted = (p) => isUnlistedDoc(p, listed)
 
 // ── the case this check exists for ───────────────────────────────────────────
-const NEW_DRAFT = 'standards/draft-dogru-scitt-disclosure-evidence-05.md'
-assert.equal(unlisted(NEW_DRAFT), true, 'a draft revision in the tree has to be decided about')
-
-const supersededRule = (p) => !/^standards\/draft-/.test(p) && unlisted(p)
+// The rule answers "does this path need a decision", not "what is listed
+// today". The list is supplied explicitly here: pinning these two assertions
+// to the live surfaces.json would make them pass or fail on an edit that has
+// nothing to do with the rule — which is what happened the first time this
+// file was written against -05, on the same branch that then listed it.
+const UNDECIDED_DRAFT = 'standards/draft-dogru-scitt-disclosure-evidence-06.md'
+const nothingListed = new Set()
 assert.equal(
-  supersededRule(NEW_DRAFT),
+  isUnlistedDoc(UNDECIDED_DRAFT, nothingListed),
+  true,
+  'a draft revision in the tree has to be decided about',
+)
+
+const supersededRule = (p) => !/^standards\/draft-/.test(p) && isUnlistedDoc(p, nothingListed)
+assert.equal(
+  supersededRule(UNDECIDED_DRAFT),
   false,
   'the rule this replaced answered false here — that is the whole reason it changed',
+)
+
+// Deciding is what silences it. -05 was read and added to the list, so the
+// auditor stops asking about it; the question was answered, not suppressed.
+assert.equal(
+  unlisted('standards/draft-dogru-scitt-disclosure-evidence-05.md'),
+  false,
+  'a draft that was reviewed and listed is read, not flagged',
 )
 
 // ── depth is not the rule ────────────────────────────────────────────────────
