@@ -1,0 +1,7 @@
+stmt_id,object,ts_source
+s1,patients,2026-08-20 10:01:02
+s2,patients,2026-08-20 10:03:01
+s3,labs,2026-08-20 10:04:30
+s4,invoices,2026-08-20 10:06:02
+s5,catalog,2026-08-20 10:08:00
+s6,vitals,2026-08-20 10:09:10

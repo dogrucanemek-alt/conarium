@@ -90,6 +90,11 @@ assert.equal(
   false,
   'working records are written to be superseded',
 )
+assert.equal(
+  unlisted('docs/teaching/method-two-ledgers-one-window.md'),
+  false,
+  'classroom texts are not product promises',
+)
 
 // ── not every changed file is prose ──────────────────────────────────────────
 assert.equal(unlisted('src/audit.ts'), false, 'code is reviewed as code')

@@ -1,0 +1,5 @@
+desk_id,object,ts_desk
+d1,patients,2026-08-20 10:01:00
+d2,patients,2026-08-20 10:03:00
+d3,labs,2026-08-20 10:04:28
+d4,invoices,2026-08-20 10:06:00
