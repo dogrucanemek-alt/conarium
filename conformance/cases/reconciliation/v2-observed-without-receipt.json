@@ -1,0 +1,14 @@
+{
+  "id": "reconciliation/v2-observed-without-receipt",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-1.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-empty.jsonl",
+  "expectOutcome": "exceptions",
+  "expectItemOutcomes": ["observed-without-receipt"],
+  "rationale": "A user-table pattern the database counted, with no naming receipt, is observed-without-receipt. /2 outcome is exceptions.",
+  "doesNotTest": "Cause. Bypass, sink failure, and scope mismatch produce the same item."
+}

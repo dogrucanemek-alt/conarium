@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const RECONCILE = fileURLToPath(new URL('../bin/conarium-reconcile.mjs', import.meta.url))
-const { extractTables, classifyPattern, reconcile } = await import(RECONCILE)
+const { extractTables, classifyPattern, reconcile, projectResultV2, loadMappingProfile, resolveDeclaredSkew } = await import(RECONCILE)
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -507,3 +507,300 @@ describe('an offset larger than the window is not a boundary artefact', () => {
     expect(r.stderr).not.toContain('NOT reported as unreceipted access')
   })
 })
+
+describe('coverage-reconciliation/2 projection', () => {
+  function snap(ts, entries) {
+    return {
+      v: 'conarium-dbsnapshot/0.1',
+      ts,
+      role: 'conarium_c2',
+      source: 'pg_stat_statements',
+      entries: new Map(entries.map((e) => [e.queryid, e])),
+    }
+  }
+
+  const ctx = {
+    snapshotStartRaw: Buffer.from('before'),
+    snapshotEndRaw: Buffer.from('after'),
+    receiptsRaw: Buffer.from('receipts'),
+    profileRaw: Buffer.from('profile'),
+  }
+
+  it('does not change /1 exit codes: five calls, one receipt still exits 0', () => {
+    const { args } = setup({
+      beforeEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }],
+      receipts: [receipt({ objects: ['zion.customers'] })],
+    })
+    expect(run(args).code).toBe(0)
+    const withV2 = run([...args, '--json-v2'])
+    expect(withV2.code).toBe(0)
+    const v2 = JSON.parse(withV2.stdout)
+    expect(v2.v).toBe('coverage-reconciliation/2')
+    expect(v2.profile).toBeNull()
+    expect(v2.bounds.multiplicity).toBe('undeclared')
+    expect(v2.counts.matched).toBe(0)
+    expect(v2.items.every((i) => i.outcome === 'indeterminate')).toBe(true)
+    expect(v2.outcome).toBe('exceptions')
+  })
+
+  it('refuses to mix /1 and /2 in one body', () => {
+    const { args } = setup({
+      beforeEntries: [],
+      afterEntries: [],
+      receipts: [],
+    })
+    const r = run([...args, '--json', '--json-v2'])
+    expect(r.code).toBe(20)
+    expect(r.stderr).toContain('MUST NOT read a /1 result as a /2 result')
+  })
+
+  it('profile null: unattributed is indeterminate, not observed-without-receipt', () => {
+    const result = reconcile(
+      snap(T0, []),
+      snap(T1, [{ queryid: '1', query: 'SELECT $1 + $2', calls: 3 }]),
+      [],
+    )
+    expect(result.unattributed).toHaveLength(1)
+    const v2 = projectResultV2(result, ctx)
+    expect(v2.items.some((i) => i.reason === 'unattributed' && i.outcome === 'indeterminate')).toBe(true)
+    expect(v2.counts['observed-without-receipt']).toBe(0)
+    expect(v2.outcome).toBe('exceptions')
+  })
+
+  it('unobserved becomes receipted-without-observation and forces exceptions', () => {
+    const result = reconcile(snap(T0, []), snap(T1, []), [receipt({ objects: ['zion.customers'] })])
+    expect(result.unobserved).toHaveLength(1)
+    const v2 = projectResultV2(result, ctx)
+    expect(v2.counts['receipted-without-observation']).toBe(1)
+    expect(v2.outcome).toBe('exceptions')
+  })
+
+  it('profile null: infrastructure is indeterminate, not excluded', () => {
+    const result = reconcile(
+      snap(T0, []),
+      snap(T1, [{ queryid: '1', query: 'SET search_path TO public', calls: 1 }]),
+      [],
+    )
+    const v2 = projectResultV2(result, ctx)
+    expect(v2.profile).toBeNull()
+    expect(v2.counts.excluded).toBe(0)
+    expect(v2.counts.indeterminate).toBe(1)
+    expect(v2.items[0].outcome).toBe('indeterminate')
+    expect(v2.items[0].reason).toBe('exclusion-undeclared')
+    expect(v2.items[0].rule).toBeUndefined()
+    expect(v2.bounds.exclusion).toBe('undeclared')
+    expect(v2.outcome).toBe('exceptions')
+  })
+
+  it('a declared exclusion rule can produce excluded / no-exceptions', () => {
+    const result = reconcile(
+      snap(T0, []),
+      snap(T1, [{ queryid: '1', query: 'SET search_path TO public', calls: 1 }]),
+      [],
+    )
+    const v2 = projectResultV2(result, {
+      ...ctx,
+      profile: {
+        version: '1',
+        maxStatementsPerReceipt: null,
+        exclusions: [{ id: 'infra-query', version: '1' }],
+      },
+    })
+    expect(v2.counts.excluded).toBe(1)
+    expect(v2.items[0].outcome).toBe('excluded')
+    expect(v2.items[0].rule).toEqual({ id: 'infra-query', version: '1' })
+    expect(v2.bounds.exclusion).toBe('operator-declared')
+    expect(v2.outcome).toBe('no-exceptions')
+  })
+
+  it('profile with no exclusion rules leaves the exclusion bound undeclared', () => {
+    const result = reconcile(
+      snap(T0, []),
+      snap(T1, [{ queryid: '1', query: 'SET search_path TO public', calls: 1 }]),
+      [],
+    )
+    const v2 = projectResultV2(result, {
+      ...ctx,
+      profile: {
+        version: '1',
+        maxStatementsPerReceipt: 8,
+        exclusions: [],
+      },
+    })
+    expect(v2.bounds.exclusion).toBe('undeclared')
+    expect(v2.bounds.multiplicity).toBe('operator-declared')
+    expect(v2.items[0].outcome).toBe('indeterminate')
+    expect(v2.items[0].reason).toBe('exclusion-not-in-profile')
+    expect(v2.counts.excluded).toBe(0)
+    expect(v2.outcome).toBe('exceptions')
+  })
+
+  it('a declared multiplicity bound can produce matched / no-exceptions', () => {
+    const result = reconcile(
+      snap(T0, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }]),
+      snap(T1, [{ queryid: '1', query: SQL_CUSTOMERS, calls: 11 }]),
+      [receipt({ objects: ['zion.customers'] })],
+    )
+    const v2 = projectResultV2(result, {
+      ...ctx,
+      profile: {
+        version: '1',
+        maxStatementsPerReceipt: 8,
+        exclusions: [
+          { id: 'infra-query', version: '1' },
+          { id: 'infra-schema', version: '1' },
+        ],
+      },
+    })
+    expect(v2.counts.matched).toBe(1)
+    expect(v2.counts.indeterminate).toBe(0)
+    expect(v2.outcome).toBe('no-exceptions')
+    expect(v2.profile.version).toBe('1')
+    expect(v2.bounds.multiplicity).toBe('operator-declared')
+  })
+
+  it('profile clocks.skew without --skew makes bounds.skew operator-declared', () => {
+    const { dir, args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+      receipts: [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    })
+    const profilePath = join(dir, 'profile.json')
+    writeFileSync(
+      profilePath,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { observation: 'pg_stat_statements', receipt: 'gateway', skew: '5s' },
+      }),
+    )
+    const r = run([...args, '--profile', profilePath, '--json-v2'])
+    expect(r.code).toBe(41)
+    const v2 = JSON.parse(r.stdout)
+    expect(v2.bounds.skew).toBe('operator-declared')
+    expect(v2.items[0].outcome).toBe('indeterminate')
+    expect(v2.items[0].reason).toBe('window-boundary')
+  })
+
+  it('a profile that omits clocks leaves bounds.skew undeclared', () => {
+    const { dir, args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+      receipts: [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    })
+    const profilePath = join(dir, 'profile.json')
+    writeFileSync(profilePath, JSON.stringify({ v: 'conarium-mapping-profile/0.1', version: '1' }))
+    const r = run([...args, '--profile', profilePath, '--json-v2'])
+    const v2 = JSON.parse(r.stdout)
+    expect(v2.profile).not.toBeNull()
+    expect(v2.bounds.skew).toBe('undeclared')
+    expect(v2.items[0].outcome).toBe('indeterminate')
+  })
+
+  it('--skew and clocks.skew that parse to the same milliseconds are one declaration', () => {
+    const { dir, args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+      receipts: [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    })
+    const profilePath = join(dir, 'profile.json')
+    writeFileSync(
+      profilePath,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { observation: 'pg_stat_statements', receipt: 'gateway', skew: '5s' },
+      }),
+    )
+    const r = run([...args, '--profile', profilePath, '--skew', '5000', '--json-v2'])
+    expect(r.code).toBe(41)
+    expect(JSON.parse(r.stdout).bounds.skew).toBe('operator-declared')
+  })
+
+  it('--skew and clocks.skew that disagree fail rather than pick one', () => {
+    const { dir, args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+      receipts: [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    })
+    const profilePath = join(dir, 'profile.json')
+    writeFileSync(
+      profilePath,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { observation: 'pg_stat_statements', receipt: 'gateway', skew: '5s' },
+      }),
+    )
+    const r = run([...args, '--profile', profilePath, '--skew', '2s', '--json-v2'])
+    expect(r.code).toBe(20)
+    expect(r.stderr).toContain('conflicts with Mapping Profile clocks.skew')
+    expect(r.stderr).toContain('will not pick one')
+  })
+
+  it('--json /1 body still carries conarium-reconcile/0.1, never /2', () => {
+    const { args } = setup({
+      beforeEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 15 }],
+      receipts: [receipt({ objects: ['zion.customers'] })],
+    })
+    const r = run([...args, '--json'])
+    expect(r.code).toBe(0)
+    const body = JSON.parse(r.stdout)
+    expect(body.v).toBe('conarium-reconcile/0.1')
+    expect(body.ok).toBe(true)
+    expect(body.reconciled.length).toBe(1)
+  })
+})
+
+describe('Mapping Profile clocks', () => {
+  it('resolveDeclaredSkew treats equal millisecond values as one declaration', () => {
+    expect(resolveDeclaredSkew(5000, 5000)).toEqual({ skewMs: 5000 })
+    expect(resolveDeclaredSkew(5000, null)).toEqual({ skewMs: 5000 })
+    expect(resolveDeclaredSkew(null, 5000)).toEqual({ skewMs: 5000 })
+    expect(resolveDeclaredSkew(null, null)).toEqual({ skewMs: null })
+  })
+
+  it('resolveDeclaredSkew refuses a silent pick when the two declarations differ', () => {
+    const r = resolveDeclaredSkew(2000, 5000)
+    expect(r.error).toMatch(/will not pick one/)
+    expect(r.skewMs).toBeUndefined()
+  })
+
+  it('loadMappingProfile reads the three clock fields and the same duration grammar as --skew', () => {
+    const dir = tmpDir()
+    const path = join(dir, 'p.json')
+    writeFileSync(
+      path,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { observation: 'pg_stat_statements', receipt: 'gateway', skew: '5s' },
+      }),
+    )
+    const loaded = loadMappingProfile(path)
+    expect(loaded.error).toBeUndefined()
+    expect(loaded.profile.clocks).toEqual({
+      observation: 'pg_stat_statements',
+      receipt: 'gateway',
+      skew: '5s',
+      skewMs: 5000,
+    })
+  })
+
+  it('loadMappingProfile rejects an unknown clocks field rather than ignore it', () => {
+    const dir = tmpDir()
+    const path = join(dir, 'p.json')
+    writeFileSync(
+      path,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { window: 'pg_stat_statements' },
+      }),
+    )
+    expect(loadMappingProfile(path).error).toMatch(/unknown field "window"/)
+  })
+})
+

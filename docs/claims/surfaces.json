@@ -1,0 +1,115 @@
+{
+  "_comment": "Single source for the claim-surface list. test/denetci.mjs and test/claim_discipline.mjs both read this file. A second copy of the list is how a document became a promise that nobody was assigned to read. phrasing=false is an exemption from retracted-phrasing scan and requires phrasingWhy. phrasing=true is not a silent default — every entry states it.",
+  "surfaces": [
+    {
+      "path": "README.md",
+      "why": "Published front page. A reader takes the opening sentences as a promise about what the package does.",
+      "phrasing": true
+    },
+    {
+      "path": "README.tr.md",
+      "why": "Turkish front page. The same promise surface in the other language; it may be absent from a given tree.",
+      "phrasing": true
+    },
+    {
+      "path": "SECURITY.md",
+      "why": "Security promises: outbound calls, countersigning, what is and is not operated.",
+      "phrasing": true
+    },
+    {
+      "path": "LIMITATIONS.md",
+      "why": "The measured-limits surface. A missing limit is itself a claim: the English reader is told something the other language is not.",
+      "phrasing": true
+    },
+    {
+      "path": "LIMITATIONS.tr.md",
+      "why": "Turkish measured-limits surface. The SOC 2 answer failed to reach this file in 0.2.26 for exactly this reason.",
+      "phrasing": true
+    },
+    {
+      "path": "docs.html",
+      "why": "Website documentation page. Not in the tarball; a reader of conarium.dev still takes it as a promise.",
+      "phrasing": true
+    },
+    {
+      "path": "dpa.html",
+      "why": "Data-processing terms a reader can treat as a legal promise.",
+      "phrasing": true
+    },
+    {
+      "path": "terms.html",
+      "why": "Terms of use. A promise surface even though it is not in the npm tarball.",
+      "phrasing": true
+    },
+    {
+      "path": "privacy.html",
+      "why": "Privacy page. The 2026-08-17 overclaim ('never receive, see, or store your data') lived here.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "why": "Names the outbound connections and the request path. A reader auditing traffic starts here.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/RECEIPT-SPEC.md",
+      "why": "The receipt-format contract. Exit codes, field meanings, and anchoring mood are taken as specification.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/API-STABILITY.md",
+      "why": "States which flags and exit codes are candidate-stable. A reader pins a script to this page.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/CONTRIBUTING.md",
+      "why": "Tells a contributor what the project claims to require. Not a product promise to a customer, but it is public and it is read.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/COUNTERSIGN.md",
+      "why": "Documents the countersigning endpoint a reader is told to run. The missing bin-registration of conarium-anchor-service lived next to this page.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/BENCHMARK.md",
+      "why": "Publishes numbers. A number without a method is a claim; a number with a method is still a claim about what was measured.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/PRIOR-ART.md",
+      "why": "States what was searched and what was not. A reader treating this as legal advice would be wrong; a reader treating the search record as a search record must still get a current one.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/CONSENT-BINDING-SPEC.md",
+      "why": "A specification page. Field names and binding rules are taken as the format.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/security/THREAT-MODEL.md",
+      "why": "Two levels down, and for five days that was enough to hide it. The sentence 'two OS processes … have no file lock' stayed in the tree after the audit sink got a lock, because unlistedDocs only looked one level under docs/ and nothing ever asked why this file was absent from both lists.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/security/PENTEST-SCOPE.md",
+      "why": "States that no independent pentest is on file. That is a claim with an expiry date attached to an event we intend to cause.",
+      "phrasing": true
+    },
+    {
+      "path": "standards/README.md",
+      "why": "Not in the tarball, public on GitHub, and the place a reader checks what we say our IETF standing is. It carried '-04 has not been submitted' for two days after -04 was posted.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/PRICING.md",
+      "why": "Ships in the tarball and states a price, a refund window and what each tier delivers. It arrived in 0.2.31 unlisted, and the review that listed it found the Button column pointing at a checkout route that redirects to the waitlist form — a promise surface that no reader was assigned.",
+      "phrasing": true
+    },
+    {
+      "path": "docs/security/NPM-PROVENANCE.md",
+      "why": "Ships in the tarball and tells a reader how to check where the package came from. Unlisted until 0.2.33, by which point it had gone stale in the worst direction: it said 'this is not a published release' inside eight published releases, and pointed at a verification command that answers 404 for npm provenance. A page about how to distrust us is one a reader must be able to trust.",
+      "phrasing": true
+    }
+  ]
+}

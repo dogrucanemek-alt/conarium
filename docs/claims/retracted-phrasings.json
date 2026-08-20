@@ -90,6 +90,13 @@
       "use": "a field longer than policy.scanCharCap is replaced whole with [MASKED_PII], even when it contains no identifier"
     },
     {
+      "id": "anchored-automatically",
+      "re": "anchored automatically",
+      "flags": "i",
+      "why": "Audit.writeReceipt emits anchor:null and does not call the scheduler; stamp and the anchor service are manual",
+      "use": "receipts are not anchored by the write path; stamp a document or run conarium-anchor-service"
+    },
+    {
       "id": "node-18-floor",
       "re": "(?:with\\s+)?node\\s*\\(?\\s*(?:≥|>=)\\s*18\\s*\\)?|engines[^\\n]{0,40}>=\\s*18\\b",
       "flags": "i",

@@ -1,0 +1,15 @@
+{
+  "id": "reconciliation/v2-neg-undeclared-skew",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-1.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers-early.jsonl",
+  "expectOutcome": "exceptions",
+  "expectItemOutcomes": ["indeterminate"],
+  "expectBounds": { "skew": "undeclared" },
+  "rationale": "Negative: no Mapping Profile and no --skew. bounds.skew is undeclared. The item whose only naming receipt sits 3s outside the window is indeterminate.",
+  "doesNotTest": "A profile or flag that does declare the bound. That is v2-clocks-declared."
+}

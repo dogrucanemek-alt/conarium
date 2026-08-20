@@ -1,0 +1,15 @@
+{
+  "id": "reconciliation/v2-neg-unattributed",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-unattributed.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-empty.jsonl",
+  "expectOutcome": "exceptions",
+  "expectItemOutcomes": ["indeterminate"],
+  "forbidItemOutcomes": ["observed-without-receipt"],
+  "rationale": "Negative: a counted pattern with no extractable table is indeterminate. It must not share the observed-without-receipt / NOT RECEIPTED class.",
+  "doesNotTest": "Whether the SQL could be attributed by a better parser. The report is about this parser's refusal to guess."
+}

@@ -1,0 +1,1 @@
+{"v":"conarium-receipt/0.3","ts":"2026-08-06T11:00:00.000Z","request":{"tool":"query","target":"zion-rest","argsHash":"sha256:00"},"dataRefs":[{"source":"zion-rest","object":"zion.customers","fieldsRequested":[]}],"policy":{"decision":"allow"},"chain":{"seq":1}}

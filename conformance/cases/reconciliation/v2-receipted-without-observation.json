@@ -1,0 +1,14 @@
+{
+  "id": "reconciliation/v2-receipted-without-observation",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-empty.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers.jsonl",
+  "expectOutcome": "exceptions",
+  "expectItemOutcomes": ["receipted-without-observation"],
+  "rationale": "A receipt that names an object the counters did not increment is receipted-without-observation and makes outcome exceptions. /1 still exits 0.",
+  "doesNotTest": "Whether the receipt is false. A reset, a pooler, and a delayed increment share the shape."
+}

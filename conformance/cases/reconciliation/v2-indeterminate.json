@@ -1,0 +1,14 @@
+{
+  "id": "reconciliation/v2-indeterminate",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-1.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers-early.jsonl",
+  "expectOutcome": "exceptions",
+  "expectItemOutcomes": ["indeterminate"],
+  "rationale": "The only naming receipt sits three seconds outside the window. /2 reports indeterminate. The item is not observed-without-receipt.",
+  "doesNotTest": "Which clock is wrong. The class exists because the tool cannot tell."
+}

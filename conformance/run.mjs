@@ -97,6 +97,56 @@ function resistanceStatusFor(c, empirical, claimsFile) {
   return empirical.denied ? 'ENFORCED' : 'NOT_COVERED'
 }
 
+function runReconcileV2(c) {
+  const bin = join(REPO, 'bin', 'conarium-reconcile.mjs')
+  const args = [
+    bin,
+    '--before', resolve(REPO, c.before),
+    '--after', resolve(REPO, c.after),
+    '--receipts', resolve(REPO, c.receipts),
+    '--json-v2',
+  ]
+  if (c.mappingProfile) args.push('--profile', resolve(REPO, c.mappingProfile))
+  const r = spawnSync(process.execPath, args, { encoding: 'utf8', cwd: REPO, windowsHide: true })
+  let body
+  try {
+    body = JSON.parse((r.stdout || '').trim().split('\n').filter(Boolean).pop() || '')
+  } catch {
+    return { toolFailure: true, detail: `reconcile --json-v2 stdout was not JSON (exit ${r.status}): ${(r.stderr || r.stdout || '').trim()}` }
+  }
+  if (body.v !== 'coverage-reconciliation/2') {
+    return { ok: false, outcome: body.v, detail: `expected v coverage-reconciliation/2, got ${body.v}` }
+  }
+  const reasons = []
+  if (c.expectOutcome && body.outcome !== c.expectOutcome) {
+    reasons.push(`outcome ${body.outcome} != ${c.expectOutcome}`)
+  }
+  if (c.expectCounts) {
+    for (const [k, n] of Object.entries(c.expectCounts)) {
+      if ((body.counts?.[k] ?? 0) !== n) reasons.push(`counts.${k} ${body.counts?.[k]} != ${n}`)
+    }
+  }
+  if (c.expectBounds) {
+    for (const [k, n] of Object.entries(c.expectBounds)) {
+      if (body.bounds?.[k] !== n) reasons.push(`bounds.${k} ${body.bounds?.[k]} != ${n}`)
+    }
+  }
+  const itemOutcomes = (body.items || []).map((i) => i.outcome)
+  if (Array.isArray(c.expectItemOutcomes)) {
+    for (const want of c.expectItemOutcomes) {
+      if (!itemOutcomes.includes(want)) reasons.push(`missing item outcome ${want}`)
+    }
+  }
+  if (Array.isArray(c.forbidItemOutcomes)) {
+    for (const bad of c.forbidItemOutcomes) {
+      if (itemOutcomes.includes(bad) || (bad === 'matched' && (body.counts?.matched ?? 0) > 0)) {
+        reasons.push(`forbidden outcome present: ${bad}`)
+      }
+    }
+  }
+  return { ok: reasons.length === 0, outcome: body.outcome, detail: reasons.join('; ') || null }
+}
+
 function evaluate(c, claimsFile, adapter) {
   const row = {
     id: c.id,
@@ -107,6 +157,15 @@ function evaluate(c, claimsFile, adapter) {
     doesNotTest: c.doesNotTest,
     expectedFail: Boolean(c.expectedFail),
     expectedStatus: c.expectedStatus || null,
+  }
+
+  if ((c.harness || 'query') === 'reconcile-v2') {
+    const v = runReconcileV2(c)
+    if (v.toolFailure) return { ...row, status: 'TOOL_FAILURE', detail: v.detail, unexpected: true }
+    const ok = v.ok
+    const status = label('conformance', conformanceStatus({ ok }))
+    const unexpected = status === 'FAIL' && claimed(claimsFile, c.claim)
+    return { ...row, status, outcome: v.outcome, unexpected, detail: v.detail || null }
   }
 
   if ((c.harness || 'query') === 'verify') {

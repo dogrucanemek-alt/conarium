@@ -1,0 +1,9 @@
+{
+  "v": "conarium-mapping-profile/0.1",
+  "version": "1",
+  "clocks": {
+    "observation": "pg_stat_statements",
+    "receipt": "gateway",
+    "skew": "5s"
+  }
+}

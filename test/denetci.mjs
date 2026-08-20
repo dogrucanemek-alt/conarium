@@ -46,63 +46,17 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { SURFACES } from './claim_surfaces.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /**
- * The documents a reader can take as a promise. Not derived from
- * `npm pack --dry-run`: terms.html, privacy.html, dpa.html and docs.html are
- * not in the tarball at all — they are the website — and the tarball in turn
- * carries ~44 files under docs/ that are plans, specs and past audits, which
- * promise nothing. Deriving this from what ships would drop the surface where
- * the real finding was and add forty that make no claims.
- *
- * A hand-written list drifts, so `input` names any changed document that is not
- * on it. See NOT_CLAIM_SURFACES below.
+ * The documents a reader can take as a promise. The list itself lives in
+ * `docs/claims/surfaces.json` — this file and `claim_discipline.mjs` both
+ * read that file, so a document cannot be a review surface in one and
+ * invisible to phrasing scan in the other. See NOT_CLAIM_SURFACES below
+ * for documents that changed and are deliberately not read as promises.
  */
-const SURFACES = [
-  'README.md',
-  'README.tr.md',
-  'SECURITY.md',
-  'LIMITATIONS.md',
-  'LIMITATIONS.tr.md',
-  'docs.html',
-  'dpa.html',
-  'terms.html',
-  'privacy.html',
-  'docs/ARCHITECTURE.md',
-  'docs/RECEIPT-SPEC.md',
-  'docs/API-STABILITY.md',
-  'docs/CONTRIBUTING.md',
-  'docs/COUNTERSIGN.md',
-  'docs/BENCHMARK.md',
-  'docs/PRIOR-ART.md',
-  'docs/CONSENT-BINDING-SPEC.md',
-  // Two levels down, and for five days that was enough to hide it. The sentence
-  // "two OS processes … have no file lock" stayed in the tree after the audit
-  // sink got a lock, because `unlistedDocs` only looked one level under docs/
-  // and nothing ever asked why this file was absent from both lists.
-  'docs/security/THREAT-MODEL.md',
-  // States that no independent pentest is on file. That is a claim with an
-  // expiry date attached to an event we intend to cause.
-  'docs/security/PENTEST-SCOPE.md',
-  // Not in the tarball, public on GitHub, and the place a reader checks what we
-  // say our IETF standing is. It carried "-04 has not been submitted" for two
-  // days after -04 was posted.
-  'standards/README.md',
-  // Ships in the tarball and states a price, a refund window and what each tier
-  // delivers. It arrived in 0.2.31 unlisted, and the review that listed it found
-  // the Button column pointing at a checkout route that redirects to the
-  // waitlist form — a promise surface that no reader was assigned.
-  'docs/PRICING.md',
-  // Ships in the tarball and tells a reader how to check where the package came
-  // from. Unlisted until 0.2.33, by which point it had gone stale in the worst
-  // direction: it said "this is not a published release" inside eight published
-  // releases, and pointed at a verification command that answers 404 for npm
-  // provenance. A page about how to distrust us is one a reader must be able to
-  // trust.
-  'docs/security/NPM-PROVENANCE.md',
-]
 
 /** Documents that changed and are deliberately not read as promises. */
 const NOT_CLAIM_SURFACES = {
@@ -264,7 +218,7 @@ function cmdInput(base, head) {
   console.log(`# surface-hash ${hash}`)
   for (const p of unlisted) {
     console.log(`# unlisted: ${p} — changed here, not read as a claim surface.`)
-    console.log(`#   Add it to SURFACES in test/denetci.mjs, or record why it is not one.`)
+    console.log(`#   Add it to docs/claims/surfaces.json, or record why it is not one.`)
   }
   console.log()
   console.log(PROMPT)

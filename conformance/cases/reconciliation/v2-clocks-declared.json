@@ -1,0 +1,16 @@
+{
+  "id": "reconciliation/v2-clocks-declared",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-1.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers-early.jsonl",
+  "mappingProfile": "conformance/fixtures/reconciliation/profile-clocks.json",
+  "expectOutcome": "exceptions",
+  "expectItemOutcomes": ["indeterminate"],
+  "expectBounds": { "skew": "operator-declared" },
+  "rationale": "A Mapping Profile that states observation clock, receipt clock, and skew bound makes bounds.skew operator-declared. The 3s-outside receipt stays indeterminate — declaring the bound does not invent a match.",
+  "doesNotTest": "Whether 5s is true of the deployment. A --skew flag that disagrees with the profile. Those are the conflict tests."
+}

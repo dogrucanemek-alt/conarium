@@ -67,19 +67,24 @@
  *   outside the boundary is now indeterminate, not an accusation, and the
  *   report names the skew that would have to be true for it to be one.
  *
- *   `--skew` declares the bound. Without it nothing decides the question, so
- *   nothing is asserted: the pattern is indeterminate and the report says the
- *   bound was never declared. With it, a receipt further out than the bound is
- *   not skew, and the pattern stays unreconciled.
+ *   `--skew` or Mapping Profile `clocks.skew` declares the bound. Without
+ *   either, nothing decides the question, so nothing is asserted: the pattern
+ *   is indeterminate and the report says the bound was never declared. With
+ *   a bound, a receipt further out than it is not skew, and the pattern
+ *   stays unreconciled. If both declarations are present and they disagree,
+ *   the run fails rather than picking one.
  *
  *   Reported for the operator, not resolved for them: this tool cannot tell a
  *   trailing clock from a receipt written late. That is why the class is
  *   "indeterminate" and not "covered".
  */
-import { readFileSync, existsSync } from 'fs'
+import { createHash } from 'crypto'
+import { readFileSync, existsSync, writeFileSync } from 'fs'
 
 const RECONCILE_V = 'conarium-reconcile/0.1'
 const SNAPSHOT_V = 'conarium-dbsnapshot/0.1'
+const RESULT_V2 = 'coverage-reconciliation/2'
+const PROFILE_V = 'conarium-mapping-profile/0.1'
 
 // ─── snapshot loading ────────────────────────────────────────────────────────
 
@@ -401,8 +406,9 @@ export function reconcile(before, after, receipts, opts = {}) {
       // unreceipted access" — an exculpation 23 hours of offset cannot support.
       //
       // The threshold is the window's own length, so it is derived from the
-      // input rather than chosen. A declared --skew is the operator's own
-      // statement about their clocks and outranks it.
+      // input rather than chosen. A declared skew bound (--skew or
+      // Mapping Profile clocks.skew) is the operator's own statement about
+      // their clocks and outranks it.
       const boundaryPlausible = declaredSkewMs !== null || requiredSkewMs <= toMs - fromMs
       indeterminate.push({ ...d, uncoveredTables: names, requiredSkewMs, boundaryPlausible })
     } else {
@@ -445,12 +451,244 @@ export function reconcile(before, after, receipts, opts = {}) {
   }
 }
 
+// ─── /2 projection ───────────────────────────────────────────────────────────
+//
+// A separate object. The /1 JSON and the exit codes are a compatibility
+// contract; a consumer MUST NOT read them as this. Draft
+// draft-dogru-scitt-disclosure-evidence-04 §Result statement.
+
+function sha256Of(buf) {
+  return 'sha256:' + createHash('sha256').update(buf).digest('hex')
+}
+
+function patternDigest(query) {
+  return sha256Of(Buffer.from(String(query), 'utf8'))
+}
+
+/**
+ * Mapping Profile as the draft names it: operator-declared bounds, versioned,
+ * digested. Absent a profile, every multiplicity-dependent item is
+ * indeterminate — this function does not invent a bound of one.
+ */
+export function loadMappingProfile(path) {
+  if (!existsSync(path)) return { error: `profile not found: ${path}` }
+  const raw = readFileSync(path)
+  let obj
+  try {
+    obj = JSON.parse(raw.toString('utf8'))
+  } catch (err) {
+    return { error: `profile is not valid JSON: ${err.message}` }
+  }
+  if (!obj || typeof obj !== 'object') return { error: 'profile: not an object' }
+  if (obj.v !== PROFILE_V) {
+    return { error: `profile: unsupported version ${JSON.stringify(obj.v)} (expected ${PROFILE_V})` }
+  }
+  if (typeof obj.version !== 'string' || !obj.version) {
+    return { error: 'profile: missing version identifier' }
+  }
+  let maxStatementsPerReceipt = null
+  if (obj.multiplicity != null) {
+    if (typeof obj.multiplicity !== 'object') return { error: 'profile: multiplicity must be an object' }
+    const n = obj.multiplicity.maxStatementsPerReceipt
+    if (!Number.isInteger(n) || n < 1) {
+      return { error: 'profile: multiplicity.maxStatementsPerReceipt must be a positive integer' }
+    }
+    maxStatementsPerReceipt = n
+  }
+  const exclusions = []
+  if (obj.exclusions != null) {
+    if (!Array.isArray(obj.exclusions)) return { error: 'profile: exclusions must be an array' }
+    for (const e of obj.exclusions) {
+      if (!e || typeof e.id !== 'string' || !e.id) return { error: 'profile: exclusion missing id' }
+      if (typeof e.version !== 'string' || !e.version) return { error: 'profile: exclusion missing version' }
+      exclusions.push({ id: e.id, version: e.version })
+    }
+  }
+  const clocks = { observation: null, receipt: null, skew: null, skewMs: null }
+  if (obj.clocks != null) {
+    if (typeof obj.clocks !== 'object' || Array.isArray(obj.clocks)) {
+      return { error: 'profile: clocks must be an object' }
+    }
+    for (const key of Object.keys(obj.clocks)) {
+      if (key !== 'observation' && key !== 'receipt' && key !== 'skew') {
+        return { error: `profile: clocks has unknown field ${JSON.stringify(key)} (expected observation, receipt, skew)` }
+      }
+    }
+    if (obj.clocks.observation != null) {
+      if (typeof obj.clocks.observation !== 'string' || !obj.clocks.observation) {
+        return { error: 'profile: clocks.observation must be a non-empty string' }
+      }
+      clocks.observation = obj.clocks.observation
+    }
+    if (obj.clocks.receipt != null) {
+      if (typeof obj.clocks.receipt !== 'string' || !obj.clocks.receipt) {
+        return { error: 'profile: clocks.receipt must be a non-empty string' }
+      }
+      clocks.receipt = obj.clocks.receipt
+    }
+    if (obj.clocks.skew != null) {
+      if (typeof obj.clocks.skew !== 'string' || !obj.clocks.skew) {
+        return { error: 'profile: clocks.skew must be a duration string (e.g. 500ms, 5s, 2m, 1h)' }
+      }
+      const ms = parseDuration(obj.clocks.skew)
+      if (ms === null) {
+        return { error: `profile: clocks.skew cannot read "${obj.clocks.skew}" as a duration (try 500ms, 5s, 2m, 1h)` }
+      }
+      clocks.skew = obj.clocks.skew
+      clocks.skewMs = ms
+    }
+  }
+  return {
+    profile: {
+      version: obj.version,
+      maxStatementsPerReceipt,
+      exclusions,
+      clocks,
+    },
+    raw,
+  }
+}
+
+/**
+ * `--skew` and `clocks.skew` are both operator declarations. If both are
+ * present and they do not parse to the same number of milliseconds, the run
+ * fails — silently preferring either would hide which bound the result used.
+ * Equal values (including `5s` and `5000`) are the same declaration.
+ */
+export function resolveDeclaredSkew(flagMs, profileSkewMs) {
+  const flag = typeof flagMs === 'number' && Number.isFinite(flagMs) ? flagMs : null
+  const fromProfile = typeof profileSkewMs === 'number' && Number.isFinite(profileSkewMs) ? profileSkewMs : null
+  if (flag != null && fromProfile != null && flag !== fromProfile) {
+    return {
+      error:
+        `--skew (${flag}ms) conflicts with Mapping Profile clocks.skew (${fromProfile}ms); ` +
+        'both are operator declarations and this tool will not pick one',
+    }
+  }
+  return { skewMs: flag ?? fromProfile }
+}
+
+function infraRuleId(query) {
+  return INFRA_QUERY_RE.test(query) ? 'infra-query' : 'infra-schema'
+}
+
+/**
+ * Project a /1 reconcile() result onto coverage-reconciliation/2.
+ * Does not change /1 fields or exit codes.
+ */
+export function projectResultV2(result, ctx) {
+  const profile = ctx.profile ?? null
+  const items = []
+  const counts = {
+    matched: 0,
+    excluded: 0,
+    'observed-without-receipt': 0,
+    'receipted-without-observation': 0,
+    indeterminate: 0,
+  }
+
+  const push = (outcome, extra) => {
+    counts[outcome] += 1
+    if (outcome !== 'matched') items.push({ outcome, ...extra })
+  }
+
+  const declaredExclusions = profile?.exclusions || []
+  const exclusionIds = new Set(declaredExclusions.map((e) => e.id))
+  const exclusionBoundDeclared = declaredExclusions.length > 0
+
+  for (const d of result.infrastructure) {
+    const id = infraRuleId(d.query)
+    if (!profile) {
+      push('indeterminate', { pattern: patternDigest(d.query), reason: 'exclusion-undeclared' })
+      continue
+    }
+    if (!exclusionIds.has(id)) {
+      push('indeterminate', { pattern: patternDigest(d.query), reason: 'exclusion-not-in-profile' })
+      continue
+    }
+    const declared = declaredExclusions.find((e) => e.id === id)
+    push('excluded', {
+      pattern: patternDigest(d.query),
+      rule: { id, version: declared.version },
+    })
+  }
+
+  for (const d of result.unattributed) {
+    push('indeterminate', { pattern: patternDigest(d.query), reason: 'unattributed' })
+  }
+
+  for (const d of result.unreconciled) {
+    push('observed-without-receipt', {
+      pattern: patternDigest(d.query),
+      objects: d.uncoveredTables || [],
+    })
+  }
+
+  for (const d of result.indeterminate) {
+    push('indeterminate', {
+      pattern: patternDigest(d.query),
+      reason: 'window-boundary',
+      requiredSkewMs: d.requiredSkewMs,
+    })
+  }
+
+  const max = profile?.maxStatementsPerReceipt ?? null
+  for (const d of result.reconciled) {
+    if (max == null) {
+      push('indeterminate', {
+        pattern: patternDigest(d.query),
+        reason: 'multiplicity-undeclared',
+        objects: d.tables || [],
+      })
+    } else if (d.delta <= max) {
+      counts.matched += 1
+    } else {
+      push('observed-without-receipt', {
+        pattern: patternDigest(d.query),
+        objects: d.tables || [],
+        reason: 'multiplicity-exceeded',
+      })
+    }
+  }
+
+  for (const u of result.unobserved) {
+    push('receipted-without-observation', { objects: u.objects, ts: u.ts })
+  }
+
+  const exceptions =
+    counts['observed-without-receipt'] > 0 ||
+    counts['receipted-without-observation'] > 0 ||
+    counts.indeterminate > 0
+
+  return {
+    v: RESULT_V2,
+    window: result.window,
+    source: result.source,
+    snapshots: {
+      start: sha256Of(ctx.snapshotStartRaw),
+      end: sha256Of(ctx.snapshotEndRaw),
+    },
+    receipts: sha256Of(ctx.receiptsRaw),
+    profile: profile
+      ? { digest: sha256Of(ctx.profileRaw), version: profile.version }
+      : null,
+    bounds: {
+      multiplicity: max != null ? 'operator-declared' : 'undeclared',
+      skew: result.clocks.declaredSkewMs !== null ? 'operator-declared' : 'undeclared',
+      exclusion: exclusionBoundDeclared ? 'operator-declared' : 'undeclared',
+    },
+    outcome: exceptions ? 'exceptions' : 'no-exceptions',
+    items,
+    counts,
+  }
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 function usage(msg) {
   if (msg) console.error(msg)
   console.error(
-    'Usage: conarium-reconcile --before <snapshot.json> --after <snapshot.json> --receipts <receipts.jsonl> [--skew <duration>] [--json]',
+    'Usage: conarium-reconcile --before <snapshot.json> --after <snapshot.json> --receipts <receipts.jsonl> [--skew <duration>] [--profile <path>] [--json] [--json-v2] [--result-v2 <path>]',
   )
   console.error(
     '  --skew  how far the gateway clock may differ from the database clock (e.g. 500ms, 5s, 2m).',
@@ -478,7 +716,16 @@ export function parseDuration(text) {
 }
 
 function parseArgs(argv) {
-  const out = { before: null, after: null, receiptsPath: null, json: false, skewMs: null }
+  const out = {
+    before: null,
+    after: null,
+    receiptsPath: null,
+    profilePath: null,
+    json: false,
+    jsonV2: false,
+    resultV2: null,
+    skewMs: null,
+  }
   const args = [...argv]
   while (args.length) {
     const a = args.shift()
@@ -491,6 +738,9 @@ function parseArgs(argv) {
     } else if (a === '--receipts') {
       out.receiptsPath = args.shift() ?? null
       if (!out.receiptsPath) throw new Error('--receipts requires a path')
+    } else if (a === '--profile') {
+      out.profilePath = args.shift() ?? null
+      if (!out.profilePath) throw new Error('--profile requires a path')
     } else if (a === '--skew') {
       const raw = args.shift() ?? null
       if (!raw) throw new Error('--skew requires a duration (e.g. 500ms, 5s, 2m)')
@@ -499,12 +749,20 @@ function parseArgs(argv) {
       out.skewMs = ms
     } else if (a === '--json') {
       out.json = true
+    } else if (a === '--json-v2') {
+      out.jsonV2 = true
+    } else if (a === '--result-v2') {
+      out.resultV2 = args.shift() ?? null
+      if (!out.resultV2) throw new Error('--result-v2 requires a path')
     } else if (a === '--help' || a === '-h') {
       usage()
       process.exit(0)
     } else {
       throw new Error(`unexpected argument: ${a}`)
     }
+  }
+  if (out.json && out.jsonV2) {
+    throw new Error('--json and --json-v2 cannot share a body; a consumer MUST NOT read a /1 result as a /2 result')
   }
   return out
 }
@@ -540,14 +798,40 @@ async function main(argv = process.argv.slice(2)) {
   const rec = loadReceipts(opts.receiptsPath)
   if (rec.error) fail(20, rec.error, opts.json)
 
-  const result = reconcile(b.snapshot, a.snapshot, rec.receipts, { skewMs: opts.skewMs })
+  let profile = null
+  let profileRaw = Buffer.from('')
+  if (opts.profilePath) {
+    const loaded = loadMappingProfile(opts.profilePath)
+    if (loaded.error) fail(20, loaded.error, opts.json)
+    profile = loaded.profile
+    profileRaw = loaded.raw
+  }
+
+  const resolved = resolveDeclaredSkew(opts.skewMs, profile?.clocks?.skewMs ?? null)
+  if (resolved.error) fail(20, resolved.error, opts.json)
+
+  const result = reconcile(b.snapshot, a.snapshot, rec.receipts, { skewMs: resolved.skewMs })
   if (result.error) fail(20, result.error, opts.json)
+
+  const wantV2 = opts.jsonV2 || opts.resultV2
+  const v2 = wantV2
+    ? projectResultV2(result, {
+        profile,
+        profileRaw,
+        snapshotStartRaw: readFileSync(opts.before),
+        snapshotEndRaw: readFileSync(opts.after),
+        receiptsRaw: readFileSync(opts.receiptsPath),
+      })
+    : null
+  if (opts.resultV2) writeFileSync(opts.resultV2, JSON.stringify(v2) + '\n')
 
   const problems = result.unreconciled.length + result.unattributed.length
   const undecided = result.indeterminate.length
   const exitCode = problems > 0 ? 40 : undecided > 0 ? 41 : 0
 
-  if (opts.json) {
+  if (opts.jsonV2) {
+    console.log(JSON.stringify(v2))
+  } else if (opts.json) {
     console.log(JSON.stringify({ ok: exitCode === 0, code: exitCode, ...result }))
   } else {
     console.log(
@@ -593,8 +877,8 @@ async function main(argv = process.argv.slice(2)) {
       if (atBoundary.length > 0) {
         const bound =
           result.clocks.declaredSkewMs === null
-            ? 'no --skew bound was declared, so the window\'s own length is the only reference'
-            : `declared --skew is ${result.clocks.declaredSkewMs}ms`
+            ? 'no skew bound was declared (--skew or Mapping Profile clocks.skew), so the window\'s own length is the only reference'
+            : `declared skew bound is ${result.clocks.declaredSkewMs}ms`
         console.error(
           `INDETERMINATE: ${atBoundary.length} pattern(s) are uncovered only by the window boundary — ${bound}:`,
         )

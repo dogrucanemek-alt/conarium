@@ -2,8 +2,8 @@
 /**
  * conarium-stamp — timestamp a document to OpenTimestamps.
  *
- * Receipts get anchored automatically. Documents — a specification, a policy
- * file, a coverage declaration, a prior-art scan — do not, and a git commit date
+ * Receipts are not anchored by the write path. Documents — a specification, a policy
+ * file, a coverage declaration, a prior-art scan — are stamped here, and a git commit date
  * is not evidence: `git commit --date` accepts anything you type.
  *
  * This stamps the SHA-256 of a file to the OpenTimestamps calendars and writes a

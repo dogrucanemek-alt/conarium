@@ -60,7 +60,7 @@ Version string: `conarium-receipt/0.4` (verifier also accepts `0.1`, `0.2`, and 
 | `chain.seq` | coverage backbone | contiguous integer; required even before v0.2 coverage proofs |
 | `chain.prevHash` / `chain.hash` | integrity | JCS (RFC 8785 subset) → SHA-256 |
 | `sig` | Ed25519 over `chain.hash` | `{ alg, keyId, value }` |
-| `anchor` | transparency-log head | filled asynchronously; may be `null` |
+| `anchor` | transparency-log head | `null` when written; filled only after `conarium-stamp` or `conarium-anchor-service` |
 
 `hash = sha256(canonicalize(receipt \ {hash, sig, anchor}))` with `chain.hash`
 stripped before hashing. Prefix: `sha256:` + hex.
@@ -254,7 +254,7 @@ occurred"** — an absent record is ambiguous by nature.
 ## Reconciliation (two-sided, v0.1)
 
 ```
-conarium-reconcile --before <snapshot.json> --after <snapshot.json> --receipts <receipts.jsonl> [--json]
+conarium-reconcile --before <snapshot.json> --after <snapshot.json> --receipts <receipts.jsonl> [--skew <duration>] [--profile <path>] [--json] [--json-v2] [--result-v2 <path>]
 ```
 
 The coverage declaration is one-sided: it reports what the receipt chain says
@@ -322,6 +322,75 @@ Rules that keep the verdict honest:
 | 40 | Unreconciled DB activity — recorded by the database, not receipted |
 | 41 | Indeterminate — a pattern is uncovered only by the window boundary, and two clocks decide that boundary |
 
+`--json` is the `/1` body (`conarium-reconcile/0.1`) and the exit codes
+above are its contract. `--json-v2` prints a separate
+`coverage-reconciliation/2` object; `--result-v2 <path>` writes that object
+to a file. The two must not share a body: a consumer MUST NOT read a `/1`
+result as a `/2` result. `/2` does not change these exit codes. Signing and
+SCITT registration of the `/2` object are out of scope for this version.
+
+Without a Mapping Profile (`--profile`), `/2` sets `profile` to `null`.
+Every item whose outcome depends on a multiplicity bound is then
+`indeterminate`, an unattributed pattern is `indeterminate` rather than
+`observed-without-receipt`, an infrastructure pattern is `indeterminate`
+rather than `excluded` (`bounds.exclusion` is `undeclared` — an undeclared
+bound does not decide), and `receipted-without-observation` makes
+`outcome` `exceptions`. `bounds.exclusion` is `operator-declared` only
+when the profile lists at least one exclusion rule.
+
+### Mapping Profile (`conarium-mapping-profile/0.1`)
+
+A Mapping Profile is an operator declaration. It is versioned, serialized as
+JSON, and digested as raw file bytes (`sha256:` + hex). The result binds that
+digest. The profile is not a measurement: a declared bound is
+`operator-declared` on the result, never `measured`.
+
+```json
+{
+  "v": "conarium-mapping-profile/0.1",
+  "version": "1",
+  "multiplicity": { "maxStatementsPerReceipt": 8 },
+  "exclusions": [ { "id": "infra-query", "version": "1" } ],
+  "clocks": {
+    "observation": "pg_stat_statements",
+    "receipt": "gateway",
+    "skew": "5s"
+  }
+}
+```
+
+`v` is the object type. `version` is the operator's identifier for this
+profile (a string). Every other member is optional. Omitted members are
+undeclared, not defaulted.
+
+| Field | Type | Encoding | What it declares |
+|---|---|---|---|
+| `multiplicity.maxStatementsPerReceipt` | integer ≥ 1 | JSON number | how many source statements one receipt may cover |
+| `exclusions[]` | array | `{ "id": string, "version": string }` | rules that remove items before comparison |
+| `clocks.observation` | string | clock identifier | the clock that stamps the observation window (the Data Source). This implementation writes it on `/1` as `clocks.window`. Typical value here: `pg_stat_statements`. |
+| `clocks.receipt` | string | clock identifier | the clock that stamps receipts (the Gateway). This implementation writes it on `/1` as `clocks.receipts`. Typical value here: `gateway`. |
+| `clocks.skew` | string | duration | how far those two clocks may differ |
+
+`clocks` accepts only those three keys. A declaration that both sides read
+one clock still writes both identifiers (they may be the same string) and
+still writes `skew` — including `0ms`. Zero is a declaration, not a default.
+
+**Duration encoding** (the same grammar as `--skew`; there is not a second
+one): a number, optional fraction, optional unit `ms` / `s` / `m` / `h`.
+The number is scaled by `ms` = 1, `s` = 1000, `m` = 60 000, `h` = 3 600 000,
+then rounded to an integer millisecond. A bare number is milliseconds.
+Examples: `500ms`, `5s`, `2m`, `1h`, `5000`. An unreadable duration is an
+error, not a default.
+
+`--skew` and `clocks.skew` are both operator declarations. If both are
+present and they do not parse to the same number of milliseconds, the run
+fails (exit 20). This tool will not pick one: which bound won would be
+invisible on the result. Equal values (`5s` and `5000`) are the same
+declaration. If either is present, `/2` reports `bounds.skew` as
+`operator-declared` and the comparison uses that bound. If neither is
+present, `bounds.skew` is `undeclared` and a pattern uncovered only by the
+window boundary stays `indeterminate`.
+
 ### The window straddles two clocks
 
 The window is `[before.ts, after.ts]` and both timestamps come from the database.
@@ -355,7 +424,8 @@ was *"NOT reported as unreceipted access"* — a sentence twenty-three hours of
 offset cannot support. 41 was never a silent pass, and is not one now; what
 changed is that the tool stops offering an excuse it cannot back.
 
-A declared `--skew` is the operator's own statement about their clocks and
+A declared skew bound (`--skew` or Mapping Profile `clocks.skew`) is the
+operator's own statement about their clocks and
 outranks the window rule. A window shorter than a clock correction is possible —
 a five-second window and a six-second step would read as beyond the boundary
 while being exactly the case the class exists for — and the operator is the one
@@ -363,11 +433,12 @@ who knows whether that is their deployment. We have not measured how often it
 happens; the flag exists so the answer does not have to come from us:
 
 ```
-INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no --skew bound was declared…
+INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no skew bound was declared…
   ~ (+5) table(s) [public.customers] have a receipt 3000ms outside the window: SELECT …
 ```
 
-`--skew <duration>` declares the bound (`500ms`, `5s`, `2m`, `1h`). A receipt
+`--skew <duration>` or Mapping Profile `clocks.skew` declares the bound
+(`500ms`, `5s`, `2m`, `1h`). A receipt
 further out than the bound is not skew, and its pattern goes back to unreconciled
 at 40 with the bypass sentence. An unreadable duration is an error, not a default:
 a tolerance nobody chose is the kind of number this tool exists to refuse.
@@ -390,10 +461,12 @@ conarium-stamp <file> [--sidecar <path>] [--json]
 | 0 | Stamped; sidecar written (`pending` until upgraded) |
 | 50 | Stamping failed — calendars unreachable or timed out |
 
-Receipts are anchored automatically. Documents are not, and **a git commit date is
-not evidence** — `git commit --date` accepts whatever you type. This stamps the
+Receipts are not anchored by the write path. An operator stamps a document
+with `conarium-stamp`, or submits a chain-head hash through
+`conarium-anchor-service`. A git commit date is **not evidence** —
+`git commit --date` accepts whatever you type. This stamps the
 SHA-256 of a file to the OpenTimestamps calendars and writes the same sidecar shape
-receipt anchoring uses, so `conarium-anchor-upgrade` upgrades it to a Bitcoin block
+those tools use, so `conarium-anchor-upgrade` upgrades it to a Bitcoin block
 height unchanged. Only the 32-byte digest leaves the machine.
 
 **What a stamp proves, exactly:** this file existed, byte for byte in this form, no
@@ -416,16 +489,20 @@ revision history is itself timestamped.
 2. **`dataRefs[].fieldsRequested` and `policy.rulesApplied` are emitted empty.** Until 0.2.29 the first was filled from the masked-field list and the second from the set of SQL functions the query touched — in both cases a field whose name described something other than its contents. A reader takes `fieldsRequested` for the columns a query asked for, and `rulesApplied` for policy rule identifiers; neither was true, and both were signed. They are now empty, because in a signed document a field filled with the wrong thing is worse than a field left empty: empty says *unknown*, wrongly-filled says *known* and misleads. The correct contents are recoverable — selected columns from the SQL AST, rule identifiers from a policy engine that emits them — and neither is implemented; when it is, these fields carry it. **The conformance vectors under `test-vectors/` show both fields populated. Those vectors are hand-written to exercise the format and are not produced by this implementation; a populated value is valid, and an empty one is what this version emits.** Losing per-field masking detail from `dataRefs` is a regression and is stated here rather than absorbed silently — `masking.byClass` still carries the per-class counts.
 3. **Bypass detection — addressed as of reconcile v0.1, with stated limits.** Disabling Conarium and reading the DB directly still produces no receipt — no gateway can prevent that from inside. What changed: absence is now *checkable from both sides*. One-sided: `conarium-coverage` emits a signed declaration (chain contiguity + which declared objects have recorded access). Two-sided: `conarium-reconcile` compares the database's own per-role query counters against the in-window receipts and reports any DB-recorded pattern no receipt covers (see §Reconciliation). Remaining limits, stated: reconciliation trusts the DB's own counters (an attacker who can falsify `pg_stat_statements` is out of scope), requires a dedicated DB role per gateway instance, and matches per pattern/table — never per call count. **The language rule stands: "access NOT RECORDED", never "no access occurred."**
 4. **Creation-time truth is not proven.** Without hardware attestation, an operator can still write false-but-well-formed receipts *before* anchoring.
-5. **In-file `sig` stripping + HMAC/`anchor` reduction.** Content `hash` is computed with `{hash, sig, anchor}` (and audit `signature`/`sig`) excluded, so an operator who controls the file can drop or thin those fields without invalidating the content hash itself. Contiguity and the trust store catch some boot-time cases, but full protection against in-file strip/reduce games is **not solvable in-file** (*in-file çözülemez*) — it needs an external transparency-log anchor and/or out-of-band key ceremony. **Opt-in strict boot (G3):** `CONARIUM_AUDIT_REQUIRE_SIG=1` rejects a chain with any unsigned line when a signing key is configured; the default stays the 08-05 compatibility open. **Mitigation available today, measured:** keep `CONARIUM_AUDIT_HMAC_KEY` enabled alongside Ed25519. HMAC is keyed, so an actor who strips `sig` and recomputes the unkeyed hashes still fails the HMAC check (`entry signature mismatch`). Verified by test: Ed25519 alone → strip-all passes the boot check; Ed25519 + HMAC → caught. `conarium-verify --pubkey` also catches it (exit 13, `missing sig`) because it is told to expect signatures. **Anchor is available** (`CONARIUM_ANCHOR_SINK=opentimestamps`) but starts as `pending` — Bitcoin finality is delayed (hours); see §Anchoring.
+5. **In-file `sig` stripping + HMAC/`anchor` reduction.** Content `hash` is computed with `{hash, sig, anchor}` (and audit `signature`/`sig`) excluded, so an operator who controls the file can drop or thin those fields without invalidating the content hash itself. Contiguity and the trust store catch some boot-time cases, but full protection against in-file strip/reduce games is **not solvable in-file** (*in-file çözülemez*) — it needs an external transparency-log anchor and/or out-of-band key ceremony. **Opt-in strict boot (G3):** `CONARIUM_AUDIT_REQUIRE_SIG=1` rejects a chain with any unsigned line when a signing key is configured; the default stays the 08-05 compatibility open. **Mitigation available today, measured:** keep `CONARIUM_AUDIT_HMAC_KEY` enabled alongside Ed25519. HMAC is keyed, so an actor who strips `sig` and recomputes the unkeyed hashes still fails the HMAC check (`entry signature mismatch`). Verified by test: Ed25519 alone → strip-all passes the boot check; Ed25519 + HMAC → caught. `conarium-verify --pubkey` also catches it (exit 13, `missing sig`) because it is told to expect signatures. **Anchor client is available** (`conarium-stamp` / `conarium-anchor-service`; `CONARIUM_ANCHOR_SINK=opentimestamps` selects the calendars). Receipts start as `anchor: null`. After a stamp is submitted the sidecar is `pending` until Bitcoin finality (hours); see §Anchoring.
 6. **`argsHash` hurts debugging.** Support cases need the customer's own logs to correlate.
 7. **Tail truncation is invisible to `conarium-verify` unless pinned.** Deleting the last N receipts leaves a consistent leftover chain (exit 0). `--expect-count` / `--expect-last-hash` exist for operators who have an external length or last-hash; they are opt-in so a verifier that saw the same file yesterday still exits 0 today. Anchoring the head, or `conarium-reconcile` against the database's own counters, are the other pins.
 
 ## Anchoring (OpenTimestamps)
 
-Chain-head hashes are optionally stamped with **OpenTimestamps** (opt-in:
-`CONARIUM_ANCHOR_SINK=opentimestamps`). Only the raw 32-byte digest is sent
-(our `sha256:<hex>` prefix is stripped first). Proofs live in a sidecar
-`<sink>.anchors.jsonl`; the receipt’s `anchor` field is a hash-exterior
+Receipts are not stamped by the write path. `Audit.writeReceipt` emits
+`anchor: null`. An operator stamps a file with `conarium-stamp`, or submits
+a chain-head hash through `conarium-anchor-service`. Those tools talk to the
+**OpenTimestamps** calendars. `CONARIUM_ANCHOR_SINK=opentimestamps` selects
+the in-tree calendar client they use; it does not stamp receipts as they
+are written. Only the raw 32-byte digest is sent (our `sha256:<hex>` prefix
+is stripped first). Proofs live in a sidecar `<sink>.anchors.jsonl`; after
+a stamp is submitted, the receipt’s `anchor` field is a hash-exterior
 reference: `{ "log": "opentimestamps", "ref": "sha256:…", "state": "pending"|"bitcoin" }`.
 
 | State | Meaning |
@@ -442,8 +519,8 @@ chain, not hash calendars.
 implementation; institutional buyers may prefer it, but it requires trusting a TSA.
 
 **Honest latency:** “not backdated” becomes Bitcoin-hard only after upgrade. Pending
-is disclosed — `conarium-verify --anchor-check` skips `anchor:null` (periodic
-anchoring), exits 0 with a stderr warning while pending, and exits 14 if a
+is disclosed — `conarium-verify --anchor-check` skips `anchor:null` (nothing
+has been submitted yet), exits 0 with a stderr warning while pending, and exits 14 if a
 *claimed* anchor's proof is missing or does not match the hash. The run prints
 `N/M anchored, head anchored: yes/no`. `--require-head-anchor` exits 14 when
 the chain head is unanchored.
