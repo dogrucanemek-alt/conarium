@@ -1,0 +1,62 @@
+/**
+ * Which changed files get read as claims, and which fall out of the review.
+ *
+ * The rule lives in claim_surfaces.mjs. This file pins the decisions it makes,
+ * including the one it used to get wrong: `standards/draft-` was excluded by
+ * name, on the ground that a posted Internet-Draft is immutable and was
+ * reviewed at submission. True of the posted copy, false of the repo one — the
+ * file exists in the tree before it is posted, and that window is the only one
+ * in which review can still change the text. -04 spent that window carrying
+ * four statements about this implementation that were accurate when written
+ * and false within days, and nothing named the file.
+ *
+ * The superseded rule is restored below rather than described, so the
+ * regression is visible to whoever reads this next instead of remembered.
+ */
+import assert from 'node:assert/strict'
+import { isUnlistedDoc, SURFACES } from './claim_surfaces.mjs'
+
+const listed = new Set(SURFACES)
+const unlisted = (p) => isUnlistedDoc(p, listed)
+
+// ── the case this check exists for ───────────────────────────────────────────
+const NEW_DRAFT = 'standards/draft-dogru-scitt-disclosure-evidence-05.md'
+assert.equal(unlisted(NEW_DRAFT), true, 'a draft revision in the tree has to be decided about')
+
+const supersededRule = (p) => !/^standards\/draft-/.test(p) && unlisted(p)
+assert.equal(
+  supersededRule(NEW_DRAFT),
+  false,
+  'the rule this replaced answered false here — that is the whole reason it changed',
+)
+
+// ── depth is not the rule ────────────────────────────────────────────────────
+// `docs/security/THREAT-MODEL.md` sat in neither list under the depth rule and
+// carried a stale sentence into 0.2.35. A new document beside it must surface.
+assert.equal(unlisted('docs/security/A-NEW-CLAIM.md'), true, 'depth does not excuse a document')
+assert.equal(unlisted('A-NEW-TOP-LEVEL-CLAIM.md'), true, 'a new top-level document surfaces')
+
+// ── already decided ──────────────────────────────────────────────────────────
+assert.equal(unlisted('README.md'), false, 'a listed surface is read, not unlisted')
+assert.equal(unlisted('standards/README.md'), false, 'a listed surface is read, not unlisted')
+
+// ── named exemptions, with their reasons beside the list ─────────────────────
+assert.equal(unlisted('CHANGELOG.md'), false, 'a record of what happened is not a promise')
+assert.equal(unlisted('AGENTS.md'), false, 'instructions to a contributor are not a promise')
+assert.equal(
+  unlisted('docs/claims/reviews/0.2.37.md'),
+  false,
+  'working records are written to be superseded',
+)
+
+// ── not every changed file is prose ──────────────────────────────────────────
+assert.equal(unlisted('src/audit.ts'), false, 'code is reviewed as code')
+assert.equal(
+  unlisted('standards/draft-dogru-scitt-disclosure-evidence-05.xml'),
+  false,
+  'the xml is generated from the md that was already read',
+)
+
+console.log(
+  'claim surface discovery: drafts in the tree surface for decision, superseded rule pinned red, depth exemption still gone, named exemptions intact',
+)
