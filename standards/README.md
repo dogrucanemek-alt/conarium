@@ -41,6 +41,18 @@ the Window is therefore reported as absent evidence, which is the outcome
 whose semantics name gateway bypass. The same defect was found in the
 implementation first, fixed in 0.2.27, attacked, and fixed again in 0.2.28.
 
+**What `-05` added.** Its Implementation Status section was rewritten from
+measurement against the published package rather than edited. Four statements in
+`-04` described a tool that had moved past them — each understating what it does
+— and nothing in the test suite compares that section against the code, so
+nothing caught them. `-05` also states the temporal correspondence as three
+named fields with an encoding (`clocks.observation`, `clocks.receipt`,
+`clocks.skew`), after a second draft in this working group asked to adopt that
+shape rather than invent a second one, and adds a security consideration on
+receipt set completeness: a truncated receipt set verifies, detecting the
+removal needs a quantity from outside it, and whether that quantity reached the
+verifier independently of the Issuer is not visible in a digest.
+
 This file has been wrong before when it copied posting status. The Datatracker
 link above is the check; a revision history in this paragraph is not.
 
