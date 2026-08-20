@@ -4,7 +4,10 @@ import { compileCustomPatterns, CustomPatternError } from './custom_patterns.js'
 import { warnIfMaxRowsHigh } from './masking-cost.js'
 import { assertProtectedColumnsSupported } from './protected-columns.js'
 
-const stringArray = z.array(z.string().min(1)).default([])
+// Zod 4 applies `.default()` even when the field is `.optional()`. An omitted
+// `protectedColumns` becoming `[]` makes `if (policy.protectedColumns)` true
+// and looks like a configured list. Leave omitted arrays undefined.
+const stringArray = z.array(z.string().min(1))
 
 const MaskingProfileSchema = z.object({
   // No .default([]): an omitted maskColumns must stay omitted so the overlay
@@ -42,8 +45,8 @@ export const GovernancePolicySchema = z.object({
   // loadConfig() threw Unrecognized key and the gateway could not boot a
   // profiled config — the feature worked only when tests constructed the
   // class by hand.
-  profiles: z.record(MaskingProfileSchema).optional(),
-  actorProfiles: z.record(z.string().min(1)).optional(),
+  profiles: z.record(z.string(), MaskingProfileSchema).optional(),
+  actorProfiles: z.record(z.string(), z.string().min(1)).optional(),
   scanCharCap: z.number().int().min(1).max(1_048_576).optional(),
   // Identity detectors (TCKN, card, IBAN, email, phone, PAN) are intentionally
   // absent. Turning them off from config would let a bank "solve" masking by
@@ -77,7 +80,7 @@ export const ConnectorConfigSchema = z.object({
   type: z.enum(['postgres', 'supabase', 'supabase-rest', 'openapi', 'files', 'docs', 'slack', 'jira', 'custom-sql']),
   name: z.string().min(1),
   description: z.string().min(1),
-  config: z.record(z.string()).default({}),
+  config: z.record(z.string(), z.string()).default({}),
 }).strict()
 
 export const ConariumConfigSchema = z.object({
