@@ -127,6 +127,10 @@ try {
   else if (!vectorKeys.length) fail('test-vectors acik anahtari/keyid dustu — dogrulayici her makbuza 13 der')
   else pass(`konformans vektorleri etkilenmedi (${vectorReceipts.length} jsonl, ${vectorKeys.length} anahtar dosyasi)`)
 
+  const teaching = files.filter((f) => f.startsWith('docs/teaching/'))
+  if (teaching.length) fail(`docs/teaching/ in the tarball: ${teaching.join(', ')}`)
+  else pass('docs/teaching/ is outside the tarball')
+
   const hetzner = files.filter((f) => f.startsWith('deploy/hetzner/'))
   if (hetzner.length) fail(`Hetzner ops scripts tarball'da (elemeli): ${hetzner.join(', ')}`)
   else pass('Hetzner ops scripts tarball disinda')

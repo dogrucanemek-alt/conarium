@@ -109,6 +109,7 @@ export const WORKING_RECORD_DIRS = [
   'docs/reviews/',
   'docs/specs/',
   'docs/superpowers/',
+  'docs/teaching/',
 ]
 
 /**

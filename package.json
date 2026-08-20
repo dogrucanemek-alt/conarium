@@ -10,6 +10,8 @@
     "scripts",
     "docs",
     "!docs/reviews",
+    "!docs/teaching",
+    "!docs/teaching/**",
     "!docs/benchmarks/*.cpuprofile",
     "public",
     "assets",
