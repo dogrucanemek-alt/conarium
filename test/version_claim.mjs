@@ -115,12 +115,20 @@ try {
   taggedLocally = false
 }
 
-assert.ok(
-  taggedLocally,
-  `origin has ${tag}, but this clone does not.\n` +
-    `  A missing local tag used to look like an unpublished version.\n` +
-    `  Fetch the tag before asking whether ${version} still matches what was shipped.\n`,
-)
+if (!taggedLocally) {
+  // A CI checkout arrives with no tags at all, so "not in this clone" is a fact
+  // about the checkout and not about the release. The tag is the thing this check
+  // compares against, so fetch it. Only a fetch that fails leaves the question
+  // unanswered, and an unanswered question is not a pass.
+  try {
+    run('git', ['fetch', '--no-tags', 'origin', `refs/tags/${tag}:refs/tags/${tag}`])
+  } catch {
+    assert.fail(
+      `origin has ${tag}, this clone does not, and fetching it failed.\n` +
+        `  Without the tag there is nothing to compare ${version} against.\n`,
+    )
+  }
+}
 
 // What npm would actually ship, asked of npm rather than restated here.
 const shipped = new Set(npmPackFileList())
