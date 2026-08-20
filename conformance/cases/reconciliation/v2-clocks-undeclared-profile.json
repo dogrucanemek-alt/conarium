@@ -1,0 +1,16 @@
+{
+  "id": "reconciliation/v2-clocks-undeclared-profile",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-1.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers-early.jsonl",
+  "mappingProfile": "conformance/fixtures/reconciliation/profile-no-clocks.json",
+  "expectOutcome": "exceptions",
+  "expectItemOutcomes": ["indeterminate"],
+  "expectBounds": { "skew": "undeclared" },
+  "rationale": "A Mapping Profile that omits clocks leaves bounds.skew undeclared. The window-boundary item stays indeterminate. Presence of a profile is not a skew declaration.",
+  "doesNotTest": "A profile that does declare clocks. That is v2-clocks-declared."
+}

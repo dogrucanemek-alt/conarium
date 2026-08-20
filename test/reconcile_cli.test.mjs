@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const RECONCILE = fileURLToPath(new URL('../bin/conarium-reconcile.mjs', import.meta.url))
-const { extractTables, classifyPattern, reconcile, projectResultV2, loadMappingProfile } = await import(RECONCILE)
+const { extractTables, classifyPattern, reconcile, projectResultV2, loadMappingProfile, resolveDeclaredSkew } = await import(RECONCILE)
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -660,6 +660,85 @@ describe('coverage-reconciliation/2 projection', () => {
     expect(v2.bounds.multiplicity).toBe('operator-declared')
   })
 
+  it('profile clocks.skew without --skew makes bounds.skew operator-declared', () => {
+    const { dir, args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+      receipts: [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    })
+    const profilePath = join(dir, 'profile.json')
+    writeFileSync(
+      profilePath,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { observation: 'pg_stat_statements', receipt: 'gateway', skew: '5s' },
+      }),
+    )
+    const r = run([...args, '--profile', profilePath, '--json-v2'])
+    expect(r.code).toBe(41)
+    const v2 = JSON.parse(r.stdout)
+    expect(v2.bounds.skew).toBe('operator-declared')
+    expect(v2.items[0].outcome).toBe('indeterminate')
+    expect(v2.items[0].reason).toBe('window-boundary')
+  })
+
+  it('a profile that omits clocks leaves bounds.skew undeclared', () => {
+    const { dir, args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+      receipts: [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    })
+    const profilePath = join(dir, 'profile.json')
+    writeFileSync(profilePath, JSON.stringify({ v: 'conarium-mapping-profile/0.1', version: '1' }))
+    const r = run([...args, '--profile', profilePath, '--json-v2'])
+    const v2 = JSON.parse(r.stdout)
+    expect(v2.profile).not.toBeNull()
+    expect(v2.bounds.skew).toBe('undeclared')
+    expect(v2.items[0].outcome).toBe('indeterminate')
+  })
+
+  it('--skew and clocks.skew that parse to the same milliseconds are one declaration', () => {
+    const { dir, args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+      receipts: [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    })
+    const profilePath = join(dir, 'profile.json')
+    writeFileSync(
+      profilePath,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { observation: 'pg_stat_statements', receipt: 'gateway', skew: '5s' },
+      }),
+    )
+    const r = run([...args, '--profile', profilePath, '--skew', '5000', '--json-v2'])
+    expect(r.code).toBe(41)
+    expect(JSON.parse(r.stdout).bounds.skew).toBe('operator-declared')
+  })
+
+  it('--skew and clocks.skew that disagree fail rather than pick one', () => {
+    const { dir, args } = setup({
+      beforeEntries: [],
+      afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+      receipts: [receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'] })],
+    })
+    const profilePath = join(dir, 'profile.json')
+    writeFileSync(
+      profilePath,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { observation: 'pg_stat_statements', receipt: 'gateway', skew: '5s' },
+      }),
+    )
+    const r = run([...args, '--profile', profilePath, '--skew', '2s', '--json-v2'])
+    expect(r.code).toBe(20)
+    expect(r.stderr).toContain('conflicts with Mapping Profile clocks.skew')
+    expect(r.stderr).toContain('will not pick one')
+  })
+
   it('--json /1 body still carries conarium-reconcile/0.1, never /2', () => {
     const { args } = setup({
       beforeEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10 }],
@@ -672,6 +751,56 @@ describe('coverage-reconciliation/2 projection', () => {
     expect(body.v).toBe('conarium-reconcile/0.1')
     expect(body.ok).toBe(true)
     expect(body.reconciled.length).toBe(1)
+  })
+})
+
+describe('Mapping Profile clocks', () => {
+  it('resolveDeclaredSkew treats equal millisecond values as one declaration', () => {
+    expect(resolveDeclaredSkew(5000, 5000)).toEqual({ skewMs: 5000 })
+    expect(resolveDeclaredSkew(5000, null)).toEqual({ skewMs: 5000 })
+    expect(resolveDeclaredSkew(null, 5000)).toEqual({ skewMs: 5000 })
+    expect(resolveDeclaredSkew(null, null)).toEqual({ skewMs: null })
+  })
+
+  it('resolveDeclaredSkew refuses a silent pick when the two declarations differ', () => {
+    const r = resolveDeclaredSkew(2000, 5000)
+    expect(r.error).toMatch(/will not pick one/)
+    expect(r.skewMs).toBeUndefined()
+  })
+
+  it('loadMappingProfile reads the three clock fields and the same duration grammar as --skew', () => {
+    const dir = tmpDir()
+    const path = join(dir, 'p.json')
+    writeFileSync(
+      path,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { observation: 'pg_stat_statements', receipt: 'gateway', skew: '5s' },
+      }),
+    )
+    const loaded = loadMappingProfile(path)
+    expect(loaded.error).toBeUndefined()
+    expect(loaded.profile.clocks).toEqual({
+      observation: 'pg_stat_statements',
+      receipt: 'gateway',
+      skew: '5s',
+      skewMs: 5000,
+    })
+  })
+
+  it('loadMappingProfile rejects an unknown clocks field rather than ignore it', () => {
+    const dir = tmpDir()
+    const path = join(dir, 'p.json')
+    writeFileSync(
+      path,
+      JSON.stringify({
+        v: 'conarium-mapping-profile/0.1',
+        version: '1',
+        clocks: { window: 'pg_stat_statements' },
+      }),
+    )
+    expect(loadMappingProfile(path).error).toMatch(/unknown field "window"/)
   })
 })
 

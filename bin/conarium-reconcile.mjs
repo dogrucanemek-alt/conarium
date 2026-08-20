@@ -67,10 +67,12 @@
  *   outside the boundary is now indeterminate, not an accusation, and the
  *   report names the skew that would have to be true for it to be one.
  *
- *   `--skew` declares the bound. Without it nothing decides the question, so
- *   nothing is asserted: the pattern is indeterminate and the report says the
- *   bound was never declared. With it, a receipt further out than the bound is
- *   not skew, and the pattern stays unreconciled.
+ *   `--skew` or Mapping Profile `clocks.skew` declares the bound. Without
+ *   either, nothing decides the question, so nothing is asserted: the pattern
+ *   is indeterminate and the report says the bound was never declared. With
+ *   a bound, a receipt further out than it is not skew, and the pattern
+ *   stays unreconciled. If both declarations are present and they disagree,
+ *   the run fails rather than picking one.
  *
  *   Reported for the operator, not resolved for them: this tool cannot tell a
  *   trailing clock from a receipt written late. That is why the class is
@@ -404,8 +406,9 @@ export function reconcile(before, after, receipts, opts = {}) {
       // unreceipted access" — an exculpation 23 hours of offset cannot support.
       //
       // The threshold is the window's own length, so it is derived from the
-      // input rather than chosen. A declared --skew is the operator's own
-      // statement about their clocks and outranks it.
+      // input rather than chosen. A declared skew bound (--skew or
+      // Mapping Profile clocks.skew) is the operator's own statement about
+      // their clocks and outranks it.
       const boundaryPlausible = declaredSkewMs !== null || requiredSkewMs <= toMs - fromMs
       indeterminate.push({ ...d, uncoveredTables: names, requiredSkewMs, boundaryPlausible })
     } else {
@@ -501,14 +504,68 @@ export function loadMappingProfile(path) {
       exclusions.push({ id: e.id, version: e.version })
     }
   }
+  const clocks = { observation: null, receipt: null, skew: null, skewMs: null }
+  if (obj.clocks != null) {
+    if (typeof obj.clocks !== 'object' || Array.isArray(obj.clocks)) {
+      return { error: 'profile: clocks must be an object' }
+    }
+    for (const key of Object.keys(obj.clocks)) {
+      if (key !== 'observation' && key !== 'receipt' && key !== 'skew') {
+        return { error: `profile: clocks has unknown field ${JSON.stringify(key)} (expected observation, receipt, skew)` }
+      }
+    }
+    if (obj.clocks.observation != null) {
+      if (typeof obj.clocks.observation !== 'string' || !obj.clocks.observation) {
+        return { error: 'profile: clocks.observation must be a non-empty string' }
+      }
+      clocks.observation = obj.clocks.observation
+    }
+    if (obj.clocks.receipt != null) {
+      if (typeof obj.clocks.receipt !== 'string' || !obj.clocks.receipt) {
+        return { error: 'profile: clocks.receipt must be a non-empty string' }
+      }
+      clocks.receipt = obj.clocks.receipt
+    }
+    if (obj.clocks.skew != null) {
+      if (typeof obj.clocks.skew !== 'string' || !obj.clocks.skew) {
+        return { error: 'profile: clocks.skew must be a duration string (e.g. 500ms, 5s, 2m, 1h)' }
+      }
+      const ms = parseDuration(obj.clocks.skew)
+      if (ms === null) {
+        return { error: `profile: clocks.skew cannot read "${obj.clocks.skew}" as a duration (try 500ms, 5s, 2m, 1h)` }
+      }
+      clocks.skew = obj.clocks.skew
+      clocks.skewMs = ms
+    }
+  }
   return {
     profile: {
       version: obj.version,
       maxStatementsPerReceipt,
       exclusions,
+      clocks,
     },
     raw,
   }
+}
+
+/**
+ * `--skew` and `clocks.skew` are both operator declarations. If both are
+ * present and they do not parse to the same number of milliseconds, the run
+ * fails — silently preferring either would hide which bound the result used.
+ * Equal values (including `5s` and `5000`) are the same declaration.
+ */
+export function resolveDeclaredSkew(flagMs, profileSkewMs) {
+  const flag = typeof flagMs === 'number' && Number.isFinite(flagMs) ? flagMs : null
+  const fromProfile = typeof profileSkewMs === 'number' && Number.isFinite(profileSkewMs) ? profileSkewMs : null
+  if (flag != null && fromProfile != null && flag !== fromProfile) {
+    return {
+      error:
+        `--skew (${flag}ms) conflicts with Mapping Profile clocks.skew (${fromProfile}ms); ` +
+        'both are operator declarations and this tool will not pick one',
+    }
+  }
+  return { skewMs: flag ?? fromProfile }
 }
 
 function infraRuleId(query) {
@@ -741,9 +798,6 @@ async function main(argv = process.argv.slice(2)) {
   const rec = loadReceipts(opts.receiptsPath)
   if (rec.error) fail(20, rec.error, opts.json)
 
-  const result = reconcile(b.snapshot, a.snapshot, rec.receipts, { skewMs: opts.skewMs })
-  if (result.error) fail(20, result.error, opts.json)
-
   let profile = null
   let profileRaw = Buffer.from('')
   if (opts.profilePath) {
@@ -752,6 +806,12 @@ async function main(argv = process.argv.slice(2)) {
     profile = loaded.profile
     profileRaw = loaded.raw
   }
+
+  const resolved = resolveDeclaredSkew(opts.skewMs, profile?.clocks?.skewMs ?? null)
+  if (resolved.error) fail(20, resolved.error, opts.json)
+
+  const result = reconcile(b.snapshot, a.snapshot, rec.receipts, { skewMs: resolved.skewMs })
+  if (result.error) fail(20, result.error, opts.json)
 
   const wantV2 = opts.jsonV2 || opts.resultV2
   const v2 = wantV2
@@ -817,8 +877,8 @@ async function main(argv = process.argv.slice(2)) {
       if (atBoundary.length > 0) {
         const bound =
           result.clocks.declaredSkewMs === null
-            ? 'no --skew bound was declared, so the window\'s own length is the only reference'
-            : `declared --skew is ${result.clocks.declaredSkewMs}ms`
+            ? 'no skew bound was declared (--skew or Mapping Profile clocks.skew), so the window\'s own length is the only reference'
+            : `declared skew bound is ${result.clocks.declaredSkewMs}ms`
         console.error(
           `INDETERMINATE: ${atBoundary.length} pattern(s) are uncovered only by the window boundary — ${bound}:`,
         )

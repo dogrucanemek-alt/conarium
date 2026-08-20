@@ -338,6 +338,59 @@ bound does not decide), and `receipted-without-observation` makes
 `outcome` `exceptions`. `bounds.exclusion` is `operator-declared` only
 when the profile lists at least one exclusion rule.
 
+### Mapping Profile (`conarium-mapping-profile/0.1`)
+
+A Mapping Profile is an operator declaration. It is versioned, serialized as
+JSON, and digested as raw file bytes (`sha256:` + hex). The result binds that
+digest. The profile is not a measurement: a declared bound is
+`operator-declared` on the result, never `measured`.
+
+```json
+{
+  "v": "conarium-mapping-profile/0.1",
+  "version": "1",
+  "multiplicity": { "maxStatementsPerReceipt": 8 },
+  "exclusions": [ { "id": "infra-query", "version": "1" } ],
+  "clocks": {
+    "observation": "pg_stat_statements",
+    "receipt": "gateway",
+    "skew": "5s"
+  }
+}
+```
+
+`v` is the object type. `version` is the operator's identifier for this
+profile (a string). Every other member is optional. Omitted members are
+undeclared, not defaulted.
+
+| Field | Type | Encoding | What it declares |
+|---|---|---|---|
+| `multiplicity.maxStatementsPerReceipt` | integer ≥ 1 | JSON number | how many source statements one receipt may cover |
+| `exclusions[]` | array | `{ "id": string, "version": string }` | rules that remove items before comparison |
+| `clocks.observation` | string | clock identifier | the clock that stamps the observation window (the Data Source). This implementation writes it on `/1` as `clocks.window`. Typical value here: `pg_stat_statements`. |
+| `clocks.receipt` | string | clock identifier | the clock that stamps receipts (the Gateway). This implementation writes it on `/1` as `clocks.receipts`. Typical value here: `gateway`. |
+| `clocks.skew` | string | duration | how far those two clocks may differ |
+
+`clocks` accepts only those three keys. A declaration that both sides read
+one clock still writes both identifiers (they may be the same string) and
+still writes `skew` — including `0ms`. Zero is a declaration, not a default.
+
+**Duration encoding** (the same grammar as `--skew`; there is not a second
+one): a number, optional fraction, optional unit `ms` / `s` / `m` / `h`.
+The number is scaled by `ms` = 1, `s` = 1000, `m` = 60 000, `h` = 3 600 000,
+then rounded to an integer millisecond. A bare number is milliseconds.
+Examples: `500ms`, `5s`, `2m`, `1h`, `5000`. An unreadable duration is an
+error, not a default.
+
+`--skew` and `clocks.skew` are both operator declarations. If both are
+present and they do not parse to the same number of milliseconds, the run
+fails (exit 20). This tool will not pick one: which bound won would be
+invisible on the result. Equal values (`5s` and `5000`) are the same
+declaration. If either is present, `/2` reports `bounds.skew` as
+`operator-declared` and the comparison uses that bound. If neither is
+present, `bounds.skew` is `undeclared` and a pattern uncovered only by the
+window boundary stays `indeterminate`.
+
 ### The window straddles two clocks
 
 The window is `[before.ts, after.ts]` and both timestamps come from the database.
@@ -371,7 +424,8 @@ was *"NOT reported as unreceipted access"* — a sentence twenty-three hours of
 offset cannot support. 41 was never a silent pass, and is not one now; what
 changed is that the tool stops offering an excuse it cannot back.
 
-A declared `--skew` is the operator's own statement about their clocks and
+A declared skew bound (`--skew` or Mapping Profile `clocks.skew`) is the
+operator's own statement about their clocks and
 outranks the window rule. A window shorter than a clock correction is possible —
 a five-second window and a six-second step would read as beyond the boundary
 while being exactly the case the class exists for — and the operator is the one
@@ -379,11 +433,12 @@ who knows whether that is their deployment. We have not measured how often it
 happens; the flag exists so the answer does not have to come from us:
 
 ```
-INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no --skew bound was declared…
+INDETERMINATE: 1 pattern(s) are uncovered only by the window boundary — no skew bound was declared…
   ~ (+5) table(s) [public.customers] have a receipt 3000ms outside the window: SELECT …
 ```
 
-`--skew <duration>` declares the bound (`500ms`, `5s`, `2m`, `1h`). A receipt
+`--skew <duration>` or Mapping Profile `clocks.skew` declares the bound
+(`500ms`, `5s`, `2m`, `1h`). A receipt
 further out than the bound is not skew, and its pattern goes back to unreconciled
 at 40 with the bypass sentence. An unreadable duration is an error, not a default:
 a tolerance nobody chose is the kind of number this tool exists to refuse.

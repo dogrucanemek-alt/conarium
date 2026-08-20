@@ -126,6 +126,11 @@ function runReconcileV2(c) {
       if ((body.counts?.[k] ?? 0) !== n) reasons.push(`counts.${k} ${body.counts?.[k]} != ${n}`)
     }
   }
+  if (c.expectBounds) {
+    for (const [k, n] of Object.entries(c.expectBounds)) {
+      if (body.bounds?.[k] !== n) reasons.push(`bounds.${k} ${body.bounds?.[k]} != ${n}`)
+    }
+  }
   const itemOutcomes = (body.items || []).map((i) => i.outcome)
   if (Array.isArray(c.expectItemOutcomes)) {
     for (const want of c.expectItemOutcomes) {
