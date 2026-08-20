@@ -4,7 +4,7 @@
 
 The receipt is opt-in. Nothing is written until a receipt sink is configured, and
 `conarium-init` configures one, so the default layout has receipts and a
-hand-written config need not. The top of this README has said so since 0.2.32.
+hand-written config need not. The top of the README has said so since 0.2.32.
 
 Two other places had not caught up. `README.md` listed "Ed25519-signed receipt per
 access" among what ships, with no condition attached — the same file contradicting
