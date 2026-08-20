@@ -135,3 +135,11 @@ standards/tracker.log
 # V8 CPU profiles — docs/ is in the npm files list; these must not ship.
 *.cpuprofile
 docs/benchmarks/*.cpuprofile
+
+# The proof service's dist/ is not build output. It is a compiled copy that was
+# placed on the demo host by hand, with no source in this tree to regenerate it
+# from, and it existed in exactly one place until it was recorded here. `dist/`
+# above is the right default for a directory this repo builds; this one it does
+# not build.
+!deploy/hetzner/proof-service/dist/
+!deploy/hetzner/proof-service/dist/**
