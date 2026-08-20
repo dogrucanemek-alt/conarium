@@ -3,6 +3,7 @@
 What Conarium has not done. Measured. No dates.
 
 ## No certification
+<!-- s: no-certification -->
 
 No SOC 2. No ISO/IEC 27001. Neither is planned: at this stage the priority is
 independent penetration testing and implementation-level assurance rather than
@@ -10,10 +11,12 @@ organisational certification. No independent penetration test yet — that one i
 on the roadmap.
 
 ## Not 1.0
+<!-- s: not-1.0 -->
 
 Version is 0.2.x. The API can break.
 
 ## Node 20 is the floor, and Node 20 is past end-of-life
+<!-- s: node-20-floor -->
 
 `engines` requires Node >=20 and CI runs the full suite on 20, 22 and 24. It said
 >=18 until 2026-08-17, and that was wrong rather than merely unverified: the MCP
@@ -29,6 +32,7 @@ ask for. Node 22 or later is the version to run; if you are on 20, that choice i
 yours to make with this stated rather than hidden.
 
 ## SQL is Postgres, Microsoft SQL Server, and Oracle
+<!-- s: sql-dialects -->
 
 MySQL is not implemented.
 A dialect is listed here only when the shared SQL-gate vector set is green against that dialect, unparseable input is denied, and a live engine run applied the row cap.
@@ -38,32 +42,40 @@ There is no MSSQL or Oracle connector. An operator can attach their own executor
 Parsers: Postgres `pgsql-ast-parser` · MSSQL `node-sql-parser` (transactsql) · Oracle `@guanmingchiu/sqlparser-ts`.
 
 ## Bare 9-digit US SSN is not a content detector
+<!-- s: bare-ssn -->
 
 `XXX-XX-XXXX` (hyphenated) is masked. A bare 9-digit run is not: it
 collides with order IDs and other identifiers. This is a measured
 limitation, not an oversight.
 
 ## Names in free text are not guaranteed
+<!-- s: names-free-text -->
 
 Structured columns: deterministic (`maskColumns`).
 Free text: best effort (carry-over of values this policy already masks; labelled names).
 A bare name in running prose is not detected.
 
 ## One production install
+<!-- s: one-prod-install -->
 
 The only production deployment is the author's own company.
 There is no external reference customer.
 The figure 121,366 identities masked comes from that company's ERP. It cannot be verified from outside.
 
 ## One-person team
+<!-- s: one-person-team -->
 
 Bus factor 1.
 
 ## Anchors may stay pending
+<!-- s: anchors-pending -->
 
-An OpenTimestamps stamp can take hours to confirm on Bitcoin. Receipts already show `pending`.
+An OpenTimestamps stamp can take hours to confirm on Bitcoin. A receipt is
+born with `anchor: null`. `pending` appears only after an operator has
+submitted a stamp (`conarium-stamp` or `conarium-anchor-service`).
 
 ## Masking hides values; it does not make them unlearnable
+<!-- s: masking-unlearnable -->
 
 Masking is applied to result rows. A query's WHERE clause is checked for table
 permission, not rewritten: `WHERE email LIKE 'a%'` on an allowed table reaches
@@ -81,6 +93,7 @@ before it reaches the database. Columns that are not on that list are unchanged
 masked values in general have become unlearnable.
 
 ## The row cap is per query, not per session
+<!-- s: row-cap-per-query -->
 
 `maxRows` caps a single query. `OFFSET` is preserved, so an allowed, unmasked
 table can be read in full, cap-sized pages at a time. That is what allowing a
@@ -88,6 +101,7 @@ table means; the cap exists to stop single-query bulk exfiltration and to keep
 result sets small, not to ration total access.
 
 ## A countersignature is not a statement about the data
+<!-- s: countersign-not-data -->
 
 The countersigning service says that a signer other than you saw this chain head
 at this time and put it at this position in a log that is appended to, never
@@ -97,6 +111,7 @@ cannot be quietly rearranged afterwards. If the signing key leaks, every
 signature it ever made is worth what the key is worth: nothing.
 
 ## The countersigning service is one key on one server
+<!-- s: countersign-one-key -->
 
 Since 2026-08-15 a Conarium-operated endpoint exists (`demo.conarium.dev/anchor`,
 keyId `verax-cs-20260815`). The signing key lives on one server, on disk, with
@@ -108,6 +123,7 @@ a countersigner you operate proves ordering to you, not to a third party who
 does not trust you.
 
 ## The operator is inside the boundary
+<!-- s: operator-inside -->
 
 The product defends the assistant-to-gateway path. Code that imports the
 library can skip the gate the same way it can open the database with the
@@ -115,6 +131,7 @@ operator's credential. The operator's own process is not an audit subject
 of this gateway.
 
 ## Two processes, one audit file
+<!-- s: two-processes -->
 
 `Audit.log()` is synchronous. One process can write many concurrent queries
 without breaking `prevHash`. A second OS process that opens the same sink
@@ -122,12 +139,14 @@ is rejected (`<sink>.lock`, advisory `wx`). The lock does not stop a writer
 outside Conarium that ignores the lock file.
 
 ## Strict signature mode is opt-in
+<!-- s: strict-sig-opt-in -->
 
 `CONARIUM_AUDIT_REQUIRE_SIG=1` refuses boot if a signing key is set and
 any audit line is unsigned. The default still accepts a fully unsigned
 legacy chain when an HMAC key is later added (08-05 compatibility).
 
 ## Audit sink hash is not JCS
+<!-- s: audit-hash-not-jcs -->
 
 Receipts hash with RFC 8785 JCS (`canonicalize`). The audit JSONL hasher
 (`src/audit-hash.ts`) uses `JSON.stringify` of insertion order. The two
@@ -136,10 +155,12 @@ Switching the sink to JCS would invalidate every existing audit file.
 Independent re-hash of an old sink must use `JSON.stringify`, not JCS.
 
 ## Cryptography is not independently audited
+<!-- s: crypto-unaudited -->
 
 The Ed25519 implementation has not had a formal audit.
 
 ## Masking cost grows with distinct masked values
+<!-- s: masking-cost -->
 
 Carry-over builds one matcher per unique value this policy already
 masked. `maxRows` bounds that set. When the policy leaves it unset the code falls
@@ -159,6 +180,7 @@ Raising the cap is allowed. The doctor and boot log warn above 500.
 The query is not rejected.
 
 ## A disclosure hash is a verification oracle on low-entropy payloads
+<!-- s: disclosure-oracle -->
 
 `disclosure.hash` is SHA-256 of the exact bytes that left the gateway after
 masking and the row cap. Anyone who holds the receipt can try a guess
@@ -168,6 +190,7 @@ would be written on the same receipt. High-entropy results are not
 practically guessable this way. A one-row yes/no result is.
 
 ## Destination is a declaration, not a verification
+<!-- s: destination-declaration -->
 
 `destination` is what the operator wrote in config. Conarium does not
 check that the result went there. MCP does not carry model identity, so
@@ -175,6 +198,7 @@ the field cannot be measured. Policy does not read it. A receipt that
 says `openai/gpt-x` is not proof that OpenAI saw the bytes.
 
 ## Reconciliation establishes object attribution, not per-statement coverage
+<!-- s: reconcile-object-attribution -->
 
 `conarium-reconcile` exits 0 when every query pattern the database counted
 names a table for which a receipt exists in the same window. One receipt
@@ -186,9 +210,13 @@ client request can produce several source statements (PostgREST, a connection
 pooler, an ORM), and a 1:1 rule would report false uncovered activity on any
 such deployment. The consequence is that a clean run establishes pattern and
 object overlap within the window. It does not establish that each recorded
-statement was itself receipted.
+statement was itself receipted. `--json-v2` prints a separate
+`coverage-reconciliation/2` object; a consumer MUST NOT read the `/1` result
+as `/2`. Without a Mapping Profile the `/2` object leaves multiplicity-bound
+items `indeterminate` rather than treating one receipt as a bound of one.
 
 ## Reconciliation cannot tell a trailing clock from a late receipt
+<!-- s: reconcile-trailing-clock -->
 
 The window comes from the database's snapshot timestamps and a receipt's
 timestamp comes from the gateway, so the boundary is decided by two clocks.
@@ -214,6 +242,7 @@ not change the exit code. `unassigned` is a different gap (the receipt
 named no object at all).
 
 ## OpenTimestamps client
+<!-- s: ots-client -->
 
 Stamping uses a built-in calendar client (Node `crypto` + HTTPS to the public calendars).
 `javascript-opentimestamps` is not a dependency. The `web3` / `elliptic` / `crypto-js` / `request` / `lodash` tree is not installed.

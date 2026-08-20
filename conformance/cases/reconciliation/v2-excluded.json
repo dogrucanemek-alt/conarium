@@ -1,0 +1,15 @@
+{
+  "id": "reconciliation/v2-excluded",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-set.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-empty.jsonl",
+  "expectOutcome": "no-exceptions",
+  "expectCounts": { "excluded": 1 },
+  "expectItemOutcomes": ["excluded"],
+  "rationale": "Session housekeeping is excluded with a rule id. Without a Mapping Profile the exclusion bound is undeclared.",
+  "doesNotTest": "Whether excluding SET is the right operational choice. Pinning is not justification."
+}

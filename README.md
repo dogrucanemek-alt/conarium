@@ -131,8 +131,11 @@ npx conarium-verify chain.jsonl --pubkey key.pem --anchor-check
 
 A second verifier, Go and the standard library only, is in [`verifiers/go`](verifiers/go). `go build -o conarium-verify .` then the same arguments as `conarium-verify`; `test-vectors/` is the contract.
 
-Opt-in anchoring: `CONARIUM_ANCHOR_SINK=opentimestamps`. Upgrade pending proofs later with
-`npx conarium-anchor-upgrade ./audit.jsonl.anchors.jsonl`.
+Anchoring is a separate step. Stamp a document with `npx conarium-stamp <file>`,
+or submit a chain-head hash with `npx conarium-anchor-service`.
+`CONARIUM_ANCHOR_SINK=opentimestamps` selects the in-tree calendar client those
+tools use; it does not stamp receipts as they are written. Upgrade pending
+proofs later with `npx conarium-anchor-upgrade ./audit.jsonl.anchors.jsonl`.
 The client is in-tree (Node `crypto` + calendar HTTPS). It does not install
 `javascript-opentimestamps`. See [LIMITATIONS.md](LIMITATIONS.md).
 

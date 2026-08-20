@@ -1,0 +1,16 @@
+{
+  "id": "reconciliation/v2-matched",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-customers-10.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-15.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers.jsonl",
+  "mappingProfile": "conformance/fixtures/reconciliation/profile-multiplicity.json",
+  "expectOutcome": "no-exceptions",
+  "expectCounts": { "matched": 1, "indeterminate": 0 },
+  "forbidItemOutcomes": [],
+  "rationale": "A declared multiplicity bound lets a naming receipt match a pattern whose delta is inside the bound. /2 outcome is no-exceptions.",
+  "doesNotTest": "Whether the bound is true of the deployment. The profile is an operator statement."
+}

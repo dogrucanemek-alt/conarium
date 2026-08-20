@@ -1,0 +1,16 @@
+{
+  "id": "reconciliation/v2-neg-undeclared-multiplicity",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-customers-10.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-15.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers.jsonl",
+  "expectOutcome": "exceptions",
+  "expectCounts": { "matched": 0 },
+  "expectItemOutcomes": ["indeterminate"],
+  "forbidItemOutcomes": ["matched"],
+  "rationale": "Negative: five new calls, one naming receipt, no Mapping Profile. /1 exits 0. /2 must not report matched — the multiplicity bound was never declared.",
+  "doesNotTest": "A profile that does declare the bound. That is v2-matched."
+}

@@ -12,6 +12,8 @@ const cases = [
   { id: 'example-plus-note', line: 'Yetkili: Ayşe Demir — Teslim edilemeyen bir madde karta girmez.', want: 'RED' },
   { id: 'gunes-plus-note', line: 'Güneş — Teslim edilemeyen bir madde karta girmez.', want: 'RED' },
   { id: 'zincir-plus-note', line: 'It writes zincir sağlam — Teslim edilemeyen bir madde karta girmez.', want: 'RED' },
+  { id: 'turkpatent-field-name', line: 'TÜRKPATENT patent search, *EPC Yayın Numarası B1* = `EP3861676B1`.', want: 'GREEN' },
+  { id: 'turkpatent-plus-note', line: 'Yayın Numarası — Teslim edilemeyen bir madde karta girmez.', want: 'RED' },
 ]
 
 let failed = 0
@@ -24,4 +26,4 @@ for (const c of cases) {
 }
 
 assert.equal(failed, 0, `${failed} locale allowlist case(s) wrong`)
-console.log('locale allow strip: 5/5')
+console.log(`locale allow strip: ${cases.length}/${cases.length}`)

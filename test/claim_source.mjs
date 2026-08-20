@@ -8,12 +8,18 @@ import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { allowedOn, CLAIMS_SOURCE, loadRules, scanSurfaces } from './claim_discipline.mjs'
+import { allowedOn, CLAIMS_SOURCE, loadRules, scanSurfaces, SURFACES } from './claim_discipline.mjs'
 
 const rules = loadRules(CLAIMS_SOURCE)
-assert.equal(rules.length, 13, 'the published list is the nine already-caught phrasings plus the four docs.html overclaims of 2026-08-18')
+assert.equal(rules.length, 14, 'the published list is the thirteen already-caught phrasings plus the automatic-anchor overclaim of 2026-08-20')
 
 const src = readFileSync(fileURLToPath(new URL('./claim_discipline.mjs', import.meta.url)), 'utf8')
+const denetciSrc = readFileSync(fileURLToPath(new URL('./denetci.mjs', import.meta.url)), 'utf8')
+assert.equal(src.includes('const SURFACES = ['), false, 'claim_discipline.mjs must not carry a second copy of the surface list')
+assert.equal(denetciSrc.includes('const SURFACES = ['), false, 'denetci.mjs must not carry a second copy of the surface list')
+assert.ok(src.includes('claim_surfaces.mjs'), 'claim_discipline.mjs must load surfaces from the published source')
+assert.ok(denetciSrc.includes('claim_surfaces.mjs'), 'denetci.mjs must load surfaces from the published source')
+assert.equal(SURFACES.length, 22, 'the published surface list is the twenty-two review documents')
 assert.equal(
   src.includes('const BANNED'),
   false,
@@ -114,4 +120,4 @@ assert.equal(byId['node-18-floor'].re.test('With Node (≥20)'), false)
 assert.equal(allowedOn('It said >=18 until 2026-08-17, and that was wrong rather than merely unverified', byId['node-18-floor'].allow), true)
 assert.equal(allowedOn('on Node 18 the gateway fails at initialize', byId['node-18-floor'].allow), true)
 
-console.log('claim source: 13 rules, one file, SOC 2 language-independent, four 08-18 overclaims locked, honest denial allowed, missing source red')
+console.log('claim source: 14 rules, one file, SOC 2 language-independent, four 08-18 overclaims locked, automatic-anchor overclaim locked, honest denial allowed, missing source red')

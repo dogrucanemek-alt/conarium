@@ -31,24 +31,11 @@ import assert from 'node:assert/strict'
 import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PHRASING_SURFACES, SURFACES } from './claim_surfaces.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 export const CLAIMS_SOURCE = join(root, 'docs/claims/retracted-phrasings.json')
-
-export const SURFACES = [
-  'README.md',
-  'README.tr.md',
-  'SECURITY.md',
-  'LIMITATIONS.md',
-  'LIMITATIONS.tr.md',
-  'docs.html',
-  'dpa.html',
-  'terms.html',
-  'privacy.html',
-  'docs/ARCHITECTURE.md',
-  'docs/RECEIPT-SPEC.md',
-  'docs/PRICING.md',
-]
+export { SURFACES, PHRASING_SURFACES }
 
 const SOURCE_MISSING =
   'kural kaynağı yok — paketi güncelle: docs/claims/retracted-phrasings.json'
@@ -131,6 +118,7 @@ const EXAMPLE_ALLOW = [
   /Atatürk Barajı/,
   /zincir sağlam/,
   /kırık \(satır/,
+  /Yayın Numarası/,
 ]
 
 function lineExemptFromLocale(line) {
@@ -227,7 +215,7 @@ if (invokedDirectly()) {
     process.exit(1)
   }
 
-  const { checked, failures } = scanSurfaces({ surfaces: SURFACES, rootDir: root, rules })
+  const { checked, failures } = scanSurfaces({ surfaces: PHRASING_SURFACES, rootDir: root, rules })
 
   assert.ok(checked > 0, 'no surfaces were read — the path list is wrong')
   assert.equal(

@@ -1,0 +1,1 @@
+{"v":"conarium-dbsnapshot/0.1","ts":"2026-08-06T12:00:00.000Z","role":"conarium_c2","source":"pg_stat_statements","entries":[{"queryid":"1","query":"SELECT $1 + $2","calls":3}]}
