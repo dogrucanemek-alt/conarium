@@ -138,8 +138,11 @@ export async function handleProofRequest(req, res) {
         res.destroy()
         return
       }
+      // The reason belongs in the operator's log, not in the response body. This
+      // endpoint is public and the failures that reach here name paths and keys.
+      console.error(`proof: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`)
       res.writeHead(503, { 'content-type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+      res.end(JSON.stringify({ error: 'proof unavailable' }))
     }
     return
   }

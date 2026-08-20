@@ -12,7 +12,7 @@
  *   CONARIUM_ROOT=/opt/conarium-mcp \
  *   node deploy/proof-anchor.mjs
  */
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, renameSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 
@@ -29,6 +29,17 @@ async function loadCore() {
   return { stampHash, upgradeProof, hashPrefixToBuffer }
 }
 
+/**
+ * Replace a file in one step. The /proof route hands chain.jsonl to visitors
+ * while this runs; a truncating write can be read half-written, and a rename
+ * has no partial state to read.
+ */
+function writeFileAtomic(path, contents) {
+  const tmp = `${path}.tmp-${process.pid}`
+  writeFileSync(tmp, contents)
+  renameSync(tmp, path)
+}
+
 function readReceipts(chainPath) {
   const raw = readFileSync(chainPath, 'utf8')
   const lines = raw.split('\n').filter((l) => l.trim())
@@ -36,7 +47,7 @@ function readReceipts(chainPath) {
 }
 
 function writeReceipts(chainPath, receipts) {
-  writeFileSync(chainPath, receipts.map((r) => JSON.stringify(r)).join('\n') + '\n')
+  writeFileAtomic(chainPath, receipts.map((r) => JSON.stringify(r)).join('\n') + '\n')
 }
 
 function lastHead(receipts) {
@@ -65,13 +76,13 @@ export async function stampDemoHead(opts) {
   const { last, hash, seq } = lastHead(receipts)
   const sidecarPath = `${opts.chainPath}.anchors.jsonl`
 
+  // Ask the file system once. A separate existence check is a second answer to
+  // the same question, and the file can change between the two answers.
   let existing = null
-  if (existsSync(opts.anchorPath)) {
-    try {
-      existing = JSON.parse(readFileSync(opts.anchorPath, 'utf8'))
-    } catch {
-      existing = null
-    }
+  try {
+    existing = JSON.parse(readFileSync(opts.anchorPath, 'utf8'))
+  } catch {
+    existing = null
   }
 
   const now = new Date().toISOString()
@@ -116,7 +127,7 @@ export async function stampDemoHead(opts) {
     stampedAt,
     upgradedAt,
   }
-  writeFileSync(opts.anchorPath, JSON.stringify(record, null, 2) + '\n')
+  writeFileAtomic(opts.anchorPath, JSON.stringify(record, null, 2) + '\n')
 
   const sidecar = {
     seq,
@@ -128,7 +139,7 @@ export async function stampDemoHead(opts) {
     upgradedAt,
     bitcoinBlock: state === 'bitcoin' ? (existing?.bitcoinBlock ?? null) : null,
   }
-  writeFileSync(sidecarPath, JSON.stringify(sidecar) + '\n')
+  writeFileAtomic(sidecarPath, JSON.stringify(sidecar) + '\n')
 
   last.anchor = { log: 'opentimestamps', ref: hash, state }
   writeReceipts(opts.chainPath, receipts)
@@ -139,10 +150,6 @@ export async function stampDemoHead(opts) {
 async function main() {
   const chainPath = process.env.CONARIUM_PROOF_CHAIN?.trim() || join(HERE, 'proof', 'chain.jsonl')
   const anchorPath = process.env.CONARIUM_PROOF_ANCHOR_FILE?.trim() || join(HERE, 'proof', 'anchor.json')
-  if (!existsSync(chainPath)) {
-    console.error(`proof-anchor: chain not found: ${chainPath}`)
-    process.exit(20)
-  }
   try {
     const out = await stampDemoHead({ chainPath, anchorPath })
     console.log(`ok: stamped ${out.ref} state=${out.state}`)
@@ -150,6 +157,12 @@ async function main() {
     console.log(`  sidecar: ${out.sidecarPath}`)
     process.exit(0)
   } catch (err) {
+    // Whether the chain is there is the read's answer to give, not a separate
+    // question asked of the file system a moment earlier.
+    if (err && err.code === 'ENOENT') {
+      console.error(`proof-anchor: chain not readable: ${chainPath}`)
+      process.exit(20)
+    }
     console.error(`proof-anchor: ${err instanceof Error ? err.message : err}`)
     process.exit(50)
   }
