@@ -25,9 +25,9 @@ against its public key on your own machine, with no account and no data of yours
 
 ```bash
 npm i @conarium-ai/core
-curl -fsS https://demo.conarium.dev/proof/chain.jsonl   -o chain.jsonl
-curl -fsS https://demo.conarium.dev/proof/key.pem       -o key.pem
-curl -fsS https://demo.conarium.dev/proof/key.pem.keyid -o key.pem.keyid
+curl -fsS https://conarium.dev/proof/chain.jsonl   -o chain.jsonl
+curl -fsS https://conarium.dev/proof/key.pem       -o key.pem
+curl -fsS https://conarium.dev/proof/key.pem.keyid -o key.pem.keyid
 npx conarium-verify chain.jsonl --pubkey key.pem
 ```
 
@@ -674,7 +674,8 @@ Conarium is **early access** — and honest about what's real:
 **Shipping now:** governed MCP gateway (stdio + HTTP) · deterministic PII masking,
 including labelled names in free text · allow/deny + row caps · per-person masking
 profiles · tamper-evident hash-chained audit ledger · Ed25519-signed receipt per access
-with an offline verifier · signed coverage declarations · two-sided reconciliation
+once a receipt sink is configured, with an offline verifier · signed coverage
+declarations · two-sided reconciliation
 against the database's own counters · OpenTimestamps anchoring and an optional
 anchoring service · conformance vectors · SQL gate: Postgres, Microsoft SQL Server, Oracle
 (MySQL is not implemented; Oracle synonyms and database links are not resolved — see LIMITATIONS) · Postgres, Supabase, docs, OpenAPI, Jira

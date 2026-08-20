@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.38 — 2026-08-20 — the conditional sentence that two other pages forgot
+
+The receipt is opt-in. Nothing is written until a receipt sink is configured, and
+`conarium-init` configures one, so the default layout has receipts and a
+hand-written config need not. The top of this README has said so since 0.2.32.
+
+Two other places had not caught up. `README.md` listed "Ed25519-signed receipt per
+access" among what ships, with no condition attached — the same file contradicting
+itself sixty lines apart. `docs/security/THREAT-MODEL.md` said every tool call "is
+supposed to write a signed receipt", which is the one document where an unstated
+precondition matters most: a reader consults a threat model to learn what the system
+does *not* guarantee.
+
+Both now name the condition. The threat model also gains the bypass it implies: a
+gateway with no sink mediates access and leaves no evidence, and it starts either
+way.
+
+The verification quickstart now fetches its three proof files from `conarium.dev`
+instead of `demo.conarium.dev`. The bytes are identical; the difference is that the
+first command a newcomer runs no longer depends on a single machine that also runs
+unrelated services.
+
+Nothing in `src/` changed. This release is three sentences and an address.
+
 ## 0.2.37 — 2026-08-20 — a claim with no call site, and the bound that decided anyway
 
 `docs/RECEIPT-SPEC.md` said "Receipts are anchored automatically." Nothing in

@@ -38,9 +38,14 @@ Whoever controls the config controls the policy. The code cannot save you from y
 **Today:** MCP stdio or Streamable HTTP. SQL is parsed (`pgsql-ast-parser`), not grepped.
 Writes are refused by the connector. Tables not on `allowTables` are denied.
 `maskColumns` plus content scanners run before the model sees a row.
-Every tool call — allowed or denied — is supposed to write a signed receipt.
+Every tool call — allowed or denied — is supposed to write a signed receipt once a
+receipt sink is configured. Without one, nothing is written and there is nothing to
+verify later.
 
 **Bypass surface:**
+- A gateway with no receipt sink mediates access and leaves no evidence of it.
+  `conarium-init` configures a sink, so the default layout has one, but a
+  hand-written config need not — and the gateway starts either way.
 - A bare name in running prose is not detected. "Ahmet called" goes through.
 - Street addresses are not detected.
 - Passport numbers in free text (non-MRZ) are not detected.
