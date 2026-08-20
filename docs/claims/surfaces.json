@@ -110,11 +110,6 @@
       "path": "docs/security/NPM-PROVENANCE.md",
       "why": "Ships in the tarball and tells a reader how to check where the package came from. Unlisted until 0.2.33, by which point it had gone stale in the worst direction: it said 'this is not a published release' inside eight published releases, and pointed at a verification command that answers 404 for npm provenance. A page about how to distrust us is one a reader must be able to trust.",
       "phrasing": true
-    },
-    {
-      "path": "standards/draft-dogru-scitt-disclosure-evidence-05.md",
-      "why": "The draft revision still open for editing, and the one place we describe this implementation to people who will not run it. -04 carried four statements about the tool that were accurate when written and false within days, each understating what it does, and no mechanism named the file while they could still be fixed. A posted revision is a record; an unposted one is a claim surface, and this is the window in which review can still change it.",
-      "phrasing": true
     }
   ]
 }

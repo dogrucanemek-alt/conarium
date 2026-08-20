@@ -22,7 +22,7 @@ assert.ok(denetciSrc.includes('claim_surfaces.mjs'), 'denetci.mjs must load surf
 assert.equal(
   SURFACES.length,
   23,
-  'the published surface list is the twenty-three review documents: twenty-two published surfaces plus the draft revision still open for editing',
+  'twenty-three review documents: twenty-two named in surfaces.json plus the current draft revision, derived from the tree rather than listed',
 )
 assert.equal(
   src.includes('const BANNED'),

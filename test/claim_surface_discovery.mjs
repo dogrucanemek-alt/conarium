@@ -14,7 +14,10 @@
  * regression is visible to whoever reads this next instead of remembered.
  */
 import assert from 'node:assert/strict'
-import { isUnlistedDoc, SURFACES } from './claim_surfaces.mjs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { currentDraft, isUnlistedDoc, SURFACES } from './claim_surfaces.mjs'
 
 const listed = new Set(SURFACES)
 const unlisted = (p) => isUnlistedDoc(p, listed)
@@ -40,13 +43,34 @@ assert.equal(
   'the rule this replaced answered false here — that is the whole reason it changed',
 )
 
-// Deciding is what silences it. -05 was read and added to the list, so the
+// Deciding is what silences it. The current revision is a surface, so the
 // auditor stops asking about it; the question was answered, not suppressed.
 assert.equal(
   unlisted('standards/draft-dogru-scitt-disclosure-evidence-05.md'),
   false,
-  'a draft that was reviewed and listed is read, not flagged',
+  'the current draft revision is read as a surface, not flagged as undecided',
 )
+
+// ── the current revision is derived, not listed by hand ──────────────────────
+// surfaces.json ships in the package, so naming each revision there costs a
+// version bump per revision. version_claim caught exactly that, in CI, on the
+// commit that tried it — a list nobody can afford to update is a list that
+// goes stale, which is the failure this whole file exists to prevent.
+const fixture = mkdtempSync(join(tmpdir(), 'cnr-drafts-'))
+for (const f of ['draft-x-03.md', 'draft-x-04.md', 'draft-x-05.md', 'draft-x-05.xml', 'README.md']) {
+  writeFileSync(join(fixture, f), '')
+}
+assert.deepEqual(
+  currentDraft(fixture),
+  ['standards/draft-x-05.md'],
+  'the highest-numbered revision is the surface; the ones before it are posted records',
+)
+assert.deepEqual(currentDraft(join(fixture, 'no-such')), [], 'a tree with no standards dir yields none')
+
+const live = currentDraft()
+assert.equal(live.length, 1, 'exactly one revision is open for editing at a time')
+assert.match(live[0], /^standards\/draft-.+-\d{2}\.md$/, 'the derived surface is a draft revision')
+assert.ok(SURFACES.includes(live[0]), 'the derived revision is part of the surface list it is derived into')
 
 // ── depth is not the rule ────────────────────────────────────────────────────
 // `docs/security/THREAT-MODEL.md` sat in neither list under the depth rule and
