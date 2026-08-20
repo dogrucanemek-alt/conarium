@@ -126,14 +126,30 @@ function lineExemptFromLocale(line) {
   return false
 }
 
-/** Strip measured PII examples, then scan what remains — same idea as /Doğru/. */
+/**
+ * Legal names, spelled the way they are registered.
+ *
+ * This scan exists to catch an internal note left in the wrong language on a
+ * surface written in English. A person's surname and a company's registered
+ * title are neither: they are proper nouns with one correct spelling, and on
+ * IETF front matter each sits beside an explicit ASCII form
+ * (`asciiFullname`, `asciiOrganization`) that the format provides for exactly
+ * this case. Transliterating them to satisfy a letter scan would put a name
+ * into the record that belongs to no one.
+ */
+const LEGAL_NAMES = [/Doğru/g, /VERAX TEKNOLOJİ LİMİTED ŞİRKETİ/g]
+
+/** Strip measured PII examples and legal names, then scan what remains. */
 export function localeResidue(line) {
   let text = line
   for (const re of EXAMPLE_ALLOW) {
     const flags = re.flags.includes('g') ? re.flags : `${re.flags}g`
     text = text.replace(new RegExp(re.source, flags), '')
   }
-  return text.replace(/Doğru/g, '')
+  for (const re of LEGAL_NAMES) {
+    text = text.replace(re, '')
+  }
+  return text
 }
 
 export function localeResidueFails(line) {

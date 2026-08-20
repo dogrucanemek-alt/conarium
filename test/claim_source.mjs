@@ -19,7 +19,11 @@ assert.equal(src.includes('const SURFACES = ['), false, 'claim_discipline.mjs mu
 assert.equal(denetciSrc.includes('const SURFACES = ['), false, 'denetci.mjs must not carry a second copy of the surface list')
 assert.ok(src.includes('claim_surfaces.mjs'), 'claim_discipline.mjs must load surfaces from the published source')
 assert.ok(denetciSrc.includes('claim_surfaces.mjs'), 'denetci.mjs must load surfaces from the published source')
-assert.equal(SURFACES.length, 22, 'the published surface list is the twenty-two review documents')
+assert.equal(
+  SURFACES.length,
+  23,
+  'twenty-three review documents: twenty-two named in surfaces.json plus the current draft revision, derived from the tree rather than listed',
+)
 assert.equal(
   src.includes('const BANNED'),
   false,

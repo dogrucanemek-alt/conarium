@@ -6,7 +6,7 @@
  * phrasing-scan exemption was "we forgot to add the file". 0.2.36 then
  * shipped stale sentences in two of the ten that only denetci knew about.
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -49,7 +49,36 @@ export function loadSurfaceRecords(sourcePath = SURFACES_SOURCE) {
   })
 }
 
-export const SURFACE_RECORDS = loadSurfaceRecords()
+/**
+ * The draft revision still open for editing.
+ *
+ * Derived, not listed. `surfaces.json` ships in the package, so naming each
+ * revision by hand costs a version bump per revision — and a list that is
+ * expensive to update is a list that stops being updated. That is the same
+ * force that kept -04 out of review while four of its sentences went stale.
+ *
+ * The tree already knows which revision is current: the highest-numbered
+ * draft under `standards/`. A posted revision is a record and does not change;
+ * the one after it is a claim surface, and this expression moves the surface
+ * forward on its own when the next revision is written.
+ */
+export function currentDraft(dir = join(root, 'standards')) {
+  if (!existsSync(dir)) return []
+  const revisions = readdirSync(dir)
+    .filter((f) => /^draft-.+-\d{2}\.md$/.test(f))
+    .sort()
+  const latest = revisions[revisions.length - 1]
+  return latest ? [`standards/${latest}`] : []
+}
+
+const DRAFT_RECORDS = currentDraft().map((path) => ({
+  path,
+  why: 'The draft revision still open for editing, and the one place this implementation is described to people who will not run it. -04 carried four statements about the tool that were accurate when written and false within days, each understating what it does, and nothing named the file while they could still be fixed.',
+  phrasing: true,
+  phrasingWhy: null,
+}))
+
+export const SURFACE_RECORDS = [...loadSurfaceRecords(), ...DRAFT_RECORDS]
 export const SURFACES = SURFACE_RECORDS.map((s) => s.path)
 export const PHRASING_SURFACES = SURFACE_RECORDS.filter((s) => s.phrasing).map((s) => s.path)
 
