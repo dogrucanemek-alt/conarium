@@ -78,18 +78,56 @@ if (existsSync(serverPath)) {
   )
 }
 
-let tagged = true
+function originHasTag(tagName) {
+  const out = execFileSync('git', ['ls-remote', '--tags', 'origin', `refs/tags/${tagName}`], {
+    cwd: root,
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim()
+  if (!out) return false
+  return out.split('\n').some((line) => {
+    const ref = line.split(/[\t ]/).pop()
+    return ref === `refs/tags/${tagName}` || ref === `refs/tags/${tagName}^{}`
+  })
+}
+
+let taggedOnOrigin
+try {
+  taggedOnOrigin = originHasTag(tag)
+} catch {
+  // Asking the remote is the question. If the network is down, we did not
+  // answer it — print SKIP rather than look like a pass.
+  console.log(`SKIP version claim: origin unreachable — cannot ask whether ${tag} exists`)
+  process.exit(0)
+}
+
+if (!taggedOnOrigin) {
+  // Nothing has been published under this number, so the number contradicts
+  // nothing. This is the normal state while a release is being prepared.
+  console.log(`version claim: ${version} is not tagged on origin — nothing published to contradict`)
+  process.exit(0)
+}
+
+let taggedLocally = true
 try {
   run('git', ['rev-parse', '--verify', `refs/tags/${tag}`])
 } catch {
-  tagged = false
+  taggedLocally = false
 }
 
-if (!tagged) {
-  // Nothing has been published under this number, so the number contradicts
-  // nothing. This is the normal state while a release is being prepared.
-  console.log(`version claim: ${version} is not tagged yet — nothing published to contradict`)
-  process.exit(0)
+if (!taggedLocally) {
+  // A CI checkout arrives with no tags at all, so "not in this clone" is a fact
+  // about the checkout and not about the release. The tag is the thing this check
+  // compares against, so fetch it. Only a fetch that fails leaves the question
+  // unanswered, and an unanswered question is not a pass.
+  try {
+    run('git', ['fetch', '--no-tags', 'origin', `refs/tags/${tag}:refs/tags/${tag}`])
+  } catch {
+    assert.fail(
+      `origin has ${tag}, this clone does not, and fetching it failed.\n` +
+        `  Without the tag there is nothing to compare ${version} against.\n`,
+    )
+  }
 }
 
 // What npm would actually ship, asked of npm rather than restated here.
