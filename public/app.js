@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const empty = document.getElementById('receipt-empty')
             if (empty && name === 'receipts') {
                 empty.hidden = false
-                empty.textContent = 'Makbuzlar alanı bulunamadı.'
+                empty.textContent = 'Receipts panel not found.'
             }
         }
     }
@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await apiFetch('/api/receipts')
             if (!res.ok) {
-                ConariumReceiptsPanel.showError(ui, 'Makbuz listesi alınamadı (' + res.status + ').')
+                ConariumReceiptsPanel.showError(ui, 'Could not load the receipt list (' + res.status + ').')
                 return
             }
             const data = await res.json()
@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
             })
         } catch (e) {
-            ConariumReceiptsPanel.showError(ui, 'Makbuz listesi alınamadı.')
+            ConariumReceiptsPanel.showError(ui, 'Could not load the receipt list.')
         }
     }
 
@@ -249,18 +249,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await apiFetch('/api/receipts/' + encodeURIComponent(id))
             if (!res.ok) {
                 detail.hidden = false
-                detail.textContent = 'Makbuz okunamadı (' + res.status + ').'
+                detail.textContent = 'Could not read the receipt (' + res.status + ').'
                 return
             }
             const data = await res.json()
             detail.hidden = false
             detail.innerHTML = data.html || ''
             if (data.html && /BEGIN PRIVATE KEY|BEGIN.*PRIVATE/.test(data.html)) {
-                detail.textContent = 'özel anahtar panele düştü — gösterilmedi'
+                detail.textContent = 'a private key reached the panel — not shown'
             }
         } catch (e) {
             detail.hidden = false
-            detail.textContent = 'Makbuz okunamadı.'
+            detail.textContent = 'Could not read the receipt.'
         }
     }
 

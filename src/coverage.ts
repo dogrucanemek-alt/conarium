@@ -1,13 +1,14 @@
 /**
- * Conarium Coverage Declaration v0.1 — kapsama kanıtı üreticisi + doğrulayıcısı.
+ * Conarium Coverage Declaration v0.1 — coverage-proof producer + verifier.
  *
  * Spec: docs/superpowers/specs/2026-08-01-coverage-proof-design.md
  *
- * KRİTİK DÜRÜSTLÜK KURALI: bu modül "erişim OLMADI" diyemez. Diyebildiği tek şey
- * "erişim KAYDEDİLMEDİ"dir. Kaydın yokluğu belirsizdir (gerçekten erişilmemiş de
- * olabilir, Conarium atlanmış da olabilir, loglama patlamış da olabilir). Bu ayrım
- * alan adlarına (notRecorded / notRecordedObjects) ve mesaj metnine ("access NOT
- * RECORDED") geçirilmiştir — yorumda değil, koddadır.
+ * CRITICAL HONESTY RULE: this module cannot say "access DID NOT HAPPEN". The only
+ * thing it can say is "access was NOT RECORDED". Absence of a record is ambiguous
+ * (it may never have been accessed, Conarium may have been bypassed, or logging
+ * may have failed). That distinction is carried in the field names (notRecorded /
+ * notRecordedObjects) and the message text ("access NOT RECORDED") — in the code,
+ * not only in a comment.
  */
 import { createHash } from 'crypto'
 import { ulid, canonicalize, receiptHash, type Receipt } from './receipt.js'
@@ -16,9 +17,9 @@ import { type SigningKey, signHash, type VerifyKey, verifyHash } from './keys.js
 export const COVERAGE_VERSION = 'conarium-coverage/0.2' as const
 
 export interface CoverageGap {
-  /** Beklenen (eksik) seq numarası. */
+  /** Expected (missing) seq number. */
   expectedSeq: number
-  /** Boşluktan sonra gelen ilk gerçek seq. */
+  /** First real seq after the gap. */
   foundSeq: number
 }
 
@@ -40,18 +41,19 @@ export interface CoverageDecisions {
 }
 
 export interface CoverageSummary {
-  /** declaredScope uzunluğu. */
+  /** Length of declaredScope. */
   declared: number
-  /** Erişimi KAYDEDİLEN nesne sayısı (makbuz dataRefs'inde geçen). */
+  /** Number of objects whose access was RECORDED (appeared in receipt dataRefs). */
   accessed: number
-  /** Erişimi KAYDEDİLMEYEN nesne sayısı. "erişilmedi" DEĞİL. */
+  /** Number of objects whose access was NOT RECORDED. NOT "was not accessed". */
   notRecorded: number
   /**
-   * Nesnesi BELİRLENEMEYEN makbuz sayısı. dataRefs boş VE request.target nesne
-   * değil VE araç veri erişimi yapan (query/search) bir makbuz "hangi nesneye
-   * dokundu" sorusuna cevap veremez. Bu, "erişilmedi" demek DEĞİLDİR — kaydın
-   * yokluğu belirsizdir. Bu sayacı sıfırdan büyükken notRecorded listesi "kesin"
-   * gibi sunulamaz; doğrulayıcı çıktısında da görünür.
+   * Number of receipts whose object CANNOT BE DETERMINED. A receipt with empty
+   * dataRefs AND a request.target that is not an object AND a data-access tool
+   * (query/search) cannot answer "which object did this touch". That is NOT the
+   * same as "was not accessed" — absence of a record is ambiguous. When this
+   * counter is greater than zero, the notRecorded list cannot be presented as
+   * "certain"; it also appears in the verifier output.
    */
   unassignedReceiptCount: number
   accessedObjects: string[]
@@ -76,15 +78,15 @@ export interface CoverageDeclaration {
   sig: CoverageSig
 }
 
-/** Beyan gövdesinden hash hesapla (sig hariç). */
+/** Hash the declaration body (excluding sig). */
 export function coverageHash(d: Omit<CoverageDeclaration, 'sig'>): string {
   const digest = createHash('sha256').update(canonicalize(d)).digest('hex')
   return `sha256:${digest}`
 }
 
 /**
- * Makbuzlardan seq aralığını ve kesintisizliği hesapla.
- * seq 1..N arası her değer tam olarak bir kez mi? Boşluk varsa gaps doldurulur.
+ * Compute the seq range and contiguity from receipts.
+ * Does every value in 1..N appear exactly once? If there is a gap, gaps is filled.
  */
 export function computeChain(
   receipts: Receipt[],
@@ -103,7 +105,7 @@ export function computeChain(
   }
   for (let expected = firstSeq; expected < lastSeq; expected++) {
     if (!seqs.includes(expected)) {
-      // Boşluktan sonraki ilk gerçek seq'i bul.
+      // Find the first real seq after the gap.
       let foundSeq = expected + 1
       while (foundSeq <= lastSeq && !seqs.includes(foundSeq)) foundSeq++
       gaps.push({ expectedSeq: expected, foundSeq })
@@ -121,7 +123,7 @@ export function computeChain(
 }
 
 /**
- * Makbuzlardan karar kırılımını hesapla (allow/partial/deny).
+ * Compute the decision breakdown from receipts (allow/partial/deny).
  */
 export function computeDecisions(receipts: Receipt[]): CoverageDecisions {
   const out: CoverageDecisions = { allow: 0, partial: 0, deny: 0 }
@@ -130,29 +132,30 @@ export function computeDecisions(receipts: Receipt[]): CoverageDecisions {
     if (d === 'allow') out.allow++
     else if (d === 'partial') out.partial++
     else if (d === 'deny') out.deny++
-    // Bilinmeyen karar sessizce sayılmaz — dürüstlük: bilinmeyeni yok saymak
-    // kırılımı yanlış gösterir. Ama şema allow/partial/deny ile sınırlı; yine de
-    // fail-closed olmak için bilinmeyen karar varsa hata ver.
+    // An unknown decision is not silently skipped — honesty: ignoring the unknown
+    // would mis-state the breakdown. The schema is limited to allow/partial/deny;
+    // still, to stay fail-closed, throw if an unknown decision appears.
     else throw new Error(`coverage: unknown policy decision "${d}" in receipt ${r.id}`)
   }
   return out
 }
 
 /**
- * declaredScope ∩ makbuz nesneleri — kapsama özeti.
- * notRecorded = declaredScope'ta olup makbuzlarda HİÇ geçmeyen nesneler.
- * Anlamı "erişim KAYDEDİLMEDİ" — "erişilmedi" değil.
+ * declaredScope ∩ receipt objects — coverage summary.
+ * notRecorded = objects that are in declaredScope and NEVER appear in receipts.
+ * Meaning is "access was NOT RECORDED" — not "was not accessed".
  *
- * Bir nesnenin "kaydedilmiş erişimi" İKİ kaynaktan çıkarılabilir:
- *   1. dataRefs[].object (query/search sonucu, describe_table target'ı)
- *   2. request.target — yalnızca target'ın nesnenin ta kendisi olduğu araçlarda
- *      (describe_table). Tek kaynağa bağlı kalmak, bir aracın dataRefs'i boş
- *      bırakması durumunda erişimi yanlış "kaydedilmedi" sayma kusurunu davet eder.
+ * An object's "recorded access" can be derived from TWO sources:
+ *   1. dataRefs[].object (query/search result, describe_table target)
+ *   2. request.target — only on tools where the target IS the object itself
+ *      (describe_table). Depending on a single source invites the fault of
+ *      counting access as "not recorded" when a tool left dataRefs empty.
  *
- * "BİLİNMİYOR"u sessizce "YOK" sayma: dataRefs boş VE target nesne değil VE araç
- * veri erişimi yapan (query/search) bir makbuzun hangi nesneye dokunduğu
- * belirsizdir. Bu, "o nesnelere erişilmedi" diye yorumlanamaz — unassignedReceiptCount
- * ile ayrıca sayılır. list_tables veri erişimi değil (sema listeleme), sayılmaz.
+ * Do not silently count "UNKNOWN" as "ABSENT": a receipt with empty dataRefs AND
+ * a target that is not an object AND a data-access tool (query/search) has an
+ * indeterminate object. That cannot be read as "those objects were not accessed"
+ * — it is counted separately via unassignedReceiptCount. list_tables is not data
+ * access (schema listing) and is not counted.
  */
 export function computeCoverage(receipts: Receipt[], declaredScope: string[]): CoverageSummary {
   const recorded = new Set<string>()
@@ -163,12 +166,12 @@ export function computeCoverage(receipts: Receipt[], declaredScope: string[]): C
       recorded.add(ref.object)
       hasObject = true
     }
-    // İkinci kanıt kaynağı: describe_table'da target zaten nesnenin ta kendisi.
+    // Second evidence source: on describe_table the target already IS the object itself.
     if (r.request.tool === 'describe_table' && r.request.target) {
       recorded.add(r.request.target)
       hasObject = true
     }
-    // Nesnesi belirlenemeyen veri-erişimi makbuzu → belirsizlik sayacı.
+    // Data-access receipt whose object cannot be determined → ambiguity counter.
     if (!hasObject && (r.request.tool === 'query' || r.request.tool === 'search')) {
       unassignedReceiptCount++
     }
@@ -186,8 +189,8 @@ export function computeCoverage(receipts: Receipt[], declaredScope: string[]): C
 }
 
 /**
- * Kapsama beyanı üret. Deterministik (makbuzlara + declaredScope'a bağlı; id/ts
- * üretim anına bağlı). Ed25519 ile imzalanır.
+ * Produce a coverage declaration. Deterministic (depends on receipts + declaredScope;
+ * id/ts depend on the moment of production). Signed with Ed25519.
  */
 export function buildCoverageDeclaration(
   receipts: Receipt[],
@@ -206,10 +209,11 @@ export function buildCoverageDeclaration(
   const decisions = computeDecisions(receipts)
   const coverage = computeCoverage(receipts, declaredScope)
 
-  // Kapsama dönemi, makbuzların KAPSADIĞI zamandan hesaplanır — oluşturma anından
-  // (r.ts) değil. Bir makbuz erişimden biraz SONRA oluşturulabilir; "bu dönemi
-  // kapsıyorum" iddiası kapsanan zamana dayanmalı. En küçük start ve en büyük end
-  // AYRI AYRI bulunur (tek diziyi sıralayıp ilk/son almak değil).
+  // The coverage period is computed from the time the receipts COVER — not from
+  // the moment they were created (r.ts). A receipt can be created a little AFTER
+  // the access; a "I cover this period" claim must rest on the covered time.
+  // The smallest start and the largest end are found SEPARATELY (not by sorting
+  // a single array and taking first/last).
   let start = receipts[0].period.start
   let end = receipts[0].period.end
   for (const r of receipts) {
@@ -239,8 +243,8 @@ export function buildCoverageDeclaration(
 }
 
 /**
- * Beyan imzasını doğrula. Geçerliyse true, değilse false (fail-closed: emin
- * olunamayan hiçbir durumda true dönmez).
+ * Verify the declaration signature. True if valid, false otherwise (fail-closed:
+ * never returns true in any case that cannot be confirmed).
  */
 export function verifyCoverageSignature(d: CoverageDeclaration, key: VerifyKey): boolean {
   if (d.sig.alg !== 'Ed25519') return false

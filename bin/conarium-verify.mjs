@@ -32,8 +32,8 @@ const RECEIPT_V2 = 'conarium-receipt/0.2'
 const RECEIPT_V3 = 'conarium-receipt/0.3'
 const RECEIPT_V4 = 'conarium-receipt/0.4'
 const SURUMLER = [RECEIPT_V1, RECEIPT_V2, RECEIPT_V3, RECEIPT_V4]
-// Tek sozluk. v0.3 model/client uc degeri kullanir; v0.4 disclosure `measured`
-// ekler. DECLARED/VERIFIED ikinci set yoktur.
+// Single vocabulary. v0.3 model/client use three values; v0.4 adds
+// disclosure `measured`. There is no second DECLARED/VERIFIED set.
 const META_KAYNAKLARI = ['protocol', 'measured', 'operator-declared', 'undeclared']
 const META_V3 = ['protocol', 'operator-declared', 'undeclared']
 const GENESIS = 'sha256:0000000000000000000000000000000000000000000000000000000000000000'
@@ -294,17 +294,17 @@ function schemaOk(r) {
   if (!Number.isInteger(r.chain.seq)) return 'chain.seq not integer'
   if (typeof r.chain.prevHash !== 'string') return 'missing chain.prevHash'
   if (typeof r.chain.hash !== 'string') return 'missing chain.hash'
-  // Her iki surumde de null olmali; undefined sema kaymasi sayilir -> 20.
-  // (Riza baglama gelecek bir surumun isi, v0.2'nin degil.)
+  // Must be null in both versions; undefined counts as a schema drift -> 20.
+  // (Binding consent is a future version's job, not v0.2's.)
   if (r.consentRef !== null && r.consentRef !== undefined) {
     return 'consentRef must be null'
   }
   if (!('consentRef' in r)) return 'missing consentRef (must be null)'
   if (!('anchor' in r)) return 'missing anchor field'
-  // Govde alanlari da semaya dahildir. Bunlar olmadan da hash zaten tutmaz ve
-  // exit 10 doner — ama "kurcalanmis" TESHISI yanlis olur: eksik alanli bir
-  // kayit degistirilmis bir makbuz degil, hic makbuz degildir. Teshis dogru
-  // olsun diye burada yakalaniyor (test-vectors/007 bunu kilitliyor).
+  // Body fields are also part of the schema. Without them the hash already
+  // fails and we exit 10 — but the "tampered" DIAGNOSIS would be wrong: a
+  // record with missing fields is not a modified receipt, it is not a receipt
+  // at all. Caught here so the diagnosis is correct (test-vectors/007 locks this).
   for (const alan of ['period', 'request', 'dataRefs', 'policy', 'flags', 'masking', 'outcome']) {
     if (!(alan in r) || r[alan] === null || r[alan] === undefined) return `missing ${alan}`
   }
@@ -313,7 +313,7 @@ function schemaOk(r) {
   if (typeof r.policy !== 'object' || typeof r.policy.decision !== 'string') {
     return 'policy.decision is required'
   }
-  // v0.1: aktör "service" olmak zorunda (degismedi — eski makbuzlar aynen dogrulanir)
+  // v0.1: actor must be "service" (unchanged — old receipts still verify as-is)
   if (r.v === RECEIPT_V1) {
     if (!r.actor || r.actor.type !== 'service') return 'actor.type must be "service" in v0.1'
   } else {
@@ -327,10 +327,11 @@ function schemaOk(r) {
       return 'actor.type "user" cannot carry assurance "shared-token"'
     }
   }
-  // v0.3: model/client artik DEGERI ile birlikte KAYNAGINI da tasir.
-  // "undeclared" gecerli bir makbuzdur — eksik degil, durustce bos.
-  // v0.4 ayni model/client kurallarini korur; disclosure/destination EKLER.
-  // Eski surumlerde bu alanlar zorunlu degil — eksik 0.3 makbuz 20 donmez.
+  // v0.3: model/client now carry their SOURCE along with the VALUE.
+  // "undeclared" is a valid receipt — not missing, honestly empty.
+  // v0.4 keeps the same model/client rules; ADDS disclosure/destination.
+  // These fields are not required in older versions — a receipt missing 0.3
+  // fields does not return 20.
   if (r.v === RECEIPT_V3 || r.v === RECEIPT_V4) {
     for (const alan of ['model', 'client']) {
       const m = r[alan]
@@ -338,7 +339,7 @@ function schemaOk(r) {
       if (!META_V3.includes(m.source)) {
         return `${alan}.source must be one of ${META_V3.join('|')} in ${r.v === RECEIPT_V4 ? 'v0.4' : 'v0.3'}`
       }
-      // Bildirilmedi denip deger tasimak celiskidir: makbuz ya bilmiyordur ya bilir.
+      // Claiming undeclared while carrying values is a contradiction: a receipt either does not know or it does.
       if (m.source === 'undeclared') {
         const dolu = alan === 'model'
           ? [m.provider, m.name, m.version].some((x) => x !== null)
@@ -604,10 +605,11 @@ async function main(argv = process.argv.slice(2)) {
           })
         }
         const otsResult = await verifyOtsProof(row.ots, receipt.chain.hash)
-        // 15 ÖNCE gelir: "kontrol edemedim" ile "kanıt tutmuyor" farklı cevaplardır
-        // ve ikincisi birincisini yutarsa doğrulayıcı bilmediği bir şeyi iddia eder.
-        // Sessizce 0 dönmek de aynı ölçüde yanlış olurdu — çağıran, çıpanın
-        // doğrulanmadığını BİLMELİ, sadece doğrulanamadığını.
+        // 15 comes FIRST: "I could not check" and "the proof does not hold" are
+        // different answers, and if the second swallows the first the verifier
+        // claims something it does not know. Silently returning 0 would be
+        // equally wrong — the caller MUST KNOW the anchor was not verified,
+        // only that it could not be verified.
         if (otsResult.unknown) {
           fail(
             15,
@@ -661,11 +663,13 @@ async function main(argv = process.argv.slice(2)) {
     }
   }
 
-  // Bildirilmemis meta BASARISIZLIK DEGILDIR — ama sessizce de gecmez. Denetci
-  // "N makbuz dogrulandi" cumlesini okurken, kacinin model kimligi tasimadigini
-  // gormeli; aksi halde dogrulama, olcmedigi bir seyi onaylamis gibi okunur.
-  // NOT: receipts elemanlari {file, receipt} sarmalidir — dogrudan r.model okumak
-  // sessizce hep 0 verir (bu tam olarak bir kez yasandi, e2e kosusu yakaladi).
+  // Undeclared metadata is NOT a failure — but it also does not pass silently.
+  // When the auditor reads "N receipts verified", they must see how many carry
+  // no model identity; otherwise verification reads as if it approved something
+  // it did not measure.
+  // NOTE: receipts elements are wrapped as {file, receipt} — reading r.model
+  // directly silently always yields 0 (this happened exactly once; the e2e run
+  // caught it).
   const modelBildirilmemis = receipts.filter((r) => r.receipt?.model?.source === 'undeclared').length
   const clientBildirilmemis = receipts.filter((r) => r.receipt?.client?.source === 'undeclared').length
   const notlar = []

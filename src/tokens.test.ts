@@ -60,7 +60,7 @@ describe('token deposu', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cnr-bozuk-'))
     const p = join(dir, 'conarium.tokens.json')
     writeFileSync(p, '{ bu gecerli json degil')
-    expect(() => loadTokenStore(p)).toThrow(/bozuk JSON/)
+    expect(() => loadTokenStore(p)).toThrow(/invalid JSON/)
   })
 
   it('depo dosyasında düz metin token bulunmaz', () => {

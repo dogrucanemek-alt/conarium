@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 
-/** validateChain / log() ile aynı kural: hash+signature+sig+anchor hariç JSON → sha256. */
+/** Same rule as validateChain / log(): JSON excluding hash+signature+sig+anchor → sha256. */
 export function computeEntryHash(entry: Record<string, unknown>): string {
   const signed: Record<string, unknown> = { ...entry }
   delete signed.hash

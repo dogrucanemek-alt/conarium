@@ -1,7 +1,7 @@
 /**
  * Supabase PostgREST connector (C1).
- * Codes canlı SQL PC'den kapalı olduğunda ZION aynasına (Codes sync) güvenli RO erişim.
- * Ham SQL → yalnızca basit SELECT ... FROM schema.table [LIMIT n] kabul edilir.
+ * Safe RO access to the ZION mirror (Codes sync) when live SQL from Codes is closed on the PC.
+ * Raw SQL → only simple SELECT ... FROM schema.table [LIMIT n] is accepted.
  */
 import type {
   Connector,
@@ -39,8 +39,9 @@ export class SupabaseRestConnector implements Connector {
     this.description = config.description || 'Supabase PostgREST (ZION RO mirror)'
     this.baseUrl = (config.config.url || process.env.CONARIUM_SUPABASE_URL || '').replace(/\/$/, '')
     this.apiKey = config.config.key || process.env.CONARIUM_SUPABASE_KEY || ''
-    // Kong gateway'i apikey basliginda BILINEN bir anahtar ister (anon yeter);
-    // kisitli-rol JWT'si yalniz Authorization: Bearer'da rol secer. Ayri verilmezse eski davranis.
+    // Kong gateway wants a KNOWN key in the apikey header (anon is enough);
+    // a restricted-role JWT only picks the role in Authorization: Bearer. If not
+    // supplied separately, keep the old behaviour.
     this.anonKey = config.config.anonKey || process.env.CONARIUM_SUPABASE_ANON || this.apiKey
     this.schema = config.config.schema || 'zion'
     const raw = config.config.allowTables || ''
@@ -56,15 +57,16 @@ export class SupabaseRestConnector implements Connector {
   async connect(): Promise<void> {
     if (!this.baseUrl) throw new Error(`${this.name}: CONARIUM_SUPABASE_URL / config.url required`)
     if (!this.apiKey) throw new Error(`${this.name}: CONARIUM_SUPABASE_KEY / config.key required`)
-    // Saglik kontrolu: OpenAPI koku Kong'da yalniz service_role'a acik — kisitli rol JWT'si
-    // orada hep 401 yer. Allowlist varsa ilk tabloya limit=0 sorgusu at (veri donmez).
+    // Health check: the OpenAPI sniff on Kong is open only to service_role — a
+    // restricted-role JWT always gets 401 there. If an allowlist exists, hit the
+    // first table with limit=0 (no data comes back).
     const first = [...this.allow].sort()[0]
     const url = first
       ? `${this.baseUrl}/rest/v1/${encodeURIComponent(first)}?select=*&limit=0`
       : `${this.baseUrl}/rest/v1/`
     const res = await fetch(url, { headers: this.headers() })
     if (!res.ok && res.status !== 200) {
-      // 401/403 = bad key / yetkisiz rol
+      // 401/403 = bad key / unauthorized role
       if (res.status === 401 || res.status === 403) {
         throw new Error(`${this.name}: Supabase REST auth failed (${res.status})`)
       }

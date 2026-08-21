@@ -19,8 +19,8 @@
 import { createHash, createPublicKey, verify as cryptoVerify } from 'crypto'
 import { readFileSync, existsSync } from 'fs'
 
-// v0.1 geriye uyum: eski beyanlar hâlâ doğrulanabilir (kanıtı çöpe atmamak için).
-// v0.2, coverage.unassignedReceiptCount alanını ekler. Hangi sürüm olduğu çıktıda belirtilir.
+// v0.1 backward compatibility: old declarations remain verifiable (so the evidence is not thrown away).
+// v0.2 adds the coverage.unassignedReceiptCount field. Which version it is is stated in the output.
 const COVERAGE_V = 'conarium-coverage/0.2'
 const COVERAGE_V_LEGACY = 'conarium-coverage/0.1'
 
@@ -213,7 +213,7 @@ function schemaOk(d) {
   if (!Number.isInteger(d.coverage.notRecorded)) return 'coverage.notRecorded not integer'
   if (!Array.isArray(d.coverage.accessedObjects)) return 'coverage.accessedObjects must be an array'
   if (!Array.isArray(d.coverage.notRecordedObjects)) return 'coverage.notRecordedObjects must be an array'
-  // v0.2: unassignedReceiptCount zorunlu. v0.1'de alan yoktu — geriye uyum için yoksa 0 varsay.
+  // v0.2: unassignedReceiptCount is required. The field did not exist in v0.1 — if absent, assume 0 for backward compatibility.
   if (d.v === COVERAGE_V && !Number.isInteger(d.coverage.unassignedReceiptCount)) {
     return 'coverage.unassignedReceiptCount not integer'
   }
@@ -265,9 +265,9 @@ function verifySig(keys, d) {
 }
 
 /**
- * Beyanı makbuzlarla çapraz kontrol et. Tutarsızlık → hata metni döner, tutarlıysa null.
- * Dürüstlük kuralı: coverage.notRecordedObjects "erişim KAYDEDİLMEDİ" anlamına gelir,
- * "erişilmedi" değil — bu metinlerde de korunur.
+ * Cross-check the declaration against receipts. Inconsistency → returns an error string, null if consistent.
+ * Honesty rule: coverage.notRecordedObjects means "access was NOT RECORDED",
+ * not "was not accessed" — this is preserved in these strings too.
  */
 function crossCheck(d, receipts) {
   if (receipts.length === 0) {
@@ -277,7 +277,7 @@ function crossCheck(d, receipts) {
   if (receipts.length !== d.chain.count) {
     return `count mismatch: declaration says ${d.chain.count}, receipts file has ${receipts.length}`
   }
-  // seq aralığı + kesintisizlik
+  // seq range + contiguity
   const seqs = receipts.map((r) => r.chain.seq).sort((a, b) => a - b)
   if (seqs[0] !== d.chain.firstSeq) {
     return `firstSeq mismatch: declaration says ${d.chain.firstSeq}, receipts start at ${seqs[0]}`
@@ -317,9 +317,9 @@ function crossCheck(d, receipts) {
       return `decisions.${k} mismatch: declaration says ${d.decisions[k]}, receipts have ${dec[k]}`
     }
   }
-  // coverage — aynı mantık src/coverage.ts computeCoverage ile birebir:
-  // nesne kaynağı dataRefs[].object + describe_table'da request.target (ikinci kanıt).
-  // list_tables veri erişimi değil (sema listeleme) — nesne sayılmaz.
+  // coverage — same logic as src/coverage.ts computeCoverage, one-to-one:
+  // object source is dataRefs[].object + request.target on describe_table (second evidence).
+  // list_tables is not data access (schema listing) — the object is not counted.
   const recorded = new Set()
   let unassignedReceiptCount = 0
   for (const r of receipts) {
@@ -344,8 +344,8 @@ function crossCheck(d, receipts) {
   if (notRecordedObjects.length !== d.coverage.notRecorded) {
     return `coverage.notRecorded mismatch: declaration says ${d.coverage.notRecorded}, receipts show ${notRecordedObjects.length}`
   }
-  // v0.2: belirsizlik sayacı makbuzlardan hesaplanıp beyanla karşılaştırılır.
-  // v0.1'de alan yoktu — geriye uyum için atla.
+  // v0.2: the unassigned counter is computed from receipts and compared against the declaration.
+  // The field did not exist in v0.1 — skip for backward compatibility.
   if (d.v === COVERAGE_V && unassignedReceiptCount !== d.coverage.unassignedReceiptCount) {
     return `coverage.unassignedReceiptCount mismatch: declaration says ${d.coverage.unassignedReceiptCount}, receipts show ${unassignedReceiptCount}`
   }
@@ -440,10 +440,11 @@ async function main(argv = process.argv.slice(2)) {
     }
   }
 
-  // Zincir kesintisizliği: CI'da sorulan soru "kapsamam eksiksiz mi?" (b).
-  // Zincirde boşluk = makbuz EKSİK = kapsam eksik. Varsayılan SIKI: boşluk varsa
-  // "ok:" yazma ve EXIT 12 ver (conarium-verify'daki seq gap ile aynı anlam).
-  // --allow-gaps yalnızca ozgunluk sorusu (a) sorulduğunda EXIT 0 döndürür.
+  // Chain contiguity: the question CI asks is "is my coverage complete?" (b).
+  // A gap in the chain = a receipt is MISSING = coverage is incomplete. Default
+  // is STRICT: if there is a gap, do not print "ok:" and EXIT 12 (same meaning
+  // as seq gap in conarium-verify).
+  // --allow-gaps returns EXIT 0 only when the authenticity question (a) is asked.
   if (!d.chain.contiguous && !opts.allowGaps) {
     const gapDesc = d.chain.gaps
       .map((g) => `seq ${g.expectedSeq} (found ${g.foundSeq})`)
@@ -459,7 +460,7 @@ async function main(argv = process.argv.slice(2)) {
   const complete = d.chain.contiguous === true && windowStartPinned
   const pinNote = windowStartPinned
     ? 'window start pinned'
-    : 'window start not pinned (başlangıç sabitlenmedi)'
+    : 'window start not pinned'
 
   if (opts.json) {
     console.log(JSON.stringify({
@@ -483,8 +484,8 @@ async function main(argv = process.argv.slice(2)) {
         'warning: window start not pinned — prefix truncation is invisible; pass --expect-seq-from N',
       )
     }
-    // Belirsizlik uyarısı: notRecorded listesi ancak unassigned=0 iken "kesin" sayılabilir.
-    // "erişilmedi"/"not accessed" ifadesi YASAK — kaydın yokluğu belirsizdir, erişim yokluğu değil.
+    // Unassigned warning: the notRecorded list can only be treated as "definitive" when unassigned=0.
+    // The phrase "not accessed" is FORBIDDEN — absence of a record is indeterminate, not absence of access.
     if (unassigned > 0) {
       console.warn(
         `warning: notRecorded=${d.coverage.notRecorded} (access NOT RECORDED; ${unassigned} receipt(s) could not be attributed ` +

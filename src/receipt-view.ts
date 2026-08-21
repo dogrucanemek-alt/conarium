@@ -71,33 +71,34 @@ export interface ProofLike {
 }
 
 export const RECEIPT_VIEW_CLAIM =
-  'Bu kayıt sonradan değiştirilmediğini, silinmediğini, yeniden sıralanmadığını veya geriye tarih atılmadığını gösterir. Oluştuğu anda doğru olduğunu kanıtlamaz.'
+  'This record shows it was not altered, deleted, reordered or backdated after the fact. It does not prove it was correct at the moment it was created.'
 
 /**
  * Exact-match presentation map. The receipt / LiveProof JSON is not rewritten.
  * Unknown strings are returned unchanged — no guessed translation.
+ * Values match keys: the viewer used to render these in Turkish.
  */
 const PRESENTATION_TR: Record<string, string> = {
   'These records have not been altered, deleted, reordered or backdated after creation. This does NOT prove they were correct at creation time.':
-    'Bu kayıtlar oluşturulduktan sonra değiştirilmedi, silinmedi, yeniden sıralanmadı veya geriye tarih atılmadı. Oluşturuldukları anda doğru olduklarını kanıtlamaz.',
+    'These records have not been altered, deleted, reordered or backdated after creation. This does NOT prove they were correct at creation time.',
   'Synthetic demo data, not real customer data.':
-    'Sentetik demo verisi, gerçek müşteri verisi değil.',
+    'Synthetic demo data, not real customer data.',
   'actor is a service identity, not a natural person.':
-    'aktör bir hizmet kimliği, gerçek kişi değil.',
+    'actor is a service identity, not a natural person.',
   'operator declared, not verified':
-    'operatör beyan etti, doğrulanmadı',
+    'operator declared, not verified',
   'destination not declared (undeclared).':
-    'hedef bildirilmedi (undeclared).',
+    'destination not declared (undeclared).',
   'Anchor may be pending — Bitcoin attestation takes hours.':
-    'Çıpa pending olabilir — Bitcoin tasdiki saatler sürer.',
+    'Anchor may be pending — Bitcoin attestation takes hours.',
   'This demo is not anchored — the chain head was never sent to a calendar.':
-    'Bu demo çıpalanmıyor — zincir başı hiçbir zaman damgasına gönderilmedi.',
+    'This demo is not anchored — the chain head was never sent to a calendar.',
   'Signature is meaningless: ephemeral mode (CONARIUM_PROOF_ALLOW_EPHEMERAL=1); not a compliance attestation.':
-    'İmza anlamsız: ephemeral kip (CONARIUM_PROOF_ALLOW_EPHEMERAL=1); tasdik değil.',
-  'revenue by month': 'aylık ciro',
-  'customer list': 'müşteri listesi',
-  'closed table': 'kapalı tablo',
-  'not permitted by policy': 'politika izin vermiyor',
+    'Signature is meaningless: ephemeral mode (CONARIUM_PROOF_ALLOW_EPHEMERAL=1); not a compliance attestation.',
+  'revenue by month': 'revenue by month',
+  'customer list': 'customer list',
+  'closed table': 'closed table',
+  'not permitted by policy': 'not permitted by policy',
 }
 
 export function presentKnownText(text: string): string {
@@ -130,7 +131,7 @@ export function proofToView(proof: ProofLike): ReceiptView {
     signature: proof.signature
       ? { alg: proof.signature.alg, keyId: proof.signature.keyId, meaning: proof.signatureMeaning }
       : null,
-    signatureAbsentNote: proof.signature ? undefined : proof.signatureMeaning ? undefined : 'Bu kipte imza anlamsız.',
+    signatureAbsentNote: proof.signature ? undefined : proof.signatureMeaning ? undefined : 'Signature is meaningless in this mode.',
     publicKey: proof.publicKey,
     verify: proof.verify,
     anchor: proof.anchor ? { ...proof.anchor, display: display ?? 'unverified' } : null,
@@ -153,21 +154,21 @@ export interface ReceiptToViewExtras {
 export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}): ReceiptView {
   const limitations: string[] = extras.limitations ? [...extras.limitations] : []
   if (!extras.limitations) {
-    if (receipt.model?.source === 'undeclared') limitations.push('model bildirmedi (undeclared).')
-    if (receipt.client?.source === 'undeclared') limitations.push('istemci bildirmedi (undeclared).')
+    if (receipt.model?.source === 'undeclared') limitations.push('model not declared (undeclared).')
+    if (receipt.client?.source === 'undeclared') limitations.push('client not declared (undeclared).')
     if (receipt.destination?.source === 'undeclared') {
-      limitations.push('hedef bildirilmedi (undeclared).')
+      limitations.push('destination not declared (undeclared).')
     } else if (receipt.destination?.source === 'operator-declared') {
-      limitations.push('hedef: operatör beyan etti, doğrulanmadı.')
+      limitations.push('destination: operator declared, not verified.')
     }
     const display = resolveAnchorDisplay(receipt.anchor, { display: extras.anchorDisplay })
-    if (!receipt.anchor) limitations.push('çıpa yok.')
+    if (!receipt.anchor) limitations.push('no anchor.')
     else if (display === 'pending') {
-      limitations.push('çıpa durumu: pending — Bitcoin tasdiki henüz yok. Saklanmıyor.')
+      limitations.push('anchor state: pending — no Bitcoin attestation yet. Not stored.')
     } else if (display === 'unverified') {
-      limitations.push('çıpa doğrulanmadı — ham state güven sinyali değil.')
+      limitations.push('anchor not verified — a raw state is not a trust signal.')
     }
-    if (!receipt.sig) limitations.push('imza yok — bu satır tasdik değil.')
+    if (!receipt.sig) limitations.push('no signature — this row is not an attestation.')
     for (const f of receipt.flags || []) limitations.push(f)
   }
 
@@ -175,7 +176,7 @@ export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}
   const denied = receipt.outcome?.denied || decision === 'deny'
 
   return {
-    title: `Makbuz ${receipt.id}`,
+    title: `Receipt ${receipt.id}`,
     generatedAt: receipt.ts,
     limitations,
     claim: extras.claim ?? RECEIPT_VIEW_CLAIM,
@@ -197,7 +198,7 @@ export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}
     signature: receipt.sig
       ? { alg: receipt.sig.alg, keyId: receipt.sig.keyId, meaning: true }
       : null,
-    signatureAbsentNote: receipt.sig ? undefined : 'üretilemedi',
+    signatureAbsentNote: receipt.sig ? undefined : 'could not be produced',
     publicKey: extras.publicKey ?? null,
     verify: extras.verify ?? 'npx conarium-verify <receipts.jsonl> --pubkey <key.pub.pem>',
     anchor: receipt.anchor
@@ -212,7 +213,7 @@ export function receiptToView(receipt: Receipt, extras: ReceiptToViewExtras = {}
           value: receipt.destination.value,
           sourceNote:
             receipt.destination.source === 'operator-declared'
-              ? 'operatör beyan etti, doğrulanmadı'
+              ? 'operator declared, not verified'
               : 'hedef bildirilmedi (undeclared).',
         }
       : undefined,
@@ -260,9 +261,9 @@ function chainIntegrityHtml(check?: ReceiptChainCheck): string {
   if (!check) return ''
   if (check.ok) {
     if (check.entries === 0) return ''
-    return `<p class="chain-ok">zincir sağlam</p>`
+    return `<p class="chain-ok">chain intact</p>`
   }
-  return `<p class="chain-broken">kırık (satır ${esc(check.brokenAt)})</p>`
+  return `<p class="chain-broken">broken (row ${esc(check.brokenAt)})</p>`
 }
 
 function innerHtml(view: ReceiptView, localId: string): string {
@@ -272,71 +273,71 @@ function innerHtml(view: ReceiptView, localId: string): string {
   const head = view.chain?.head || ''
   const sig = view.signature
   const jsonLink = view.jsonHref
-    ? `<p><a class="btn" href="${esc(view.jsonHref)}">Ham JSON</a></p>`
+    ? `<p><a class="btn" href="${esc(view.jsonHref)}">Raw JSON</a></p>`
     : ''
 
   return `
   <h1>${esc(view.title)}</h1>
-  <p class="muted">Üretildi: <time datetime="${esc(view.generatedAt)}">${esc(view.generatedAt)}</time><span id="${localId}"></span></p>
+  <p class="muted">Generated: <time datetime="${esc(view.generatedAt)}">${esc(view.generatedAt)}</time><span id="${localId}"></span></p>
   ${chainIntegrityHtml(view.chainIntegrity)}
 
   <section class="limits">
-    <h2>Sınırlar</h2>
-    <ul>${lims || '<li>sınır listesi boş — gizlenmedi, yazılmadı.</li>'}</ul>
-    ${pending ? `<p class="pending">Çıpa durumu: <strong>pending</strong> — Bitcoin tasdiki henüz yok. Saklanmıyor.</p>` : ''}
-    ${display === 'unverified' ? `<p class="muted">Çıpa: doğrulanmadı${view.anchor?.log ? ` (${esc(view.anchor.log)})` : ''}</p>` : ''}
-    ${display === 'verified' ? `<p class="muted">Çıpa: bitcoin${view.anchor?.log ? ` (${esc(view.anchor.log)})` : ''}</p>` : ''}
-    ${!view.anchor ? `<p class="muted">Çıpa yok.</p>` : ''}
+    <h2>Limitations</h2>
+    <ul>${lims || '<li>limitation list empty — not hidden, not written.</li>'}</ul>
+    ${pending ? `<p class="pending">Anchor state: <strong>pending</strong> — no Bitcoin attestation yet. Not stored.</p>` : ''}
+    ${display === 'unverified' ? `<p class="muted">Anchor: not verified${view.anchor?.log ? ` (${esc(view.anchor.log)})` : ''}</p>` : ''}
+    ${display === 'verified' ? `<p class="muted">Anchor: bitcoin${view.anchor?.log ? ` (${esc(view.anchor.log)})` : ''}</p>` : ''}
+    ${!view.anchor ? `<p class="muted">No anchor.</p>` : ''}
   </section>
 
   ${view.claim ? `<p>${esc(presentKnownText(view.claim))}</p>` : ''}
 
   ${
     view.destination
-      ? `<h2>Hedef</h2>
+      ? `<h2>Destination</h2>
   <p>${esc(view.destination.value ?? '—')} — ${esc(presentKnownText(view.destination.sourceNote))}</p>`
       : ''
   }
 
-  <h2>İşlemler</h2>
+  <h2>Operations</h2>
   <table>
-    <thead><tr><th>İstek</th><th>Politika</th><th>Dönen</th><th>Maske</th><th>Örnek / neden</th></tr></thead>
+    <thead><tr><th>Request</th><th>Policy</th><th>Returned</th><th>Mask</th><th>Sample / reason</th></tr></thead>
     <tbody>${opRows(view.operations || [])}</tbody>
   </table>
 
-  <h2>Zincir</h2>
+  <h2>Chain</h2>
   <dl>
     <dt>seq</dt><dd>${esc(view.chain?.seq)}</dd>
     <dt>entries</dt><dd>${view.chain?.entries == null ? '—' : esc(view.chain.entries)}</dd>
     <dt>head</dt><dd>
       <div class="row">
         <code title="${esc(head)}">${esc(shortHead(head))}</code>
-        <button type="button" data-copy-from="head-full">Kopyala</button>
+        <button type="button" data-copy-from="head-full">Copy</button>
       </div>
       <pre id="head-full" hidden>${esc(head)}</pre>
     </dd>
   </dl>
 
-  <h2>İmza</h2>
+  <h2>Signature</h2>
   ${
     sig
       ? `<dl>
     <dt>alg</dt><dd>${esc(sig.alg)}</dd>
     <dt>keyId</dt><dd><code>${esc(sig.keyId)}</code></dd>
-    <dt>anlamlı</dt><dd>${sig.meaning ? 'evet' : 'hayır — ephemeral, tasdik değil'}</dd>
+    <dt>meaningful</dt><dd>${sig.meaning ? 'yes' : 'no — ephemeral, not an attestation'}</dd>
   </dl>
   ${
     view.publicKey
-      ? `<p class="muted">Açık anahtar</p>
-  <div class="row"><button type="button" data-copy-from="pubkey">Kopyala</button></div>
+      ? `<p class="muted">Public key</p>
+  <div class="row"><button type="button" data-copy-from="pubkey">Copy</button></div>
   <pre id="pubkey">${esc(view.publicKey)}</pre>`
       : ''
   }`
-      : `<p>İmza yok.${view.signatureAbsentNote ? ` ${esc(view.signatureAbsentNote)}` : ''}</p>`
+      : `<p>No signature.${view.signatureAbsentNote ? ` ${esc(view.signatureAbsentNote)}` : ''}</p>`
   }
 
-  <h2>Doğrulama</h2>
-  <div class="row"><button type="button" data-copy-from="verify">Kopyala</button></div>
+  <h2>Verify</h2>
+  <div class="row"><button type="button" data-copy-from="verify">Copy</button></div>
   <pre id="verify">${esc(view.verify)}</pre>
   ${jsonLink}`
 }
@@ -416,14 +417,14 @@ function copyScript(localId: string): string {
   var slot = document.getElementById(${JSON.stringify(localId)});
   if (t && slot) {
     var d = new Date(t.getAttribute('datetime'));
-    if (!isNaN(d.getTime())) slot.textContent = '  ·  yerel ' + d.toLocaleString();
+    if (!isNaN(d.getTime())) slot.textContent = '  ·  local ' + d.toLocaleString();
   }
   document.querySelectorAll('[data-copy-from]').forEach(function(btn){
     btn.addEventListener('click', function(){
       var el = document.getElementById(btn.getAttribute('data-copy-from'));
       if (!el) return;
       var text = el.textContent || '';
-      function done(){ btn.textContent = 'Kopyalandı'; setTimeout(function(){ btn.textContent = 'Kopyala'; }, 1400); }
+      function done(){ btn.textContent = 'Copied'; setTimeout(function(){ btn.textContent = 'Copy'; }, 1400); }
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(done).catch(function(){
           var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
@@ -449,11 +450,11 @@ export function renderReceiptHtml(view: ReceiptView, opts: { mode?: 'document' |
     return `<div class="cnr-rv"><style>${FRAGMENT_CSS}</style>${body}${copyScript(localId)}</div>`
   }
   return `<!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Conarium — kanıt</title>
+<title>Conarium — proof</title>
 <style>
 ${DOCUMENT_CSS}
 </style>

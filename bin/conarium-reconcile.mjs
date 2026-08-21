@@ -134,9 +134,9 @@ function loadSnapshot(path, label) {
 export function extractTables(sql) {
   const found = []
   const seen = new Set()
-  // CTE adları (WITH x AS (…)) ilişki değildir — PostgREST her sorguyu
-  // `WITH pgrst_source AS (…) SELECT … FROM pgrst_source` diye sarar; CTE adı
-  // tablo sanılırsa her PostgREST deseni sahte "unreconciled" üretir.
+  // CTE names (WITH x AS (…)) are not relations — PostgREST wraps every query
+  // as `WITH pgrst_source AS (…) SELECT … FROM pgrst_source`; if the CTE name
+  // is taken for a table, every PostgREST pattern produces a false "unreconciled".
   const cteNames = new Set()
   const cteRe = /("([^"]+)"|[a-z_][a-z0-9_$]*)\s+as\s*\(/gi
   let c
@@ -212,7 +212,7 @@ function loadReceipts(path) {
   return { receipts }
 }
 
-/** Son nokta-parçası: "zion.customers" → "customers". Şema önekleri bağlayıcı farklı adlandırır. */
+/** Last dotted segment: "zion.customers" → "customers". Schema prefixes are named differently by the binder. */
 function normalizeObject(name) {
   const parts = String(name).toLowerCase().split('.')
   return parts[parts.length - 1]
@@ -937,8 +937,8 @@ async function main(argv = process.argv.slice(2)) {
       )
     }
   }
-  // Literal çıkışlar bilerek ayrı: spec_exitcode_drift bekçisi sadece
-  // literal sayıları tarar, ternary içindeki kod görünmez kalırdı.
+  // Literal exits are deliberately separate: the spec_exitcode_drift sentinel
+  // only scans literal numbers; a code inside a ternary would stay invisible.
   if (problems > 0) {
     process.exit(40)
   }

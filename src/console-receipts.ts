@@ -12,10 +12,10 @@ import {
 import { parseTrustPubkeyPaths } from './keys.js'
 
 export const EMPTY_RECEIPTS_MESSAGE =
-  'henüz makbuz yok. Gateway `audit.receiptSink` ile çalışıyorsa her erişim bir satır yazar.'
+  'no receipts yet. If the gateway is running with `audit.receiptSink`, each access writes a line.'
 
 export const NO_SINK_MESSAGE =
-  'henüz makbuz yok. `conarium.config.json` içinde `audit.receiptSink` yok; denetim kaydı makbuz değildir.'
+  'no receipts yet. `conarium.config.json` has no `audit.receiptSink`; an audit log is not a receipt.'
 
 export interface ReceiptListItem {
   id: string

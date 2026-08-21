@@ -44,14 +44,15 @@ export const SAFE_BUILTIN_FUNCTIONS = new Set([
 ])
 
 /**
- * Lehçeye özgü skaler fonksiyonlar. Ortak liste Postgres adlarını taşır; MSSQL ve
- * Oracle kapıları da o listeye bağlanınca `GETDATE`/`NVL` gibi en sıradan çağrılar
- * reddedilir hâle gelmişti — açık kapanırken meşru kullanım kırılıyordu.
+ * Dialect-specific scalar functions. The shared list carries Postgres names; once
+ * the MSSQL and Oracle gates bound to that list, the most ordinary calls like
+ * `GETDATE`/`NVL` started being rejected — the gate closed while legitimate use
+ * broke.
  *
- * Kural: buraya YALNIZ saf, okuma amaçlı, satır sayısını değiştirmeyen skaler
- * dönüşümler girer. Satır toplayan/serileştiren her şey BLOCKED_DUMP_FUNCTIONS'ın
- * işidir; dinamik SQL üreten, dosya/ağ/OS'a uzanan aileler (DBMS_*, UTL_*, xp_*,
- * sp_*, OPENROWSET/OPENJSON) hiçbir koşulda buraya yazılmaz.
+ * Rule: only pure, read-oriented scalar transforms that do not change row count
+ * go here. Anything that aggregates/serializes rows is BLOCKED_DUMP_FUNCTIONS'
+ * job; families that produce dynamic SQL or reach file/network/OS (DBMS_*, UTL_*,
+ * xp_*, sp_*, OPENROWSET/OPENJSON) must never be written here.
  */
 export const DIALECT_SAFE_FUNCTIONS: Record<'mssql' | 'oracle', ReadonlySet<string>> = {
   mssql: new Set([
@@ -126,8 +127,9 @@ export function isSafeBuiltinFunction(
   dialect?: SqlDialectId,
 ): boolean {
   if (SAFE_BUILTIN_FUNCTIONS.has(baseName) && (!schema || schema === 'pg_catalog')) return true
-  // Lehçe listesi YALNIZ şemasız çağrıyı karşılar: `app.pkg.nvl` kullanıcı paketidir,
-  // yerleşik değil — şema niteleyicisi varsa lehçe listesi devreye girmez.
+  // The dialect list covers ONLY un-schema-qualified calls: `app.pkg.nvl` is a
+  // user package, not a builtin — if a schema qualifier is present the dialect
+  // list does not apply.
   if (schema) return false
   if (dialect === 'mssql' || dialect === 'oracle') {
     return DIALECT_SAFE_FUNCTIONS[dialect].has(baseName)

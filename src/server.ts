@@ -81,8 +81,8 @@ export async function bootDeps(config: ConariumConfig): Promise<ConariumDeps> {
     consumer: config.consumer,
     failClosed: config.audit?.failClosed,
     receiptSink: config.audit?.receiptSink,
-    // v0.3: ikisi de opsiyonel. Eksik alan makbuzda `source: 'undeclared'` olur —
-    // eskiden ikisi birden yoksa makbuz HİÇ üretilmiyordu.
+    // v0.3: both are optional. A missing field becomes `source: 'undeclared'`
+    // on the receipt — previously, if both were absent, no receipt was produced at all.
     receiptMeta: {
       model: config.audit?.receiptModel,
       client: config.audit?.receiptClient,
@@ -126,33 +126,38 @@ async function runConnectorQuery(conn: Connector, guardedSql: string) {
 /**
  * Build an MCP Server wired to the shared deps. One instance per transport/session.
  *
- * `aktor`: bu OTURUMU açan kişi. Oturum tek token'la açıldığı için kimlik oturum
- * boyunca sabittir. Bilerek parametre — modül seviyesinde bir global kullanmak
- * eşzamanlı oturumlarda kimlikleri birbirine karıştırırdı ve denetim kaydı
- * yanlış kişiyi suçlardı. Verilmezse davranış eskisi gibi (consumer).
+ * `aktor`: the person who opened THIS SESSION. Because the session is opened
+ * with a single token, identity is fixed for the life of the session. Deliberately
+ * a parameter — a module-level global would mix identities across concurrent
+ * sessions and the audit record would blame the wrong person. If omitted,
+ * behavior is as before (consumer).
  */
 export function buildServer(
   { config, governance: temelGovernance, audit, connectors }: ConariumDeps,
   aktor?: ResolvedActor,
 ): Server {
-  // Maskeleme bu oturumu açan KİŞİYE göre çözülür. Profil yoksa, aktör yoksa ya da
-  // paylaşılan token'sa taban politika döner — genişleme yönünde sessiz sapma yok.
+  // Masking is resolved for the PERSON who opened this session. If there is no
+  // profile, no actor, or a shared token, the base policy is returned — no silent
+  // drift toward widening access.
   const governance = temelGovernance.forActor(aktor)
-  // Oturumun kimliğini her denetim satırına TEK yerden geçir: audit.log çağrısı
-  // bu dosyada 8+ yerde ve tek tek alan eklemek er geç birinde unutulur.
+  // Pass the session identity into every audit line from ONE place: audit.log
+  // is called 8+ times in this file and adding a field at each site would
+  // eventually miss one.
   //
-  // Aynı yerden istemci kimliği de geçer. `getClientVersion()` MCP `initialize`
-  // sırasında karşı tarafın BİLDİRDİĞİ değerdir — yani beyan değil, protokolden
-  // ölçülmüş veri; makbuzda `source: 'protocol'` ile işaretlenir. Handshake henüz
-  // olmadıysa undefined döner ve makbuz config beyanına ya da "bildirilmedi"ye düşer.
+  // Client identity goes through the same place. `getClientVersion()` is the
+  // value the peer REPORTED during MCP `initialize` — not a declaration, but
+  // data measured from the protocol; marked `source: 'protocol'` on the receipt.
+  // If the handshake has not happened yet it returns undefined and the receipt
+  // falls back to the config declaration or "undeclared".
   const kaydet: typeof audit.log = (e) => {
     const ci = server.getClientVersion()
     return audit.log({
       ...e,
       ...(aktor ? { actor: aktor.id, actorAssurance: aktor.assurance } : {}),
-      // Hangi maskeleme profili yürürlükteydi. Bu alan olmadan, profili olan bir
-      // kişinin makbuzu profili olmayanınkiyle aynı görünür — imzalı ama eksik
-      // beyan. Denetçinin sorduğu soru tam olarak budur: kime göre maskelendi.
+      // Which masking profile was in force. Without this field, a receipt for
+      // someone with a profile looks the same as one for someone without —
+      // signed but an incomplete declaration. That is exactly the question
+      // an auditor asks: masked for whom.
       ...(governance.appliedProfile() ? { policyProfile: governance.appliedProfile()! } : {}),
       ...(ci?.name ? { client: { name: ci.name, version: ci.version ?? '', source: 'protocol' as const } } : {}),
     })
@@ -225,18 +230,19 @@ export function buildServer(
         },
       },
     ].filter(t => governance.allowsTool(t.name)),
-    // Politikayla kapatılan araç listede de görünmez. Aksi hâlde model aracı
-    // görür, çağırır, reddedilir — kapalı olduğunu keşfetmenin tek yolu denemek
-    // olurdu ve her deneme denetim kaydına gürültü yazardı.
+    // A tool closed by policy is also absent from the list. Otherwise the model
+    // would see the tool, call it, and be refused — the only way to discover
+    // it is closed would be to try, and every attempt would write noise to
+    // the audit log.
   }))
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params
 
-    // Araç izni her şeyden ÖNCE: reddedilen araç connector'a, sorguya ya da ağa
-    // hiç ulaşmasın. Denetim satırı yine düşer — reddedilen erişim de bir erişim
-    // girişimidir ve makbuzun onu görmemesi, tam olarak bu ürünün kaçındığı
-    // sessizlik olurdu.
+    // Tool permission BEFORE everything else: a refused tool must never reach
+    // a connector, a query, or the network. An audit line is still written —
+    // a denied access is still an access attempt, and a receipt that did not
+    // see it would be exactly the silence this product exists to avoid.
     if (!governance.allowsTool(name)) {
       kaydet({ tool: name, args: args as Record<string, unknown>, denied: true, reason: 'policy' })
       throw new PolicyError(`Tool '${name}' is not permitted by policy.`)
@@ -250,8 +256,9 @@ export function buildServer(
         if (!governance.allowsConnector(found.name)) throw new PolicyError(`Connector '${found.name}' is not permitted by policy.`)
         return found
       }
-      // Ad verilmediyse: aracin ihtiyacini (or. canQuery) karsilayan ilk izinli konnektore dus —
-      // aksi halde SQL sorgusu docs gibi sorgu bilmeyen ilk konnektore gidip "Not supported" yiyor.
+      // If no name is given: fall through to the first allowed connector that
+      // meets the tool's need (e.g. canQuery) — otherwise a SQL query would
+      // hit the first connector that cannot query (e.g. docs) and get "Not supported".
       const allowedAll = connectors.filter(c => governance.allowsConnector(c.name))
       const allowed = need ? (allowedAll.find(c => c.capabilities[need]) ?? allowedAll[0]) : allowedAll[0]
       if (!allowed) throw new PolicyError('No connector is permitted by policy.')
@@ -266,8 +273,9 @@ export function buildServer(
 
     try {
       if (name === 'list_tables') {
-        // Ad verilmediyse TUM izinli konnektorler listelenir — arac "all connectors" vaat ediyor,
-        // ilkine dusmek cok-konnektorlu kurulumda gerisini gorunmez yapiyordu.
+        // If no name is given, ALL allowed connectors are listed — the tool
+        // promises "all connectors"; falling through to the first one hid the
+        // rest in a multi-connector setup.
         const preferred = (args as Record<string, string>)?.connector
         const targets = preferred
           ? [getConnector(preferred)]
@@ -368,8 +376,9 @@ export function buildServer(
             recordAccess({ tool: 'query', args: { sql: a.sql }, denied: true, reason: (err as Error).message })
             throw err
           }
-          // Sema konnektorun yapilandirmasindan gelir — sabit 'zion' varsayimi baska semali
-          // kurulumlarda (demo, musteri tenant'i) her sorguyu yanlislikla policy'ye takiyordu.
+          // Schema comes from the connector's configuration — a hard-coded
+          // 'zion' default wrongly tripped policy on every query in setups
+          // with another schema (demo, customer tenant).
           const schema = conn.schemaName
           const qualified = `${schema}.${parsed.table}`
           if (!governance.allowsTable(qualified)) {
@@ -482,10 +491,11 @@ export function buildServer(
 
         const capped = capSearchResult(await conn.search(a.query, requested), governance.maxRows())
         const result = governance.redact(capped)
-        // Arama sonucunun GERÇEKTEN dokunduğu tabloları satırlardaki _table'dan topla.
-        // entry.target konnektör adıdır (tablo değil) — onu makbuza nesne olarak yazmak
-        // yanlış veri olur. Sonuç satırları _table taşıyorsa onları kaydet; taşımıyorsa
-        // boş bırak (kapsama "bilinmiyor" sayacına düşer — uydurma yok).
+        // Collect the tables the search result ACTUALLY touched from _table on
+        // the rows. entry.target is the connector name (not a table) — writing
+        // it onto the receipt as the object would be wrong data. If result rows
+        // carry _table, record those; if not, leave empty (falls into the
+        // "unknown" coverage counter — no fabrication).
         const searchTables = [...new Set(result.rows.map((r) => (r as Record<string, unknown>)._table).filter(Boolean))] as string[]
         const searchGovernance = searchTables.length
           ? { ...result.governance, accessedTables: searchTables }
