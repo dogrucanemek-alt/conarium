@@ -344,7 +344,7 @@ in the contract, **not shipped yet**.
 ### Implementing the format yourself
 
 The receipt is meant to outlive this implementation, so it ships with
-conformance vectors — twelve frozen cases plus a machine-readable manifest in
+conformance vectors — thirteen frozen cases plus a machine-readable manifest in
 [`test-vectors/`](test-vectors/):
 
 ```bash
