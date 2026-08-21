@@ -16,9 +16,10 @@ checks run in.
 
 That section exists because someone built a verifier from this directory and
 reached 13/13 only after opening our source. It is not repeated here — a fact
-written down twice by hand is a fact that will disagree with itself. Every
-sentence in it is asserted against the shipped verifier by
-`test/spec_wire_contract.mjs`.
+written down twice by hand is a fact that will disagree with itself. The parts
+of it marked *measured* — the signed payload, the sequence rule, the
+required-field table and the check order — are asserted against the shipped
+verifier by `test/spec_wire_contract.mjs`. The rest is prose, and says so.
 
 ## Run them
 
