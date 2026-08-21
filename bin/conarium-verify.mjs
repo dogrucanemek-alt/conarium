@@ -21,6 +21,7 @@
  *      (null anchors are skipped; --require-head-anchor fails if head is unanchored)
  *  15  anchor COULD NOT BE CHECKED (calendar unreachable, verifier not installed)
  *      — deliberately distinct from 14: "I could not verify" is not "this is invalid"
+ *   2  usage error — no receipt was read
  *  20  schema invalid
  */
 import { createHash, createPublicKey, verify as cryptoVerify } from 'crypto'
@@ -425,11 +426,11 @@ async function main(argv = process.argv.slice(2)) {
     opts = parseArgs(argv)
   } catch (err) {
     usage(err.message)
-    process.exit(20)
+    process.exit(2)
   }
   if (!opts.target) {
     usage('missing <file|dir>')
-    process.exit(20)
+    process.exit(2)
   }
 
   if (opts.strict && opts.expectSeqFrom === null) {

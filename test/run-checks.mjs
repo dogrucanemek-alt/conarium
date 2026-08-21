@@ -60,6 +60,7 @@ export const CHECKS = [
   'test/spec_jcs_class.mjs',
   'test/encoding_evasion_mask.mjs',
   'test/verify_tail_pin.mjs',
+  'test/verify_usage_exit.mjs',
   'test/partial_mask_root.mjs',
   'test/pii_regression_matrix.mjs',
   'test/scanner_perf.mjs',

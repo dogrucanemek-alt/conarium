@@ -189,6 +189,7 @@ are unchanged.
 | Exit | Meaning |
 |---|---|
 | 0 | Chain intact, signatures valid |
+| 2 | Usage error — no receipt was read |
 | 10 | Hash mismatch — record altered |
 | 11 | `prevHash` break — deleted or inserted; also `--expect-count` / `--expect-last-hash` mismatch |
 | 12 | `seq` gap / non-increasing — missing or reordered |
