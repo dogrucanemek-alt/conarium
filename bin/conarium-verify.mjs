@@ -31,7 +31,7 @@ const RECEIPT_V1 = 'conarium-receipt/0.1'
 const RECEIPT_V2 = 'conarium-receipt/0.2'
 const RECEIPT_V3 = 'conarium-receipt/0.3'
 const RECEIPT_V4 = 'conarium-receipt/0.4'
-const SURUMLER = [RECEIPT_V1, RECEIPT_V2, RECEIPT_V3, RECEIPT_V4]
+const VERSIONS = [RECEIPT_V1, RECEIPT_V2, RECEIPT_V3, RECEIPT_V4]
 // Single vocabulary. v0.3 model/client use three values; v0.4 adds
 // disclosure `measured`. There is no second DECLARED/VERIFIED set.
 const META_KAYNAKLARI = ['protocol', 'measured', 'operator-declared', 'undeclared']
@@ -287,7 +287,7 @@ function loadReceipts(target) {
 
 function schemaOk(r) {
   if (!r || typeof r !== 'object') return 'not an object'
-  if (!SURUMLER.includes(r.v)) return `unsupported version ${r.v}`
+  if (!VERSIONS.includes(r.v)) return `unsupported version ${r.v}`
   if (typeof r.id !== 'string' || !r.id) return 'missing id'
   if (typeof r.ts !== 'string') return 'missing ts'
   if (!r.chain || typeof r.chain !== 'object') return 'missing chain'
@@ -305,8 +305,8 @@ function schemaOk(r) {
   // fails and we exit 10 — but the "tampered" DIAGNOSIS would be wrong: a
   // record with missing fields is not a modified receipt, it is not a receipt
   // at all. Caught here so the diagnosis is correct (test-vectors/007 locks this).
-  for (const alan of ['period', 'request', 'dataRefs', 'policy', 'flags', 'masking', 'outcome']) {
-    if (!(alan in r) || r[alan] === null || r[alan] === undefined) return `missing ${alan}`
+  for (const field of ['period', 'request', 'dataRefs', 'policy', 'flags', 'masking', 'outcome']) {
+    if (!(field in r) || r[field] === null || r[field] === undefined) return `missing ${field}`
   }
   if (!Array.isArray(r.dataRefs)) return 'dataRefs must be an array'
   if (!Array.isArray(r.flags)) return 'flags must be an array'
@@ -333,18 +333,18 @@ function schemaOk(r) {
   // These fields are not required in older versions — a receipt missing 0.3
   // fields does not return 20.
   if (r.v === RECEIPT_V3 || r.v === RECEIPT_V4) {
-    for (const alan of ['model', 'client']) {
-      const m = r[alan]
-      if (!m || typeof m !== 'object') return `missing ${alan}`
+    for (const field of ['model', 'client']) {
+      const m = r[field]
+      if (!m || typeof m !== 'object') return `missing ${field}`
       if (!META_V3.includes(m.source)) {
-        return `${alan}.source must be one of ${META_V3.join('|')} in ${r.v === RECEIPT_V4 ? 'v0.4' : 'v0.3'}`
+        return `${field}.source must be one of ${META_V3.join('|')} in ${r.v === RECEIPT_V4 ? 'v0.4' : 'v0.3'}`
       }
       // Claiming undeclared while carrying values is a contradiction: a receipt either does not know or it does.
       if (m.source === 'undeclared') {
-        const dolu = alan === 'model'
+        const populated = field === 'model'
           ? [m.provider, m.name, m.version].some((x) => x !== null)
           : [m.name, m.version].some((x) => x !== null)
-        if (dolu) return `${alan}.source is "undeclared" but carries values`
+        if (populated) return `${field}.source is "undeclared" but carries values`
       }
     }
   }

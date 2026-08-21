@@ -166,10 +166,10 @@ if (!NO_KEYS) {
   console.log(`  export CONARIUM_AUDIT_SIGNING_KEY=${signingKeyPath}`)
   console.log(`  export CONARIUM_AUDIT_TRUST_PUBKEYS=${publicPath}`)
 }
-// --config HER ZAMAN yazilir. Onceki hal 'conarium-doctor --no-net' diyordu ve
-// `--out <dir>` kullanildiginda o komut FAIL ediyordu: config <dir> altina yaziliyor,
-// doctor ise cwd'ye bakiyor. Aracin kendi yazdirdigi komutun basarisiz olmasi,
-// "kimse bize sormadan kurabilsin" sartinin dogrudan ihlali.
+// --config is ALWAYS printed. The previous form printed 'conarium-doctor --no-net',
+// which FAILED whenever `--out <dir>` was used: the config is written under <dir>
+// while doctor looks in the cwd. A tool whose own printed command fails is a direct
+// breach of the requirement that anyone can install this without asking us.
 console.log(`  conarium-doctor --config ${configPath} --no-net`)
 console.log('')
 console.log('MCP client block (Cursor / Claude Code) — paste into mcp.json:')
@@ -177,11 +177,12 @@ console.log(JSON.stringify({
   mcpServers: {
     conarium: {
       command: 'node',
-      // Config yolu ACIKCA veriliyor: MCP istemcisi sunucuyu KENDI calisma
-      // dizininde baslatir, kullanicinin kurulum dizininde degil. Yol yazilmazsa
-      // gecit config'i bulamaz ve HATA VERMEZ — sifir connector'la acilir, yani
-      // hicbir sey yonetilmez. Doctor'un "Config file: not found" uyarisi tam
-      // bunu anlatiyor; blogu uretirken ayni tuzaga dusmustuk.
+      // The config path is given EXPLICITLY: an MCP client starts the server in
+      // ITS OWN working directory, not the user's install directory. Without the
+      // path the gateway does not find the config and does NOT error — it comes up
+      // with zero connectors, so nothing is governed at all. Doctor's "Config file:
+      // not found" warning says exactly that, and we fell into the same trap once
+      // while producing the walkthrough.
       args: [gatewayJs, '--config', configPath],
       env: NO_KEYS
         ? {}
