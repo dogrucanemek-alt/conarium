@@ -72,6 +72,7 @@ export const CHECKS = [
   'test/gacs_case_schema.mjs',
   'test/gacs_regime.mjs',
   'test/gacs_run.mjs',
+  'test/reconciliation_label_coverage.mjs',
   'test/workflow_pins.mjs',
   'test/publish_modes.mjs',
   'test/standards_claim.mjs',
