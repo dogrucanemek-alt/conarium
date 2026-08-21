@@ -1,0 +1,6 @@
+{
+  "safe_max": 9007199254740991,
+  "not_representable": 9007199254740993,
+  "reference_pair_low": 9007199254740994,
+  "reference_pair_high": 9007199254740996
+}

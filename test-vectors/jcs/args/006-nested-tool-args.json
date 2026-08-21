@@ -1,0 +1,9 @@
+{
+  "query": "select * from clients where montant > 0.1",
+  "limit": 100,
+  "filters": [
+    { "field": "montant", "op": ">", "value": 1234.5 },
+    { "field": "société", "op": "in", "value": ["FR", "DE"] }
+  ],
+  "options": { "timeout_s": 2e-3, "dry_run": false, "cursor": null }
+}

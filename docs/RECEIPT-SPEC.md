@@ -372,7 +372,7 @@ sent to look at the wrong thing. The guard builds exactly that case — it
 removes the signature from the one receipt that already breaks the chain — and
 requires 11 and 12 rather than 13.
 
-### Canonical form, and what the vectors do not measure — prose
+### Canonical form, and where JCS is actually reachable — measured
 
 Content bytes are canonicalised with **JCS (RFC 8785)** and digested with
 SHA-256, prefixed `sha256:`. `hash`, `sig` and `anchor` are removed first,
@@ -382,14 +382,50 @@ including the nested `chain.hash`.
 compare canonical bytes without holding our private key. Matching them is what
 interoperability actually requires; signing is RFC 8032 and none of it is ours.
 
-⚠️ **Stated limit.** The published vectors are ASCII-keyed with integer and
-string values. A naive sorted-key serialiser reproduces every one of their
-hashes, so passing them does **not** demonstrate a conforming JCS
-implementation. The number formatting rules (RFC 8785 §3.2.2.3) and the
-UTF-16 code-unit sort order over non-ASCII keys are unexercised. A receipt
-carrying a float, a large integer, or a non-ASCII key is where two
-implementations will first disagree, and this repository does not currently
-publish a vector that would catch it.
+⚠️ **Correction to an earlier statement.** Up to 0.2.40 this section said the
+limit would first bite on "a receipt carrying a float, a large integer, or a
+non-ASCII key". No such receipt exists. The receipt body is a fixed shape: its
+only numbers are `chain.seq`, `masking.pii` and `outcome.rows`, all small
+integers, and every key in it is ASCII. `test/spec_jcs_class.mjs` measures that
+across every shipped receipt rather than asserting it here. The limit was real;
+it was announced in the wrong place.
+
+Caller-shaped JSON reaches JCS at one point: `hashArgs()`, whose argument is
+typed `any` and whose digest becomes `request.argsHash`. It is the only surface
+whose *shape* is unbounded — arbitrary keys, arbitrary numbers — and until
+0.2.41 its preimages were published nowhere: vector 001 carries
+`sha256:abab...`, a placeholder standing in for a hash of nothing.
+
+It is not, however, the only place two implementations can part company.
+`canonicalize` also digests countersign records, coverage rows and licence
+payloads, and a receipt's string *values* — `actor.id`, `model.name`,
+`policy.rules[]` — are free text that nothing constrains to ASCII. Keys are
+fixed by the format; values are not. No shipped vector carries a non-ASCII
+value today, which `test/spec_jcs_class.mjs` counts rather than asserts,
+because the format permits one tomorrow.
+
+**What is published now.** [`test-vectors/jcs/`](../test-vectors/jcs/) carries
+the preimages, and `test/spec_jcs_class.mjs` measures all of it on every run:
+
+| Evidence | Scope |
+|---|---|
+| The reference's own six input/expected pairs, compared over bytes | complete |
+| 3,000 published IEEE-754 doubles from the reference's number vectors | **sampled** |
+| Eight `argsHash` preimages: floats, integers past 2^53, non-ASCII keys, a surrogate-pair sort, escapes, the raw-string branch | complete |
+| Eight mutants that must each be caught | complete |
+
+**What is still a limit.** The number vectors are a sample: 3,000 lines of the
+reference's 100,000,000, of which the first 2,168 are its deliberate
+edge-case block and the rest are drawn from its pseudorandom stream. The space
+of IEEE-754 doubles is not covered and cannot be. Separately, the thirteen
+*receipt* vectors are unchanged and still exercise none of this — matching
+their hashes demonstrates what it always did, no more.
+
+⚠️ One consequence worth stating plainly, because it is the case most likely to
+break a second implementation: `hashArgs` does **not** canonicalise a string
+argument. It digests the bytes it was handed. An implementation that parses and
+re-canonicalises a string argument produces a different `argsHash` for input
+both sides consider identical. Vector `008-raw-string` is that case.
 
 ### Which document is normative for what — prose
 

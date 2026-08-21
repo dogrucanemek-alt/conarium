@@ -77,6 +77,33 @@ when the caller never asked for one. Silence is not a pass. This vector was
 originally written expecting `0`; the verifier disagreed and the verifier was
 right, so the expectation was corrected rather than the behaviour.
 
+## JCS vectors — [`jcs/`](jcs/)
+
+The thirteen cases above are ASCII-keyed with integer and string values, so a
+naive sorted-key serialiser reproduces all thirteen hashes. That is still true
+and is not a defect in them: a receipt body *cannot* carry a float or a
+non-ASCII key. Its only numbers are `chain.seq`, `masking.pii` and
+`outcome.rows`.
+
+Canonicalisation is reachable from outside at one point — `hashArgs()`, the
+tool arguments an operator's client sent, typed `any`, digested into
+`request.argsHash`. [`jcs/args/`](jcs/args/) publishes eight preimages for it
+with their frozen hashes: floats at the `1e21` exponent boundary and the
+denormal minimum, integers past 2^53, non-ASCII keys, a surrogate-pair sort
+order, escape rules, and the raw-string branch.
+
+Read [`jcs/args/expected-args-hashes.json`](jcs/args/expected-args-hashes.json)
+before implementing against them — `kind` decides whether the file is parsed
+and canonicalised or digested as the bytes it is. Getting that wrong is the
+single most likely way two implementations disagree here.
+
+Our own conformance against the RFC's reference data — six input/expected pairs
+byte for byte, and 3,000 published IEEE-754 doubles — is measured by
+`test/spec_jcs_class.mjs`, alongside eight mutants it must catch. The number
+evidence is a **sample** of the reference's 100,000,000 and says so; see
+[`jcs/rfc8785/PROVENANCE.md`](jcs/rfc8785/PROVENANCE.md), which also records
+that the vendored fixtures are Apache-2.0 and not ours.
+
 ## The key, and why the private half is not here
 
 `keys/vector-key.pub.pem` is published. The private half is not, and will not

@@ -1,0 +1,8 @@
+{
+  "sin": "locale-independent",
+  "pêche": "e-circumflex U+00EA",
+  "péché": "e-acute U+00E9",
+  "peach": "ascii",
+  "École": "U+00C9 sorts after every ascii key, not next to E",
+  "ecole": "ascii e"
+}
