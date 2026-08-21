@@ -84,7 +84,8 @@ const WORDS = [
   'bitir', 'bulunamadi', 'bulundu', 'deger', 'degerler', 'dolu', 'dosya',
   'eksik', 'eski', 'gecerli', 'gecersiz', 'gelen', 'giden', 'guncelle', 'hata',
   'imza', 'islem', 'kayit', 'kontrol', 'kural', 'kurallar', 'liste', 'olustur',
-  'ornek', 'sayi', 'satir', 'sonra', 'sonuc', 'surum', 'surumler', 'tarih',
+  'bildirilmemis', 'notlar', 'ornek', 'sayi', 'satir', 'sonra', 'sonuc', 'surum',
+  'surumler', 'tarih',
   'toplam', 'uyari', 'varsayilan', 'yani', 'yazildi', 'yeni', 'yoksa',
   'zorunlu',
 ]
