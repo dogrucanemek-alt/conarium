@@ -217,11 +217,18 @@ schema errors rather than hash mismatches, and in what order the checks run.
 A specification that has to be read alongside its own implementation is not
 finished. What they had to guess is written down below.
 
-Every statement in this section is asserted against the shipped verifier by
-`test/spec_wire_contract.mjs`. If the code moves and a sentence does not, that
-check fails — the sentences are measured, not remembered.
+Parts of this section are asserted against the shipped verifier by
+`test/spec_wire_contract.mjs` and are marked **measured** where they appear:
+the signed payload and its byte length, the order the checks run in, the
+required-field table row by row, and the vector counts quoted in prose. If the
+code moves and one of those sentences does not, the check fails.
 
-### What the signature covers
+The rest of this section is prose. It describes behaviour the verifier has, and
+nothing in the test suite compares it to the code — the same gap the
+Implementation Status guard was written to close one document over. Read it as
+accurate on the revision that shipped it, not as pinned.
+
+### What the signature covers — measured
 
 `sig.value` is base64 of an Ed25519 signature over the **UTF-8 bytes of the
 `chain.hash` string, `sha256:` prefix included** — 71 bytes for a SHA-256
@@ -238,7 +245,8 @@ payload = utf8("sha256:" + hex(SHA-256(canonical bytes)))     # 71 bytes
 sig.value = base64(Ed25519-sign(payload))
 ```
 
-`sig.alg` is `Ed25519` — any other value is rejected before the key is loaded.
+The three paragraphs that follow are prose, not measured. `sig.alg` is
+`Ed25519` — any other value is rejected before the key is loaded.
 `sig.keyId` selects the public key from the caller's trust set; an unknown
 `keyId` is a signature failure, not a "skip". `sig.value` must be canonical
 base64: a re-encodable variant is refused rather than normalised.
@@ -249,6 +257,11 @@ transparency-log anchor be attached after signing, and is also the limit
 recorded under **Known gaps**.
 
 ### `seq` advances by exactly one
+
+**Measured:** that a gap yields exit 12, and that it is diagnosed before the
+signature check. **Not measured:** the non-increasing case and
+`--expect-seq-from`, which no vector exercises — stated here rather than left
+to be discovered.
 
 `chain.seq` is an integer that increases by **exactly one** between consecutive
 receipts. Both failure shapes are exit **12**:
@@ -267,7 +280,7 @@ file whose first receipt is `seq: 7` verifies as a valid *suffix* — the
 verifier reports what it can prove, and where a chain starts is not something a
 single file can prove.
 
-### Fields whose absence is a schema error (exit 20)
+### Fields whose absence is a schema error (exit 20) — measured
 
 A receipt missing one of these is not a tampered receipt — it is not a receipt.
 The distinction matters because the exit code is a diagnosis: reporting exit 10
@@ -325,7 +338,7 @@ receipt in a v0.4 chain still verifies (`012-mixed-chain`).
 `sig` is deliberately not in this table. A receipt without a signature is a
 well-formed receipt that cannot be trusted — exit **13**, not 20.
 
-### Check order
+### Check order — measured
 
 The order is part of the contract, because the exit code is a diagnosis and the
 wrong order produces a true verdict with a false reason.
@@ -349,7 +362,7 @@ sent to look at the wrong thing. The guard builds exactly that case — it
 removes the signature from the one receipt that already breaks the chain — and
 requires 11 and 12 rather than 13.
 
-### Canonical form, and what the vectors do not measure
+### Canonical form, and what the vectors do not measure — prose
 
 Content bytes are canonicalised with **JCS (RFC 8785)** and digested with
 SHA-256, prefixed `sha256:`. `hash`, `sig` and `anchor` are removed first,
@@ -368,7 +381,7 @@ carrying a float, a large integer, or a non-ASCII key is where two
 implementations will first disagree, and this repository does not currently
 publish a vector that would catch it.
 
-### Which document is normative for what
+### Which document is normative for what — prose
 
 The IETF draft (`standards/`) defines Transformation Evidence and Coverage
 Reconciliation, and states that signature and chain verification are **out of
