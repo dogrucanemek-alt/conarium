@@ -670,11 +670,11 @@ async function main(argv = process.argv.slice(2)) {
   // NOTE: receipts elements are wrapped as {file, receipt} — reading r.model
   // directly silently always yields 0 (this happened exactly once; the e2e run
   // caught it).
-  const modelBildirilmemis = receipts.filter((r) => r.receipt?.model?.source === 'undeclared').length
-  const clientBildirilmemis = receipts.filter((r) => r.receipt?.client?.source === 'undeclared').length
-  const notlar = []
-  if (modelBildirilmemis) notlar.push(`${modelBildirilmemis} with undeclared model`)
-  if (clientBildirilmemis) notlar.push(`${clientBildirilmemis} with undeclared client`)
+  const undeclaredModelCount = receipts.filter((r) => r.receipt?.model?.source === 'undeclared').length
+  const undeclaredClientCount = receipts.filter((r) => r.receipt?.client?.source === 'undeclared').length
+  const notes = []
+  if (undeclaredModelCount) notes.push(`${undeclaredModelCount} with undeclared model`)
+  if (undeclaredClientCount) notes.push(`${undeclaredClientCount} with undeclared client`)
 
   if (opts.requireHeadAnchor && !headAnchored) {
     fail(14, 'head anchor required but head is not anchored', opts.json, {
@@ -682,6 +682,23 @@ async function main(argv = process.argv.slice(2)) {
       total: receipts.length,
       headAnchored: false,
     })
+  }
+
+  // --anchor-check on a chain where no receipt carries an anchor used to exit 0:
+  // every null was skipped, nothing was compared, and the caller who asked
+  // whether the anchors held was told yes by a path that never reached one.
+  // That is the same defect as a checker returning a verdict on an input it
+  // never examined. The value for it already exists — 15 means "could not be
+  // checked", deliberately distinct from 14 "does not hold" — so this is 15.
+  // `--require-head-anchor` above stays 14: the caller asserted an anchor must
+  // be there, and its absence is a failed assertion rather than an unread one.
+  if (opts.anchorCheck && receipts.length > 0 && anchoredCount === 0) {
+    fail(
+      15,
+      `anchor check requested but no receipt carries an anchor: 0/${receipts.length} anchored, nothing was compared`,
+      opts.json,
+      { anchored: 0, total: receipts.length, headAnchored: false },
+    )
   }
 
   const summary = `${anchoredCount}/${receipts.length} anchored, head anchored: ${headAnchored ? 'yes' : 'no'}`
@@ -693,16 +710,16 @@ async function main(argv = process.argv.slice(2)) {
       ok: true,
       code: 0,
       count: receipts.length,
-      undeclaredModel: modelBildirilmemis,
-      undeclaredClient: clientBildirilmemis,
+      undeclaredModel: undeclaredModelCount,
+      undeclaredClient: undeclaredClientCount,
       anchored: anchoredCount,
       headAnchored,
       anchorSummary: opts.anchorCheck ? summary : undefined,
       tailPinned,
     }))
   } else {
-    const ek = notlar.length ? ` (${notlar.join(', ')})` : ''
-    console.log(`ok: ${receipts.length} receipt(s) verified${ek}`)
+    const suffix = notes.length ? ` (${notes.join(', ')})` : ''
+    console.log(`ok: ${receipts.length} receipt(s) verified${suffix}`)
     if (opts.anchorCheck) console.log(summary)
   }
   process.exit(0)

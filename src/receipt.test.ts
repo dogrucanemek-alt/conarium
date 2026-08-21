@@ -289,12 +289,27 @@ describe('T5 verify scenarios', () => {
     expect(res.stderr).toMatch(/single-receipt/)
   })
 
-  it('T5.8 / G17: null anchors are skipped; summary is 0/N', () => {
+  // Each null anchor is still skipped rather than failed — that half was always
+  // right, and G17's point stands: an unverified state is never presented as a
+  // trust signal. The exit code was the part that did present one. Skipping all
+  // of them and returning 0 answers "do the anchors hold?" from a path that
+  // reached no anchor, which is the same thing G17 forbids the HTML from doing,
+  // one layer down. 15 ("could not be checked") is the value that already exists
+  // for it. Changed in 0.2.40; the count was always printed either way.
+  it('T5.8 / G17: every anchor null → skipped, and nothing left to compare is 15', () => {
     const path = writeChain(chainOf(2, key))
     const res = runVerify([path, '--pubkey', publicPath, '--anchor-check'])
+    expect(res.code).toBe(15)
+    expect(res.stderr).toMatch(/0\/2 anchored/)
+    expect(res.stderr).toMatch(/nothing was compared/)
+  })
+
+  // The control that keeps the change honest: a run that never asked about
+  // anchors is untouched.
+  it('T5.8b: without --anchor-check an unanchored chain is still 0', () => {
+    const path = writeChain(chainOf(2, key))
+    const res = runVerify([path, '--pubkey', publicPath])
     expect(res.code).toBe(0)
-    expect(res.stdout).toMatch(/0\/2 anchored/)
-    expect(res.stdout).toMatch(/head anchored: no/)
   })
 
   it('G17: claimed bitcoin without sidecar → 14', () => {

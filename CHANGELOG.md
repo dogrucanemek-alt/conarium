@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.2.40 — an exit code that answered a question it had not examined
+
+`conarium-verify --anchor-check` over a chain where every receipt is unanchored
+exited **0**. Each null anchor was skipped, which is correct — periodic anchoring
+leaves most receipts null and failing on that would make the flag unusable. What
+followed was not: with nothing left to compare, the run reported success. A
+caller who asked whether the anchors held was answered by a code path that never
+reached an anchor.
+
+The count was always printed — the summary line said `0/N anchored` — so the
+information was on screen. The exit code was the part that claimed more than had
+been examined, and the exit code is what a machine reads.
+
+It is now **15**, which already means "could not be checked" and is evaluated
+ahead of 14 so that "I could not check" is never swallowed by "it does not hold".
+`--require-head-anchor` keeps 14: there the caller asserted an anchor must be
+present, and its absence is a failed assertion rather than an unread one. A chain
+carrying at least one anchor is unaffected.
+
+**This is a behaviour change.** A caller who ran `--anchor-check` over
+never-anchored chains and treated 0 as success will now see 15. That is the
+point — but it is a break, and it is why this is a version rather than a patch to
+the last one.
+
+The old answer was not an oversight: `test/anchor_verify.mjs` A6.5 asserted it.
+The test had written the defect down, so the behaviour changed and the
+expectation was corrected — the opposite of vector 008, where the implementation
+was right and the expectation was wrong. A6.9 adds the multi-receipt case and a
+control proving that a run which never asked about anchors still exits 0.
+
+Found by applying a rule from the SCITT list to our own tool: a checker must
+report that it did not compare, rather than return a verdict it did not earn.
+
+Also here: four more Turkish identifiers in `bin/conarium-verify.mjs`
+(`modelBildirilmemis`, `clientBildirilmemis`, `notlar`, `ek`) that 0.2.39's word
+pass did not carry in its list. Translated, and the words added — which is the
+second time that list has grown by being wrong, and is exactly the limit recorded
+against it.
+
 ## 0.2.39 — 2026-08-21 — the package speaks the language its documentation is written in
 
 The executable package carried operational text in Turkish. Not in the

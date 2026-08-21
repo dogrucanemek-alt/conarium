@@ -193,11 +193,21 @@ are unchanged.
 | 11 | `prevHash` break — deleted or inserted; also `--expect-count` / `--expect-last-hash` mismatch |
 | 12 | `seq` gap / non-increasing — missing or reordered |
 | 13 | Signature invalid / pubkey missing (fail-closed) |
-| 14 | Claimed anchor invalid under `--anchor-check`, or `--require-head-anchor` when the head is unanchored. `anchor:null` receipts are skipped (periodic anchoring). |
-| 15 | Anchor **could not be checked** — calendar unreachable, or the OpenTimestamps verifier is not installed. Deliberately distinct from 14: "I could not verify this" is not "this is invalid". The digest comparison is performed offline and still holds; only the timestamp attestation is unconfirmed. A verifier that collapsed the two would be asserting something it did not measure. |
+| 14 | Claimed anchor invalid under `--anchor-check`, or `--require-head-anchor` when the head is unanchored. An individual `anchor:null` receipt is skipped, not failed — periodic anchoring leaves most of them null. |
+| 15 | Anchor **could not be checked** — calendar unreachable, the OpenTimestamps verifier is not installed, or `--anchor-check` reached no anchor at all because every receipt in the chain is unanchored. Deliberately distinct from 14: "I could not verify this" is not "this is invalid". The digest comparison is performed offline and still holds; only the timestamp attestation is unconfirmed. A verifier that collapsed the two would be asserting something it did not measure. |
 | 20 | Schema invalid |
 
 Fail-closed: if the verifier is unsure, it does not exit 0.
+
+⚠️ `--anchor-check` over a chain where **no** receipt carries an anchor is exit
+**15**, not 0. Each null is still skipped rather than failed, which is right —
+but skipping all of them and then reporting success answers the caller's question
+from a path that never reached an anchor. The summary line always printed
+`0/N anchored`; the exit code was the part that claimed more than was examined,
+and the exit code is what a machine reads. `--require-head-anchor` stays 14: the
+caller asserted an anchor must be there, and its absence is a failed assertion
+rather than an unread one. *Changed in 0.2.40; it was 0 before, and a test had
+written the old answer down.*
 
 ⚠️ Under `--anchor-check`, an OpenTimestamps **calendar** that cannot be
 reached is exit **15** (`anchor could not be checked`) — not 14. Digest
