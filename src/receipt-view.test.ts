@@ -87,8 +87,8 @@ describe('renderReceiptHtml', () => {
     const html = renderReceiptHtml(proofToView(proof), { mode: 'document' })
     expect(JSON.stringify(proof)).toBe(before)
     expect(html.startsWith('<!doctype html>')).toBe(true)
-    expect(html).toContain('lang="tr"')
-    expect(html).toContain('Sınırlar')
+    expect(html).toContain('lang="en"')
+    expect(html).toContain('Limitations')
     expect(html).toContain('pending')
     expect(html).toContain('/proof?format=json')
     expect(html).toContain('0.2.7')
@@ -97,12 +97,12 @@ describe('renderReceiptHtml', () => {
     expect(html).toContain('class="pol deny"')
     expect(html.includes('fonts.googleapis.com')).toBe(false)
     expect(html.includes('cdn.')).toBe(false)
-    expect(html).toContain('Sentetik demo verisi, gerçek müşteri verisi değil.')
-    expect(html).toContain('aktör bir hizmet kimliği, gerçek kişi değil.')
-    expect(html).toContain('Çıpa pending olabilir')
+    expect(html).toContain('Synthetic demo data, not real customer data.')
+    expect(html).toContain('actor is a service identity, not a natural person.')
+    expect(html).toContain('Anchor may be pending')
     expect(
       presentKnownText('This demo is not anchored — the chain head was never sent to a calendar.'),
-    ).toBe('Bu demo çıpalanmıyor — zincir başı hiçbir zaman damgasına gönderilmedi.')
+    ).toBe('This demo is not anchored — the chain head was never sent to a calendar.')
     const unanchored = demoProof({
       anchor: null,
       limitations: [
@@ -111,12 +111,12 @@ describe('renderReceiptHtml', () => {
       ],
     })
     const unanchoredHtml = renderReceiptHtml(proofToView(unanchored), { mode: 'document' })
-    expect(unanchoredHtml).toContain('Bu demo çıpalanmıyor — zincir başı hiçbir zaman damgasına gönderilmedi.')
-    expect(unanchoredHtml).toContain('Çıpa yok.')
-    expect(unanchoredHtml).not.toContain('saatler sürer')
-    expect(html).toContain('Bu kayıtlar oluşturulduktan sonra değiştirilmedi')
-    expect(html).toContain('aylık ciro')
-    expect(html).toContain('politika izin vermiyor')
+    expect(unanchoredHtml).toContain('This demo is not anchored — the chain head was never sent to a calendar.')
+    expect(unanchoredHtml).toContain('No anchor.')
+    expect(unanchoredHtml).not.toContain('takes hours')
+    expect(html).toContain('These records have not been altered, deleted, reordered or backdated after creation')
+    expect(html).toContain('revenue by month')
+    expect(html).toContain('not permitted by policy')
     for (const lim of proof.limitations) {
       expect(JSON.stringify(proof)).toContain(lim)
     }
@@ -138,22 +138,22 @@ describe('renderReceiptHtml', () => {
     expect(html).not.toContain('sample receipt')
   })
 
-  it('broken chain is red and is not labelled sağlam', () => {
+  it('broken chain is red and is not labelled intact', () => {
     const view = proofToView(demoProof())
     view.chainIntegrity = { ok: false, brokenAt: 2, reason: 'hash mismatch', entries: 3 }
     const html = renderReceiptHtml(view, { mode: 'fragment' })
-    expect(html).toContain('kırık (satır 2)')
+    expect(html).toContain('broken (row 2)')
     expect(html).toContain('chain-broken')
-    expect(html).not.toContain('zincir sağlam')
+    expect(html).not.toContain('chain intact')
   })
 
-  it('intact chain with entries says sağlam, empty does not', () => {
+  it('intact chain with entries says intact, empty does not', () => {
     const ok = proofToView(demoProof())
     ok.chainIntegrity = { ok: true, entries: 3 }
-    expect(renderReceiptHtml(ok)).toContain('zincir sağlam')
+    expect(renderReceiptHtml(ok)).toContain('chain intact')
     const empty = proofToView(demoProof())
     empty.chainIntegrity = { ok: true, entries: 0 }
-    expect(renderReceiptHtml(empty)).not.toContain('zincir sağlam')
+    expect(renderReceiptHtml(empty)).not.toContain('chain intact')
   })
 
   it('receiptToView keeps pending and does not show a green tick when unsigned', () => {
@@ -161,8 +161,8 @@ describe('renderReceiptHtml', () => {
     r.anchor = { log: 'opentimestamps', ref: r.chain.hash, state: 'pending' }
     const html = renderReceiptHtml(receiptToView(r, { chainIntegrity: { ok: true, entries: 1 } }))
     expect(html).toContain('pending')
-    expect(html).toContain('İmza yok')
-    expect(html).toContain('üretilemedi')
+    expect(html).toContain('No signature')
+    expect(html).toContain('could not be produced')
     expect(html).not.toContain('✓')
     expect(html).not.toContain('SOC 2')
   })
@@ -171,8 +171,8 @@ describe('renderReceiptHtml', () => {
     const r = sampleReceipt(1, RECEIPT_GENESIS_HASH, 'allow')
     r.anchor = { log: 'opentimestamps', ref: r.chain.hash, state: 'bitcoin' }
     const html = renderReceiptHtml(receiptToView(r))
-    expect(html).toContain('doğrulanmadı')
-    expect(html).not.toMatch(/Çıpa:\s*bitcoin/)
+    expect(html).toContain('not verified')
+    expect(html).not.toMatch(/Anchor:\s*bitcoin/)
   })
 
   it('destination uses the same language as model.source — never verified/safe', () => {
@@ -180,22 +180,22 @@ describe('renderReceiptHtml', () => {
     r.destination = { value: 'openai/gpt-x', source: 'operator-declared' }
     const html = renderReceiptHtml(receiptToView(r))
     expect(html).toContain('openai/gpt-x')
-    expect(html).toContain('operatör beyan etti, doğrulanmadı')
+    expect(html).toContain('operator declared, not verified')
     expect(html).not.toMatch(/destination güvenli|destination safe|verified destination/i)
   })
 
   it('undeclared destination is named, not invented', () => {
     const r = sampleReceipt(1, RECEIPT_GENESIS_HASH, 'allow')
     const html = renderReceiptHtml(receiptToView(r))
-    expect(html).toContain('hedef bildirilmedi (undeclared).')
+    expect(html).toContain('destination not declared (undeclared).')
   })
 
   it('G17: verified sidecar may print bitcoin', () => {
     const r = sampleReceipt(1, RECEIPT_GENESIS_HASH, 'allow')
     r.anchor = { log: 'opentimestamps', ref: r.chain.hash, state: 'bitcoin' }
     const html = renderReceiptHtml(receiptToView(r, { anchorDisplay: 'verified' }))
-    expect(html).toMatch(/Çıpa:\s*bitcoin/)
-    expect(html).not.toContain('doğrulanmadı')
+    expect(html).toMatch(/Anchor:\s*bitcoin/)
+    expect(html).not.toContain('not verified')
   })
 })
 

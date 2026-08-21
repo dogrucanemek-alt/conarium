@@ -207,10 +207,10 @@ export function createConsoleApp(opts: {
   onPresence?: () => void
 } = {}) {
   const app = express()
-  // Limiter app basina: testler birbirinin sayacini kirletmesin.
+  // Limiter is per app: tests must not pollute each other's counters.
   const limiter = new RateLimiter({ perWindow: Number(process.env.CONARIUM_CONSOLE_RATE_PER_MIN ?? 60) })
   const sweepTimer = setInterval(() => limiter.sweep(), 5 * 60_000)
-  sweepTimer.unref()   // acik bir zamanlayici sureci canli tutmasin
+  sweepTimer.unref()   // an open timer must not keep the process alive
   app.use(express.json({ limit: '64kb' }))
 
   const publicDir = path.join(__dirname, '../public')
@@ -237,16 +237,17 @@ export function createConsoleApp(opts: {
 
   if (fs.existsSync(assetsDir)) app.use('/assets', express.static(assetsDir))
   app.use(express.static(publicDir))
-  // Hiz siniri KIMLIK KONTROLUNDEN ONCE.
+  // Rate limit BEFORE AUTH.
   //
-  // http.ts'te limit bilerek auth'tan SONRA kosuyor: orada amac, yetkisiz bir selin
-  // gercek bir istemcinin butcesini yakmasini onlemek. Burada tehdit tam tersi —
-  // konsol tek bir operator icindir ve korunmasi gereken sey TOKEN'IN KENDISI.
-  // Limit auth'tan sonra kossaydi basarisiz denemeler hic sayilmaz, yani kaba
-  // kuvvet denemesi sinirsiz kalirdi. Ayni kutuphane, ters sira, farkli gerekce.
+  // In http.ts the limit deliberately runs AFTER auth: there the goal is to stop
+  // an unauthorized flood from eating a real client's budget. Here the threat is
+  // the opposite — the console is for a single operator and what must be protected
+  // is THE TOKEN ITSELF. If the limit ran after auth, failed attempts would never
+  // count, so brute force would stay unbounded. Same library, reverse order,
+  // different reason.
   //
-  // Varsayilan 60/dk: mesru bir operator konsolu bu hizda kullanmaz, kaba kuvvet
-  // ise bu hizda ise yaramaz. CONARIUM_CONSOLE_RATE_PER_MIN=0 kapatir.
+  // Default 60/min: a legitimate operator does not use the console at that rate,
+  // and brute force is useless at that rate. CONARIUM_CONSOLE_RATE_PER_MIN=0 disables.
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     const client = clientKey(req.headers as Record<string, unknown>, req.socket.remoteAddress ?? undefined)
     if (!limiter.take(client)) {
@@ -439,8 +440,8 @@ export function createConsoleApp(opts: {
 
     const gov = new Governance({
       maxRows: cfg.maxRows,
-      // Playground açık örnek-veri demosu: default-deny sonrası açık modu EXPLICIT belirt
-      // (secrets yine denyTables ile reddedilir). Üretim yolu (index.ts) config.policy kullanır.
+      // Playground is an open sample-data demo: after default-deny, state open mode EXPLICITLY
+      // (secrets are still refused via denyTables). The production path (index.ts) uses config.policy.
       allowTables: ['*'],
       denyTables: ['public.secrets'],
       maskColumns: cfg.maskColumns,

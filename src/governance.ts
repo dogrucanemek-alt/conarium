@@ -370,10 +370,11 @@ export class Governance {
 
     if (denyTables?.some(p => match(p, qualified))) return false
 
-    // 🔒 DEFAULT-DENY (Codex denetimi 2026-07-06, P1): allowTables tanımlı DEĞİLSE hiçbir
-    // tabloya izin verme. docs.html "Nothing is allowed unless you allow it" + README
-    // "denied by default" bunu vaat ediyordu; eski kod (return true) TAM TERSİYDİ = güvenlik
-    // ürününde vaad ihlali. Açık mod isteyen (playground/demo) explicit allowTables:['*'] verir.
+    // 🔒 DEFAULT-DENY (Codex review 2026-07-06, P1): if allowTables is NOT defined,
+    // allow no table. docs.html "Nothing is allowed unless you allow it" + README
+    // "denied by default" already promised this; the old code (return true) was THE
+    // OPPOSITE = a broken guarantee in a security product. Anyone who wants open mode
+    // (playground/demo) must pass explicit allowTables:['*'].
     if (allowTables && allowTables.length > 0) {
       return allowTables.some(p => match(p, qualified))
     }
@@ -385,21 +386,22 @@ export class Governance {
   }
 
   /**
-   * Araç izni — `allowTools` / `denyTools`.
+   * Tool permission — `allowTools` / `denyTools`.
    *
-   * 🔴 2026-08-12: bu alanlar KONSOLDA düzenlenebiliyor, `types.ts`'te belgeli ve
-   * testi vardı, ama kontrol yalnızca hiçbir yerden çağrılmayan `ApiGovernance`
-   * içinde duruyordu — yani operatör "şu aracı kapattım" der, hiçbir şey kapanmazdı.
-   * Delik değildi (yazma işlemleri connector'da zaten reddediliyor, okuma
-   * `allowsTable`'dan geçiyor), ama YANLIŞ BEYANDI: arayüz bir söz veriyor, motor
-   * tutmuyordu. Bu ürünün tek iddiası "söylediğini gerçekten yapmak" olduğu için
-   * ölü bir politika alanı, çalışan bir açıktan daha pahalıdır.
+   * 🔴 2026-08-12: these fields were editable in the CONSOLE, documented in `types.ts`
+   * and had a test, but the check lived only inside `ApiGovernance`, which nothing
+   * called — so an operator saying "I turned that tool off" changed nothing.
+   * It was not a hole (writes are already refused at the connector; reads go through
+   * `allowsTable`), but it was a FALSE CLAIM: the UI promised something the engine
+   * did not do. This product's only claim is "actually do what you said", so a dead
+   * policy field is more expensive than a working gap.
    *
-   * ⚠️ Bilerek fail-OPEN — `allowsTable`/`allowsConnector`'ın aksine. `allowTools`
-   * tanımsızsa her araç geçer, çünkü asıl kapı zaten tablo politikası ve o
-   * fail-closed. Burayı da fail-closed yapmak, `allowTools` yazmamış her mevcut
-   * kurulumu sessizce kırardı; bu, kapatmaya çalıştığımız hatanın aynısı olurdu.
-   * Bu alan koruma katmanı değil, DARALTMA katmanıdır.
+   * ⚠️ Deliberately fail-OPEN — unlike `allowsTable`/`allowsConnector`. If
+   * `allowTools` is undefined every tool passes, because the real door is already
+   * table policy and that is fail-closed. Making this fail-closed too would silently
+   * break every existing install that never wrote `allowTools`; that would be the
+   * same class of error we are closing. This field is not a protection layer, it is
+   * a NARROWING layer.
    */
   allowsTool(toolName: string): boolean {
     const { allowTools, denyTools } = this.policy
@@ -464,16 +466,16 @@ export class Governance {
     this.applyRowCap(ast[0])
     let rewrittenSql = emitPostgresSql(ast[0])
 
-    // KÜME İŞLEMLERİ (UNION / UNION ALL / INTERSECT / EXCEPT) — satır sınırı boşluğu.
-    // applyRowCap yalnızca 'select' ve 'with' düğümlerine LIMIT ekleyebiliyor;
-    // küme işlemleri limitTarget'tan undefined dönüp SESSİZCE sınırsız geçiyordu.
-    // Bu, ürünün "row caps stop bulk extraction" vaadini deliyordu: politika ve
-    // maskeleme çalışıyor, ama satır sayısı sınırsız.
+    // SET OPERATIONS (UNION / UNION ALL / INTERSECT / EXCEPT) — row-cap gap.
+    // applyRowCap can only attach LIMIT to 'select' and 'with' nodes;
+    // set operations returned undefined from limitTarget and SILENTLY passed uncapped.
+    // That punched the product's "row caps stop bulk extraction" promise: policy and
+    // masking still ran, but the row count was unbounded.
     //
-    // AST'de küme düğümü limit taşıyamıyor (yalnız type/left/right), üstelik parser
-    // kullanıcının yazdığı `A UNION ALL B LIMIT 50`'yi sağ kola koyup anlamı
-    // değiştiriyor. O yüzden sınır DIŞARIDAN sarmalanarak uygulanıyor — iç SQL
-    // zaten doğrulanmış ve yeniden yazılmış AST'den geliyor.
+    // A set node in the AST cannot carry a limit (only type/left/right), and the parser
+    // puts a user-written `A UNION ALL B LIMIT 50` onto the right arm, changing the
+    // meaning. So the cap is applied by wrapping FROM THE OUTSIDE — the inner SQL
+    // already comes from a validated, rewritten AST.
     if (!this.limitTarget(ast[0])) {
       rewrittenSql = `SELECT * FROM (${rewrittenSql}) AS conarium_capped LIMIT ${this.maxRows()}`
     }
@@ -597,17 +599,18 @@ export class Governance {
   maskPII(obj: unknown, ctx?: { column?: string }): { masked: unknown, count: number, byClass: Record<string, number> } {
     if (!obj) return { masked: obj, count: 0, byClass: {} };
 
-    // SAYISAL PII (NEO guvenlik taramasi, 2026-07-31 — deneysel dogrulandi).
-    // Maskeleme yalnizca string ve object dallarinda calisiyordu; number/bigint
-    // hicbir kontrolden gecmeden HAM donuyordu. Olculen sonuc:
-    //   tckn_metin "12345678901" -> [MASKED_PII]   ·  tckn_sayi 12345678901 -> SIZDI
-    // Turkiye'de TCKN ve telefonun bigint tutulmasi yaygin; bu teorik degil.
+    // NUMERIC PII (NEO security scan, 2026-07-31 — experimentally confirmed).
+    // Masking only ran on string and object branches; number/bigint returned RAW
+    // without any check. Measured result:
+    //   tckn_text "12345678901" -> [MASKED_PII]   ·  tckn_number 12345678901 -> LEAKED
+    // In Turkey, storing TCKN and phone as bigint is common; this is not theoretical.
     //
-    // Sayi metne cevrilip AYNI desenlerden geciriliyor — ayri bir "hangi sayi
-    // PII'dir" kural seti tutmak ikinci bir kaynak yaratir ve biri bayatlar.
-    // Desen tutmazsa sayi TIPI KORUNARAK aynen doner: id/adet/fiyat/yil bozulmaz.
-    // 13–16 hane Luhn tutmuyorsa, veya dizi daha uzunsa (siparis no), icerik
-    // tarayici dokunmaz — yarim maske + maskedCount yalanindan daha kotu.
+    // The number is converted to text and run through THE SAME patterns — keeping a
+    // separate "which numbers are PII" rule set would create a second source that
+    // would go stale. If no pattern matches, the number is returned unchanged WITH
+    // ITS TYPE PRESERVED: id/count/price/year stay intact.
+    // If 13–16 digits fail Luhn, or the sequence is longer (order number), the
+    // content scanner does not touch it — a half-mask plus a lying maskedCount is worse.
     if (typeof obj === 'number' || typeof obj === 'bigint') {
       const sonuc = this.maskPII(String(obj), ctx);
       return sonuc.count > 0 ? sonuc : { masked: obj, count: 0, byClass: {} };
@@ -660,12 +663,13 @@ export class Governance {
         count += mrzPass.count
       }
 
-      // Sertleştirme (Codex denetimi 2026-07-06, P1): README "secrets are redacted in the
-      // response stream" diyor ama yanıt yolu (maskPII) sadece PII yakalıyordu — API key /
-      // token / şifre / bağlantı-dizesi kimliği MODELE ham gidiyordu (ör. api_key sütunu
-      // maskColumns'ta değilse). Audit yolu (audit.ts maskArgs) bunu zaten yakalıyordu;
-      // aynı dedektörleri yanıt yoluna da taşıdık. Ürünün güvenlik vaadi = bu.
-      // sk- ailesi: yeni OpenAI anahtarları sk-proj-... (tire içerir) → tire/alt-çizgiye izin ver.
+      // Hardening (Codex review 2026-07-06, P1): README says "secrets are redacted in the
+      // response stream" but the response path (maskPII) only caught PII — API key /
+      // token / password / connection-string credentials went to the MODEL in the clear
+      // (e.g. if the api_key column was not in maskColumns). The audit path
+      // (audit.ts maskArgs) already caught these; we carried the same detectors onto
+      // the response path. The product's security promise = this.
+      // sk- family: new OpenAI keys are sk-proj-... (contain hyphens) → allow hyphen/underscore.
       // Secrets and labelled names need letters. A 12k-digit order field
       // otherwise still pays for those unicode regexes.
       if (/[A-Za-z]/.test(masked)) {
@@ -698,9 +702,9 @@ export class Governance {
         })
       }
 
-      // Sertleştirme (Claude, 2026-07-02): encode(...,'base64') ile kaçırılan PII'yi de yakala.
-      // NEO red-team harness bu deliği buldu (pii-base64 BYPASS). Saf base64 bir metin
-      // çözülünce e-posta/TCKN içeriyorsa maskele.
+      // Hardening (Claude, 2026-07-02): also catch PII smuggled via encode(...,'base64').
+      // The NEO red-team harness found this hole (pii-base64 BYPASS). If a pure-base64
+      // string decodes to email/TCKN, mask it.
       // Length-capped: a 12k-digit field matches `{12,}` and Buffer.from of
       // 12 kB of '1's was the leftover ~80 ms after the email regex was bounded.
       // Encoded TCKN/email/IBAN fit in well under 256 characters.
@@ -712,7 +716,7 @@ export class Governance {
             count++;
             masked = '[MASKED_PII]';
           }
-        } catch { /* base64 değil */ }
+        } catch { /* not base64 */ }
       }
 
       masked = ibanPass.restore(masked)

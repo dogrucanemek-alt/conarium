@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Salt-oku audit zincir doğrulayıcı.
- * Hash kuralı = src/audit-hash.ts / validateChain (hash+signature hariç JSON → sha256).
+ * Read-only audit chain verifier.
+ * Hash rule = src/audit-hash.ts / validateChain (JSON excluding hash+signature → sha256).
  *
  * Usage: node scripts/audit-chain-check.mjs <sink.jsonl>
- * exit 0 temiz · exit 1 kırık/self-hash · exit 2 kullanım
+ * exit 0 clean · exit 1 broken/self-hash · exit 2 usage
  */
 import { createHash } from 'crypto'
 import { existsSync, readFileSync, statSync } from 'fs'
@@ -32,13 +32,13 @@ function check(sinkPath) {
   }
   if (!result.exists) {
     result.ok = true
-    result.note = 'sink yok — genesis kabul'
+    result.note = 'no sink — treat as genesis'
     return result
   }
   result.bytes = statSync(abs).size
   const raw = readFileSync(abs, 'utf-8').trim()
   if (!raw) {
-    result.note = 'boş sink'
+    result.note = 'empty sink'
     return result
   }
   const lines = raw.split('\n').filter(Boolean)
@@ -96,7 +96,7 @@ function human(r) {
     `sink: ${r.sink}`,
     `exists: ${r.exists} · bytes: ${r.bytes} · lines: ${r.lines}`,
     `prevHash breaks: ${r.prevHashBreaks.length}`,
-    `self-hash mismatches (tamper şüphesi): ${r.selfHashMismatches.length}`,
+    `self-hash mismatches (tamper suspected): ${r.selfHashMismatches.length}`,
     `ok: ${r.ok}`,
   ]
   if (r.prevHashBreaks[0]) {

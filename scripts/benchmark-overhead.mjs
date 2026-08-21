@@ -4,7 +4,7 @@
  *
  *   CONARIUM_BENCH_DSN=postgres://… node scripts/benchmark-overhead.mjs
  *
- * Without a DSN this does not invent a comparison. It writes koşulamadı
+ * Without a DSN this does not invent a comparison. It writes not run
  * for (a) vs (b) and still records in-process gate timings (CPU of
  * guardQuery + redact — not a substitute for the Postgres delta).
  *
@@ -43,7 +43,7 @@ Measures Conarium's added cost, not absolute speed.
 Scenarios: allow (unmasked) · partial (email masked) · deny (query must not run).
 Caps: 100 (code default) · 500 · 5 000. Dataset is 5 000 rows.
 
-Needs CONARIUM_BENCH_DSN for (a) vs (b). Without it: koşulamadı.`)
+Needs CONARIUM_BENCH_DSN for (a) vs (b). Without it: not run.`)
   process.exit(0)
 }
 
@@ -472,7 +472,7 @@ if (postgresResult.comparison) {
     }
   }
 } else {
-  console.log('Postgres comparison: koşulamadı')
+  console.log('Postgres comparison: not run')
 }
 console.log('')
 console.log('in-process (not vs Postgres)')
@@ -482,7 +482,7 @@ for (const kind of Object.keys(inProcess.guard)) {
 for (const n of Object.keys(inProcess.redact)) {
   const cell = inProcess.redact[n]
   if (cell.status === 'kosulanmadi') {
-    console.log(`  redact ${n}: koşulamadı — ${cell.reason}`)
+    console.log(`  redact ${n}: not run — ${cell.reason}`)
   } else {
     console.log('  ' + line(`redact ${String(n).padStart(6)}`, cell))
   }

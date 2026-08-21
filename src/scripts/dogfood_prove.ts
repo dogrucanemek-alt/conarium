@@ -1,6 +1,6 @@
 /**
- * Conarium Dogfood Proof — GERÇEK ZION verisinde governance kanıtı.
- * Satırlar ZION_ROWS env'inden gelir (ham PII koda gömülmez).
+ * Conarium dogfood proof — governance against real ZION rows.
+ * Rows come from the ZION_ROWS env (raw PII is not embedded in this file).
  */
 import { Governance } from '../governance.js';
 
@@ -13,28 +13,28 @@ const gov = new Governance({
   maxRows: 100,
 });
 
-console.log('👁️  CONARIUM — GERÇEK ZION VERİSİNDE GOVERNANCE KANITI\n' + '='.repeat(52));
+console.log('CONARIUM — GOVERNANCE PROOF ON REAL ZION DATA\n' + '='.repeat(52));
 
-console.log('\n1) ERİŞİM KONTROLÜ (allow/deny):');
-console.log('   public.aifurniture_waitlist →', gov.allowsTable('public.aifurniture_waitlist') ? 'ALLOW ✅' : 'DENY ⛔');
-console.log('   public.wa_messages (özel)   →', gov.allowsTable('public.wa_messages') ? 'ALLOW ✅' : 'DENY ⛔');
+console.log('\n1) ACCESS CONTROL (allow/deny):');
+console.log('   public.aifurniture_waitlist →', gov.allowsTable('public.aifurniture_waitlist') ? 'ALLOW' : 'DENY');
+console.log('   public.wa_messages (private) →', gov.allowsTable('public.wa_messages') ? 'ALLOW' : 'DENY');
 
-console.log('\n2) SORGU KORUMASI (read-only guard):');
-try { gov.guardQuery('DELETE FROM aifurniture_waitlist'); console.log('   DELETE → İZİN (HATA!)'); }
-catch (e: any) { console.log('   "DELETE FROM ..." →', e.message, '⛔'); }
-try { gov.guardQuery('SELECT email FROM aifurniture_waitlist'); console.log('   "SELECT email ..." → izin verildi ✅'); }
-catch (e: any) { console.log('   SELECT bloklandı (HATA!):', e.message); }
+console.log('\n2) QUERY GUARD (read-only):');
+try { gov.guardQuery('DELETE FROM aifurniture_waitlist'); console.log('   DELETE → ALLOWED (BUG!)'); }
+catch (e: any) { console.log('   "DELETE FROM ..." →', e.message); }
+try { gov.guardQuery('SELECT email FROM aifurniture_waitlist'); console.log('   "SELECT email ..." → allowed'); }
+catch (e: any) { console.log('   SELECT blocked (BUG!):', e.message); }
 
-console.log('\n3) GERÇEK VERİ MASKELEME — AI Conarium üzerinden BUNU görür:');
+console.log('\n3) REAL DATA MASKING — this is what an AI sees through Conarium:');
 const masked = gov.redact({ rows } as any);
 masked.rows.forEach((r: any) => console.log('   ', JSON.stringify({ email: r.email, source: r.source })));
 
 const pii = gov.maskPII(rows);
-console.log('\n4) REGEX PII TARAMA: toplam', pii.count, 'PII tespit edildi + maskelendi');
+console.log('\n4) REGEX PII SCAN: total', pii.count, 'PII detected and masked');
 
-console.log('\n5) SATIR LİMİTİ:', gov.maxRows(), 'satır (AI milyon satır çekemez)');
+console.log('\n5) ROW LIMIT:', gov.maxRows(), 'rows (the AI cannot pull millions)');
 
-console.log('\n6) AUDIT LOG (ham PII İÇERMEZ):');
+console.log('\n6) AUDIT LOG (contains no raw PII):');
 console.log('   ', JSON.stringify({ ts: '2026-06-28', actor: 'Cursor', tool: 'query_db', table: 'aifurniture_waitlist', rows: rows.length, masked: pii.count, decision: 'allow' }));
 
-console.log('\n' + '='.repeat(52) + '\n✅ Conarium GERÇEK ZION verisinde çalıştı — PII maskelendi, özel tablo reddedildi.');
+console.log('\n' + '='.repeat(52) + '\nConarium ran on real ZION data — PII masked, private table denied.');

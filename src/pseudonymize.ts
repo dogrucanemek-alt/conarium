@@ -1,23 +1,23 @@
 export interface PseudoResult {
-  /** İçindeki adlar token'la değiştirilmiş metin (LLM'e bu gider). */
+  /** Text with names inside replaced by tokens (this is what goes to the LLM). */
   text: string;
-  /** token → gerçek ad. YALNIZCA audit/iç kullanım — LLM'e ASLA gitmez. */
+  /** token → real name. AUDIT/internal use ONLY — NEVER goes to the LLM. */
   map: Record<string, string>;
-  /** Kaç benzersiz ad pseudonymize edildi. */
+  /** How many unique names were pseudonymized. */
   count: number;
 }
 
 /**
- * Metindeki BİLİNEN adları (müşteri/tedarikçi/çalışan) sabit token'larla değiştirir.
- * Aynı ad her yerde aynı token'a map'lenir → LLM "Müşteri #1 borçlu + Müşteri #1 5000 harcadı"
- * diye tutarlı akıl yürütebilir ama gerçek kimliği bilmez.
+ * Replace KNOWN names in the text (customer/supplier/employee) with stable tokens.
+ * The same name maps to the same token everywhere → the LLM can reason consistently
+ * ("Record #1 is in debt + Record #1 spent 5000") without knowing the real identity.
  *
- * ZION entegrasyonu (assistant/route.ts): ctx'i kurarken adları buradan geçir:
+ * ZION integration (assistant/route.ts): when building ctx, pass names through here:
  *   const { text, map } = pseudonymizeText(ctx, [...customerNames, ...supplierNames], 'Kayıt');
- *   appendAudit({ pseudoMap: map });  // token→ad audit'e, ctx (text) LLM'e.
+ *   appendAudit({ pseudoMap: map });  // token→name to audit, ctx (text) to the LLM.
  */
 export function pseudonymizeText(text: string, names: string[], kind = 'Kayıt'): PseudoResult {
-  // 3+ karakter, benzersiz, UZUN adlar önce (kısmi çakışma önlenir)
+  // 3+ chars, unique, LONGEST names first (prevents partial overlap)
   const uniq = [...new Set(names.map(s => (s || '').trim()).filter(s => s.length >= 3))]
     .sort((a, b) => b.length - a.length);
 
@@ -28,7 +28,7 @@ export function pseudonymizeText(text: string, names: string[], kind = 'Kayıt')
     n++;
     const token = `${kind} #${n}`;
     map[token] = real;
-    out = out.split(real).join(token); // tüm geçişleri değiştir
+    out = out.split(real).join(token); // replace every occurrence
   }
   return { text: out, map, count: uniq.length };
 }

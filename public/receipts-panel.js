@@ -1,6 +1,6 @@
 /**
- * Makbuzlar tab view-state. Fetch'ten ÖNCE çağrılır — aksi halde ilk tık
- * boş (hepsi hidden) kalır ve ikinci tıkta dolu görünür.
+ * Receipts tab view-state. Called BEFORE the fetch — otherwise the first click
+ * stays empty (everything hidden) and only the second click looks filled.
  */
 (function (root) {
   function showLoading(ui) {
@@ -8,7 +8,7 @@
     ui.table.hidden = true
     ui.detail.hidden = true
     ui.empty.hidden = false
-    ui.empty.textContent = 'Yükleniyor…'
+    ui.empty.textContent = 'Loading…'
   }
 
   function showError(ui, message) {
@@ -24,7 +24,7 @@
     ui.table.hidden = true
     ui.detail.hidden = true
     ui.empty.hidden = false
-    ui.empty.textContent = message || 'henüz makbuz yok'
+    ui.empty.textContent = message || 'no receipts yet'
   }
 
   function showList(ui, data, make) {
@@ -36,11 +36,11 @@
     if (chain.ok === false) {
       ui.chain.hidden = false
       ui.chain.className = 'receipt-chain broken'
-      ui.chain.textContent = 'kırık (satır ' + chain.brokenAt + ')'
+      ui.chain.textContent = 'broken (row ' + chain.brokenAt + ')'
     } else {
       ui.chain.hidden = false
       ui.chain.className = 'receipt-chain ok'
-      ui.chain.textContent = 'zincir sağlam'
+      ui.chain.textContent = 'chain intact'
     }
     items.forEach(function (row) {
       const tr = make.tr()
@@ -71,7 +71,7 @@
 
   function render(ui, data, make) {
     if (!data || data.error) {
-      showError(ui, (data && data.error) || 'Makbuz listesi alınamadı.')
+      showError(ui, (data && data.error) || 'Could not load the receipt list.')
       return 'error'
     }
     const items = Array.isArray(data.items) ? data.items : []

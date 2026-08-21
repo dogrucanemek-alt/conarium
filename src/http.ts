@@ -37,7 +37,7 @@ import { announceUpdate } from './update-check.js'
 const PORT = Number(process.env.CONARIUM_MCP_PORT || 8791)
 const HOST = process.env.CONARIUM_MCP_HOST || '127.0.0.1'
 const TOKEN = process.env.CONARIUM_MCP_TOKEN || ''
-// Bir kez yuklenir; dosya yoksa null = kisi bazli kimlik kapali (davranis birebir eski).
+// Loaded once; if the file is missing, null = per-person identity is off (behavior identical to before).
 /**
  * Staleness is decided by the file's CONTENT, not its mtime.
  *
@@ -93,26 +93,27 @@ export function currentTokenStore(): ReturnType<typeof loadTokenStore> {
 
 function tokenOk(supplied: string): boolean {
   if (!supplied) return false
-  // sha256 both sides: equal-length buffers → timingSafeEqual güvenli
+  // sha256 both sides: equal-length buffers → timingSafeEqual is safe
   const a = createHash('sha256').update(supplied).digest()
   const b = createHash('sha256').update(TOKEN).digest()
   return timingSafeEqual(a, b)
 }
 
-/** Oturumun sahibi = onu açan kimlik bilgisinin karması. Ham token asla saklanmaz. */
+/** Session owner = hash of the credential that opened it. The raw token is never stored. */
 export function ownerKey(supplied: string): Buffer {
   return createHash('sha256').update(supplied).digest()
 }
 
-/** Sabit zamanlı karşılaştırma — iki taraf da sha256, uzunluklar eşit. */
+/** Constant-time comparison — both sides are sha256, lengths are equal. */
 export function sessionOwnerMatches(owner: Buffer, supplied: string): boolean {
   return timingSafeEqual(owner, ownerKey(supplied))
 }
 
 /**
- * Transport + onu açan kimlik. Kimliği transport'la BİRLİKTE tutuyoruz, çünkü
- * `buildServer(deps, kisi)` oturum başına bir kez çağrılır: o andan sonra gelen
- * her istek, o Server'ın kimliğiyle çalışır ve makbuzu o ad altında yazar.
+ * Transport + the identity that opened it. We keep the identity WITH the
+ * transport because `buildServer(deps, kisi)` is called once per session:
+ * every request after that runs under that Server's identity and writes
+ * the receipt under that name.
  */
 export interface SessionEntry {
   transport: StreamableHTTPServerTransport
@@ -159,18 +160,19 @@ function readBody(req: IncomingMessage): Promise<unknown> {
 }
 
 /**
- * İstek işleyicisi — main()'den ayrı tutuluyor çünkü oturum sahipliği kuralının
- * test edilebilir olması gerekiyor: bir devralma denemesi düzeltmeden önce
- * kırmızı yanmadan "kapatıldı" denemez.
+ * Request handler — kept separate from main() because the session-ownership
+ * rule must be testable: a takeover attempt cannot be called "closed" until
+ * it has gone red before the fix.
  */
 /**
- * Hata gövdeleri JSON-RPC olmak ZORUNDA.
+ * Error bodies MUST be JSON-RPC.
  *
- * 2026-08-13'te canlıda yaşandı: geçit yeniden başlatıldı, istemci elindeki eski
- * `Mcp-Session-Id` ile geldi, sunucu `400 expected initialize` + `text/plain`
- * döndü. İstemci tarafındaki proxy bunu ayrıştıramadı ve kullanıcıya
- * "Invalid content from server" dedi — yani gerçek sebep (oturum düştü, yeniden
- * başlat) kullanıcıya HİÇ ulaşmadı. Düz metin hata, teşhis edilemeyen hata demek.
+ * Happened in production on 2026-08-13: the gateway was restarted, the client
+ * arrived with the old `Mcp-Session-Id` it still held, the server returned
+ * `400 expected initialize` + `text/plain`. The client-side proxy could not
+ * parse that and told the user "Invalid content from server" — so the real
+ * cause (session dropped, restart) NEVER reached the user. A plain-text
+ * error is an undiagnosable error.
  */
 function sendRpcError(
   res: ServerResponse,
@@ -194,7 +196,7 @@ export function createHandler(
     try {
       const url = new URL(req.url || '/', 'http://localhost')
 
-      // TLS proxy'siz sağlık ucu (token istemez, veri dönmez)
+      // Health endpoint without a TLS proxy (does not ask for a token, returns no data)
       if (url.pathname === '/healthz') {
         res.writeHead(200, { 'content-type': 'text/plain' }).end('ok')
         return
@@ -210,7 +212,7 @@ export function createHandler(
         return
       }
 
-      // Yol: /t/<token>/mcp (capability URL) ya da /mcp + Authorization: Bearer
+      // Path: /t/<token>/mcp (capability URL) or /mcp + Authorization: Bearer
       const pathMatch = url.pathname.match(/^\/t\/([^/]+)\/mcp$/)
       const isPlainMcp = url.pathname === '/mcp'
       if (!pathMatch && !isPlainMcp) {
@@ -219,9 +221,10 @@ export function createHandler(
       }
       const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
       const supplied = pathMatch ? decodeURIComponent(pathMatch[1]) : bearer
-      // Kimlik: kişiye özel token eşleşirse o kişi, yoksa paylaşılan token.
-      // İkisi de tutmuyorsa 401 — kişi bazlı kimlik yetkiyi GENİŞLETMEZ, sadece
-      // kimin geçtiğini adlandırır. Eşleşmeyen token hâlâ kapıda kalır.
+      // Identity: if a per-person token matches, that person; otherwise the
+      // shared token. If neither holds, 401 — per-person identity does NOT
+      // widen authorization, it only names who got through. A non-matching
+      // token still stays at the door.
       const kisi = resolveActor(supplied, currentTokenStore(), deps.config.consumer ?? 'unknown')
       if (!kisi.isUser && !tokenOk(supplied)) {
         sendRpcError(res, 401, -32001, 'unauthorized')
@@ -241,11 +244,12 @@ export function createHandler(
       const existing = sessionId ? transports.get(sessionId) : undefined
 
       if (existing) {
-        // Kapının kendisi: oturum, onu açan kimlik bilgisine aittir. Geçerli bir
-        // token taşımak konuşma hakkı vermez — AYNI token olmalı. Bu kontrol
-        // olmadan, kişisel token'la açılmış bir oturumun id'sini ele geçiren
-        // paylaşılan-token sahibi, o kişinin profil/maskeleme bağlamıyla çalışır
-        // ve o andan sonraki her makbuz yanlış kişiyi adlandırır.
+        // The door itself: the session belongs to the credential that opened
+        // it. Carrying a valid token does not grant the right to speak — it
+        // must be the SAME token. Without this check, a shared-token holder
+        // who captured the id of a session opened with a personal token would
+        // run in that person's profile/masking context, and every receipt
+        // from that point on would name the wrong person.
         if (!sessionOwnerMatches(existing.owner, supplied)) {
           sendRpcError(res, 403, -32003, 'session owner mismatch')
           return
@@ -263,17 +267,18 @@ export function createHandler(
         return
       }
 
-      // Oturum kimliği GELDİ ama sunucuda yok: yeniden başlatılmış geçit, ya da
-      // süresi dolmuş oturum. Spec bunun için 404 der — istemcinin yapması gereken
-      // yeni bir initialize açmaktır. 400 "isteğin bozuk" demektir; istemci bunu
-      // toparlanma sinyali saymaz ve bağlantı kalıcı olarak ölür. Canlıda tam olarak
-      // bu yaşandı: 03:38'deki yeniden başlatmadan sonra konnektör bir daha açılmadı.
+      // A session id ARRIVED but is not on the server: restarted gateway, or
+      // an expired session. The spec says 404 for this — what the client must
+      // do is open a new initialize. 400 means "the request is malformed";
+      // the client does not treat that as a recovery signal and the
+      // connection dies permanently. That is exactly what happened in
+      // production: after the 03:38 restart the connector never opened again.
       if (sessionId) {
         sendRpcError(res, 404, -32004, 'session not found — send a new initialize request')
         return
       }
 
-      // Yeni oturum: yalnız initialize POST açar
+      // New session: only an initialize POST opens one
       if (req.method !== 'POST') {
         sendRpcError(res, 400, -32600, 'no session — open one with an initialize POST')
         return
@@ -299,11 +304,11 @@ export function createHandler(
       transport.onclose = () => {
         if (transport.sessionId) transports.delete(transport.sessionId)
       }
-      const server = buildServer(deps, kisi)   // oturum başına Server + oturumun kimligi; connectors/governance/audit ORTAK
+      const server = buildServer(deps, kisi)   // one Server per session + the session's identity; connectors/governance/audit are SHARED
       await server.connect(transport)
       await transport.handleRequest(req, res, body)
     } catch (err) {
-      console.error('[conarium-http] istek hatası:', (err as Error).message)
+      console.error('[conarium-http] request error:', (err as Error).message)
       try { if (!res.headersSent) sendRpcError(res, 500, -32603, 'internal error') } catch { /* */ }
     }
   }
@@ -311,7 +316,7 @@ export function createHandler(
 
 async function main() {
   if (!TOKEN || TOKEN.length < 24) {
-    console.error('[conarium-http] CONARIUM_MCP_TOKEN eksik ya da <24 karakter — fail-closed, başlamıyorum.')
+    console.error('[conarium-http] CONARIUM_MCP_TOKEN missing or shorter than 24 characters — fail-closed, not starting.')
     process.exit(1)
   }
 
@@ -341,9 +346,9 @@ async function main() {
   httpServer.listen(PORT, HOST, () => {
     const addr = httpServer.address()
     const bound = typeof addr === 'object' && addr !== null ? addr.port : PORT
-    const rate = limiter.enabled ? `${ratePerMin}/dk` : 'KAPALI'
+    const rate = limiter.enabled ? `${ratePerMin}/min` : 'OFF'
     console.error(
-      `[conarium-http] remote MCP hazır — http://${HOST}:${bound} (token: SET, ${deps.connectors.length} connector, rate-limit: ${rate})`
+      `[conarium-http] remote MCP ready — http://${HOST}:${bound} (token: SET, ${deps.connectors.length} connector, rate-limit: ${rate})`
     )
     // A remote gateway is the one nobody looks at for weeks. One stderr line at
     // start is the only place a stale build gets announced to its operator.
@@ -359,15 +364,15 @@ async function main() {
 }
 
 /**
- * main() yalnızca dosya DOĞRUDAN çalıştırıldığında koşar.
+ * main() runs only when the file is executed DIRECTLY.
  *
- * Modül seviyesinde koşulduğu sürece bu dosyayı içe aktarmak sunucuyu ayağa
- * kaldırır ya da config bulamayıp `process.exit(1)` ile çağıranı öldürür —
- * yani oturum sahipliği gibi bir kuralın testi hiç yazılamazdı. Test edilemeyen
- * güvenlik kuralı, olmayan güvenlik kuralıdır.
+ * As long as it ran at module level, importing this file would start the
+ * server or fail to find config and kill the caller with `process.exit(1)` —
+ * so a test of a rule like session ownership could never be written. An
+ * untestable security rule is a security rule that does not exist.
  *
- * Tespit başarısız olursa ESKİ davranışa düşeriz (çalıştır): bir sunucunun
- * sessizce başlamaması, bir testin gürültülü patlamasından pahalıdır.
+ * If detection fails we fall back to the OLD behavior (run): a server that
+ * silently fails to start is more expensive than a test blowing up loudly.
  */
 const dogrudanCalistirildi = (() => {
   try {

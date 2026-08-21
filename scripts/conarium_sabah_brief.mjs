@@ -54,9 +54,9 @@ function parseToolResults(out) {
 }
 
 function fmtRows(payload, max = 8) {
-  if (payload?.error) return `_Hata: ${payload.error}_\n`
+  if (payload?.error) return `_Error: ${payload.error}_\n`
   const rows = payload?.rows || []
-  if (!rows.length) return '_boş_\n'
+  if (!rows.length) return '_empty_\n'
   const keys = Object.keys(rows[0]).filter(k => !/phone|email|gsm|tckn/i.test(k)).slice(0, 6)
   const lines = ['| ' + keys.join(' | ') + ' |', '| ' + keys.map(() => '---').join(' | ') + ' |']
   for (const r of rows.slice(0, max)) {
@@ -76,27 +76,27 @@ const { out, err } = await runMcp([
 
 const r = parseToolResults(out)
 const now = new Date().toISOString()
-const md = `# Conarium sabah — ${now}
+const md = `# Conarium morning — ${now}
 
-> Kaynak: zion-rest (Codes sync aynası). Canlı Codes değil. PII maskeli alanlar atlandı.
+> Source: zion-rest (Codes sync mirror). Not live Codes. PII-masked fields omitted.
 
-## 1) Ölü stok
+## 1) Dead stock
 ${fmtRows(r[2], 3)}
 
-## 2) Şube özet
+## 2) Branch summary
 ${fmtRows(r[3], 10)}
 
 ## 3) Stock runout
 ${fmtRows(r[4], 10)}
 
-## 4) Sevk özet
+## 4) Shipment summary
 ${fmtRows(r[5], 3)}
 
-## Not
-- |marj| uçuksa önce maliyet/veri_hatası hipotezi.
-- 3 hamleyi Agent skill \`conarium-sabah\` ile yorumla.
+## Note
+- If |margin| looks wild, test the cost / data-error hypothesis first.
+- Interpret the three moves with the \`conarium-sabah\` agent skill.
 
-## stderr (kısa)
+## stderr (short)
 \`\`\`
 ${err.split('\\n').filter(l => /allow=|Connected|running|Fatal/.test(l)).slice(0, 8).join('\\n')}
 \`\`\`

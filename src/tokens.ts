@@ -1,13 +1,13 @@
 /**
- * Kişi bazlı kimlik — token deposu.
+ * Per-person identity — token store.
  *
- * Neden beyan değil token: istemcinin gönderdiği isim (X-Conarium-Actor gibi)
- * kimse tarafından doğrulanmamıştır; onu imzalayıp makbuza yazmak, dürüst
- * 'service' değerinden kötüdür. Token'ı Conarium zaten doğruluyor, dolayısıyla
- * kimin bağlandığını BİLİR.
+ * Why a token, not a declaration: a name the client sends (such as
+ * X-Conarium-Actor) has not been verified by anyone; signing it onto the
+ * receipt is worse than an honest 'service' value. Conarium already verifies
+ * the token, so it KNOWS who connected.
  *
- * Token'lar düz metin saklanmaz — yalnızca SHA-256 karması. Dosya sızsa bile
- * kimsenin token'ı ele geçmez.
+ * Tokens are not stored in plaintext — only a SHA-256 hash. Even if the
+ * file leaks, nobody's token is captured.
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
@@ -21,26 +21,26 @@ export interface ResolvedActor {
 }
 
 /**
- * Yol her çağrıda okunur, modül yüklenirken DEĞİL.
- * Sabit olarak yakalansaydı `CONARIUM_TOKENS_FILE`'ı sonradan değiştirmek
- * hiçbir şeyi etkilemezdi — testler dahil, ki bu sessizce yanlış şeyi ölçmek
- * demek olurdu.
+ * The path is read on every call, NOT at module load.
+ * If it were captured as a constant, changing `CONARIUM_TOKENS_FILE`
+ * afterwards would affect nothing — including tests, which would silently
+ * measure the wrong thing.
  */
 function varsayilanYol(): string {
   return process.env.CONARIUM_TOKENS_FILE || 'conarium.tokens.json'
 }
 
-/** karma → kişi id. Dosya yoksa null = kişi bazlı kimlik kapalı (hata değil). */
+/** hash → person id. If the file is missing, null = per-person identity is off (not an error). */
 export function loadTokenStore(path: string = varsayilanYol()): Map<string, string> | null {
   if (!existsSync(path)) return null
   let raw: { tokens?: { sha256?: string; id?: string }[] }
   try {
     raw = JSON.parse(readFileSync(path, 'utf8'))
   } catch (e) {
-    // Bilerek FIRLATIYORUZ, sessizce null dönmüyoruz: null dönmek kişi bazlı
-    // kimliği fark edilmeden kapatır ve herkes yeniden 'service' olur —
-    // sessiz düşüş, gürültülü hatadan çok daha tehlikelidir.
-    throw new Error(`loadTokenStore: ${path} okunamadı/bozuk JSON — ${(e as Error).message}`)
+    // We THROW on purpose, we do not silently return null: returning null
+    // would turn off per-person identity unnoticed and everyone would become
+    // 'service' again — a silent drop is far more dangerous than a noisy error.
+    throw new Error(`loadTokenStore: ${path} unreadable or invalid JSON — ${(e as Error).message}`)
   }
   const map = new Map<string, string>()
   for (const t of raw.tokens ?? []) {
@@ -52,8 +52,8 @@ export function loadTokenStore(path: string = varsayilanYol()): Map<string, stri
 }
 
 /**
- * Gelen token'ı kişiye çözer. Eşleşme yoksa ASLA kişi kimliği üretmez —
- * paylaşılan token davranışına düşer.
+ * Resolves the incoming token to a person. If there is no match it NEVER
+ * invents a person identity — it falls back to shared-token behavior.
  */
 export function resolveActor(
   supplied: string,

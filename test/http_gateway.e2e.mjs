@@ -109,7 +109,7 @@ function waitReady(child) {
     }, 15_000)
     const onData = (chunk) => {
       buf += chunk.toString()
-      const m = buf.match(/remote MCP hazır — http:\/\/127\.0\.0\.1:(\d+)/)
+      const m = buf.match(/remote MCP ready — http:\/\/127\.0\.0\.1:(\d+)/)
       if (m) {
         cleanup()
         resolve({ port: Number(m[1]), log: buf })

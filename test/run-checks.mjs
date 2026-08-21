@@ -44,6 +44,7 @@ export const CHECKS = [
   'test/init.mjs',
   'test/demo_bank_seed.mjs',
   'test/pack_artefakt.mjs',
+  'test/pack_locale.mjs',
   'test/connectors.mjs',
   'test/governance_lineage_adversarial.mjs',
   'test/governance_security_regression.mjs',

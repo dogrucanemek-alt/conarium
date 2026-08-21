@@ -10,14 +10,14 @@ export interface GateAudit {
 }
 
 /**
- * Conarium LLM kapısı: giden prompt'u PII-maske + audit'ten geçirir, SONRA modele iletir.
- * Kullanım (jarvis-web/lib/konnektor/llm.ts):
+ * Conarium LLM gate: run the outgoing prompt through PII-mask + audit, THEN send it to the model.
+ * Usage (jarvis-web/lib/konnektor/llm.ts):
  *   export const claudeLlm = governLlm(rawClaudeLlm, policy, a => appendAudit(a));
  *
- * NOT (dürüst): maskPII yakalar: email (ve &#64; / \\u0040 / %40 biçimleri),
- * TCKN / telefon / kart, IBAN (mod-97), MRZ (TD3 checksum), sır desenleri.
- * IP yalnız `policy.detectors.ip === true` iken. Sokak adresi ve çıplak ad
- * yapısal değil — sütun politikası / conarium-suggest-policy.
+ * NOTE (honest): maskPII catches: email (and &#64; / \\u0040 / %40 forms),
+ * TCKN / phone / card, IBAN (mod-97), MRZ (TD3 checksum), secret patterns.
+ * IP only when `policy.detectors.ip === true`. Street address and bare names
+ * are not structural — column policy / conarium-suggest-policy.
  */
 export function governLlm(
   llm: LlmFn,

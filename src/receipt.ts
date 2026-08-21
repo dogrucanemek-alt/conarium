@@ -1,15 +1,15 @@
 /**
  * Conarium Receipt v0.4 — schema, canonicalize (JCS subset), hash, sign.
- * v0.1 / v0.2 / v0.3 makbuzları sonsuza kadar doğrulanabilir kalır; eski makbuz
- * yeniden hash'lenmez, yeniden imzalanmaz, alan eklenmez.
+ * v0.1 / v0.2 / v0.3 receipts remain verifiable forever; an old receipt is
+ * not re-hashed, not re-signed, and no fields are added.
  * Spec: docs/superpowers/specs/2026-07-29-conarium-receipt-design.md §4
  *      + docs/superpowers/specs/2026-08-05-receipt-meta-provenance-design.md (v0.3)
  *
- * Bilgi-durumu sözlüğü TEK: model / client / (ileride disclosure, destination)
- * aynı `MetaSource` değerlerini kullanır. DECLARED / OBSERVED / VERIFIED / DERIVED
- * diye ikinci bir set YOKTUR — aynı fikri iki kelimeyle anlatmak, okuyanı ve
- * doğrulayıcıyı iki yola zorlar. `verified` bir değer de değildir; doğrulayabildiğimiz
- * bir hedef yokken boş bir "verified" alanı ilerideki yalanın kabı olur.
+ * Knowledge-state vocabulary is ONE: model / client / (later disclosure, destination)
+ * use the same `MetaSource` values. There is NO second set of DECLARED / OBSERVED /
+ * VERIFIED / DERIVED — telling the same idea in two words forces the reader and
+ * the verifier down two paths. `verified` is not a value either; an empty
+ * "verified" field with no target we can verify becomes a vessel for a future lie.
  */
 import { createHash, randomBytes } from 'crypto'
 import { type SigningKey, signHash } from './keys.js'
@@ -17,7 +17,7 @@ import type { ActorAssurance } from './tokens.js'
 
 export const RECEIPT_VERSION = 'conarium-receipt/0.4' as const
 
-/** Tek kaynak sözlüğü. Sıra belgelenen anlam sırasıdır; yeni değer sona eklenir. */
+/** Single-source vocabulary. Order is the documented meaning order; new values are appended. */
 export const META_SOURCES = ['protocol', 'measured', 'operator-declared', 'undeclared'] as const
 
 export type ActorType = 'service' | 'user'
@@ -27,23 +27,23 @@ export type OutcomeStatus = 'complete' | 'error' | 'denied'
 export interface ReceiptActor {
   type: ActorType
   id: string
-  /** Kimliğin nasıl kurulduğu — makbuz kimi değil, NASIL bilindiğini de taşır. */
+  /** How the identity was established — the receipt carries not just who, but HOW they were known. */
   assurance: ActorAssurance
 }
 
 /**
- * Bir meta alanının değeri NEREDEN geldi.
+ * WHERE a meta field's value came from.
  *
- * Makbuz "model şuydu" demez — "şu olarak beyan edildi" ya da "bildirilmedi" der.
- * `ReceiptActor.assurance` ile aynı disiplin: değerin yanında, onu ne kadar
- * ciddiye alabileceğini söyleyen kanıt seviyesi taşınır.
+ * The receipt does not say "the model was X" — it says "declared as X" or
+ * "not declared". Same discipline as `ReceiptActor.assurance`: next to the
+ * value, an evidence level saying how seriously it can be taken.
  *
- *  - `protocol`           bağlantı sırasında ölçüldü (MCP initialize → clientInfo)
- *  - `measured`           Conarium'un kendi hesapladığı (hash gibi) — uydurma yok
- *  - `operator-declared`  operatör config'te beyan etti; Conarium DOĞRULAMADI
- *  - `undeclared`         bildirilmedi; alanlar null, uydurulmadı
+ *  - `protocol`           measured during the connection (MCP initialize → clientInfo)
+ *  - `measured`           computed by Conarium itself (a hash, etc.) — no invention
+ *  - `operator-declared`  operator declared it in config; Conarium did NOT verify
+ *  - `undeclared`         not declared; fields are null, nothing was invented
  *
- * `verified` / `attested` BUGÜN YOK. Attestation gelirse o zaman `attested` eklenir.
+ * `verified` / `attested` do NOT exist TODAY. If attestation arrives, `attested` is added then.
  */
 export type MetaSource = (typeof META_SOURCES)[number]
 
@@ -61,12 +61,12 @@ export interface ReceiptClient {
 }
 
 /**
- * Sınırdan geçen sonucun taahhüdü. Hash, istemciye giden maskelenmiş /
- * satır-tavanı uygulanmış metnin UTF-8 baytları üzerindendir — istek hash'i
- * (`request.argsHash`) çıkanı bağlamaz; bu alan bağlar.
+ * Commitment over the result that crossed the boundary. The hash is over the
+ * UTF-8 bytes of the masked / row-capped text sent to the client — the
+ * request hash (`request.argsHash`) does not bind the output; this field does.
  *
- * `measured`: Conarium o baytları hesapladı. `undeclared`: hata/ret yolu veya
- * sonuç serileştirilmedi; hash/bytes null, uydurma yok.
+ * `measured`: Conarium computed those bytes. `undeclared`: error/deny path or
+ * the result was not serialized; hash/bytes are null, nothing invented.
  */
 export interface ReceiptDisclosure {
   hash: string | null
@@ -75,9 +75,10 @@ export interface ReceiptDisclosure {
 }
 
 /**
- * Hedef beyanı. MCP modeli taşımaz; değer operatör config'inden gelir.
- * Conarium doğrulamaz. Politika kararı bu alana BAĞLANMAZ — doğrulanamayan
- * bir alana erişim kararı bağlamak, beyanı zorlama gibi göstermek olur.
+ * Destination declaration. MCP does not carry a model; the value comes from
+ * operator config. Conarium does not verify it. The policy decision is NOT
+ * bound to this field — binding an access decision to an unverifiable field
+ * would make the declaration look like enforcement.
  */
 export interface ReceiptDestination {
   value: string | null
@@ -163,16 +164,18 @@ export interface ReceiptInput {
   period: { start: string; end: string }
   actor: { id: string; type?: ActorType; assurance?: ActorAssurance }
   /**
-   * Verilmezse `undeclared` yazılır. Model kimliği MCP protokolünde YOK; operatör
-   * beyan etmediyse makbuz bunu gizlemek yerine "bildirilmedi" der.
+   * If omitted, written as `undeclared`. Model identity is NOT in the MCP
+   * protocol; if the operator did not declare it, the receipt says "not
+   * declared" instead of hiding that.
    */
   model?: { provider: string; name: string; version: string }
   /**
-   * `source` verilmezse beyan sayılır. MCP `initialize`'dan ölçülen değer
-   * `source: 'protocol'` ile gelmelidir — ölçülmüş ile beyan edilmiş karışmasın.
+   * If `source` is omitted it counts as a declaration. A value measured from
+   * MCP `initialize` must arrive with `source: 'protocol'` — measured and
+   * declared must not be mixed.
    */
   client?: { name: string; version: string; source?: MetaSource }
-  /** Operatör beyanı (ör. "openai/gpt-x"). Doğrulanmaz. Yoksa undeclared. */
+  /** Operator declaration (e.g. "openai/gpt-x"). Not verified. Undeclared if absent. */
   destination?: string
   request: ReceiptRequest
   dataRefs: ReceiptDataRef[]
@@ -180,9 +183,10 @@ export interface ReceiptInput {
   flags: string[]
   masking: ReceiptMasking
   /**
-   * İstemciye giden metnin ta kendisi (MCP `content[0].text`). Ham sonuç
-   * makbuza yazılmaz — yalnız hash ve bayt sayısı. Ret/hata yolunda verme;
-   * verilse bile yok sayılır (uydurma yok, `undeclared`).
+   * The exact text sent to the client (MCP `content[0].text`). The raw
+   * result is not written on the receipt — only hash and byte count. Do not
+   * supply it on the deny/error path; even if supplied it is ignored (no
+   * invention, `undeclared`).
    */
   disclosurePayload?: string
   outcome: ReceiptOutcome
@@ -300,9 +304,9 @@ function assertSigningAllowed(key: SigningKey | null): void {
 }
 
 /**
- * Kanıtsız kişi iddiasını YAPISAL olarak imkânsız kılar: 'user' yalnızca
- * doğrulanmış bir güvenceyle yazılabilir. Bu kural yorum değil, kod olmalı —
- * yorum bir sonraki değişiklikte unutulur.
+ * Makes an unproven person-claim STRUCTURALLY impossible: 'user' can only
+ * be written with a verified assurance. This rule must be code, not a
+ * comment — a comment is forgotten on the next change.
  */
 function buildActor(a: { id: string; type?: ActorType; assurance?: ActorAssurance }): ReceiptActor {
   const assurance: ActorAssurance = a.assurance ?? 'shared-token'
@@ -317,11 +321,13 @@ function buildActor(a: { id: string; type?: ActorType; assurance?: ActorAssuranc
 }
 
 /**
- * Model kimliği MCP protokolünde YOKTUR — bağlanan istemci hangi modeli kullandığını
- * sunucuya bildirmez. Bu yüzden değer ancak operatörün beyanı olabilir, ölçüm değil.
- * Beyan yoksa boş string / "unknown" / config varsayılanı UYDURULMAZ: makbuz
- * "bildirilmedi" der. Uydurulan bir model kimliği makbuzu Md.19 karşısında yalancı yapar
- * ve ürünün tek savunulabilir konumunu (ölçtüğü ile beyanı ayırmak) çürütür.
+ * Model identity is NOT in the MCP protocol — the connecting client does not
+ * tell the server which model it used. The value can therefore only be an
+ * operator declaration, not a measurement. If there is no declaration, an
+ * empty string / "unknown" / config default is NOT INVENTED: the receipt
+ * says "not declared". An invented model identity makes the receipt a lie
+ * against Art. 19 and collapses the product's only defensible position
+ * (separating what it measured from what was declared).
  */
 function buildModel(m?: { provider: string; name: string; version: string }): ReceiptModel {
   if (!m) return { source: 'undeclared', provider: null, name: null, version: null }
@@ -329,9 +335,10 @@ function buildModel(m?: { provider: string; name: string; version: string }): Re
 }
 
 /**
- * Client, modelden farklı olarak GERÇEKTEN ölçülebilir (MCP `initialize` → `clientInfo`).
- * Ölçülen değer `source: 'protocol'` ile gelir. Kaynak belirtilmemişse beyan sayılır —
- * ölçüldü diye işaretlemek, doğrulayanın makbuza fazladan güvenmesine yol açardı.
+ * Unlike model, client is ACTUALLY measurable (MCP `initialize` → `clientInfo`).
+ * A measured value arrives with `source: 'protocol'`. If source is omitted it
+ * counts as a declaration — marking it as measured would make the verifier
+ * put extra trust in the receipt.
  */
 function buildClient(c?: { name: string; version: string; source?: MetaSource }): ReceiptClient {
   if (!c) return { source: 'undeclared', name: null, version: null }
@@ -458,7 +465,7 @@ export type ReceiptChainCheck =
 
 /**
  * Hash + prevHash + seq, same rules as `conarium-verify` on a single file.
- * `brokenAt` is 1-based index in the array (satır N). Does not hide a break.
+ * `brokenAt` is 1-based index in the array (line N). Does not hide a break.
  */
 export function verifyReceiptChain(receipts: unknown[]): ReceiptChainCheck {
   const entries = receipts.length

@@ -33,9 +33,9 @@ import {
 export interface AuditEntry {
   timestamp: string
   actor: string
-  /** Kimliğin nasıl kurulduğu. Artefakt kimi değil, NASIL bilindiğini de taşır. */
+  /** How the identity was established. The artefact carries not just who, but HOW they were known. */
   actorAssurance?: ActorAssurance
-  /** Yürürlükteki maskeleme profilinin adı (varsa). Taban politikada tanımsız. */
+  /** Name of the active masking profile (if any). Undefined on the base policy. */
   policyProfile?: string
   tool: string
   args?: any
@@ -48,13 +48,13 @@ export interface AuditEntry {
   reason?: string
   governance?: unknown
   /**
-   * Bağlanan istemci, MCP `initialize` sırasında bildirdiyse (`clientInfo`).
-   * Config'teki beyanı EZER: ölçülmüş değer, beyan edilmiş değerden üstündür.
+   * Connected client, if it reported during MCP `initialize` (`clientInfo`).
+   * OVERRIDES the config declaration: a measured value outranks a declared one.
    */
   client?: { name: string; version: string; source?: MetaSource }
   /**
-   * İstemciye giden metin. Makbuza yalnız hash yazılır. Audit JSONL'e
-   * ASLA yazılmaz — sonuç satırı denetim izine sızmasın.
+   * Text sent to the client. Only the hash is written to the receipt. NEVER
+   * written to the audit JSONL — the result line must not leak into the audit trail.
    */
   disclosurePayload?: string
   prevHash?: string
@@ -65,25 +65,26 @@ export interface AuditEntry {
 }
 
 /**
- * Makbuz meta bilgisi. v0.3'ten beri İKİSİ DE OPSİYONEL — eksiklik uydurulmaz,
- * makbuza `source: 'undeclared'` olarak yazılır.
+ * Receipt metadata. Since v0.3 BOTH are OPTIONAL — a gap is not invented;
+ * it is written on the receipt as `source: 'undeclared'`.
  *
- * Neden gevşetildi: model kimliği MCP protokolünde yok, yani operatör beyan etmedikçe
- * hiçbir yerden gelemez. Zorunlu tutmak makbuzu tamamen kapalı tutuyordu — "her erişim
- * için imzalı makbuz" vaadi bu yüzden canlıda karşılıksızdı. Artık makbuz üretilir ve
- * bilinmeyen alanı gizlemek yerine bildirilmedi olarak işaretler.
+ * Why it was relaxed: model identity is not in the MCP protocol, so it cannot
+ * come from anywhere unless the operator declares it. Making it required kept
+ * the receipt completely shut — the "signed receipt for every access" promise
+ * was therefore unmet in production. Receipts are now produced and mark the
+ * unknown field as undeclared instead of hiding it.
  */
 export interface ReceiptMeta {
   model?: { provider: string; name: string; version: string }
   client?: { name: string; version: string; source?: MetaSource }
-  /** Operatör beyanı. Doğrulanmaz. Politika bunu okumaz. */
+  /** Operator declaration. Not verified. Policy does not read this. */
   destination?: string
 }
 
 /**
  * AuditEntry + governance metadata → ReceiptInput.
- * Makbuz gövdesine HİÇBİR ham PII/SQL girmez: argsHash zaten hash'li,
- * dataRefs sadece alan adları, masking sadece sayılar.
+ * NO raw PII/SQL enters the receipt body: argsHash is already hashed,
+ * dataRefs are field names only, masking is counts only.
  */
 function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput {
   const g = (entry.governance ?? {}) as Partial<GovernanceMetadata>
@@ -93,33 +94,36 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
       ? 'partial'
       : 'allow'
 
-  // dataRefs — makbuzun dokunduğu nesneler. Kaynak ARACA GÖRE değişir:
-  //  - query:   governance.accessedTables (SQL ayrıştırıcısı doldurur)
-  //  - search:  governance.accessedTables (server.ts sonuç satırlarındaki _table'dan doldurur)
-  //  - describe_table: entry.target zaten nesnenin ta kendisi → doğrudan kullan
-  //  - list_tables:    sema listeleme, veri nesnesi erişimi DEĞİL → boş kalması doğru
-  // Tek kaynağa (accessedTables) bağlı kalmak describe_table/search'i boş bırakıp
-  // kapsama beyanını yanlış "kaydedilmedi" demeye itiyordu — bu kusurun tekrarını
-  // önlemek için nesne kaynağı araca göre seçilir.
+  // dataRefs — objects the receipt touched. Source varies BY TOOL:
+  //  - query:   governance.accessedTables (SQL parser fills this)
+  //  - search:  governance.accessedTables (server.ts fills from `_table` on result rows)
+  //  - describe_table: entry.target is already the object itself → use directly
+  //  - list_tables:    schema listing, NOT data-object access → empty is correct
+  // Staying bound to a single source (accessedTables) left describe_table/search
+  // empty and pushed the coverage claim toward a false "not recorded" — object
+  // source is chosen per tool so that defect does not repeat.
   const dataRefs: ReceiptDataRef[] = []
   const seenObjects = new Set<string>()
   for (const t of g.accessedTables ?? []) {
     if (seenObjects.has(t)) continue
     seenObjects.add(t)
-    // BOŞ, ve `rulesApplied` ile aynı sebepten. Bu alan `g.maskedFields`'ten
-    // dolduruluyordu: adı "istenen alanlar", içeriği "maskelenen alanlar". Bir
-    // denetçi makbuza bakıp "şu kolonlar istendi" diye okur — yanlış okur, ve
-    // okuduğu şey imzalıdır.
+    // EMPTY, and for the same reason as `rulesApplied`. This field used to be
+    // filled from `g.maskedFields`: the name said "fields requested", the
+    // content was "fields masked". An auditor looking at the receipt would
+    // read "these columns were requested" — a wrong reading, and what they
+    // read is signed.
     //
-    // Doğru içerik (sorgunun gerçekten seçtiği kolonlar) SQL AST'sinden
-    // çıkarılabilir — `outputNamesForColumn` güvenilirlik bayrağını zaten
-    // üretiyor — ama tablo-kolon nitelemesi governance içinde iki ayrı yerde
-    // kuruluyor (SELECT çıktısı ve nested JSON) ve yanlış eşleme, düzeltmeye
-    // çalıştığımız kusurun aynısını üretir. Doğrusunu yazana kadar boş.
+    // The correct content (columns the query actually selected) can be
+    // extracted from the SQL AST — `outputNamesForColumn` already produces a
+    // reliability flag — but table-column qualification is built in two
+    // separate places inside governance (SELECT output and nested JSON), and
+    // a wrong mapping would reproduce the same defect we are trying to fix.
+    // Leave empty until we can write the truth.
     //
-    // Kaybedilen: alan bazında maskeleme detayı. `masking.byClass` sınıf bazında
-    // duruyor. Bu bir gerileme ve saklanmıyor — imzalı bir belgede yanlış adla
-    // dolu bir alan, eksik bir alandan daha pahalıdır.
+    // What is lost: field-level masking detail. `masking.byClass` still
+    // stands at class granularity. This is a regression and it is not hidden
+    // — a misnamed populated field on a signed document costs more than a
+    // missing field.
     dataRefs.push({ source: entry.source ?? 'unknown', object: t, fieldsRequested: [] })
   }
   if (entry.tool === 'describe_table' && entry.target && !seenObjects.has(entry.target)) {
@@ -129,25 +133,27 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
 
   return {
     period: { start: entry.timestamp, end: entry.timestamp },
-    // `type` sabit 'service' idi. Kişi bazlı token'la bağlanan bir insan, kendi
-    // e-postasıyla adlandırılmış ama `type: "service"` damgalı imzalı bir kanıt
-    // üretiyordu — makbuz aktörün NE olduğu konusunda yanlış, ve imzalı.
+    // `type` was hardcoded as 'service'. A person connecting with a per-user
+    // token was named by their own email but produced a signed proof stamped
+    // `type: "service"` — the receipt was wrong about WHAT the actor is, and
+    // it was signed.
     //
-    // Ayrı bir `isUser` alanı taşımak yerine assurance'tan türetiliyor: resolveActor
-    // tek kaynak (src/tokens.ts) ve orada isUser === (assurance === 'per-user-token').
-    // İkinci bir alan, aynı gerçeğin iki elle yazılmış beyanı olurdu; zamanla ayrışan
-    // tam olarak budur.
+    // Derived from assurance instead of carrying a separate `isUser` field:
+    // resolveActor is the single source (src/tokens.ts) and there
+    // isUser === (assurance === 'per-user-token'). A second field would be
+    // the same fact declared by two hands; that is exactly what drifts apart
+    // over time.
     //
-    // Doğrulayıcı bu ayrımı zaten biliyordu (bin/conarium-verify.mjs: type "service"
-    // ya da "user" olmalı, ve "user" + "shared-token" reddedilir). Üretim tarafı hiç
-    // 'user' yazmadığı için o kural bugüne kadar hiç tetiklenmedi.
+    // The verifier already knew this distinction (bin/conarium-verify.mjs:
+    // type must be "service" or "user", and "user" + "shared-token" is
+    // rejected). Production never wrote 'user', so that rule never fired.
     actor: {
       id: entry.actor,
       type: (entry.actorAssurance ?? 'shared-token') === 'per-user-token' ? 'user' : 'service',
       assurance: entry.actorAssurance ?? 'shared-token',
     },
     model: meta.model,
-    // Ölçülmüş (protokolden gelen) client, config'teki beyanı ezer.
+    // Measured client (from the protocol) overrides the config declaration.
     client: entry.client ?? meta.client,
     destination: meta.destination,
     request: {
@@ -157,18 +163,20 @@ function entryToReceiptInput(entry: AuditEntry, meta: ReceiptMeta): ReceiptInput
     },
     dataRefs,
     policy: {
-      // Profil yürürlükteyse makbuz bunu TAŞIR. Hash'in içinde olduğu için sonradan
-      // "taban politikaydı" diye gösterilemez.
+      // If a profile is in force, the receipt CARRIES it. Because it is inside
+      // the hash, it cannot later be presented as "it was the base policy".
       id: entry.policyProfile ? `conarium.policy/${entry.policyProfile}` : 'conarium.policy',
       version: '1',
       decision,
-      // BOŞ, ve bilerek. Bu alan `g.accessedFunctions` ile doldurulmuştu — yani
-      // adı "uygulanan politika kuralları" derken içeriği "erişilen fonksiyonlar"
-      // taşıyordu. Bir denetçi bunu politika kural kimlikleri diye okur ve inanır.
+      // EMPTY, and on purpose. This field used to be filled from
+      // `g.accessedFunctions` — so the name said "policy rules applied" while
+      // the content was "functions accessed". An auditor would read that as
+      // policy rule ids and believe it.
       //
-      // İmzalı bir belgede yanlış adla dolu bir alan, boş alandan kötüdür: boş alan
-      // "bilmiyoruz" der, yanlış dolu alan "biliyoruz" der ve yalan söyler. Gerçek
-      // kural kimliği bugün üretilmiyor; üretilene kadar burası boş kalır.
+      // A misnamed populated field on a signed document is worse than an empty
+      // one: empty says "we do not know", wrongly filled says "we know" and
+      // lies. Real rule ids are not produced today; this stays empty until they
+      // are.
       rulesApplied: [],
     },
     flags: [
@@ -356,10 +364,10 @@ export class Audit {
   /** keyId → verify key (current signing pubkey + CONARIUM_AUDIT_TRUST_PUBKEYS). */
   private trustStore: Map<KeyId, VerifyKey>
   private lastHash = GENESIS_HASH
-  /** Sink byte size at last sync — başka yazıcı araya girdiyse stale lastHash yakalanır. */
+  /** Sink byte size at last sync — if another writer interleaved, a stale lastHash is caught. */
   private sinkSize = -1
 
-  /** Makbuz zinciri durumu — opt-in (receiptSink verilirse aktif). */
+  /** Receipt chain state — opt-in (active when receiptSink is provided). */
   private receiptSink?: string
   private receiptMeta?: ReceiptMeta
   private receiptLastHash = RECEIPT_GENESIS_HASH
@@ -397,20 +405,21 @@ export class Audit {
     this.validateChain()
     // Read the tail hash ONCE at startup; keep it in memory afterwards so log()
     // is O(1) instead of re-reading + splitting the whole sink on every call.
-    // NOT: başka bir Audit instance araya yazarsa lastHash bayatlar — syncLastHashIfStale
-    // bunu kapatır. Aynı milisaniyede iki yazıcı (gerçek yarış) dosya kilidi ister;
-    // tek kullanıcılı kurulum için kabul.
+    // NOTE: if another Audit instance writes in between, lastHash goes stale —
+    // syncLastHashIfStale closes that. Two writers in the same millisecond
+    // (a real race) need a file lock; accepted for a single-user setup.
     this.lastHash = this.getLastHash()
     this.sinkSize = this.currentSinkSize()
 
-    // Makbuz üretimi opt-in: receiptSink verilirse zincir durumunu dosyadan yükle.
+    // Receipt production is opt-in: if receiptSink is set, load chain state from the file.
     if (opts.receiptSink) {
       this.receiptSink = opts.receiptSink
       this.receiptMeta = opts.receiptMeta
-      // Makbuz HMAC ile imzalanamaz — yalnızca Ed25519 kabul edilir. HMAC anahtarı
-      // requireSigningCapability'yi geçirir ama buildReceipt'i geçirmez; bu uyumsuzluk
-      // istek yolunda (log → writeReceipt) patlardı. Yapılandırma anında yakala:
-      // receiptSink açıkken Ed25519 yoksa sunucu daha ayağa kalkmadan hata versin.
+      // A receipt cannot be signed with HMAC — only Ed25519 is accepted. An
+      // HMAC key passes requireSigningCapability but not buildReceipt; that
+      // mismatch would blow up on the request path (log → writeReceipt). Catch
+      // it at configuration time: if receiptSink is on and Ed25519 is missing,
+      // fail before the server comes up.
       if (!this.signingKey) {
         throw new Error(
           'Audit: receiptSink is configured but no Ed25519 signing key is available — ' +
@@ -418,17 +427,21 @@ export class Audit {
             'Set the key or remove receiptSink from config.',
         )
       }
-      // v0.3: receiptMeta ARTIK ZORUNLU DEĞİL.
+      // v0.3: receiptMeta is NO LONGER REQUIRED.
       //
-      // Eski davranış (zorunlu) doğru bir kaygıdan doğmuştu: uydurma varsayılan, makbuzun
-      // model alanını (Md.19 "model identification") yalancı yapar. Kaygı hâlâ geçerli —
-      // ama çözümü "makbuzu hiç üretme" değil. Model kimliği MCP protokolünde yok, yani
-      // operatör beyan etmedikçe hiçbir yerden gelemez; zorunluluk makbuzu kalıcı olarak
-      // kapalı tutuyordu ve "her erişim için imzalı makbuz" vaadi karşılıksız kalıyordu.
+      // The old behaviour (required) came from a valid concern: an invented
+      // default makes the receipt's model field (Art. 19 "model identification")
+      // a lie. The concern still holds — but the fix is not "never produce a
+      // receipt". Model identity is not in the MCP protocol, so it cannot come
+      // from anywhere unless the operator declares it; the requirement kept
+      // receipts permanently shut and the "signed receipt for every access"
+      // promise unmet.
       //
-      // Artık makbuz üretilir ve bilinmeyen alanı UYDURMAK yerine `source: 'undeclared'`
-      // ile işaretler. Uydurmama kuralı korunuyor, üretim engeli kalkıyor.
-      // ⚠️ Ed25519 zorunluluğu (yukarıda) GEVŞETİLMEDİ: imzasız makbuz makbuz değildir.
+      // Receipts are now produced and mark the unknown field as
+      // `source: 'undeclared'` instead of INVENTING it. The no-invention rule
+      // is kept; the production blocker is lifted.
+      // ⚠️ The Ed25519 requirement (above) was NOT relaxed: an unsigned
+      // receipt is not a receipt.
       this.loadReceiptChainState()
     }
   }
@@ -460,9 +473,9 @@ export class Audit {
   }
 
   /**
-   * Başka bir yazıcı sink'e ekleme yaptıysa bellekdeki lastHash bayat kalır.
-   * Size değişmediyse ucuz çık; değiştiyse kuyruğu yeniden oku.
-   * İki instance'ın aynı anda yazdığı gerçek yarışı kapatmaz — dosya kilidi gerekir.
+   * If another writer appended to the sink, the in-memory lastHash is stale.
+   * Cheap exit if size did not change; re-read the tail if it did.
+   * Does not close a real race of two instances writing at once — that needs a file lock.
    */
   private syncLastHashIfStale(): void {
     if (!this.sink) return
@@ -481,7 +494,7 @@ export class Audit {
     return lastLine.hash
   }
 
-  /** Makbuz zincirinin son durumunu dosyadan yükle (seq + hash). */
+  /** Load the receipt chain's last state from the file (seq + hash). */
   private loadReceiptChainState(): void {
     if (!this.receiptSink || !existsSync(this.receiptSink)) return
     const content = readFileSync(this.receiptSink, 'utf-8').trim().split('\n').filter(Boolean)
@@ -522,7 +535,7 @@ export class Audit {
 
   log(
     entry: Omit<AuditEntry, 'timestamp' | 'actor' | 'prevHash' | 'hash'> & {
-      /** Erişimi yapan kişi. Verilmezse örnek başına sabit consumer kullanılır. */
+      /** The person who performed the access. If omitted, the per-instance fixed consumer is used. */
       actor?: string
       actorAssurance?: ActorAssurance
     },
@@ -533,9 +546,10 @@ export class Audit {
     const full: AuditEntry = {
       timestamp: new Date().toISOString(),
       ...persistable,
-      // Yayılımdan SONRA ve açıkça: eskiden `actor: this.consumer` yayılımın
-      // ÖNÜNDEYDİ, yani çağıran aktörü sessizce ezebiliyordu (tipte yasak,
-      // çalışma zamanında serbest). Varsayılan artık belirsizliğe bırakılmıyor.
+      // AFTER the spread and explicitly: `actor: this.consumer` used to sit
+      // BEFORE the spread, so it could silently overwrite the caller's actor
+      // (forbidden by the type, free at runtime). The default is no longer
+      // left to ambiguity.
       actor: entry.actor ?? this.consumer,
       actorAssurance: entry.actorAssurance ?? 'shared-token',
     }
@@ -589,8 +603,8 @@ export class Audit {
         this.lastHash = full.hash
       }
 
-      // Makbuz üretimi — opt-in (receiptSink yapılandırıldıysa).
-      // disclosurePayload audit satırına yazılmaz; yalnız makbuz hash'i için taşınır.
+      // Receipt production — opt-in (when receiptSink is configured).
+      // disclosurePayload is not written to the audit line; it is carried only for the receipt hash.
       if (this.receiptSink) {
         this.writeReceipt(
           disclosurePayload === undefined ? full : { ...full, disclosurePayload },
@@ -603,11 +617,11 @@ export class Audit {
     }
   }
 
-  /** AuditEntry'den makbuz üret, zincire ekle, receiptSink'e yaz. */
+  /** Build a receipt from AuditEntry, append to the chain, write to receiptSink. */
   private writeReceipt(entry: AuditEntry): void {
-    // Defansif: constructor makbuz için Ed25519 şartını koyar; bu ikinci katman
-    // yapılandırma kontrolünün atlandığı bir yolda (ör. alt sınıf) sessizce
-    // imzasız makbuz üretilmesini engeller.
+    // Defensive: the constructor requires Ed25519 for receipts; this second
+    // layer stops an unsigned receipt from being produced silently on a path
+    // that skipped the configuration check (e.g. a subclass).
     if (!this.signingKey) {
       throw new Error(
         'Audit: cannot write receipt without an Ed25519 signing key — ' +
@@ -645,7 +659,7 @@ export class Audit {
     let previous = GENESIS_HASH
     /** F5 contiguity: after the first entry that carries `sig`, every later entry must too. */
     let seenSig = false
-    /** Aynı kural HMAC `signature` alanı için (2026-08-05, F1'in HMAC tarafı). */
+    /** Same rule for the HMAC `signature` field (2026-08-05, F1's HMAC side). */
     let seenSignature = false
     const lines = raw.split('\n').filter(Boolean)
     for (let i = 0; i < lines.length; i++) {
@@ -668,25 +682,28 @@ export class Audit {
       if (entry.hash !== expectedHash) {
         throw new Error('Audit sink is corrupt: entry hash mismatch.')
       }
-      // HMAC bitişiklik kuralı — F1/F5'in HMAC tarafı (2026-08-05).
+      // HMAC contiguity rule — F1/F5's HMAC side (2026-08-05).
       //
-      // Eskiden `entry.signature !== expected` tek kontroldü ve imzası HİÇ OLMAYAN satır da
-      // buna takılıyordu. Sonuç: 07-29 öncesi yazılmış (imzasız) her denetim dosyası, HMAC
-      // anahtarı verildiği anda "corrupt" ilan ediliyordu ve sunucu açılmıyordu. Bu, F1'in
-      // Ed25519 için düzelttiği kavram karışmasının aynısı: *"bu anahtarla doğrulanamaz"*
-      // ile *"kurcalanmış"* aynı şey değildir. 08-05'te canlıda çarptı (Hetzner c2/c3) ve
-      // HMAC kapatılmak zorunda kalındı — ama HMAC'siz kurulum strip-all saldırısına açık
-      // (RECEIPT-SPEC known gap #4), yani bunu kapatmak zorunluydu.
+      // Previously `entry.signature !== expected` was the only check, and a
+      // line with NO signature at all also failed it. Result: every audit
+      // file written before 07-29 (unsigned) was declared "corrupt" the
+      // moment an HMAC key was supplied, and the server would not start.
+      // Same concept mix-up F1 already fixed for Ed25519: *"cannot verify
+      // with this key"* and *"tampered"* are not the same thing. Hit
+      // production on 08-05 (Hetzner c2/c3) and HMAC had to be turned off —
+      // but a setup without HMAC is open to a strip-all attack (RECEIPT-SPEC
+      // known gap #4), so closing this was mandatory.
       //
-      // Kural artık Ed25519 ile birebir simetrik:
-      //   imza YOK  + henüz imzalı satır görülmedi → eski kayıt, kabul
-      //   imza YOK  + daha önce imzalı satır var   → strip girişimi, reddet
-      //   imza VAR  ama eşleşmiyor                 → kurcalama, her zaman reddet
+      // The rule is now one-to-one symmetric with Ed25519:
+      //   NO signature  + no signed line seen yet     → legacy record, accept
+      //   NO signature  + a signed line already seen  → strip attempt, reject
+      //   signature PRESENT but does not match        → tampering, always reject
       const presentedSig = typeof entry.signature === 'string' ? entry.signature : ''
       const hasSignature = presentedSig.length > 0
       if (hasSignature) {
-        // Doğrulama yalnızca anahtar varken yapılabilir; anahtarsızken imzanın VARLIĞI
-        // yine de bitişiklik için sayılır, yoksa "anahtarı kaldır + imzaları sil" açık kalırdı.
+        // Verification is only possible when a key is present; without a key
+        // the PRESENCE of a signature still counts for contiguity, otherwise
+        // "remove the key + delete the signatures" would stay open.
         if (this.hmacKey) {
           const expectedSignature = createHmac('sha256', this.hmacKey).update(entry.hash).digest('hex')
           if (!hmacDigestEqual(presentedSig, expectedSignature)) {
