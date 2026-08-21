@@ -612,8 +612,8 @@ export class Governance {
     // If 13–16 digits fail Luhn, or the sequence is longer (order number), the
     // content scanner does not touch it — a half-mask plus a lying maskedCount is worse.
     if (typeof obj === 'number' || typeof obj === 'bigint') {
-      const sonuc = this.maskPII(String(obj), ctx);
-      return sonuc.count > 0 ? sonuc : { masked: obj, count: 0, byClass: {} };
+      const result = this.maskPII(String(obj), ctx);
+      return result.count > 0 ? result : { masked: obj, count: 0, byClass: {} };
     }
 
     if (typeof obj === 'string') {

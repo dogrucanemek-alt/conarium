@@ -96,19 +96,20 @@ export function prepareIbanPass(text: string, opts: MaskIbanOpts = {}): IbanPass
   const checksum = opts.checksum !== false
   const holes: string[] = []
   let count = 0
-  // ⛔ String.replace ile TEK aday regex'i yetmiyor, olculdu (08-13):
-  // "IBAN1 ve IBAN2" tek eslesme oluyor (gruplama bosluklarina izin veren
-  // [\s-]* araya giren "ve"yi de alnum sayiyor), sonra {11,30} siniri
-  // eslesmeyi IKINCI IBAN'IN ORTASINDA kesiyor ("...841326 ve TR33 00").
-  // replace eslesmenin SONUNDAN devam ettigi icin ikinci IBAN'in kalani bir
-  // daha hicbir desene uymuyordu: iki IBAN'li her metinde count=1 ve ikinci
-  // IBAN TAMAMEN aciktaydi. Odeme metninde "X hesabindan Y hesabina" siradan
-  // bir cumle, yani bu kenar durum degil.
+  // ⛔ One candidate regex with String.replace is not enough. Measured:
+  // "IBAN1 and IBAN2" collapses into a single match — the [\s-]* that allows
+  // grouping spaces counts the word between them as alphanumeric too — and then
+  // the {11,30} bound cuts the match IN THE MIDDLE OF THE SECOND IBAN
+  // ("...841326 and TR33 00"). Because replace resumes at the END of a match,
+  // the remainder of the second IBAN never matched any pattern again: every text
+  // carrying two IBANs produced count=1 and left the second one FULLY exposed.
+  // "from account X to account Y" is an ordinary sentence in payment text, so
+  // this is not an edge case.
   //
-  // Cozum: capa bul → oradan IBAN bicimli en uzun akisi topla (en fazla 34
-  // alnum) → checksum tutana kadar sondan kis → ve taramaya TUKETILEN parcanin
-  // hemen ardindan devam et. Boylece asiri acgozlu akis ikinci IBAN'i yutsa
-  // bile, imlec onun basina geri doner.
+  // Fix: find an anchor → collect the longest IBAN-shaped run from there (34
+  // alphanumerics at most) → shrink from the end until the checksum holds → and
+  // resume scanning immediately after the CONSUMED span. So even when an
+  // over-greedy run swallows the second IBAN, the cursor returns to its start.
   const ANCHOR = /[A-Za-z]{2}[\s-]*\d{2}/g
   const isAlnum = (c: string) => /[A-Za-z0-9]/.test(c)
   const isSep = (c: string) => /[\s-]/.test(c)
