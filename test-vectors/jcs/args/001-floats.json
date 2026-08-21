@@ -1,0 +1,11 @@
+{
+  "ratio": 333333333.33333329,
+  "small": 2e-3,
+  "large": 1E30,
+  "trailing_zero": 4.50,
+  "below_exponent_boundary": 999999999999999900000,
+  "at_exponent_boundary": 1e21,
+  "denormal_min": 5e-324,
+  "negative_zero": -0,
+  "python_would_print_1e_06": 0.000001
+}

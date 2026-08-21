@@ -1,0 +1,7 @@
+{
+  "quote_backslash": "\"\\",
+  "solidus_stays_bare": "a/b",
+  "short_forms": "\b\f\n\r\t",
+  "control_no_short_form": "\u0000\u001f\u007f",
+  "literal_non_ascii": "€ é 😂"
+}

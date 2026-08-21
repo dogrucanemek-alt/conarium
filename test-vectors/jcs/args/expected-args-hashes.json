@@ -1,0 +1,69 @@
+{
+  "note": "Preimages for request.argsHash. Feed the file to your hashArgs equivalent and compare. kind=json: parse, canonicalise (RFC 8785), SHA-256. kind=string: hash the bytes as they are — do NOT parse or re-canonicalise. Frozen: regenerate only if the canonical form itself changed on purpose.",
+  "cases": [
+    {
+      "name": "001-floats",
+      "file": "001-floats.json",
+      "kind": "json",
+      "exercises": "RFC 8785 §3.2.2.3 number formatting: exponent boundary at 1e21, denormal minimum, negative zero, trailing zero",
+      "canonicalBytes": 228,
+      "argsHash": "sha256:57ab485264c96fe1732bafcab50763793d10c88503d7d2c9c3f4c4b76c0285d1"
+    },
+    {
+      "name": "002-integers-beyond-double",
+      "file": "002-integers-beyond-double.json",
+      "kind": "json",
+      "exercises": "JSON numbers are IEEE-754 doubles. An implementation using arbitrary-precision integers produces different bytes for the same document.",
+      "canonicalBytes": 143,
+      "argsHash": "sha256:d966f958a2df3f2726ca87fc14407d5486d5987932dc50c22c446558621019ba"
+    },
+    {
+      "name": "003-non-ascii-keys",
+      "file": "003-non-ascii-keys.json",
+      "kind": "json",
+      "exercises": "Key order is over UTF-16 code units and MUST ignore locale. A French collation puts these in a different order.",
+      "canonicalBytes": 181,
+      "argsHash": "sha256:421d8b0e71ae3234ec29d60ebe6fb68ec83da86e2997118a9f3b7be5d37766ef"
+    },
+    {
+      "name": "004-surrogate-key-order",
+      "file": "004-surrogate-key-order.json",
+      "kind": "json",
+      "exercises": "The code-unit / code-point split. U+1F602 is stored as the surrogate pair D83D DE02; by code unit it sorts BEFORE U+FB33, by code point AFTER. Only one of those is RFC 8785.",
+      "canonicalBytes": 130,
+      "argsHash": "sha256:a909c2091fb4403862084a333cc067cfb5c0954acd7be125ee8aafdb757862f6"
+    },
+    {
+      "name": "005-string-escapes",
+      "file": "005-string-escapes.json",
+      "kind": "json",
+      "exercises": "RFC 8785 §3.2.2.2: which characters are escaped and which are emitted literally. Solidus is NOT escaped; C0 controls without a short form use \\u00XX lower case.",
+      "canonicalBytes": 154,
+      "argsHash": "sha256:bdb9633a3b4d4507734c091261df3703e0cc06829952419f481a417809f4ad5c"
+    },
+    {
+      "name": "006-nested-tool-args",
+      "file": "006-nested-tool-args.json",
+      "kind": "json",
+      "exercises": "The realistic shape: what an MCP client actually sends. Nesting, arrays whose order is preserved, and the classes above reached through a nested path.",
+      "canonicalBytes": 233,
+      "argsHash": "sha256:1bc49cf8d4b78e4ea867078b78808e172ec460015367c31680f7baf17107ccb2"
+    },
+    {
+      "name": "007-null",
+      "file": "007-null.json",
+      "kind": "json",
+      "exercises": "The default path. audit.ts calls hashArgs(entry.args ?? null), so this is the hash every receipt with no arguments carries.",
+      "canonicalBytes": 4,
+      "argsHash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "008-raw-string",
+      "file": "008-raw-string.txt",
+      "kind": "string",
+      "exercises": "hashArgs does NOT canonicalise a string argument — it hashes the bytes it was handed. The bytes below are valid JSON, which is the trap: an implementation that parses and re-canonicalises produces a different hash for the same input.",
+      "canonicalBytes": 13,
+      "argsHash": "sha256:3fb75453225c732a76b7899ea2096dda1455189c89817239732182f73fe5a09f"
+    }
+  ]
+}

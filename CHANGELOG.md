@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.2.41 — a limit that was announced in the wrong place
+
+Since 0.2.34 `docs/RECEIPT-SPEC.md` had carried a stated limit: the thirteen
+receipt vectors are ASCII-keyed with integer and string values, a naive
+sorted-key serialiser reproduces all thirteen hashes, and so matching them does
+not demonstrate a conforming JCS implementation. That much was true, and stays
+true.
+
+The remedy named in the same paragraph was not. It said the disagreement would
+first appear in "a receipt carrying a float, a large integer, or a non-ASCII
+key". No such receipt can exist. The receipt body is a fixed shape whose only
+numbers are `chain.seq`, `masking.pii` and `outcome.rows` — small integers — and
+every key in it is ASCII. The paragraph described a vector nobody could write.
+
+Caller-shaped JSON reaches canonicalisation at one point: `hashArgs()`, whose
+argument is typed `any` and whose digest becomes `request.argsHash`. That is
+where a second implementation can disagree with us, and its preimages were
+published nowhere — vector 001 carries `sha256:abab...`, a placeholder standing
+in for a hash of nothing.
+
+`test-vectors/jcs/` now publishes eight preimages with frozen hashes: floats at
+the `1e21` exponent boundary and the denormal minimum, integers past 2^53,
+non-ASCII keys, a surrogate-pair sort order, the escape rules, and the
+raw-string branch — where `hashArgs` digests the bytes it was handed rather than
+canonicalising them, which is the case most likely to split two implementations
+that otherwise agree.
+
+`test/spec_jcs_class.mjs` measures our own conformance against the reference
+data published with RFC 8785: six input/expected pairs compared over bytes, and
+3,000 of its published IEEE-754 doubles. All pass. The number evidence is a
+**sample** of 100,000,000 and says so wherever it is cited. The guard also runs
+eight mutants and fails if any of them reproduces the reference bytes, because
+three checks in this repository have now reported success without comparing
+anything, and the fix for that is not a fourth check that could do the same.
+
+No behaviour changed. The verifier, the canonical form and all thirteen receipt
+vectors are byte-identical to 0.2.40.
+
 ## 0.2.40 — an exit code that answered a question it had not examined
 
 `conarium-verify --anchor-check` over a chain where every receipt is unanchored
