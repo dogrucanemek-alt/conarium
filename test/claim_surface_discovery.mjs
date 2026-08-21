@@ -27,8 +27,20 @@ const unlisted = (p) => isUnlistedDoc(p, listed)
 // today". The list is supplied explicitly here: pinning these two assertions
 // to the live surfaces.json would make them pass or fail on an edit that has
 // nothing to do with the rule — which is what happened the first time this
-// file was written against -05, on the same branch that then listed it.
-const UNDECIDED_DRAFT = 'standards/draft-dogru-scitt-disclosure-evidence-06.md'
+// file was written against a revision, on the same branch that then listed it.
+//
+// The revision names are derived, not written. An earlier version of this file
+// named the next revision by hand as the undecided case, and went stale on the
+// day that revision was written — a check about documents going stale, stale
+// for the reason it exists to catch. The undecided case is now whatever comes
+// after the revision in the tree, so it stays undecided however far the drafts
+// run.
+const CURRENT_DRAFT = currentDraft()[0]
+const UNDECIDED_DRAFT = CURRENT_DRAFT.replace(
+  /-(\d{2})\.md$/,
+  (_, n) => `-${String(Number(n) + 1).padStart(2, '0')}.md`,
+)
+assert.notEqual(UNDECIDED_DRAFT, CURRENT_DRAFT, 'the undecided case has to be a different revision')
 const nothingListed = new Set()
 assert.equal(
   isUnlistedDoc(UNDECIDED_DRAFT, nothingListed),
@@ -46,7 +58,7 @@ assert.equal(
 // Deciding is what silences it. The current revision is a surface, so the
 // auditor stops asking about it; the question was answered, not suppressed.
 assert.equal(
-  unlisted('standards/draft-dogru-scitt-disclosure-evidence-05.md'),
+  unlisted(CURRENT_DRAFT),
   false,
   'the current draft revision is read as a surface, not flagged as undecided',
 )
@@ -99,7 +111,7 @@ assert.equal(
 // ── not every changed file is prose ──────────────────────────────────────────
 assert.equal(unlisted('src/audit.ts'), false, 'code is reviewed as code')
 assert.equal(
-  unlisted('standards/draft-dogru-scitt-disclosure-evidence-05.xml'),
+  unlisted(CURRENT_DRAFT.replace(/\.md$/, '.xml')),
   false,
   'the xml is generated from the md that was already read',
 )
