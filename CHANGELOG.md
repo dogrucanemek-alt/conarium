@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.2.39 — 2026-08-21 — the package speaks the language its documentation is written in
+
+The executable package carried operational text in Turkish. Not in the
+documentation, which has always been English, and not in the specification — in
+the running code, where a reader who installs the package meets it.
+
+The sharpest instance: a gateway started without a token printed
+`CONARIUM_MCP_TOKEN eksik ya da <24 karakter — fail-closed, baslamiyorum.` That
+is the first sentence an unaffiliated operator sees when their configuration is
+wrong, and it was unreadable to most of them. The receipt viewer rendered
+`lang="tr"` and translated its own labels into Turkish through a presentation
+map. The console UI in `public/` said `Yukleniyor...` and `zincir saglam`. The
+reasoning comments throughout `src/` — the part of this repository that explains
+why a thing is written the way it is, and the part with the most value to anyone
+extending it — were Turkish, and `tsc` carried them into `dist/`.
+
+This project claims to be implementable without us. A code base whose reasoning
+cannot be read by the people expected to implement it is a claim that was never
+measured. Nothing here changes behaviour: strings, comments, `lang`, and the
+presentation map whose values are now its keys. Thresholds, conditions and
+identifiers are untouched, including the Turkish tokens the PII detectors match
+on and the record-kind name they emit, which are data rather than prose.
+
+`test/pack_locale.mjs` keeps it that way. It reads the file list `npm pack`
+would ship and fails on Turkish-specific letters outside a narrow allow-list:
+the deliberately Turkish `*.tr.md`, the detector tokens, and the sample names
+the locale tests pin. It was shown failing before it was wired in, and again
+from a comment added to `src/http.ts` and carried into `dist/http.js` by a
+build, which is the path that put the text there in the first place.
+
+Two limits, stated rather than left to be found. The check tests for Turkish
+letters, not Turkish language: a sentence written without them passes. And the
+markdown that ships alongside the code — the changelog's own history, parts of
+`docs/` — is still Turkish in places and is a second pass, not this one.
+
 ## 0.2.38 — 2026-08-20 — the conditional sentence that two other pages forgot
 
 The receipt is opt-in. Nothing is written until a receipt sink is configured, and
