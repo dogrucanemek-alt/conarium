@@ -6,6 +6,20 @@ Conarium Receipt verifier. Thirteen cases, one public key, one manifest.
 A specification that cannot be implemented from the document alone is a blog
 post. These vectors are the difference.
 
+## Before you write a verifier
+
+Read [Wire format for a second implementation](../docs/RECEIPT-SPEC.md#wire-format-for-a-second-implementation)
+first. It carries the things these vectors do not tell you on their own: what
+the Ed25519 signature actually covers, that `seq` advances by exactly one,
+which absent fields are schema errors rather than tampering, and the order the
+checks run in.
+
+That section exists because someone built a verifier from this directory and
+reached 13/13 only after opening our source. It is not repeated here — a fact
+written down twice by hand is a fact that will disagree with itself. Every
+sentence in it is asserted against the shipped verifier by
+`test/spec_wire_contract.mjs`.
+
 ## Run them
 
 Against this repository's verifier:

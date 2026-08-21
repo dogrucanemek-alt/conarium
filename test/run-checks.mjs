@@ -56,6 +56,7 @@ export const CHECKS = [
   'test/countersign_verify.mjs',
   'deploy/anchor-service/dry-run.mjs',
   'test/spec_exitcode_drift.mjs',
+  'test/spec_wire_contract.mjs',
   'test/encoding_evasion_mask.mjs',
   'test/verify_tail_pin.mjs',
   'test/partial_mask_root.mjs',

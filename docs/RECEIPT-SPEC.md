@@ -207,10 +207,184 @@ block-explorer client in this repository; `ignoreBitcoinNode: true` is set.
 Tracked remainder: unclassified network-shaped errors still share 14 with
 "proof does not hold".
 
+## Wire format for a second implementation
+
+An independent implementer built a verifier from the published vectors and the
+IETF draft alone. They reached 13/13 — but only after opening this repository's
+source, because four things were nowhere in the documents: what the signature
+actually covers, that `seq` must advance by exactly one, which absent fields are
+schema errors rather than hash mismatches, and in what order the checks run.
+A specification that has to be read alongside its own implementation is not
+finished. What they had to guess is written down below.
+
+Every statement in this section is asserted against the shipped verifier by
+`test/spec_wire_contract.mjs`. If the code moves and a sentence does not, that
+check fails — the sentences are measured, not remembered.
+
+### What the signature covers
+
+`sig.value` is base64 of an Ed25519 signature over the **UTF-8 bytes of the
+`chain.hash` string, `sha256:` prefix included** — 71 bytes for a SHA-256
+digest (`sha256:` plus 64 hex characters).
+
+It is not the raw 32-byte digest, not the hex without the prefix, and not the
+canonical JSON of the receipt. Those are the three natural guesses, and the
+guard verifies that a correct signature fails against all three: an
+implementation that picks one of them produces receipts nobody else can check,
+and discovers this only when a second party tries.
+
+```
+payload = utf8("sha256:" + hex(SHA-256(canonical bytes)))     # 71 bytes
+sig.value = base64(Ed25519-sign(payload))
+```
+
+`sig.alg` is `Ed25519` — any other value is rejected before the key is loaded.
+`sig.keyId` selects the public key from the caller's trust set; an unknown
+`keyId` is a signature failure, not a "skip". `sig.value` must be canonical
+base64: a re-encodable variant is refused rather than normalised.
+
+The signature covers the hash, and the hash covers the receipt. `hash`, `sig`
+and `anchor` are excluded from the bytes that are hashed — which is what lets a
+transparency-log anchor be attached after signing, and is also the limit
+recorded under **Known gaps**.
+
+### `seq` advances by exactly one
+
+`chain.seq` is an integer that increases by **exactly one** between consecutive
+receipts. Both failure shapes are exit **12**:
+
+- `seq` not greater than its predecessor — reordered or duplicated;
+- `seq` greater by more than one — a receipt is missing.
+
+`prevHash` alone does not catch the second case. A chain with a deleted receipt
+can still link correctly if the deletion happened before the successors were
+written; only the counter reveals the hole. That is what vector
+`005-seq-gap` is for, and a verifier that checks hashes but not `seq` passes it
+and is wrong.
+
+`--expect-seq-from N` pins the first receipt of the file to `N`. Without it, a
+file whose first receipt is `seq: 7` verifies as a valid *suffix* — the
+verifier reports what it can prove, and where a chain starts is not something a
+single file can prove.
+
+### Fields whose absence is a schema error (exit 20)
+
+A receipt missing one of these is not a tampered receipt — it is not a receipt.
+The distinction matters because the exit code is a diagnosis: reporting exit 10
+("record altered") for a document that never had the field would name the wrong
+event.
+
+Each row is checked by removing exactly that path from the named vector and
+requiring exit 20.
+
+| Path | Checked against |
+|---|---|
+| `v` | 001-single-receipt |
+| `id` | 001-single-receipt |
+| `ts` | 001-single-receipt |
+| `period` | 001-single-receipt |
+| `request` | 001-single-receipt |
+| `dataRefs` | 001-single-receipt |
+| `policy` | 001-single-receipt |
+| `policy.decision` | 001-single-receipt |
+| `flags` | 001-single-receipt |
+| `masking` | 001-single-receipt |
+| `outcome` | 001-single-receipt |
+| `actor` | 001-single-receipt |
+| `actor.type` | 001-single-receipt |
+| `actor.assurance` | 001-single-receipt |
+| `chain` | 001-single-receipt |
+| `chain.seq` | 001-single-receipt |
+| `chain.prevHash` | 001-single-receipt |
+| `chain.hash` | 001-single-receipt |
+| `consentRef` | 001-single-receipt |
+| `anchor` | 001-single-receipt |
+| `model` | 001-single-receipt |
+| `model.source` | 001-single-receipt |
+| `client` | 001-single-receipt |
+| `client.source` | 001-single-receipt |
+| `disclosure` | 010-disclosure-commitment |
+| `disclosure.source` | 010-disclosure-commitment |
+| `disclosure.hash` | 010-disclosure-commitment |
+| `disclosure.bytes` | 010-disclosure-commitment |
+| `destination` | 010-disclosure-commitment |
+| `destination.source` | 010-disclosure-commitment |
+| `destination.value` | 010-disclosure-commitment |
+
+`consentRef` and `anchor` must be **present and null**, not absent: the two
+carry different meanings, and a reader who cannot tell "declared empty" from
+"never written" is guessing. The same rule governs `disclosure` and
+`destination` under `source: "undeclared"` — the value keys stay, holding
+`null`. Vector `013-disclosure-keys-omitted` locks that case.
+
+`model` and `client` are required from v0.3 onward; `disclosure` and
+`destination` from v0.4. An older receipt that lacks them is valid at its own
+version — the version field decides which rows apply, which is why a v0.3
+receipt in a v0.4 chain still verifies (`012-mixed-chain`).
+
+`sig` is deliberately not in this table. A receipt without a signature is a
+well-formed receipt that cannot be trusted — exit **13**, not 20.
+
+### Check order
+
+The order is part of the contract, because the exit code is a diagnosis and the
+wrong order produces a true verdict with a false reason.
+
+| Order | Check | Exit on failure |
+|---|---|---|
+| 1st | Schema | 20 |
+| 2nd | Recomputed content hash | 10 |
+| 3rd | `prevHash` link to the previous receipt | 11 |
+| 4th | `seq` advances by exactly one | 12 |
+| 5th | Ed25519 signature | 13 |
+| 6th | Anchor, only under `--anchor-check` | 14 / 15 |
+
+Receipts are processed in file order, and the first failure ends the run — so
+the exit code names the first defective receipt, not the worst one.
+
+Put the signature check first and a deleted receipt (`004`) or a sequence gap
+(`005`) reports as a bad signature whenever the offending receipt is also
+unsigned. The verdict "do not trust this chain" is unchanged; the operator is
+sent to look at the wrong thing. The guard builds exactly that case — it
+removes the signature from the one receipt that already breaks the chain — and
+requires 11 and 12 rather than 13.
+
+### Canonical form, and what the vectors do not measure
+
+Content bytes are canonicalised with **JCS (RFC 8785)** and digested with
+SHA-256, prefixed `sha256:`. `hash`, `sig` and `anchor` are removed first,
+including the nested `chain.hash`.
+
+`expected-hashes.json` publishes those digests, so a second implementation can
+compare canonical bytes without holding our private key. Matching them is what
+interoperability actually requires; signing is RFC 8032 and none of it is ours.
+
+⚠️ **Stated limit.** The published vectors are ASCII-keyed with integer and
+string values. A naive sorted-key serialiser reproduces every one of their
+hashes, so passing them does **not** demonstrate a conforming JCS
+implementation. The number formatting rules (RFC 8785 §3.2.2.3) and the
+UTF-16 code-unit sort order over non-ASCII keys are unexercised. A receipt
+carrying a float, a large integer, or a non-ASCII key is where two
+implementations will first disagree, and this repository does not currently
+publish a vector that would catch it.
+
+### Which document is normative for what
+
+The IETF draft (`standards/`) defines Transformation Evidence and Coverage
+Reconciliation, and states that signature and chain verification are **out of
+scope** for it. That is deliberate: those belong to the receipt format, not to
+the evidence structures layered on top.
+
+So the draft is normative for the evidence structures; **this document is
+normative for the receipt wire format** — signature payload, canonical form,
+sequence rule, schema requirements and check order. An implementer who reads
+only the draft has not been told how to verify a receipt, and should not
+conclude the format leaves it open.
+
 ## Conformance vectors
 
 A specification that cannot be implemented from the document alone is a blog
-post. [`test-vectors/`](../test-vectors/) is the difference: twelve frozen cases,
+post. [`test-vectors/`](../test-vectors/) is the difference: thirteen frozen cases,
 the public key, and a machine-readable manifest.
 
 ```
