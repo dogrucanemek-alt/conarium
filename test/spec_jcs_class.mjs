@@ -233,6 +233,7 @@ const walkKeys = (v, out = []) => {
 
 let receiptsSeen = 0
 let offenders = 0
+let nonAsciiValues = 0
 for (const dir of readdirSync(VECTORS, { withFileTypes: true })) {
   if (!dir.isDirectory() || !/^\d{3}-/.test(dir.name)) continue
   const file = path.join(VECTORS, dir.name, 'receipts.jsonl')
@@ -254,11 +255,20 @@ for (const dir of readdirSync(VECTORS, { withFileTypes: true })) {
         fail(`${dir.name}: key ${JSON.stringify(k)} carries ${v}, not a safe integer — the spec paragraph says this cannot happen`)
         offenders++
       }
+      // Counted, never failed. Receipt KEYS are fixed by the format; receipt
+      // VALUES are free text and nothing constrains them to ASCII. A receipt
+      // whose actor.id is not ASCII exercises string escaping through
+      // receiptHash, so hashArgs is not the only way two implementations can
+      // part company. The count keeps that sentence honest as the vectors grow.
+      if (typeof v === 'string' && [...v].some((c) => c.charCodeAt(0) > 127)) nonAsciiValues++
     }
   }
 }
 if (receiptsSeen === 0) fail('no receipt vectors found — check 5 measured nothing')
-else if (offenders === 0) pass(`${receiptsSeen} shipped receipts: every key ASCII, every number a safe integer`)
+else if (offenders === 0)
+  pass(
+    `${receiptsSeen} shipped receipts: every key ASCII, every number a safe integer, ${nonAsciiValues} non-ASCII string value(s) — values are unconstrained, so this is a count, not a rule`,
+  )
 
 // ------------------------------------------------- 6. prose states the sample
 

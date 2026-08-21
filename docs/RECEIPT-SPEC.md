@@ -391,11 +391,18 @@ across every shipped receipt rather than asserting it here. The limit was real;
 it was announced in the wrong place.
 
 Caller-shaped JSON reaches JCS at one point: `hashArgs()`, whose argument is
-typed `any` and whose digest becomes `request.argsHash`. That is the only
-surface where a second implementation can disagree with us about
-canonicalisation, and until 0.2.41 its preimages were published nowhere —
-vector 001 carries `sha256:abab...`, a placeholder standing in for a hash of
-nothing.
+typed `any` and whose digest becomes `request.argsHash`. It is the only surface
+whose *shape* is unbounded — arbitrary keys, arbitrary numbers — and until
+0.2.41 its preimages were published nowhere: vector 001 carries
+`sha256:abab...`, a placeholder standing in for a hash of nothing.
+
+It is not, however, the only place two implementations can part company.
+`canonicalize` also digests countersign records, coverage rows and licence
+payloads, and a receipt's string *values* — `actor.id`, `model.name`,
+`policy.rules[]` — are free text that nothing constrains to ASCII. Keys are
+fixed by the format; values are not. No shipped vector carries a non-ASCII
+value today, which `test/spec_jcs_class.mjs` counts rather than asserts,
+because the format permits one tomorrow.
 
 **What is published now.** [`test-vectors/jcs/`](../test-vectors/jcs/) carries
 the preimages, and `test/spec_jcs_class.mjs` measures all of it on every run:
