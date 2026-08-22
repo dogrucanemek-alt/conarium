@@ -90,7 +90,7 @@ const PROFILE_V = 'conarium-mapping-profile/0.1'
 
 function loadSnapshot(path, label) {
   if (!existsSync(path)) {
-    return { error: `${label} snapshot not found: ${path}` }
+    return { error: `${label} snapshot not found: ${path}`, code: 2 }
   }
   let obj
   try {
@@ -192,7 +192,7 @@ export function classifyPattern(query) {
 // ─── receipts ────────────────────────────────────────────────────────────────
 
 function loadReceipts(path) {
-  if (!existsSync(path)) return { error: `receipts file not found: ${path}` }
+  if (!existsSync(path)) return { error: `receipts file not found: ${path}`, code: 2 }
   const raw = readFileSync(path, 'utf-8').trim()
   if (!raw) return { receipts: [] }
   const receipts = []
@@ -471,7 +471,7 @@ function patternDigest(query) {
  * indeterminate — this function does not invent a bound of one.
  */
 export function loadMappingProfile(path) {
-  if (!existsSync(path)) return { error: `profile not found: ${path}` }
+  if (!existsSync(path)) return { error: `profile not found: ${path}`, code: 2 }
   const raw = readFileSync(path)
   let obj
   try {
@@ -784,25 +784,25 @@ async function main(argv = process.argv.slice(2)) {
     opts = parseArgs(argv)
   } catch (err) {
     usage(err.message)
-    process.exit(20)
+    process.exit(2)
   }
   if (!opts.before || !opts.after || !opts.receiptsPath) {
     usage('missing required flag (--before, --after and --receipts are all required)')
-    process.exit(20)
+    process.exit(2)
   }
 
   const b = loadSnapshot(opts.before, 'before')
-  if (b.error) fail(20, b.error, opts.json)
+  if (b.error) fail(b.code ?? 20, b.error, opts.json)
   const a = loadSnapshot(opts.after, 'after')
-  if (a.error) fail(20, a.error, opts.json)
+  if (a.error) fail(a.code ?? 20, a.error, opts.json)
   const rec = loadReceipts(opts.receiptsPath)
-  if (rec.error) fail(20, rec.error, opts.json)
+  if (rec.error) fail(rec.code ?? 20, rec.error, opts.json)
 
   let profile = null
   let profileRaw = Buffer.from('')
   if (opts.profilePath) {
     const loaded = loadMappingProfile(opts.profilePath)
-    if (loaded.error) fail(20, loaded.error, opts.json)
+    if (loaded.error) fail(loaded.code ?? 20, loaded.error, opts.json)
     profile = loaded.profile
     profileRaw = loaded.raw
   }
@@ -955,6 +955,6 @@ const isDirect =
 if (isDirect) {
   main().catch((err) => {
     console.error(err)
-    process.exit(20)
+    process.exit(1)
   })
 }

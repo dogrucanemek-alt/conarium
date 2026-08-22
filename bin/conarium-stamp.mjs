@@ -65,15 +65,15 @@ async function main(argv = process.argv.slice(2)) {
     opts = parseArgs(argv)
   } catch (err) {
     usage(err.message)
-    process.exit(20)
+    process.exit(2)
   }
   if (!opts.target) {
     usage('missing <file>')
-    process.exit(20)
+    process.exit(2)
   }
   if (!existsSync(opts.target)) {
     console.error(`file not found: ${opts.target}`)
-    process.exit(20)
+    process.exit(2)
   }
 
   let content
@@ -81,7 +81,7 @@ async function main(argv = process.argv.slice(2)) {
     content = readFileSync(opts.target)
   } catch (err) {
     console.error(`cannot read ${opts.target}: ${err.message}`)
-    process.exit(20)
+    process.exit(2)
   }
 
   const digest = createHash('sha256').update(content).digest()
@@ -147,6 +147,6 @@ const isDirect =
 if (isDirect) {
   main().catch((err) => {
     console.error(err)
-    process.exit(20)
+    process.exit(1)
   })
 }

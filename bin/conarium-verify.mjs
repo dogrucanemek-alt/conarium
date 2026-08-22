@@ -249,7 +249,7 @@ function loadVerifyKeys(paths) {
 
 function loadReceipts(target) {
   if (!existsSync(target)) {
-    return { error: `path not found: ${target}`, code: 20 }
+    return { error: `path not found: ${target}`, code: 2 }
   }
   const st = statSync(target)
   let files = []
@@ -734,6 +734,6 @@ const isDirect =
 if (isDirect) {
   main().catch((err) => {
     console.error(err)
-    process.exit(20)
+    process.exit(1)
   })
 }
