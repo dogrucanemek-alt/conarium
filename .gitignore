@@ -132,6 +132,9 @@ DURUM.md
 standards/.refcache/
 standards/tracker.log
 
+# Preprint PDF, if one is ever produced. Source stays under paper/.
+paper/build/
+
 # V8 CPU profiles — docs/ is in the npm files list; these must not ship.
 *.cpuprofile
 docs/benchmarks/*.cpuprofile
