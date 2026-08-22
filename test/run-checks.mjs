@@ -46,6 +46,7 @@ export const CHECKS = [
   'test/pack_artefakt.mjs',
   'test/pack_locale.mjs',
   'test/pack_path_refs.mjs',
+  'test/pack_tracked.mjs',
   'test/exit_contract.mjs',
   'test/exit_code_descriptions.mjs',
   'test/connectors.mjs',
