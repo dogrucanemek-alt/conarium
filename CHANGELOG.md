@@ -14,6 +14,14 @@ read — is still 20. The uncaught-exception path at the bottom of the file
 is also still 20; it is not a schema diagnosis, and this release does not
 rename it.
 
+Nor is a target that is not there. `conarium-verify missing.jsonl --pubkey
+<key>` prints `path not found` and exits **20**, having opened no receipt.
+That is the same defect one path over, and this release does not fix it:
+whether an unreachable input is a usage error, a verdict, or a third thing
+is a decision about the exit-code contract, not a typo. It is written down
+in `docs/RECEIPT-SPEC.md` where the table can be read against the binary,
+and it is the next change to this file.
+
 **This is a behaviour change.** A script that treated every 20 as "schema
 invalid" was already folding typos into that bucket. Those typos will now
 be 2. Schema-invalid inputs are unaffected.

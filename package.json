@@ -1,6 +1,6 @@
 {
   "name": "@conarium-ai/core",
-  "version": "0.2.41",
+  "version": "0.2.42",
   "mcpName": "io.github.dogrucanemek-alt/conarium",
   "//files-artefakt": "Generated files under examples/ (private key, receipt/audit JSONL) are EXCLUDED. .gitignore does not bind npm: because the allow-list contained 'examples', `npm publish` on a machine that had run the demo was shipping _keys/audit-ed25519.pem (PRIVATE KEY) and the receipts. test/pack_artefakt.mjs locks this. The exclusions are LIMITED to examples/: receipts.jsonl and .pub.pem under test-vectors/ MUST ship, or a third party cannot run the conformance vectors.",
   "//files": "Allow-list of what enters the package. Without it npm sent everything: 296 files / 1.5 MB — CI workflows, gitleaks config, a 137 KB marketing image, the site's api/chat.js. A bank security team opens the tarball and sees those. scripts/ is here ON PURPOSE: conarium-reconcile references scripts/pg-snapshot.sql at runtime; without it the user files a support mail.",
