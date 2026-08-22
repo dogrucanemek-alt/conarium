@@ -192,7 +192,7 @@ are unchanged.
 |---|---|
 | 0 | Chain intact, signatures valid |
 | 1 | The tool failed unexpectedly — no verdict was reached |
-| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a target that is not there. Nothing was read, so nothing is being judged. |
+| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a target that is not there. The artefact under test was never opened, so nothing is being judged. |
 | 10 | Hash mismatch — record altered |
 | 11 | `prevHash` break — deleted or inserted; also `--expect-count` / `--expect-last-hash` mismatch |
 | 12 | `seq` gap / non-increasing — missing or reordered |
@@ -484,7 +484,7 @@ occurred"** — an absent record is ambiguous by nature.
 |---|---|
 | 0 | Declaration signature valid (+ consistent with receipts if given), chain contiguous. Unpinned window start is printed, not a silent complete. |
 | 1 | The tool failed unexpectedly — no verdict was reached |
-| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a declaration or receipts file that is not there. Nothing was read, so nothing is being judged. |
+| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a declaration or receipts file that is not there. The artefact under test was never opened, so nothing is being judged. |
 | 12 | Chain has gaps — coverage incomplete (`--allow-gaps` verifies authenticity only); also `--expect-seq-from` miss |
 | 13 | Signature invalid / pubkey missing (fail-closed); also a receipt Ed25519 failure under `--receipts` |
 | 20 | Schema invalid — the declaration was read and failed the schema |
@@ -558,7 +558,7 @@ Rules that keep the verdict honest:
 |---|---|
 | 0 | Every DB query pattern in the window is attributable to receipt(s) for the same table — object attribution, not per-statement coverage |
 | 1 | The tool failed unexpectedly — no verdict was reached |
-| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a snapshot, receipts file or profile that is not there. Nothing was read, so nothing is being judged. |
+| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a snapshot, receipts file or profile that is not there. The artefact under test was never opened, so nothing is being judged. |
 | 20 | Input was read and is invalid, or the window is unreliable (schema error, counter regression) |
 | 40 | Unreconciled DB activity — recorded by the database, not receipted |
 | 41 | Indeterminate — a pattern is uncovered only by the window boundary, and two clocks decide that boundary |
@@ -701,7 +701,7 @@ conarium-stamp <file> [--sidecar <path>] [--json]
 |---|---|
 | 0 | Stamped; sidecar written (`pending` until upgraded) |
 | 1 | The tool failed unexpectedly — no verdict was reached |
-| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a target that is not there. Nothing was read, so nothing is being judged. |
+| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a target that is not there. The artefact under test was never opened, so nothing is being judged. |
 | 50 | Stamping failed — calendars unreachable or timed out |
 
 Receipts are not anchored by the write path. An operator stamps a document
