@@ -33,7 +33,7 @@
       "scheme": "url"
     },
     {
-      "identifier": "swh:1:snp:bc6105f9b58a09866928df917e27c7fa50d21ed2",
+      "identifier": "swh:1:snp:d60322ed2ea0b1cd4a3e75847677e9a04e18b65a",
       "relation": "isSupplementTo",
       "resource_type": "software",
       "scheme": "swh"
