@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.2.42 — a usage error is not a schema verdict
+
+`conarium-verify` exited **20** for an unknown flag and for a missing path.
+The published tables give 20 one meaning: *Schema invalid*. A machine that
+typed the command wrong was therefore handed a verdict about a receipt it
+had never opened. That is the same shape as the 0.2.40 `--anchor-check`
+defect: the code named an event that had not occurred.
+
+Usage errors are now **2**, which sits outside the verdict range (10–20).
+A real schema failure — vector 007, or `fail(20, …)` after a receipt is
+read — is still 20. The uncaught-exception path at the bottom of the file
+is also still 20; it is not a schema diagnosis, and this release does not
+rename it.
+
+Nor is a target that is not there. `conarium-verify missing.jsonl --pubkey
+<key>` prints `path not found` and exits **20**, having opened no receipt.
+That is the same defect one path over, and this release does not fix it:
+whether an unreachable input is a usage error, a verdict, or a third thing
+is a decision about the exit-code contract, not a typo. It is written down
+in `docs/RECEIPT-SPEC.md` where the table can be read against the binary,
+and it is the next change to this file.
+
+**This is a behaviour change.** A script that treated every 20 as "schema
+invalid" was already folding typos into that bucket. Those typos will now
+be 2. Schema-invalid inputs are unaffected.
+
+`conarium-coverage`, `conarium-reconcile` and `conarium-stamp` still exit
+20 on usage errors. They were measured, not changed.
+
 ## 0.2.41 — a limit that was announced in the wrong place
 
 Since 0.2.34 `docs/RECEIPT-SPEC.md` had carried a stated limit: the thirteen

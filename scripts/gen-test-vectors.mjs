@@ -184,6 +184,7 @@ writeFileSync(
       note: 'Frozen conformance vectors. Run each case through your verifier and compare the exit code. KEYS/ in args resolves to the keys/ directory at the root of test-vectors.',
       exitCodes: {
         0: 'chain intact, signatures valid',
+        2: 'Usage error — no receipt was read',
         10: 'hash mismatch — record altered',
         11: 'prevHash break — deleted or inserted',
         12: 'seq gap / non-increasing',

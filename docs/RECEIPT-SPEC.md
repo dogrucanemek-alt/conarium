@@ -189,13 +189,14 @@ are unchanged.
 | Exit | Meaning |
 |---|---|
 | 0 | Chain intact, signatures valid |
+| 2 | Usage error — no receipt was read |
 | 10 | Hash mismatch — record altered |
 | 11 | `prevHash` break — deleted or inserted; also `--expect-count` / `--expect-last-hash` mismatch |
 | 12 | `seq` gap / non-increasing — missing or reordered |
 | 13 | Signature invalid / pubkey missing (fail-closed) |
 | 14 | Claimed anchor invalid under `--anchor-check`, or `--require-head-anchor` when the head is unanchored. An individual `anchor:null` receipt is skipped, not failed — periodic anchoring leaves most of them null. |
 | 15 | Anchor **could not be checked** — calendar unreachable, the OpenTimestamps verifier is not installed, or `--anchor-check` reached no anchor at all because every receipt in the chain is unanchored. Deliberately distinct from 14: "I could not verify this" is not "this is invalid". The digest comparison is performed offline and still holds; only the timestamp attestation is unconfirmed. A verifier that collapsed the two would be asserting something it did not measure. |
-| 20 | Schema invalid |
+| 20 | Schema invalid — a receipt was read and failed the schema. ⚠️ Also returned when the target path does not exist (`path not found`) and on an uncaught exception, neither of which reads a receipt. Both are known and unfixed; `CHANGELOG.md` 0.2.42 says why. |
 
 Fail-closed: if the verifier is unsure, it does not exit 0.
 
