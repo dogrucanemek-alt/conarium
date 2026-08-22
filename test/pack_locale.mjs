@@ -129,11 +129,12 @@ const wordProbe = (line) => {
  *
  * ⚠️ This ran `wordProbe` alone until 0.2.43, and `wordProbe` is the pass
  * written for Turkish that carries no Turkish letter. Over `docs/` — which is
- * Turkish prose, letters and all — it is the wrong instrument: it reported 324
- * lines across 22 files where the letter pass finds 1041 across 29. The number
- * whose whole job was to keep the remainder visible was showing a third of it,
- * and it read as the total because nothing beside it disagreed. Both probes
- * now run, and the union is what gets printed and pinned.
+ * Turkish prose, letters and all — it is the wrong instrument: it reports a
+ * fraction of the remainder, and that fraction reads as the total because
+ * nothing beside it disagrees. Both probes now run, and the union is what
+ * gets printed and pinned. Historical figures belong in CHANGELOG (0.2.43)
+ * and the live ceiling in `docs/claims/locale-residue.json` — not here. A
+ * number in this comment is the defect this file exists to catch.
  */
 function docsRemainder(packed) {
   let hits = 0

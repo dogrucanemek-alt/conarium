@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.2.46 - three numbers that named something they were not
+
+Every item here is a figure this project printed, published, or wrote down,
+which turned out to measure something other than what it said. Two were
+declared on the SCITT list before they were fixed; this is that debt.
+
+**`exit_contract.mjs` reported its own work wrong.** The success line said
+`27 invocation(s)`. It runs 25 processes; 27 was the pass counter, 23 cases
+plus four assertions over two of them. A count that names something it is not,
+printed by the file added to stop codes naming events they are not, in the
+release that was about exactly that. Both numbers are now derived from the run
+through a single `invoke()` wrapper and both are printed:
+`25 invocation(s), 27 assertion(s)`. Add a case and the label moves on its own.
+
+**`pack_locale.mjs` carried a figure its own subject forbids.** Its comment
+said the letter pass finds 1041 where the changelog said 1034 — two
+hand-written declarations of one number, inside the check whose whole purpose
+is catching hand-written declarations drifting apart. Neither was reproducible:
+on the 0.2.42 packed set the letter pass is 971 across 26, the word pass 310
+across 20, and their union 1034 across 29. So 1034 was the union and never the
+letter pass. The comment now describes the mechanism and states no figure at
+all; the live number lives in `docs/claims/locale-residue.json`, where a run
+compares it.
+
+**And the number underneath both of them was a measurement of one disk.** See
+the 0.2.43 entry, corrected in place: `324 / 22` came from a working tree
+holding two gitignored files under `docs/audit/` that are in no commit. It
+reached a changelog, and from there a public mailing list, where nobody can
+reproduce it.
+
+**`test/pack_tracked.mjs`** is the mechanism for that class, and it is not
+about Turkish. Every path npm would ship must be tracked by git or fall under
+one declared generated prefix, `dist/`, which `npm run build` reproduces from
+source. Anything else is a file that exists on the packer's machine and in no
+release, which means the package built here is not the package CI builds, and
+every measurement taken over it is a measurement of somebody's disk.
+
+The same mechanism once shipped a private key: `npm publish` from a machine
+that had run the demo included `examples/_keys/audit-ed25519.pem`, which is why
+package.json carries the sentence about .gitignore not binding npm and why
+`pack_artefakt.mjs` locks that one path. This locks the class instead of the
+path. It fails closed: if git cannot answer, the check does not pass.
+
 ## 0.2.45 - the rest of an outside report, and a check over the descriptions
 
 **Behaviour change in `conarium-verify` and `conarium-coverage`.** Read the two
@@ -118,11 +161,26 @@ plainly rather than implied by an untested green.
 
 `test/pack_locale.mjs` has always ended with a line naming what it does *not*
 fix: Turkish left under `docs/`, out of interface scope, printed so it stays
-visible. The line read `324 occurrences across 22 files`. The letter pass finds
-**1034 lines across 29 files**. The remainder was counted by `wordProbe` alone —
-the pass written for Turkish that carries *no* Turkish letter, and therefore the
-wrong instrument for Turkish prose. Both passes now run and the union is
-reported.
+visible. The 0.2.43 note wrote that line down as `324 occurrences across 22
+files`, and called **1034 lines across 29 files** the letter pass. Remeasured
+on 22 August 2026 against both bases that could have produced those figures:
+the published 0.2.42 tarball (508 extracted paths) and `npm pack --dry-run` at
+`v0.2.42` (256 paths). The lists differ only by `dist/` build artefacts, which
+`docsRemainder` already excludes (`bin/`, `scripts/` and `public/` too). On
+that packed-doc set the 0.2.42 instrument (`wordProbe` only) is **310 lines
+across 20 files**. `324 / 22` reproduces on neither base, and the reason
+was found rather than left open: two files under `docs/audit/` that are
+gitignored, present on the machine the figure was taken on, and in no commit.
+Copy them into a clean v0.2.42 worktree and the same guard prints 324 across
+22; remove them and it prints 310 across 20. The number was never a fact about
+the package. `.gitignore` does not bind npm, so a tree with extra files packs
+a different package, and 0.2.46 adds `test/pack_tracked.mjs` to refuse that.
+The `308 / 19` handover note below is the same class with the cause still
+unknown. The **union** of letter and word on that set is **1034 / 29**; the
+letter pass alone is 971 / 26. 1034 is the union, not the letter pass. The
+remainder was counted by `wordProbe` alone — the pass written for Turkish that
+carries *no* Turkish letter, and therefore the wrong instrument for Turkish
+prose. Both passes now run and the union is reported.
 
 What the package was shipping under that number: `docs/superpowers/`,
 `docs/plans/`, `docs/specs/` and `docs/audit/` — dated internal design and
