@@ -382,17 +382,24 @@ async function main(argv = process.argv.slice(2)) {
     process.exit(2)
   }
 
-  const keyResult = loadVerifyKeys(opts.pubkeys)
-  if (keyResult.error) {
-    fail(keyResult.code, keyResult.error, opts.json)
-  }
-  const { keys } = keyResult
-
+  /**
+   * Target before key, for the reason set out in conarium-verify: with the key
+   * first, a declaration that is not there answered 13 — a signature verdict
+   * about a file nobody opened — and answered 2 as soon as an unrelated
+   * --pubkey was supplied. Fail-closed is unaffected: a missing declaration
+   * exits 2, and one that is present still needs a key.
+   */
   const declResult = loadDeclaration(opts.target)
   if (declResult.error) {
     fail(declResult.code, declResult.error, opts.json)
   }
   const d = declResult.declaration
+
+  const keyResult = loadVerifyKeys(opts.pubkeys)
+  if (keyResult.error) {
+    fail(keyResult.code, keyResult.error, opts.json)
+  }
+  const { keys } = keyResult
 
   const schemaErr = schemaOk(d)
   if (schemaErr) {

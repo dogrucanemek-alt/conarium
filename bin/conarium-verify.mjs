@@ -247,43 +247,124 @@ function loadVerifyKeys(paths) {
   return { keys }
 }
 
+function isWholeJson(raw) {
+  try {
+    JSON.parse(raw)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Read one file as receipts, or say truthfully why it could not be.
+ *
+ * The message used to be `invalid JSON in <file>:1` for any line that failed
+ * to parse, and for the commonest case that sentence was false. Receipts are
+ * one per line, so a pretty-printed JSON document has its opening brace handed
+ * to JSON.parse on its own — and the file it was read from is perfectly valid
+ * JSON. An outside reader hit it and said the message mattered more than the
+ * code, which is right: a caller acts on what it is told went wrong, and being
+ * told a valid file is invalid sends them to look at the wrong thing.
+ *
+ * So the file is asked the second question before the tool answers the first.
+ * Valid JSON that is not JSONL is a format mismatch and says so; anything else
+ * is genuinely malformed and says that instead.
+ */
+function parseReceiptFile(file, raw) {
+  const lines =
+    raw.includes('\n') && !raw.trimStart().startsWith('[')
+      ? raw.split('\n').filter(Boolean)
+      : [raw]
+  const out = []
+  for (let i = 0; i < lines.length; i++) {
+    let obj
+    try {
+      obj = JSON.parse(lines[i])
+    } catch (err) {
+      /**
+       * Two different answers, and the split decides whether this is a verdict.
+       *
+       * If the whole file is valid JSON, nothing is wrong with the bytes — the
+       * caller handed a shape this tool does not read, and no judgement about
+       * the content has been made. That is 2.
+       *
+       * If it is not valid JSON either, the artefact was examined and rejected,
+       * and that is a verdict whatever the caller intended. It stays in the
+       * verdict range, because a one-byte mutation of a signed chain lands
+       * here — `src/invariants.property.test.ts` mutates a valid chain and
+       * caught this file answering 2 when it first split them. Telling a
+       * caller "your command could not be run" about a tampered file sends
+       * them to check their arguments instead of their evidence.
+       */
+      if (isWholeJson(raw)) {
+        return {
+          code: 2,
+          error:
+            `${file} is JSON but not JSONL: this reads one receipt per line, ` +
+            `and line ${i + 1} is not a complete JSON document on its own. ` +
+            'Convert it with `jq -c .`, or pass a file that already has one receipt per line.',
+        }
+      }
+      return { code: 20, error: `${file}:${i + 1} is not valid JSON: ${err.message}` }
+    }
+    if (Array.isArray(obj)) {
+      for (const item of obj) out.push(item)
+    } else {
+      out.push(obj)
+    }
+  }
+  return { receipts: out }
+}
+
 function loadReceipts(target) {
   if (!existsSync(target)) {
     return { error: `path not found: ${target}`, code: 2 }
   }
   const st = statSync(target)
-  let files = []
-  if (st.isDirectory()) {
-    files = readdirSync(target)
-      .filter((f) => ['.json', '.jsonl', '.receipt'].includes(extname(f)))
-      .map((f) => join(target, f))
-      .sort()
-  } else {
-    files = [target]
-  }
+  const isDir = st.isDirectory()
+  const files = isDir
+    ? readdirSync(target)
+        .filter((f) => ['.json', '.jsonl', '.receipt'].includes(extname(f)))
+        .map((f) => join(target, f))
+        .sort()
+    : [target]
 
   const receipts = []
+  const skipped = []
   for (const file of files) {
     const raw = readFileSync(file, 'utf-8').trim()
     if (!raw) continue
-    const lines = raw.includes('\n') && !raw.trimStart().startsWith('[')
-      ? raw.split('\n').filter(Boolean)
-      : [raw]
-    for (let i = 0; i < lines.length; i++) {
-      let obj
-      try {
-        obj = JSON.parse(lines[i])
-      } catch (err) {
-        return { error: `invalid JSON in ${file}:${i + 1}: ${err.message}`, code: 20 }
+    const parsed = parseReceiptFile(file, raw)
+    if (parsed.error) {
+      /**
+       * Naming a file asserts that it is receipts, so failing to read it is
+       * the answer. Naming a directory asks about the receipts in it, and a
+       * neighbour that is not receipts is not a verdict about the ones that
+       * are — this is what happens to anyone who points the verifier at our
+       * own published `test-vectors/`, where `expected-hashes.json` sits
+       * beside the vectors and used to stop the run.
+       *
+       * Skipped, and named. Skipping quietly would report success over
+       * something that was never examined, which is the defect this codebase
+       * keeps finding in itself and in other people's checkers.
+       */
+      if (isDir && parsed.code === 2) {
+        skipped.push(parsed.error)
+        continue
       }
-      if (Array.isArray(obj)) {
-        for (const item of obj) receipts.push({ file, receipt: item })
-      } else {
-        receipts.push({ file, receipt: obj })
-      }
+      /**
+       * A neighbour that is not valid JSON at all is never skipped, in a
+       * directory or out of it. A corrupt file sitting among receipts is
+       * exactly what a tampered receipt looks like, and skipping it because
+       * the caller named a directory rather than a file would decide, on a
+       * detail of the invocation, not to report evidence.
+       */
+      return { error: parsed.error, code: parsed.code }
     }
+    for (const receipt of parsed.receipts) receipts.push({ file, receipt })
   }
-  return { receipts }
+  return { receipts, skipped }
 }
 
 function schemaOk(r) {
@@ -444,17 +525,34 @@ async function main(argv = process.argv.slice(2)) {
     )
   }
 
-  const keyResult = loadVerifyKeys(opts.pubkeys)
-  if (keyResult.error) {
-    fail(keyResult.code, keyResult.error, opts.json)
-  }
-  const { keys } = keyResult
-
+  /**
+   * The target is resolved before the key is loaded, and the order is the
+   * point. Both checks are refusals, but they answer different questions, and
+   * whichever runs first decides what a caller is told about an invocation
+   * that is wrong in two ways. With the key first, a path that does not exist
+   * came back as 13 — a verdict about signatures, for a file that was never
+   * opened — and the same missing path came back as 2 the moment an unrelated
+   * --pubkey was added. Which answer you got was a fact about this ordering
+   * rather than about your run.
+   *
+   * Fail-closed is untouched by the swap: a target that is missing exits 2,
+   * which is not success, and a target that is present still cannot be
+   * verified without a key.
+   */
   const loaded = loadReceipts(opts.target)
   if (loaded.error) {
     fail(loaded.code, loaded.error, opts.json)
   }
   const { receipts } = loaded
+  for (const note of loaded.skipped ?? []) {
+    console.error(`skipped, not receipts: ${note}`)
+  }
+
+  const keyResult = loadVerifyKeys(opts.pubkeys)
+  if (keyResult.error) {
+    fail(keyResult.code, keyResult.error, opts.json)
+  }
+  const { keys } = keyResult
 
   let anchorRows = []
   if (opts.anchorCheck) {

@@ -88,7 +88,11 @@ test('truncated JSONL line is exit 20, not a silent skip', () => {
   fs.writeFileSync(broken, full[0] + '\n{"v":"0.3","id":\n')
   const r = verify(broken)
   assert.equal(r.status, 20, `expected 20, got ${r.status}\n${r.stderr}\n${r.stdout}`)
-  assert.match(`${r.stderr}${r.stdout}`, /invalid JSON/)
+  // 0.2.45 reworded this: the old text said "invalid JSON" for every parse
+  // failure, including files that were valid JSON and merely not JSONL. This
+  // one is genuinely not valid JSON, so it keeps 20 and says so — and the
+  // assertion names the line, which is the part a reader acts on.
+  assert.match(`${r.stderr}${r.stdout}`, /truncated-line\.jsonl:2 is not valid JSON/)
 })
 
 for (const { name, fn } of tests) {
