@@ -21,8 +21,8 @@ assert.ok(src.includes('claim_surfaces.mjs'), 'claim_discipline.mjs must load su
 assert.ok(denetciSrc.includes('claim_surfaces.mjs'), 'denetci.mjs must load surfaces from the published source')
 assert.equal(
   SURFACES.length,
-  23,
-  'twenty-three review documents: twenty-two named in surfaces.json plus the current draft revision, derived from the tree rather than listed',
+  24,
+  'twenty-four review documents: twenty-three named in surfaces.json plus the current draft revision, derived from the tree rather than listed',
 )
 assert.equal(
   src.includes('const BANNED'),
