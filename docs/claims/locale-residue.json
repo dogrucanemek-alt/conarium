@@ -1,0 +1,7 @@
+{
+  "lines": 34,
+  "files": 14,
+  "why": "bilingual limitation paragraphs, quoted product strings in the changelog, and a TURKPATENT citation",
+  "measuredBy": "test/pack_locale.mjs — union of the letter pass and the word pass over every path npm packs, excluding dist/bin/scripts/public and *.tr.md",
+  "rule": "A ceiling, not a target. Lower it whenever Turkish leaves the package. Raising it means a new Turkish file is shipping to strangers, which needs a reason written in the release note."
+}
