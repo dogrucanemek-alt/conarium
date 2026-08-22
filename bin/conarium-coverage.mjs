@@ -164,7 +164,7 @@ function loadVerifyKeys(paths) {
 
 function loadDeclaration(path) {
   if (!existsSync(path)) {
-    return { error: `declaration not found: ${path}`, code: 20 }
+    return { error: `declaration not found: ${path}`, code: 2 }
   }
   let obj
   try {
@@ -177,7 +177,7 @@ function loadDeclaration(path) {
 
 function loadReceipts(path) {
   if (!existsSync(path)) {
-    return { error: `receipts file not found: ${path}`, code: 20 }
+    return { error: `receipts file not found: ${path}`, code: 2 }
   }
   const raw = readFileSync(path, 'utf-8').trim()
   if (!raw) return { receipts: [] }
@@ -375,11 +375,11 @@ async function main(argv = process.argv.slice(2)) {
     opts = parseArgs(argv)
   } catch (err) {
     usage(err.message)
-    process.exit(20)
+    process.exit(2)
   }
   if (!opts.target) {
     usage('missing <declaration.json>')
-    process.exit(20)
+    process.exit(2)
   }
 
   const keyResult = loadVerifyKeys(opts.pubkeys)
@@ -504,6 +504,6 @@ const isDirect =
 if (isDirect) {
   main().catch((err) => {
     console.error(err)
-    process.exit(20)
+    process.exit(1)
   })
 }

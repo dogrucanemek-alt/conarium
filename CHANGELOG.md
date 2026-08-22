@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.2.44 — a verdict code, on all four tools, now means something was read
+
+**This is a behaviour change to every command-line tool in the package. Read
+the table before upgrading a script that branches on exit codes.**
+
+0.2.42 moved `conarium-verify`'s usage errors out of the verdict range and said
+the remaining misuse of 20 was the uncaught-exception handler. That was written
+from reading the file. Running it found `conarium-verify missing.jsonl` exiting
+**20** — *Schema invalid* — with no receipt opened, from a `return { code: 20 }`
+inside `loadReceipts`. 0.2.43 documented it. This release fixes it, and finishes
+the job across the three tools that were measured in 0.2.42 and left alone.
+
+Two codes now sit outside the verdict range, and mean the same thing on all
+four binaries:
+
+| Exit | Meaning |
+|---|---|
+| 1 | The tool failed unexpectedly — no verdict was reached |
+| 2 | The command could not be run as given — an unknown flag, a required argument that was not given, or a target that is not there. Nothing was read. |
+
+What moved, measured before and after:
+
+| Invocation | 0.2.43 | 0.2.44 |
+|---|---|---|
+| `conarium-verify <missing path>` | 20 | **2** |
+| `conarium-coverage` — unknown flag, missing argument, missing declaration or receipts file | 20 | **2** |
+| `conarium-reconcile` — unknown flag, missing flags, missing snapshot, receipts or profile | 20 | **2** |
+| `conarium-stamp` — unknown flag, missing argument, missing or unreadable target | 20 | **2** |
+| all four — uncaught exception | 20 | **1** |
+
+Unchanged, and asserted in the same test run so the release cannot trade one
+wrong answer for another: a valid chain is 0, a schema failure on a receipt that
+was read is 20, a bad signature is 13, and **a missing `--pubkey` is still 13**.
+That last one is a usage mistake by any ordinary reading, and it stays a verdict
+on purpose: 13 is fail-closed, a script that has special-cased it is asserting
+*do not trust this*, and moving it to 2 would turn that assertion off in the
+name of tidiness. `--help` is 0 on all four.
+
+**Who breaks.** A script reading 20 as "schema invalid" was already folding
+typos and missing files into that bucket; those now arrive as 2, and genuine
+schema failures are unaffected. A script treating any non-zero as failure sees
+no change. A script that branches on 20 to page a human about a malformed
+receipt will now page correctly — the missing-file case that used to reach it
+was never a malformed receipt.
+
+`test/exit_contract.mjs` is new and runs all four binaries: twelve invocations
+that reach no artefact, nine verdicts and `--help` cases that must not move. It
+was written first and failed on eleven of the twelve, which is the record of
+what this release actually changed. The uncaught-exception path is the one line
+here not covered by it — no CLI input reaches that handler, which is why it is
+last-resort, and the change is covered by reading rather than by a run. Said
+plainly rather than implied by an untested green.
+
 ## 0.2.43 — the number watching the Turkish was reporting a third of it
 
 `test/pack_locale.mjs` has always ended with a line naming what it does *not*

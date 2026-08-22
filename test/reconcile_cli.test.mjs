@@ -217,7 +217,8 @@ describe('conarium-reconcile CLI', () => {
       receipts: [],
     })
     const r = run([...args, '--skew', 'soonish'])
-    expect(r.code).toBe(20)
+    // 2, not 20: parseArgs throws before a snapshot is opened. 0.2.44.
+    expect(r.code).toBe(2)
     expect(r.stderr).toContain('cannot read "soonish" as a duration')
   })
 
@@ -285,8 +286,9 @@ describe('conarium-reconcile CLI', () => {
     expect(r.stderr).toContain('empty or inverted')
   })
 
-  it('exit 20 on missing flags and unknown snapshot version', () => {
-    expect(run([]).code).toBe(20)
+  it('exit 2 on missing flags, 20 on a snapshot that was read and rejected', () => {
+    // The split is the point: nothing given is 2, something read and wrong is 20.
+    expect(run([]).code).toBe(2)
     const dir = tmpDir()
     const before = writeSnapshot(dir, 'b.json', { ts: T0, entries: [], v: 'conarium-dbsnapshot/9.9' })
     const after = writeSnapshot(dir, 'a.json', { ts: T1, entries: [] })
@@ -551,7 +553,8 @@ describe('coverage-reconciliation/2 projection', () => {
       receipts: [],
     })
     const r = run([...args, '--json', '--json-v2'])
-    expect(r.code).toBe(20)
+    // 2, not 20: the flags contradict each other, so no run happened. 0.2.44.
+    expect(r.code).toBe(2)
     expect(r.stderr).toContain('MUST NOT read a /1 result as a /2 result')
   })
 
