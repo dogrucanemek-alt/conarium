@@ -1,7 +1,7 @@
 # Two ledgers, one window
 
 Emek Can Doğru  
-VERAX Limited Şirketi, İzmir, Türkiye  
+VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey  
 [ORCID: to be supplied]
 
 ## 1. Abstract
@@ -219,7 +219,7 @@ The following artefacts implement or specify the method. The product name appear
 - npm package `@conarium-ai/core`, version `0.2.46` (declared, from the repository `package.json` at the commit that carries this preprint).
 - Individual Internet-Draft `draft-dogru-scitt-disclosure-evidence-06`, title *Transformation Evidence and Coverage Reconciliation for Auditable Data Disclosure* (declared, from the draft front matter). It defines Transformation Evidence and Coverage Reconciliation as evidence payloads for registration as signed statements on a transparency service as described in RFC 9943.
 - Conformance vectors shipped with the package: thirteen receipt cases, one public key, one manifest (declared); eight JCS argument preimages for `hashArgs()` (declared); six official RFC 8785 input/expected pairs, compared byte for byte (declared); and 3,000 published IEEE-754 doubles sampled from the reference set of 100,000,000 (sampled, \(N = 3000\) of \(M = 100000000\)).
-- Software Heritage snapshot `swh:1:snp:bc6105f9b58a09866928df917e27c7fa50d21ed2`, as recorded. Re-verification of that identifier was blocked by the archive's anti-automation challenge at the time of writing.
+- Software Heritage snapshot `swh:1:snp:bc6105f9b58a09866928df917e27c7fa50d21ed2` (measured: resolved through the archive's API on 22 August 2026; `refs/heads/main` at `d35ccee4`, release tags through `v0.2.37`). That snapshot predates the commit carrying this preprint; a new snapshot is to be requested after this text is merged.
 - A Go verifier lives in the same repository, under the same maintenance, at `verifiers/go/` (declared). It is a second implementation of the receipt checks, not an independently governed project.
 
 ## 11. Conclusion

@@ -67,6 +67,6 @@ Format: `sentence | file:line | kind`
 | version 0.2.46 (declared) | paper/two-ledgers-one-window.md:219 | declared (package.json) |
 | draft-dogru-scitt-disclosure-evidence-06; RFC 9943 | paper/two-ledgers-one-window.md:220 | declared (K6 front matter) |
 | thirteen receipt cases; eight JCS preimages; six RFC 8785 pairs (declared); 3,000 of 100,000,000 (sampled, N=3000 of M=100000000) | paper/two-ledgers-one-window.md:221 | declared (test-vectors/README.md); sampled (jcs/rfc8785/PROVENANCE.md) |
-| swh:1:snp:bc6105f9b58a09866928df917e27c7fa50d21ed2 | paper/two-ledgers-one-window.md:222 | as recorded (task brief; not in current K4; archive challenge blocked re-check) |
+| swh:1:snp:bc6105f9b58a09866928df917e27c7fa50d21ed2; main at d35ccee4; tags through v0.2.37 | paper/two-ledgers-one-window.md:222 | measured (archive API, 22 Aug 2026, gate pass; snapshot predates this preprint's commit) |
 | verifiers/go/ (declared); second implementation | paper/two-ledgers-one-window.md:223 | declared (tree path) |
 | seven assumptions (declared); five classes (declared) | paper/two-ledgers-one-window.md:227 | declared |
