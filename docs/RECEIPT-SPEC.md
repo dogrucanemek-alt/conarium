@@ -192,14 +192,14 @@ are unchanged.
 |---|---|
 | 0 | Chain intact, signatures valid |
 | 1 | The tool failed unexpectedly — no verdict was reached |
-| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a target that is not there. The artefact under test was never opened, so nothing is being judged. |
+| 2 | No verdict was reached because the run could not begin — a flag that does not exist, a required argument that was not given, a target that is not there, or an input that could not be read as receipts. No receipt was judged. |
 | 10 | Hash mismatch — record altered |
 | 11 | `prevHash` break — deleted or inserted; also `--expect-count` / `--expect-last-hash` mismatch |
 | 12 | `seq` gap / non-increasing — missing or reordered |
 | 13 | Signature invalid / pubkey missing (fail-closed) |
 | 14 | Claimed anchor invalid under `--anchor-check`, or `--require-head-anchor` when the head is unanchored. An individual `anchor:null` receipt is skipped, not failed — periodic anchoring leaves most of them null. |
 | 15 | Anchor **could not be checked** — calendar unreachable, the OpenTimestamps verifier is not installed, or `--anchor-check` reached no anchor at all because every receipt in the chain is unanchored. Deliberately distinct from 14: "I could not verify this" is not "this is invalid". The digest comparison is performed offline and still holds; only the timestamp attestation is unconfirmed. A verifier that collapsed the two would be asserting something it did not measure. |
-| 20 | Schema invalid — a receipt was read and failed the schema |
+| 20 | The input was read as receipts and rejected — a receipt that failed the schema, or a file that is not valid JSON. A one-byte mutation of a signed chain lands here rather than on 2: the bytes were examined. |
 
 Fail-closed: if the verifier is unsure, it does not exit 0.
 
@@ -484,7 +484,7 @@ occurred"** — an absent record is ambiguous by nature.
 |---|---|
 | 0 | Declaration signature valid (+ consistent with receipts if given), chain contiguous. Unpinned window start is printed, not a silent complete. |
 | 1 | The tool failed unexpectedly — no verdict was reached |
-| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a declaration or receipts file that is not there. The artefact under test was never opened, so nothing is being judged. |
+| 2 | No verdict was reached because the run could not begin — a flag that does not exist, a required argument that was not given, or a declaration or receipts file that is not there. Nothing was judged. |
 | 12 | Chain has gaps — coverage incomplete (`--allow-gaps` verifies authenticity only); also `--expect-seq-from` miss |
 | 13 | Signature invalid / pubkey missing (fail-closed); also a receipt Ed25519 failure under `--receipts` |
 | 20 | Schema invalid — the declaration was read and failed the schema |
@@ -558,7 +558,7 @@ Rules that keep the verdict honest:
 |---|---|
 | 0 | Every DB query pattern in the window is attributable to receipt(s) for the same table — object attribution, not per-statement coverage |
 | 1 | The tool failed unexpectedly — no verdict was reached |
-| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a snapshot, receipts file or profile that is not there. The artefact under test was never opened, so nothing is being judged. |
+| 2 | No verdict was reached because the run could not begin — a flag that does not exist, a required argument that was not given, or a snapshot, receipts file or profile that is not there. Nothing was judged. |
 | 20 | Input was read and is invalid, or the window is unreliable (schema error, counter regression) |
 | 40 | Unreconciled DB activity — recorded by the database, not receipted |
 | 41 | Indeterminate — a pattern is uncovered only by the window boundary, and two clocks decide that boundary |
@@ -701,7 +701,7 @@ conarium-stamp <file> [--sidecar <path>] [--json]
 |---|---|
 | 0 | Stamped; sidecar written (`pending` until upgraded) |
 | 1 | The tool failed unexpectedly — no verdict was reached |
-| 2 | The command could not be run as given — a flag that does not exist, a required argument that was not given, or a target that is not there. The artefact under test was never opened, so nothing is being judged. |
+| 2 | No verdict was reached because the run could not begin — a flag that does not exist, a required argument that was not given, or a target that is not there or unreadable. Nothing was judged. |
 | 50 | Stamping failed — calendars unreachable or timed out |
 
 Receipts are not anchored by the write path. An operator stamps a document
