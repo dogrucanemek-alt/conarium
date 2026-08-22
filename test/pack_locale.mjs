@@ -126,11 +126,20 @@ const wordProbe = (line) => {
 /**
  * Turkish under `docs/` is out of scope on purpose — but an unreported
  * remainder reads as "there is none". Counted, so it stays visible.
+ *
+ * ⚠️ This ran `wordProbe` alone until 0.2.43, and `wordProbe` is the pass
+ * written for Turkish that carries no Turkish letter. Over `docs/` — which is
+ * Turkish prose, letters and all — it is the wrong instrument: it reported 324
+ * lines across 22 files where the letter pass finds 1041 across 29. The number
+ * whose whole job was to keep the remainder visible was showing a third of it,
+ * and it read as the total because nothing beside it disagreed. Both probes
+ * now run, and the union is what gets printed and pinned.
  */
-function docsRemainder(files) {
+function docsRemainder(packed) {
   let hits = 0
   let touched = 0
-  for (const rel of files) {
+  const files = []
+  for (const rel of packed) {
     if (SCOPE.test(rel) || rel.endsWith('.tr.md')) continue
     if (!TEXT.test(extname(rel))) continue
     let raw
@@ -140,13 +149,14 @@ function docsRemainder(files) {
       continue
     }
     let n = 0
-    for (const line of raw.split(/\r?\n/)) if (wordProbe(line)) n++
+    for (const line of raw.split(/\r?\n/)) if (letterProbe(line) || wordProbe(line)) n++
     if (n) {
       hits += n
       touched++
+      files.push(rel)
     }
   }
-  return { hits, touched }
+  return { hits, touched, files: files.sort() }
 }
 
 const files = packedFiles()
@@ -172,6 +182,36 @@ console.log(
     `in dist/bin/scripts/public`,
 )
 console.log(
-  `  out of scope, not fixed: ${remainder.hits} Turkish word occurrence(s) across ` +
+  `  out of scope, not fixed: ${remainder.hits} Turkish line(s) across ` +
     `${remainder.touched} packed doc file(s) under docs/ and the changelog`,
 )
+
+/**
+ * A reported number nobody compares against anything drifts silently — which is
+ * the defect above, and it survived three releases because the figure was
+ * printed, copied into a handover note, and never asked to agree with the tree.
+ *
+ * So the remainder is pinned. The pin is a ceiling, not a target: it may be
+ * lowered whenever Turkish leaves the package and it must be edited
+ * deliberately when a file is added. Growth is what it refuses.
+ */
+const PIN = JSON.parse(readFileSync(join(root, 'docs/claims/locale-residue.json'), 'utf-8'))
+
+const drifted = remainder.hits !== PIN.lines || remainder.touched !== PIN.files
+if (drifted) {
+  const grew = remainder.hits > PIN.lines || remainder.touched > PIN.files
+  console.error(
+    `pack locale RED — the docs remainder is pinned at ${PIN.lines} line(s) across ` +
+      `${PIN.files} file(s); the tree has ${remainder.hits} across ${remainder.touched}.`,
+  )
+  console.error(
+    grew
+      ? '  Turkish grew inside the package. Put the text in a *.tr.md file, or keep the\n' +
+          '  path out of the "files" list in package.json. Raising the pin is the last resort.'
+      : '  Turkish left the package — lower the pin in docs/claims/locale-residue.json to\n' +
+          '  the numbers above, so the next growth is still visible.',
+  )
+  console.error(`  files carrying it:\n    ${remainder.files.join('\n    ')}`)
+  process.exit(1)
+}
+console.log(`  remainder pinned at ${PIN.lines}/${PIN.files} — ${PIN.why}`)

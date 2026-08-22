@@ -7,7 +7,8 @@ reference adapter; the suite does not import that product.
 A one-person team maintains both the suite and one implementation. That
 is stated here so nobody has to discover it later.
 
-Dokümandan implement edilemiyorsa spesifikasyon değil blog yazısıdır.
+If it cannot be implemented from the document, it is not a specification;
+it is a blog post.
 
 If a frozen case stops matching, do not edit the expectation so the
 suite goes green. Either the implementation changes, or the

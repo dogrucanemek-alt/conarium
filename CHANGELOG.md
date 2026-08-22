@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.2.43 — the number watching the Turkish was reporting a third of it
+
+`test/pack_locale.mjs` has always ended with a line naming what it does *not*
+fix: Turkish left under `docs/`, out of interface scope, printed so it stays
+visible. The line read `324 occurrences across 22 files`. The letter pass finds
+**1034 lines across 29 files**. The remainder was counted by `wordProbe` alone —
+the pass written for Turkish that carries *no* Turkish letter, and therefore the
+wrong instrument for Turkish prose. Both passes now run and the union is
+reported.
+
+What the package was shipping under that number: `docs/superpowers/`,
+`docs/plans/`, `docs/specs/` and `docs/audit/` — dated internal design and
+process documents, in Turkish, including plan files whose first instruction is
+addressed to an agent rather than to a reader. They are out of the package, the
+way `docs/reviews` and `docs/teaching` already were. **243 packed paths, down
+from 257.** The remainder is **34 lines across 14 files**: the bilingual
+limitation paragraphs in `README.md` and `docs/RECEIPT-SPEC.md`, product strings
+quoted in this changelog, and a TURKPATENT citation in `docs/PRIOR-ART.md`.
+
+Two sentences were translated rather than dropped: the specification test in
+`conformance/README.md`, and a Turkish parenthetical inside an English paragraph
+of `docs/RECEIPT-SPEC.md`.
+
+The remainder is now **pinned** in `docs/claims/locale-residue.json` and the
+guard fails when the tree disagrees with it — in either direction. A printed
+number nobody compares against anything is how this one drifted through three
+releases; it was copied into a handover note as `308 / 19`, a figure that
+reproduces under no definition and matched no release.
+
+`test/pack_path_refs.mjs` is new. Dropping `docs/superpowers/` turned the
+"Design source:" line at the top of `docs/RECEIPT-SPEC.md` into a path a reader
+who installed the package cannot open — a dead reference created by a packaging
+change, with no character of that sentence edited. The check reads the documents
+npm packs and fails when one names a path that exists in the repository and not
+in the package. It only considers directories the package *partially* ships:
+`src/` and `test/` are wholly absent and always were, and a check that reports
+those is a check that gets switched off.
+
 ## 0.2.42 — a usage error is not a schema verdict
 
 `conarium-verify` exited **20** for an unknown flag and for a missing path.
