@@ -118,11 +118,20 @@ plainly rather than implied by an untested green.
 
 `test/pack_locale.mjs` has always ended with a line naming what it does *not*
 fix: Turkish left under `docs/`, out of interface scope, printed so it stays
-visible. The line read `324 occurrences across 22 files`. The letter pass finds
-**1034 lines across 29 files**. The remainder was counted by `wordProbe` alone —
-the pass written for Turkish that carries *no* Turkish letter, and therefore the
-wrong instrument for Turkish prose. Both passes now run and the union is
-reported.
+visible. The 0.2.43 note wrote that line down as `324 occurrences across 22
+files`, and called **1034 lines across 29 files** the letter pass. Remeasured
+on 22 August 2026 against both bases that could have produced those figures:
+the published 0.2.42 tarball (508 extracted paths) and `npm pack --dry-run` at
+`v0.2.42` (256 paths). The lists differ only by `dist/` build artefacts, which
+`docsRemainder` already excludes (`bin/`, `scripts/` and `public/` too). On
+that packed-doc set the 0.2.42 instrument (`wordProbe` only) is **310 lines
+across 20 files**. `324 / 22` does not reproduce on either base with the word
+list that shipped in 0.2.42 — same class as the `308 / 19` handover note
+below. The **union** of letter and word on that set is **1034 / 29**; the
+letter pass alone is 971 / 26. 1034 is the union, not the letter pass. The
+remainder was counted by `wordProbe` alone — the pass written for Turkish that
+carries *no* Turkish letter, and therefore the wrong instrument for Turkish
+prose. Both passes now run and the union is reported.
 
 What the package was shipping under that number: `docs/superpowers/`,
 `docs/plans/`, `docs/specs/` and `docs/audit/` — dated internal design and

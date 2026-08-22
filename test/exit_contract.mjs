@@ -105,15 +105,20 @@ const CASES = [
 ]
 
 let passed = 0
+let invocations = 0
 const failures = []
 
-for (const [tool, args, want, why] of CASES) {
-  const run = spawnSync(
+function invoke(tool, args) {
+  invocations += 1
+  return spawnSync(
     process.execPath,
     [join(root, 'bin', `conarium-${tool}.mjs`), ...args],
     { cwd: root, encoding: 'utf-8' },
   )
-  const got = run.status
+}
+
+for (const [tool, args, want, why] of CASES) {
+  const got = invoke(tool, args).status
   const label = `conarium-${tool} ${args.join(' ')}`.trim()
   if (got === want) {
     passed += 1
@@ -135,11 +140,7 @@ for (const [tool, args, want, why] of CASES) {
  * user acts on.
  */
 function run(tool, args) {
-  const r = spawnSync(
-    process.execPath,
-    [join(root, 'bin', `conarium-${tool}.mjs`), ...args],
-    { cwd: root, encoding: 'utf-8' },
-  )
+  const r = invoke(tool, args)
   return { code: r.status, err: r.stderr ?? '', out: r.stdout ?? '' }
 }
 
@@ -189,6 +190,6 @@ if (failures.length) {
 }
 
 console.log(
-  `exit contract GREEN — ${passed} invocation(s) across four binaries; ` +
+  `exit contract GREEN — ${invocations} invocation(s), ${passed} assertion(s) across four binaries; ` +
     `nothing that reached no artefact answered inside the verdict range`,
 )
