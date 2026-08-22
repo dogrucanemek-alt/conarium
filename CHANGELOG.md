@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.2.45 - the rest of an outside report, and a check over the descriptions
+
+**Behaviour change in `conarium-verify` and `conarium-coverage`.** Read the two
+rows below before upgrading a script that branches on exit codes.
+
+Joel Hillier probed the exit-code defect we disclosed on 22 August and found
+five routes to 20 where we had named three. 0.2.44 closed three of them. This
+closes the other two.
+
+**A file that is valid JSON but not JSONL was called "invalid JSON".** The
+loader splits on newlines unless the file opens with `[`, so a pretty-printed
+JSON object has its opening brace handed to `JSON.parse` alone, and the tool
+reported a valid file as invalid. His point was that the false message mattered
+more than the code, and it does: a caller acts on what it is told went wrong.
+The message now names the real fact and says how to fix it. Where a reader
+actually meets this is directory mode - pointed at our own published
+`test-vectors/`, the verifier reached `expected-hashes.json` and stopped. A
+directory is now asked for the receipts in it: a neighbour that is valid JSON
+in the wrong shape is skipped **and named on stderr**, never skipped quietly.
+
+**The check ordering.** The key was loaded before the target was resolved, so a
+path that does not exist answered 13 - a verdict about signatures, for a file
+never opened - and answered 2 as soon as an unrelated `--pubkey` was supplied.
+Which wrong answer a caller received was a fact about check order. The target is
+resolved first now, in `conarium-verify` and `conarium-coverage`. Fail-closed is
+untouched: a missing target exits 2, and a target that is present still cannot
+be verified without a key.
+
+| Invocation | 0.2.44 | 0.2.45 |
+|---|---|---|
+| valid JSON that is not JSONL | 20, "invalid JSON" | **2**, and the message is true |
+| a directory holding receipts and a metadata file | 20 | **0**, the metadata file named as skipped |
+| a missing target with no `--pubkey` | 13 | **2** |
+| a corrupt receipts file | 20 | 20, unchanged |
+| a missing `--pubkey` on a file that exists | 13 | 13, unchanged |
+
+The last two rows are the split, and a property test decided where it fell. The
+first attempt sent every parse failure to 2, and
+`src/invariants.property.test.ts` - which mutates one byte of a signed chain -
+failed. It was right to: a corrupted file is the artefact being examined and
+rejected, which is a verdict, and answering 2 would send an operator to check
+their arguments instead of their evidence. Valid JSON in the wrong shape is 2.
+Anything else is 20, in a directory as well as out of one.
+
+**`test/exit_code_descriptions.mjs`** is new, and it is the part worth keeping.
+The same code is described in `docs/RECEIPT-SPEC.md`, in
+`test-vectors/manifest.json` and in `scripts/gen-test-vectors.mjs`. It requires
+the two machine-readable copies to be identical and each manifest description to
+be the leading clause of the specification's row. On its first run it failed on
+two things nothing else could see: the manifest and the specification describing
+code 2 differently in the same release, and the manifest describing 13 as
+"signature invalid or missing while a pubkey was supplied" - false in the one
+case 13 is returned for, since 13 is what you get when no pubkey was supplied.
+
+`spec_exitcode_drift.mjs` was green through all of it, because it compares the
+*set* of codes in the binaries with the set in the tables. That is the blindness
+Joel named after hitting the identical shape in his own `ABSENT` verdict the
+same week: a check over the members of a set cannot see a member that means two
+things. The new check does not close it entirely - it establishes that the three
+texts agree with each other, not that any of them is true of the binary.
+
 ## 0.2.44 — a verdict code, on all four tools, now means something was read
 
 **This is a behaviour change to every command-line tool in the package. Read
