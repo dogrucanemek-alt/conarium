@@ -89,8 +89,9 @@ the defined vocabulary and every BCP 14 sentence left as they were;
 `test/draft_sentences.mjs` measures it (`-06`: 344 sentences, 108
 non-normative sentences over 25 words; `-07`: 671 and 29). Four individual
 drafts recording signed decisions about automated access are placed in the
-Introduction, and `ADOPTION-EVIDENCE.md` lists the public records that used
-this draft's terms, labelled by kind: none is an independent implementation.
+Introduction, and `ADOPTION-EVIDENCE.md` lists the public records that reproduced,
+cited, or adopted wording from this draft, labelled by kind and checked
+against the source: none is an independent implementation.
 
 This file has been wrong before when it copied posting status. The Datatracker
 link above is the check; a revision history in this paragraph is not.

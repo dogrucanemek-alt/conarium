@@ -110,6 +110,11 @@
       "path": "docs/security/NPM-PROVENANCE.md",
       "why": "Ships in the tarball and tells a reader how to check where the package came from. Unlisted until 0.2.33, by which point it had gone stale in the worst direction: it said 'this is not a published release' inside eight published releases, and pointed at a verification command that answers 404 for npm provenance. A page about how to distrust us is one a reader must be able to trust.",
       "phrasing": true
+    },
+    {
+      "path": "standards/ADOPTION-EVIDENCE.md",
+      "why": "Public on GitHub and linked from standards/README.md. Every row asserts what an outside party did with this draft; a row that overstates a citation as an adoption is the same overclaim the kind labels exist to prevent. Its first version carried one.",
+      "phrasing": true
     }
   ]
 }
