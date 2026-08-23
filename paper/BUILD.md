@@ -64,3 +64,15 @@ node paper/record-build.mjs --container <digest>
 | source tarball SHA-256 | |
 | date | |
 | container digest | |
+
+The published PDF and arXiv source tarball were produced by this row (written by `record-build.mjs` at final build):
+
+| Field | Value |
+|---|---|
+| commit | 5d9f89c4e4b99134d69494e52c33e5d9abb16a9f |
+| PDF SHA-256 | dfe655238652e1aeca10289d1eb54697485f3196e91f7ea74cb0c3863b5044de |
+| source tarball SHA-256 | 00ce40655678803ab71a5d32c9aa2173d7ad65a0e11e1b87965066b6299450aa |
+| date | 2026-08-23T21:22:28.566Z |
+| container digest | ghcr.io/xu-cheng/texlive-small@sha256:495075f44d717e3d801f1817eedfb95254e16789e5cb12d357f3c3938ccf9b9d |
+
+The files this row describes are the ones submitted to Zenodo and arXiv; any rebuild produces a different tarball hash (gzip timestamps) and gets its own row.
