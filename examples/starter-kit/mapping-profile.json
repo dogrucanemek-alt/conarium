@@ -1,0 +1,14 @@
+{
+  "v": "conarium-mapping-profile/0.1",
+  "version": "starter-kit-1",
+  "multiplicity": { "maxStatementsPerReceipt": 4 },
+  "exclusions": [
+    { "id": "infra-query", "version": "1" },
+    { "id": "infra-schema", "version": "1" }
+  ],
+  "clocks": {
+    "observation": "pg_stat_statements",
+    "receipt": "gateway",
+    "skew": "5s"
+  }
+}
