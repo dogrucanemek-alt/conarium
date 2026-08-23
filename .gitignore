@@ -130,6 +130,7 @@ DURUM.md
 
 # xml2rfc build artefacts
 standards/.refcache/
+.refcache/
 standards/tracker.log
 
 # V8 CPU profiles — docs/ is in the npm files list; these must not ship.
