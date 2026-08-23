@@ -30,6 +30,8 @@
     "!examples/**/conarium.tokens.json",
     "!examples/starter-kit",
     "!examples/starter-kit/**",
+    "!examples/missing-record-demo",
+    "!examples/missing-record-demo/**",
     "conformance",
     "test-vectors",
     "!test-vectors/jcs/rfc8785",
