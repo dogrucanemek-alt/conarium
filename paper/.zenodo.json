@@ -39,6 +39,6 @@
       "scheme": "swh"
     }
   ],
-  "license": "MIT",
-  "notes": "ORCID to be supplied. License is the repository MIT licence; CC-BY-4.0 for the text alone is a later decision."
+  "license": "CC-BY-4.0",
+  "notes": "Text of the preprint: CC BY 4.0. The implementing software cited under related_identifiers is MIT-licensed in its own repository. ORCID: not yet supplied."
 }
