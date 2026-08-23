@@ -1,0 +1,28 @@
+{
+  "serverName": "conarium-missing-record-demo",
+  "consumer": "missing-record-demo",
+  "connectors": [
+    {
+      "type": "postgres",
+      "name": "demo",
+      "description": "Local missing-record-demo Postgres. Not a production DSN.",
+      "config": {
+        "url": "postgresql://conarium_gate:gate-demo-not-prod@127.0.0.1:54333/conarium_demo"
+      }
+    }
+  ],
+  "policy": {
+    "dialect": "postgres",
+    "allowConnectors": ["demo"],
+    "allowTables": ["public.patients"],
+    "denyTables": [],
+    "maskColumns": [],
+    "maxRows": 10,
+    "allowTools": ["query"]
+  },
+  "audit": {
+    "sink": "conarium-audit.jsonl",
+    "failClosed": true,
+    "receiptSink": "conarium-receipts.jsonl"
+  }
+}

@@ -58,6 +58,10 @@ examples/starter-kit/_keys/
 examples/starter-kit/*.jsonl
 examples/starter-kit/snapshots/
 examples/starter-kit/node_modules/
+examples/missing-record-demo/_keys/
+examples/missing-record-demo/*.jsonl
+examples/missing-record-demo/snapshots/
+examples/missing-record-demo/node_modules/
 examples/per-user-identity/conarium.tokens.json
 # 2026-07-31'de yakalandi: bir ajan calisma sirasinda tmp-test/test-key.pem
 # (Ed25519 ozel anahtari) uretti ve burasi PUBLIC repo; hicbir desen onu

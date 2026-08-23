@@ -1,0 +1,13 @@
+{
+  "name": "conarium-missing-record-demo",
+  "private": true,
+  "type": "module",
+  "description": "Three-minute local demo of an intact chain missing two events. Not published.",
+  "scripts": {
+    "start": "node run.mjs",
+    "down": "docker compose down -v"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.0"
+  }
+}
