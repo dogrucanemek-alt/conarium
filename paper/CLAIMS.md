@@ -7,14 +7,14 @@ Format: `sentence | file:line | kind`
 | sentence | file:line | kind |
 |---|---|---|
 | this paper states that distinction as two propositions | paper/two-ledgers-one-window.md:9 | declared (structure of K3) |
-| under seven stated assumptions (declared) | paper/two-ledgers-one-window.md:9 | declared |
-| one of five outcome classes (declared) | paper/two-ledgers-one-window.md:9 | declared |
-| twelve published table lines (measured) | paper/two-ledgers-one-window.md:9 | measured (desk.csv 5 lines + source.csv 7 lines) |
+| under seven stated assumptions | paper/two-ledgers-one-window.md:9 | declared (count of A1–A7; label dropped) |
+| one of five outcome classes | paper/two-ledgers-one-window.md:9 | declared (count of classes; label dropped) |
+| four desk rows and six source rows (measured) | paper/two-ledgers-one-window.md:9 | measured (desk.csv 4 data rows + source.csv 6 data rows) |
 | two worlds in which R is the same | paper/two-ledgers-one-window.md:15 | declared (K1 §1) |
 | two worlds that share R | paper/two-ledgers-one-window.md:17 | declared (K1 §1 / P1) |
-| a four-step comparison (declared) | paper/two-ledgers-one-window.md:19 | declared (K1 §3) |
+| a four-step comparison | paper/two-ledgers-one-window.md:19 | declared (K1 §3; label dropped) |
 | two books and one window | paper/two-ledgers-one-window.md:19 | declared (K1 title / setup) |
-| seven assumptions (declared) | paper/two-ledgers-one-window.md:23 | declared (K3 A1–A7) |
+| seven assumptions | paper/two-ledgers-one-window.md:23 | declared (K3 A1–A7; label dropped) |
 | A1 | paper/two-ledgers-one-window.md:25 | declared (K3) |
 | A2 | paper/two-ledgers-one-window.md:27 | declared (K3) |
 | A3 | paper/two-ledgers-one-window.md:29 | declared (K3) |
@@ -43,7 +43,8 @@ Format: `sentence | file:line | kind`
 | two facts force the fifth class | paper/two-ledgers-one-window.md:115 | declared (K1 §5) |
 | a third, operational, reason | paper/two-ledgers-one-window.md:121 | declared (K1 §5) |
 | source window 2026-08-20 10:00:00 through 2026-08-20 10:10:00 (declared) | paper/two-ledgers-one-window.md:129 | declared (K2) |
-| four desk rows and six source rows (measured); two files are twelve lines (measured); twelve rows (declared) | paper/two-ledgers-one-window.md:133 | measured (CSV line counts); declared (K2 “Twelve rows”) |
+| Declared correspondence (declared) | paper/two-ledgers-one-window.md:131 | declared (K2 operator statement) |
+| four desk rows and six source rows (measured); exercise text's "twelve rows" counts the two header lines | paper/two-ledgers-one-window.md:133 | measured (CSV data rows); header-count explanation |
 | desk timestamps 10:01:00, 10:03:00, 10:04:28, 10:06:00 | paper/two-ledgers-one-window.md:137–140 | measured (desk.csv) |
 | source timestamps 10:01:02, 10:03:01, 10:04:30, 10:06:02, 10:08:00, 10:09:10 | paper/two-ledgers-one-window.md:144–149 | measured (source.csv) |
 | Step 1 | paper/two-ledgers-one-window.md:151 | declared (K2) |
@@ -51,22 +52,23 @@ Format: `sentence | file:line | kind`
 | Step 2 classification table | paper/two-ledgers-one-window.md:155–161 | declared (answer-key.json); reproduced (classify.mjs) |
 | a third path | paper/two-ledgers-one-window.md:163 | declared (K2 Q5) |
 | desk clock was 6 minutes slow (declared); d4 at 10:00:00; d1–d3 outside | paper/two-ledgers-one-window.md:165 | declared (K2 step 3) |
-| Step 3 classification table | paper/two-ledgers-one-window.md:167–173 | declared (answer-key.json); reproduced (classify.mjs) |
-| one observed-without-receipt; two indeterminate; one attributed | paper/two-ledgers-one-window.md:174 | declared (K2 expected summary); reproduced |
-| skew bound of 7 minutes (declared, illustrative); bound of 2 minutes; 6-minute offset | paper/two-ledgers-one-window.md:176 | declared, illustrative (K2 Q8) |
-| exits 0 (declared); five source calls (declared, from the tool's positive case); one naming receipt | paper/two-ledgers-one-window.md:187 | declared (LIMITATIONS.md reconcile-object-attribution / test/reconcile_cli.test.mjs) |
-| two clocks | paper/two-ledgers-one-window.md:192 | declared (K1 / LIMITATIONS trailing-clock) |
-| two papers that scan named | paper/two-ledgers-one-window.md:199 | declared (K5: Sello + Auditable Agents) |
-| United States patent 7,770,032 B2; expired | paper/two-ledgers-one-window.md:201 | declared (K5); confirmed Google Patents Expired — Lifetime |
-| the three remedies proposed there (declared) | paper/two-ledgers-one-window.md:203 | declared (K5 / Sello) |
-| Sello v0.1 | paper/two-ledgers-one-window.md:203 | declared (K5) |
-| scan dated 6 August 2026 (declared), amended 19 August 2026 (declared) | paper/two-ledgers-one-window.md:205 | declared (K5) |
-| commit befdced (declared); artefacts of section 10 | paper/two-ledgers-one-window.md:205 | declared (K5) |
-| RFC 9943 | paper/two-ledgers-one-window.md:209 | declared (opened rfc-editor / datatracker) |
-| two searches; HTTP 403 (declared, from the scan) | paper/two-ledgers-one-window.md:211 | declared (K5 limitations) |
-| version 0.2.46 (declared) | paper/two-ledgers-one-window.md:219 | declared (package.json) |
-| draft-dogru-scitt-disclosure-evidence-06; RFC 9943 | paper/two-ledgers-one-window.md:220 | declared (K6 front matter) |
-| thirteen receipt cases; eight JCS preimages; six RFC 8785 pairs (declared); 3,000 of 100,000,000 (sampled, N=3000 of M=100000000) | paper/two-ledgers-one-window.md:221 | declared (test-vectors/README.md); sampled (jcs/rfc8785/PROVENANCE.md) |
-| swh:1:snp:d60322ed2ea0b1cd4a3e75847677e9a04e18b65a; main at 3c7536c; tags through v0.2.46; save request 2449665 | paper/two-ledgers-one-window.md:222 | measured (archive API, 22 Aug 2026 20:36Z, gate pass; covers the release described) |
-| verifiers/go/ (declared); second implementation | paper/two-ledgers-one-window.md:223 | declared (tree path) |
-| seven assumptions (declared); five classes (declared) | paper/two-ledgers-one-window.md:227 | declared |
+| Step 3 classification table | paper/two-ledgers-one-window.md:167–172 | declared (answer-key.json); reproduced (classify.mjs) |
+| Excluded rows unchanged; catalog stays excluded | paper/two-ledgers-one-window.md:174 | declared (step 3 note; answer key unchanged) |
+| one observed-without-receipt; two indeterminate; one attributed | paper/two-ledgers-one-window.md:176 | declared (K2 expected summary); reproduced |
+| skew bound of 7 minutes (declared, illustrative); bound of 2 minutes; 6-minute offset | paper/two-ledgers-one-window.md:178 | declared, illustrative (K2 Q8) |
+| exits 0 (declared); five source calls (declared, from the tool's positive case); one naming receipt | paper/two-ledgers-one-window.md:189 | declared (LIMITATIONS.md reconcile-object-attribution / test/reconcile_cli.test.mjs) |
+| two clocks | paper/two-ledgers-one-window.md:194 | declared (K1 / LIMITATIONS trailing-clock) |
+| two papers that scan named | paper/two-ledgers-one-window.md:201 | declared (K5: Sello + Auditable Agents) |
+| United States patent 7,770,032 B2; expired | paper/two-ledgers-one-window.md:203 | declared (K5); confirmed Google Patents Expired — Lifetime |
+| the three remedies proposed there (declared) | paper/two-ledgers-one-window.md:205 | declared (K5 / Sello) |
+| Sello v0.1 | paper/two-ledgers-one-window.md:205 | declared (K5) |
+| scan dated 6 August 2026 (declared), amended 19 August 2026 (declared) | paper/two-ledgers-one-window.md:207 | declared (K5) |
+| commit befdced (declared); artefacts of section 10 | paper/two-ledgers-one-window.md:207 | declared (K5) |
+| RFC 9943 | paper/two-ledgers-one-window.md:211 | declared (opened rfc-editor / datatracker) |
+| two searches; HTTP 403 (declared, from the scan) | paper/two-ledgers-one-window.md:213 | declared (K5 limitations) |
+| version 0.2.46 (declared) | paper/two-ledgers-one-window.md:221 | declared (package.json) |
+| draft-dogru-scitt-disclosure-evidence-06; RFC 9943 | paper/two-ledgers-one-window.md:222 | declared (K6 front matter) |
+| thirteen receipt cases; eight JCS preimages; six RFC 8785 pairs (declared); 3,000 of 100,000,000 (sampled, N=3000 of M=100000000) | paper/two-ledgers-one-window.md:223 | declared (test-vectors/README.md); sampled (jcs/rfc8785/PROVENANCE.md) |
+| swh:1:snp:d60322ed2ea0b1cd4a3e75847677e9a04e18b65a; main at 3c7536c; tags through v0.2.46; save request 2449665 | paper/two-ledgers-one-window.md:224 | measured (archive API, 22 Aug 2026 20:36Z, gate pass; covers the release described) |
+| verifiers/go/ (declared); second implementation | paper/two-ledgers-one-window.md:225 | declared (tree path) |
+| seven assumptions; five classes | paper/two-ledgers-one-window.md:229 | declared (counts; labels dropped) |

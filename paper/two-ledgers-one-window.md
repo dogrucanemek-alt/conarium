@@ -1,4 +1,4 @@
-# Two ledgers, one window
+# Two ledgers, one window: integrity of a mediator's record does not establish its completeness
 
 Emek Can Doğru  
 VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey  
@@ -6,7 +6,7 @@ VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey
 
 ## 1. Abstract
 
-Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as two propositions. Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions (declared), a bypass path yields two worlds that differ in whether an occurrence happened and share the same record \(R\); no judgement whose only input is \(R\) can distinguish them. Proposition 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Proposition 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes (declared). A worked example of twelve published table lines (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.
+Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as two propositions. Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions, a bypass path yields two worlds that differ in whether an occurrence happened and share the same record \(R\); no judgement whose only input is \(R\) can distinguish them. Proposition 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Proposition 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes. A worked example of four desk rows and six source rows (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.
 
 ## 2. Introduction
 
@@ -16,11 +16,11 @@ That is not a software defect. If there is any path by which an event can occur 
 
 That is the single-ledger blindness proposition: a bypass path plus a record that does not depend on the bypassed event yields two worlds that share \(R\). It is a proposition, not a theorem. If the unobserved event changes later rows \(G\) does write — a source sequence copied into \(R\) — then \(R\) has already imported a second account, and this setup is not blind.
 
-The rest of the paper states the assumptions that carry that proposition, a second proposition that caps how a result may label the standing of its bounds, a four-step comparison (declared) that uses two books and one window, a classroom example that breaks the usual wrong answers in order, and the cases the method does not catch. The last sentence of this introduction is the standing of the whole: this is a proposition with stated assumptions, not a theorem.
+The rest of the paper states the assumptions that carry that proposition, a second proposition that caps how a result may label the standing of its bounds, a four-step comparison that uses two books and one window, a classroom example that breaks the usual wrong answers in order, and the cases the method does not catch. The last sentence of this introduction is the standing of the whole: this is a proposition with stated assumptions, not a theorem.
 
 ## 3. Setting and assumptions
 
-Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(E\) be the multiset of occurrences that actually happened. The propositions below rest on seven assumptions (declared). Each is required for the two-world construction; dropping one changes what the construction may say.
+Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(E\) be the multiset of occurrences that actually happened. The propositions below rest on seven assumptions. Each is required for the two-world construction; dropping one changes what the construction may say.
 
 **A1.** \(R\) is a subset of \(G\)'s observations. A mediator may write selectively — sampling, or omitting a refused request — so the record need not contain every observation \(G\) made.
 
@@ -130,7 +130,7 @@ The example is a clinic front desk and the clinic's own activity book. Times are
 
 Declared correspondence (declared): the match key is the object name; one desk row naming an object accounts for every source row on that object inside the window; the skew bound is undeclared unless a later question declares one; exclude `object = catalog` before comparing, and drop nothing else.
 
-The published tables contain four desk rows and six source rows (measured). Counting headers, the two files are twelve lines (measured). The exercise text calls this twelve rows (declared).
+The published tables contain four desk rows and six source rows (measured); the exercise text's "twelve rows" counts the two header lines.
 
 | desk_id | object | ts_desk |
 |---|---|---|
@@ -170,6 +170,8 @@ The exercise text names the absence class `observed-without-desk`. The published
 | labs | indeterminate |
 | invoices | attributed |
 | vitals | observed-without-receipt |
+
+Excluded rows are unchanged by the clock shift; `catalog` stays excluded.
 
 `patients` and `labs` have naming desk rows, but those rows now sit outside the window. Attributed requires an in-window desk row. The method cannot tell a trailing desk clock from a late row, so those items are `indeterminate`, not observed-without-receipt. `vitals` still has no naming desk row anywhere; a neighbour's clock does not make a genuine absence undecidable. Folding this window into "clean" both promotes `indeterminate` to a pass and washes `vitals` out of the summary. The honest summary is one observed-without-receipt (`vitals`), two indeterminate (`patients`, `labs`), one attributed (`invoices`), skew undeclared.
 
@@ -224,4 +226,4 @@ The following artefacts implement or specify the method. The product name appear
 
 ## 11. Conclusion
 
-A record can be intact and still silent about what was not written. Under the seven assumptions (declared) of Proposition 1, a bypass path produces two worlds that share \(R\). Integrity marks do not close that gap. A second book under other custody can make a missing row visible relative to that book. If the second book is also short, or if membership in the window is a cross-clock question whose skew bound is undeclared, the comparison does not get to print a pass. Proposition 2a forbids inflating the standing of a bound. Proposition 2b forbids deciding from an undeclared bound. The method is the comparison, the five classes (declared), and the refusal to fold `indeterminate` into clean. That is the claim. It is a proposition with stated assumptions, not a theorem.
+A record can be intact and still silent about what was not written. Under the seven assumptions of Proposition 1, a bypass path produces two worlds that share \(R\). Integrity marks do not close that gap. A second book under other custody can make a missing row visible relative to that book. If the second book is also short, or if membership in the window is a cross-clock question whose skew bound is undeclared, the comparison does not get to print a pass. Proposition 2a forbids inflating the standing of a bound. Proposition 2b forbids deciding from an undeclared bound. The method is the comparison, the five classes, and the refusal to fold `indeterminate` into clean. That is the claim. It is a proposition with stated assumptions, not a theorem.
