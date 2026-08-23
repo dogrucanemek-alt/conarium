@@ -2,7 +2,7 @@
 
 Emek Can Doğru  
 VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey  
-[ORCID: to be supplied]
+
 
 ## 1. Abstract
 
@@ -41,7 +41,7 @@ A5 is listed with the others because the construction fails without it, and beca
 ## 4. Proposition 1 — Single-Ledger Insufficiency
 
 **Proposition 1 (Single-Ledger Insufficiency).**
-Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(E\) be the multiset of occurrences that actually happened. Under assumptions A1–A7 below, if there exists a path by which an occurrence can happen without \(G\) observing it, then **there exist two worlds \(W_0\), \(W_1\) differing in whether that occurrence happened, for which \(R\) is identical.** Consequently no judgement whose only input is \(R\) can distinguish them.
+Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(E\) be the multiset of occurrences that actually happened. Under assumptions A1–A7 above, if there exists a path by which an occurrence can happen without \(G\) observing it, then **there exist two worlds \(W_0\), \(W_1\) differing in whether that occurrence happened, for which \(R\) is identical.** Consequently no judgement whose only input is \(R\) can distinguish them.
 
 ### Proof sketch
 
@@ -204,7 +204,7 @@ Hash-chained, MAC-protected log entries are old public art. United States patent
 
 Receiver-attested receipts invert the trust boundary: the service that receives a call signs what it observed. Figuera's *Notarized Agents / Sello* states the residual that remains after inclusion: an inclusion proof answers whether a receipt is in the log; it does not answer whether the log returned every matching receipt. The three remedies proposed there (declared) stay on the log side — a signed exhaustive answer from the log, downloading the whole log, or submitting to several independent logs. Sello v0.1 declines to speak for set completeness. Independently, Nian et al., *Auditable Agents*, name evidence integrity and lifecycle coverage among the most neglected dimensions of current audit approaches.
 
-A scan dated 6 August 2026 (declared), amended 19 August 2026 (declared) after a related mechanism was raised on the SCITT mailing list, looked at project documentation for enforcement, portable signed receipts, and coverage reconciliation against the data source's own bookkeeping. Source-code-level search was not performed on any repository in the original pass. One row, Vaara, was later scored from source at commit `befdced` (declared): its design document specifies a join from each used credential to a receipt, and reads a used credential with no matching receipt as a bypassed broker, with the stated limit that this is detection of a defeated broker, not a mathematical-completeness claim. At that commit the scan found no collector, join, command, or test implementing the join. That is the only such design the scan found outside the artefacts of section 10. Reconciling against the data source's own counters was not among the proposals found in the Sello paper or elsewhere in that scan.
+A scan dated 6 August 2026 (declared), amended 19 August 2026 (declared) after a related mechanism was raised on the SCITT mailing list, looked at project documentation for enforcement, portable signed receipts, and coverage reconciliation against the data source's own bookkeeping. Source-code-level search was not performed on any repository in the original pass. One row, Vaara, was later scored from source at commit `befdced` (declared): its design document specifies a join from each used credential to a receipt, and reads a used credential with no matching receipt as a bypassed broker, with the stated limit that this is detection of a defeated broker, not a mathematical-completeness claim. At that commit the scan found no collector, join, command, or test implementing the join. That is the only such design the scan found outside the artefacts of Section 10. Reconciling against the data source's own counters was not among the proposals found in the Sello paper or elsewhere in that scan.
 
 Two near misses are worth naming because they use the same words for different objects. One governance toolkit publishes a "completeness score" that measures how many required fields it populated from signals it already collected, and a "reconciliation" of discovered agents against a registry. Neither asks whether the data source saw access the chain has no receipt for. A commercial agent monitor that tracks calls made outside a gateway through hooks in client tools sees what the client tells it. That is not the data source's own telemetry, and it comes with no signed receipt.
 
