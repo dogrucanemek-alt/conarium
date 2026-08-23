@@ -95,7 +95,7 @@ function originHasTag(tagName) {
 
 function npmHasVersion(name, ver) {
   try {
-    const out = execFileSync(`npm view --silent "${name}@${ver}" version`, {
+    const out = execFileSync(`npm view "${name}@${ver}" version`, {
       cwd: root,
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -104,8 +104,8 @@ function npmHasVersion(name, ver) {
     }).trim()
     return out === ver
   } catch (err) {
-    const text = `${err.stderr || ''}\n${err.message || ''}`
-    if (/E404|404 Not Found|not found/i.test(text)) return false
+    const text = `${err.stderr || ''}\n${err.stdout || ''}\n${err.message || ''}`
+    if (/E404|404 Not Found|not found|No match found/i.test(text)) return false
     throw err
   }
 }

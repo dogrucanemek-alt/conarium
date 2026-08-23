@@ -74,6 +74,25 @@ fails: where the identifying material was read from the receipt set itself, a
 reader recomputes the Issuer's answer, and the digest checks transcription
 rather than completeness.
 
+**What `-07` added.** An IANA section that registers rather than defers: two
+media types (`application/transformation-evidence+json`,
+`application/coverage-reconciliation+json`) and two registries (Transformation
+Actions, Coverage Reconciliation Outcomes, both Specification Required). Seven
+terms the earlier revisions used without defining — Item, Data Object,
+Consumer, Reconciler, protocol-defined/measured, client-level/source-level,
+the two operators — now have entries in Conventions, with Item defined as what
+the shipped reconciliation tool actually counts. Six forward dependencies a
+reader of `-04` reported now carry an explicit pointer, and a short threat
+model subsection sits under the Introduction so the bound is met before the
+procedure. The non-normative prose was shortened sentence by sentence, with
+the defined vocabulary and every BCP 14 sentence left as they were;
+`test/draft_sentences.mjs` measures it (`-06`: 344 sentences, 108
+non-normative sentences over 25 words; `-07`: 671 and 29). Four individual
+drafts recording signed decisions about automated access are placed in the
+Introduction, and `ADOPTION-EVIDENCE.md` lists the public records that reproduced,
+cited, or adopted wording from this draft, labelled by kind and checked
+against the source: none is an independent implementation.
+
 This file has been wrong before when it copied posting status. The Datatracker
 link above is the check; a revision history in this paragraph is not.
 

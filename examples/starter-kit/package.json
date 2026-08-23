@@ -1,0 +1,15 @@
+{
+  "name": "conarium-starter-kit",
+  "private": true,
+  "type": "module",
+  "description": "15-minute local demo. Not published.",
+  "scripts": {
+    "start": "node run.mjs",
+    "tamper": "node tamper.mjs",
+    "bypass": "node bypass.mjs"
+  },
+  "dependencies": {
+    "@conarium-ai/core": "0.2.46",
+    "@modelcontextprotocol/sdk": "^1.25.0"
+  }
+}

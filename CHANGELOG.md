@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.2.47 - a number for the paper and the kit
+
+v0.2.46 is on npm. Two things that are not that package now exist in
+this repository, and publishing either of them under 0.2.46 would put
+a new changelog and a new claims review on a number already sold.
+
+**The two-ledgers preprint** (*Two ledgers, one window*) passed gate R2
+on `docs/paper-two-ledgers`. `paper/` is not in the npm tarball. This
+release does not republish the JSONL or exit-code rows already recorded
+in 0.2.44–0.2.46.
+
+**The starter kit** is `examples/starter-kit`: a local Postgres, three
+mediated queries, signed receipts, and a reconcile against the
+database's own counters. It is also not in the tarball. It is not a
+second implementation.
+
+`server.json` moves with `package.json` because the MCP registry reads
+it and refuses a number it already holds.
+
+`version_claim` asked npm with `--silent`. A 404 for a number that is
+not on the registry arrived as an empty error, and the check printed
+SKIP (registry unreachable) instead of "not tagged — nothing to
+contradict". That is the state of every unpublished bump. The view is
+no longer silent; E404 is "not published".
+
 ## 0.2.46 - three numbers that named something they were not
 
 Every item here is a figure this project printed, published, or wrote down,

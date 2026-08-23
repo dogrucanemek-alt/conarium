@@ -1,0 +1,28 @@
+{
+  "serverName": "conarium-starter-kit",
+  "consumer": "starter-kit",
+  "connectors": [
+    {
+      "type": "postgres",
+      "name": "demo",
+      "description": "Local starter-kit Postgres. Not a production DSN.",
+      "config": {
+        "url": "postgresql://conarium_gate:gate-demo-not-prod@127.0.0.1:54332/conarium_demo"
+      }
+    }
+  ],
+  "policy": {
+    "dialect": "postgres",
+    "allowConnectors": ["demo"],
+    "allowTables": ["public.customers"],
+    "denyTables": [],
+    "maskColumns": ["*.email"],
+    "maxRows": 10,
+    "allowTools": ["query"]
+  },
+  "audit": {
+    "sink": "conarium-audit.jsonl",
+    "failClosed": true,
+    "receiptSink": "conarium-receipts.jsonl"
+  }
+}
