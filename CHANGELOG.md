@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.48 - the preprint is a claim surface
+
+`paper/two-ledgers-one-window.md` joined `docs/claims/surfaces.json`. That
+file ships in the tarball, so the number moves even though `paper/` does
+not; v0.2.47 already holds the previous copy, and a tree that differs in
+a shipped file from the tag it names is what `version_claim` refuses.
+
+The preprint's text is CC BY 4.0 (`paper/LICENSE`); the software stays
+MIT. The Zenodo record carries that licence. Nothing here changes a
+tool.
+
 ## 0.2.47 - a number for the paper and the kit
 
 v0.2.46 is on npm. Two things that are not that package now exist in

@@ -115,6 +115,11 @@
       "path": "standards/ADOPTION-EVIDENCE.md",
       "why": "Public on GitHub and linked from standards/README.md. Every row asserts what an outside party did with this draft; a row that overstates a citation as an adoption is the same overclaim the kind labels exist to prevent. Its first version carried one.",
       "phrasing": true
+    },
+    {
+      "path": "paper/two-ledgers-one-window.md",
+      "why": "A preprint is read as the project's claim about what the method shows; it is the one surface that outlives the package.",
+      "phrasing": true
     }
   ]
 }

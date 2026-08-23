@@ -1,0 +1,9 @@
+The text of this preprint (two-ledgers-one-window.md, arxiv/main.tex, arxiv/refs.bib,
+CLAIMS.md, BUILD.md) is licensed under the Creative Commons Attribution 4.0
+International License (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+
+Attribution: Emek Can Doğru, "Two ledgers, one window: integrity of a mediator's
+record does not establish its completeness", 2026.
+
+The software this preprint describes is licensed separately (MIT) in the
+repository root LICENSE file. This directory is not part of the npm package.
