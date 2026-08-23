@@ -28,6 +28,8 @@
     "!examples/**/*.jsonl",
     "!examples/**/*.keyid",
     "!examples/**/conarium.tokens.json",
+    "!examples/starter-kit",
+    "!examples/starter-kit/**",
     "conformance",
     "test-vectors",
     "!test-vectors/jcs/rfc8785",

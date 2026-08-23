@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: conarium
+      POSTGRES_PASSWORD: demo-not-a-secret
+      POSTGRES_DB: conarium_demo
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+    ports:
+      - "54332:5432"
+    volumes:
+      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U conarium -d conarium_demo"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
