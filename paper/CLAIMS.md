@@ -66,8 +66,8 @@ Format: `sentence | file:line | kind`
 | commit befdced (declared); artefacts of section 10 | paper/two-ledgers-one-window.md:207 | declared (K5) |
 | RFC 9943 | paper/two-ledgers-one-window.md:211 | declared (opened rfc-editor / datatracker) |
 | two searches; HTTP 403 (declared, from the scan) | paper/two-ledgers-one-window.md:213 | declared (K5 limitations) |
-| version 0.2.46 (declared) | paper/two-ledgers-one-window.md:221 | declared (package.json) |
-| draft-dogru-scitt-disclosure-evidence-06; RFC 9943 | paper/two-ledgers-one-window.md:222 | declared (K6 front matter) |
+| version 0.2.46 (declared) | paper/two-ledgers-one-window.md:221 | declared (release described; npm view @conarium-ai/core@0.2.46, published 2026-08-22; the carrying commit is at 0.2.48) |
+| draft-dogru-scitt-disclosure-evidence-07; RFC 9943 | paper/two-ledgers-one-window.md:222 | declared (front matter; ietf.org/archive/id/...-07.txt HTTP 200 on 2026-08-23) |
 | thirteen receipt cases; eight JCS preimages; six RFC 8785 pairs (declared); 3,000 of 100,000,000 (sampled, N=3000 of M=100000000) | paper/two-ledgers-one-window.md:223 | declared (test-vectors/README.md); sampled (jcs/rfc8785/PROVENANCE.md) |
 | swh:1:snp:d60322ed2ea0b1cd4a3e75847677e9a04e18b65a; main at 3c7536c; tags through v0.2.46; save request 2449665 | paper/two-ledgers-one-window.md:224 | measured (archive API, 22 Aug 2026 20:36Z, gate pass; covers the release described) |
 | verifiers/go/ (declared); second implementation | paper/two-ledgers-one-window.md:225 | declared (tree path) |
