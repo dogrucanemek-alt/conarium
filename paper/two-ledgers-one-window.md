@@ -6,7 +6,7 @@ VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey
 
 ## 1. Abstract
 
-Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as two propositions. Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions, a bypass path yields two worlds that differ in whether an occurrence happened and share the same record \(R\); no judgement whose only input is \(R\) can distinguish them. Proposition 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Proposition 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes. A worked example of four desk rows and six source rows (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.
+Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as one conditional impossibility result (Proposition 1) and two normative principles (Principles 2a and 2b). Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions, a bypass path yields two worlds that differ in whether an occurrence happened and share the same record \(R\); no judgement whose only input is \(R\) can distinguish them. Principle 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Principle 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes. A worked example of four desk rows and six source rows (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.
 
 ## 2. Introduction
 
@@ -14,9 +14,9 @@ A mediator \(G\) writes a record \(R\) of the events it sees. Integrity marks on
 
 That is not a software defect. If there is any path by which an event can occur without \(G\) seeing it, there are two worlds in which \(R\) is the same: one where the event did not happen, and one where it happened unobserved. No function of \(R\) alone tells those worlds apart. Completeness of \(R\) with respect to what occurred is independent of the integrity of \(R\). A second account, under different custody, is what makes the missing row visible. If that second account is also short, the honest answer is not a pass. It is that the comparison did not decide.
 
-That is the single-ledger blindness proposition: a bypass path plus a record that does not depend on the bypassed event yields two worlds that share \(R\). It is a proposition, not a theorem. If the unobserved event changes later rows \(G\) does write — a source sequence copied into \(R\) — then \(R\) has already imported a second account, and this setup is not blind.
+That is the single-ledger blindness proposition: a bypass path plus a record that does not depend on the bypassed event yields two worlds that share \(R\). It is a conditional impossibility result under seven explicit assumptions, not an unconditional completeness theorem. If the unobserved event changes later rows \(G\) does write — a source sequence copied into \(R\) — then \(R\) has already imported a second account, and this setup is not blind.
 
-The rest of the paper states the assumptions that carry that proposition, a second proposition that caps how a result may label the standing of its bounds, a four-step comparison that uses two books and one window, a classroom example that breaks the usual wrong answers in order, and the cases the method does not catch. The last sentence of this introduction is the standing of the whole: this is a proposition with stated assumptions, not a theorem.
+The rest of the paper states the assumptions that carry that proposition, two normative principles that cap how a result may label the standing of its bounds, a four-step comparison that uses two books and one window, a classroom example that breaks the usual wrong answers in order, and the cases the method does not catch. The last sentence of this introduction is the standing of the whole: it is a conditional impossibility result under seven explicit assumptions, not an unconditional completeness theorem.
 
 ## 3. Setting and assumptions
 
@@ -30,7 +30,7 @@ Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(
 
 **A4.** The integrity mechanisms of \(R\) (signature, chain, sequence) are produced by \(G\). They speak about the set \(G\) wrote. They are silent about an occurrence \(G\) did not produce.
 
-**A5.** An unobserved occurrence does not change the content of rows \(G\) writes afterwards. This is the load-bearing assumption. If a source issues a sequential identity (a Postgres transaction identifier, a write-ahead-log sequence number, a serial, a stock balance) and the unobserved occurrence advances it, then a later row \(G\) does write can differ between the two worlds — for example \(7\) in one world and \(8\) in the other (declared, illustrative). That difference sits inside \(R\). The construction is then not blind: the leaked source identity is a second account already embedded in the first book. Recording that identity on every mediated access is therefore a design opening. Whether typical mediated deployments break A5, and how far a reconciliation that uses those identities would reach, is not measured.
+**A5.** An unobserved occurrence does not change the content of rows \(G\) writes afterwards. This is the load-bearing assumption. If a source issues a sequential identity (a Postgres transaction identifier, a write-ahead-log sequence number, a serial, a stock balance) and the unobserved occurrence advances it, then a later row \(G\) does write can differ between the two worlds — for example \(7\) in one world and \(8\) in the other (declared, illustrative). That difference sits inside \(R\). The construction is then not blind: the leaked source identity is a second account already embedded in the first book. Recording that identity on every mediated access is therefore a design opening. Whether typical mediated deployments break A5, and how far a reconciliation that uses those identities would reach, is not measured. The internal randomness and internal state \(G\) uses to produce signatures and the chain are fixed in both worlds; an unobserved occurrence does not affect them.
 
 **A6.** \(E\) and \(R\) are bound to the same window. An occurrence outside the window is out of scope, not a blindness of the record.
 
@@ -45,16 +45,16 @@ Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(
 
 ### Proof sketch
 
-Fix a bypass path satisfying A2, and an occurrence \(e\) that can take that path. Construct \(W_0\) in which \(e\) does not occur inside the window (A6), and \(W_1\) in which \(e\) occurs unobserved. By A1, \(R\) contains only observations \(G\) made; \(e\) is not among them in either world. By A2, the bypass does not add or edit a row of \(R\). By A5, \(e\) does not change later rows \(G\) does write. By A4, the integrity marks \(G\) attaches are functions of the rows \(G\) wrote, so they match when the rows match. By A3, the auditor sees only that \(R\). The two worlds differ in \(E\) (A7) and agree on \(R\). Therefore any procedure whose only input is \(R\) returns the same answer in both worlds.
+Fix a bypass path satisfying A2, and an occurrence \(e\) that can take that path. Construct \(W_0\) in which \(e\) does not occur inside the window (A6), and \(W_1\) in which \(e\) occurs unobserved. By A1, \(R\) contains only observations \(G\) made; \(e\) is not among them in either world. By A2, the bypass does not add or edit a row of \(R\). By A5, \(e\) does not change later rows \(G\) does write. By A4, the integrity marks \(G\) attaches are functions of the rows \(G\) wrote and of \(G\)'s internal randomness and state, both held equal across the two worlds, so they match when the rows match. By A3, the auditor sees only that \(R\). The two worlds differ in \(E\) (A7) and agree on \(R\). Therefore any procedure whose only input is \(R\) returns the same answer in both worlds.
 
 The sketch does not generalise past A1–A7. It does not say that two books suffice: both can be short. It does not say that a bypass occurred: only that \(R\) cannot tell the two worlds apart. It does not say that a sequence number is useless: a sequence \(G\) assigned shows what was dropped from the set \(G\) produced, and is silent about what \(G\) did not produce.
 
-## 5. Proposition 2 — Provenance Ceiling (2a) and Undeclared Does Not Decide (2b)
+## 5. Principle 2 — Provenance Ceiling (2a) and Undeclared Does Not Decide (2b)
 
-**Proposition 2a (Provenance Ceiling, per bound).**
+**Principle 2a (Provenance Ceiling, per bound).**
 Each bound (multiplicity, skew, exclusion, population) carries an origin class: `undeclared < operator-declared < measured < protocol-enforced`. A result MUST NOT label a bound's standing above the origin of the input it rests on.
 
-**Proposition 2b (Undeclared Does Not Decide).**
+**Principle 2b (Undeclared Does Not Decide).**
 A bound whose origin is `undeclared` cannot license a decision that depends on it. The affected items are `indeterminate`.
 
 The order is an origin order, not a strength order. A broken measurement is less useful than a careful declaration. It is not a truth ranking.
@@ -68,7 +68,7 @@ Outcome classes (`attributed`, `indeterminate`, and the rest) and origin labels 
 | Account-claim | "The two books differ by 3 rows" | measured — a computed relation |
 | World-claim | "Therefore 3 accesses were not recorded" | no stronger than the bounds it rests on |
 
-The ceiling applies to world-claims, not to account-claims. Proposition 2b forces `indeterminate` as an outcome class when a required bound is undeclared. It does not force every item into that class. An operator-declared correspondence may still attribute. It may not print that attribution as a measurement.
+The ceiling applies to world-claims, not to account-claims. Principle 2b forces `indeterminate` as an outcome class when a required bound is undeclared. It does not force every item into that class. An operator-declared correspondence may still attribute. It may not print that attribution as a measurement.
 
 ## 6. Method — two ledgers, one window
 
@@ -226,4 +226,4 @@ The following artefacts implement or specify the method. The product name appear
 
 ## 11. Conclusion
 
-A record can be intact and still silent about what was not written. Under the seven assumptions of Proposition 1, a bypass path produces two worlds that share \(R\). Integrity marks do not close that gap. A second book under other custody can make a missing row visible relative to that book. If the second book is also short, or if membership in the window is a cross-clock question whose skew bound is undeclared, the comparison does not get to print a pass. Proposition 2a forbids inflating the standing of a bound. Proposition 2b forbids deciding from an undeclared bound. The method is the comparison, the five classes, and the refusal to fold `indeterminate` into clean. That is the claim. It is a proposition with stated assumptions, not a theorem.
+A record can be intact and still silent about what was not written. Under the seven assumptions of Proposition 1, a bypass path produces two worlds that share \(R\). Integrity marks do not close that gap. A second book under other custody can make a missing row visible relative to that book. If the second book is also short, or if membership in the window is a cross-clock question whose skew bound is undeclared, the comparison does not get to print a pass. Principle 2a forbids inflating the standing of a bound. Principle 2b forbids deciding from an undeclared bound. The method is the comparison, the five classes, and the refusal to fold `indeterminate` into clean. That is the claim. It is a conditional impossibility result under seven explicit assumptions, not an unconditional completeness theorem.

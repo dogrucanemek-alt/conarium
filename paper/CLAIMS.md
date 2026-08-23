@@ -6,7 +6,7 @@ Format: `sentence | file:line | kind`
 
 | sentence | file:line | kind |
 |---|---|---|
-| this paper states that distinction as two propositions | paper/two-ledgers-one-window.md:9 | declared (structure of K3) |
+| this paper states that distinction as one conditional impossibility result (Proposition 1) and two normative principles (Principles 2a and 2b) | paper/two-ledgers-one-window.md:9 | declared (structure of K3) |
 | under seven stated assumptions | paper/two-ledgers-one-window.md:9 | declared (count of A1–A7; label dropped) |
 | one of five outcome classes | paper/two-ledgers-one-window.md:9 | declared (count of classes; label dropped) |
 | four desk rows and six source rows (measured) | paper/two-ledgers-one-window.md:9 | measured (desk.csv 4 data rows + source.csv 6 data rows) |
@@ -26,7 +26,7 @@ Format: `sentence | file:line | kind`
 | assumptions A1–A7; two worlds W0, W1 | paper/two-ledgers-one-window.md:44 | declared (K3 P1, verbatim) |
 | A2, A6, W0, W1, A1, A5, A4, A3, A7 | paper/two-ledgers-one-window.md:48 | declared (proof sketch from A1–A7) |
 | A1–A7; two books | paper/two-ledgers-one-window.md:50 | declared |
-| Proposition 2a / 2b | paper/two-ledgers-one-window.md:54–58 | declared (K3, verbatim) |
+| Principle 2a / 2b | paper/two-ledgers-one-window.md:54–58 | declared (K3, verbatim) |
 | pair (measured multiplicity, undeclared skew) incomparable with (undeclared multiplicity, measured skew) (declared, illustrative) | paper/two-ledgers-one-window.md:62 | declared, illustrative (K4) |
 | two operator-declared books | paper/two-ledgers-one-window.md:64 | declared (K3 account-claim) |
 | the two books differ by 3 rows | paper/two-ledgers-one-window.md:68 | declared, illustrative (K3/K4 table) |
