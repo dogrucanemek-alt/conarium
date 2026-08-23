@@ -48,3 +48,19 @@ Then check `paper/build/main.log` for `LaTeX Warning: Citation` / `Reference` li
 ## Generated PDF
 
 If a PDF is produced later, write it under `paper/build/` and nowhere else. That directory is gitignored. A generated PDF committed under `docs/` would enter the npm allow-list; `test/pack_tracked.mjs` is right to refuse a package built from files the repository does not describe.
+
+## Build record
+
+The row for the published PDF is written by running `paper/record-build.mjs` at final build. Do not fill the value cells before that run. The script prints this table; it does not invent a hash or a digest that the tree and the `--container` argument do not supply.
+
+```
+node paper/record-build.mjs --container <digest>
+```
+
+| Field | Value |
+|---|---|
+| commit | |
+| PDF SHA-256 | |
+| source tarball SHA-256 | |
+| date | |
+| container digest | |

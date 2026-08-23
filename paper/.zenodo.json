@@ -2,14 +2,16 @@
   "title": "Two ledgers, one window: integrity of a mediator's record does not establish its completeness",
   "upload_type": "publication",
   "publication_type": "preprint",
+  "version": "1.0",
+  "publication_date": "2026-08-24",
+  "language": "eng",
   "creators": [
     {
       "name": "Doğru, Emek Can",
-      "affiliation": "VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey",
-      "orcid": ""
+      "affiliation": "VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey"
     }
   ],
-  "description": "Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as two propositions. Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions, a bypass path yields two worlds that differ in whether an occurrence happened and share the same record R; no judgement whose only input is R can distinguish them. Proposition 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Proposition 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes. A worked example of four desk rows and six source rows (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.",
+  "description": "Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as one conditional impossibility result (Proposition 1) and two normative principles (Principles 2a and 2b). Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions, a bypass path yields two worlds that differ in whether an occurrence happened and share the same record R; no judgement whose only input is R can distinguish them. Principle 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Principle 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes. A worked example of four desk rows and six source rows (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.",
   "keywords": [
     "audit",
     "completeness",
@@ -22,19 +24,19 @@
   "related_identifiers": [
     {
       "identifier": "https://www.npmjs.com/package/@conarium-ai/core",
-      "relation": "isSupplementTo",
+      "relation": "isSupplementedBy",
       "resource_type": "software",
       "scheme": "url"
     },
     {
       "identifier": "https://datatracker.ietf.org/doc/draft-dogru-scitt-disclosure-evidence/",
-      "relation": "isSupplementTo",
+      "relation": "references",
       "resource_type": "publication-preprint",
       "scheme": "url"
     },
     {
       "identifier": "swh:1:snp:d60322ed2ea0b1cd4a3e75847677e9a04e18b65a",
-      "relation": "isSupplementTo",
+      "relation": "isSupplementedBy",
       "resource_type": "software",
       "scheme": "swh"
     }
