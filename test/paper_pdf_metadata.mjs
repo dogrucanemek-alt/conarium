@@ -1,168 +1,173 @@
 #!/usr/bin/env node
 /**
- * The preprint PDF must carry its own title and author.
+ * The preprint PDF must carry its own bibliographic metadata.
  *
- * A PDF whose information dictionary is empty is still readable, but every
- * archive that indexes it — Zenodo, arXiv, a reference manager, a search
- * engine — reads that dictionary, not the title page. The first build shipped
- * `/Title()` and `/Author()`: pdfTeX does not copy `\title` and `\author` into
- * the dictionary, and `hyperref` only does so when it is told to.
+ * A PDF whose information dictionary is empty is still readable, but a copy of
+ * the file that has travelled away from its Zenodo record — in a mailbox, a
+ * reference manager, a shared drive — has nothing else to say what it is. The
+ * first build shipped `/Title()` and `/Author()`: pdfTeX does not copy `\title`
+ * and `\author` into the dictionary, and `hyperref` only does so when told.
  *
- * Two properties are measured here:
+ * Three properties are measured:
  *
- *   1. The tex names the title and the author once and reads them twice — the
- *      title page and `\hypersetup` both expand the same macros. Two hand-typed
- *      copies drift; one of them goes stale and the suite stays green.
- *   2. If a built PDF is present, its dictionary carries those exact strings.
- *      `paper/build/` is gitignored, so on a fresh clone only property 1 can be
- *      measured. The line this prints says which of the two it measured.
+ *   1. The tex names title, author, subject and keywords once each, and reads
+ *      them twice — the title page and `\hypersetup` expand the same macros.
+ *      Two hand-typed copies of one string drift; one goes stale and the suite
+ *      stays green because each file is self-consistent.
+ *   2. `paper/.zenodo.json` — the deposit metadata, and the copy a reader of
+ *      the record sees before opening the file — agrees with those names.
+ *   3. If a built PDF is present, the dictionary its cross-reference chain
+ *      actually points at carries those exact strings. Not any bytes that
+ *      happen to appear in the file: the resolved `/Info` object and no other.
  *
- *   node test/paper_pdf_metadata.mjs [path-to-pdf]
+ * `paper/build/` is gitignored, so on a fresh clone only 1 and 2 can be
+ * measured. The line this prints says which of the three it measured.
+ *
+ * Release mode refuses that leniency. It takes the artefact by path and by
+ * hash, and fails when either is absent:
+ *
+ *   node test/paper_pdf_metadata.mjs                       # source, and a build if there is one
+ *   node test/paper_pdf_metadata.mjs --release <pdf> --sha256 <hex>
  */
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readInfoDict } from './pdf_info_dict.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const tex = readFileSync(join(root, 'paper/arxiv/main.tex'), 'utf8')
 
+function argValue(flag) {
+  const at = process.argv.indexOf(flag)
+  if (at === -1 || at + 1 >= process.argv.length) return null
+  const value = process.argv[at + 1]
+  return value.startsWith('--') ? null : value
+}
+
 function command(name) {
   const match = tex.match(new RegExp(`\\\\newcommand\\{\\\\${name}\\}\\{([^{}]*)\\}`))
-  assert.ok(match, `main.tex must define \\${name} — the title and author are named once there`)
-  return match[1]
+  assert.ok(match, `main.tex must define \\${name} — each of these is named once there`)
+  const value = match[1].trim()
+  assert.ok(value.length > 0, `\\${name} must not be empty`)
+  return value
 }
 
 const titleFirst = command('papertitlefirst')
 const titleSecond = command('papertitlesecond')
 const author = command('paperauthorname')
+const subject = command('papersubject')
+const keywords = command('paperkeywords')
 
-assert.ok(titleFirst.length > 0 && titleSecond.length > 0, 'title macros must not be empty')
-assert.ok(author.length > 0, 'author macro must not be empty')
+const expected = {
+  Title: `${titleFirst} ${titleSecond}`,
+  Author: author,
+  Subject: subject,
+  Keywords: keywords,
+}
 
-// Property 1 — one source, read twice.
-assert.ok(
-  /\\title\{\s*\\papertitlefirst\\\\\s*\\papertitlesecond\s*\}/.test(tex),
-  'the title page must expand \\papertitlefirst and \\papertitlesecond, not a second hand-typed copy',
-)
-assert.ok(
-  /\\author\{\s*\\paperauthorname\\\\/.test(tex),
-  'the title page must expand \\paperauthorname, not a second hand-typed copy',
-)
-assert.ok(
-  /pdftitle=\{\\papertitlefirst\{\}\s\\papertitlesecond\}/.test(tex),
-  'hypersetup pdftitle must expand the same two title macros',
-)
-assert.ok(
-  /pdfauthor=\{\\paperauthorname\}/.test(tex),
-  'hypersetup pdfauthor must expand the same author macro',
-)
-// The author name carries a letter outside PDFDocEncoding (ğ). Without the
-// unicode option hyperref cannot write it into the dictionary.
-assert.ok(
-  /\\usepackage\[[^\]]*\bunicode\b[^\]]*\]\{hyperref\}/.test(tex),
-  'hyperref must be loaded with the unicode option — the author name is not PDFDocEncoding',
+// --- Property 1: one source in the tex, read twice ---------------------------
+
+const wiring = [
+  [/\\title\{\s*\\papertitlefirst\\\\\s*\\papertitlesecond\s*\}/,
+    'the title page must expand the title macros, not a second hand-typed copy'],
+  [/\\author\{\s*\\paperauthorname\\\\/,
+    'the title page must expand \\paperauthorname, not a second hand-typed copy'],
+  [/pdftitle=\{\\papertitlefirst\{\}\s\\papertitlesecond\}/,
+    'hypersetup pdftitle must expand the same two title macros'],
+  [/pdfauthor=\{\\paperauthorname\}/, 'hypersetup pdfauthor must expand the author macro'],
+  [/pdfsubject=\{\\papersubject\}/, 'hypersetup pdfsubject must expand the subject macro'],
+  [/pdfkeywords=\{\\paperkeywords\}/, 'hypersetup pdfkeywords must expand the keywords macro'],
+  // The author name carries a letter outside PDFDocEncoding (ğ). Without the
+  // unicode option hyperref cannot write it into the dictionary.
+  [/\\usepackage\[[^\]]*\bunicode\b[^\]]*\]\{hyperref\}/,
+    'hyperref must be loaded with the unicode option — the author name is not PDFDocEncoding'],
+]
+for (const [pattern, message] of wiring) assert.ok(pattern.test(tex), message)
+
+// A bookmark is built from the section title, and LaTeX quoting survives into
+// it unless the heading says what the bookmark should read instead. One such
+// heading shipped as ``clean'' in the outline of the 24 August build.
+const quoted = [...tex.matchAll(/\\(sub)?section\{([^{}]*(?:``|'')[^{}]*)\}/g)]
+assert.equal(
+  quoted.length,
+  0,
+  `these headings carry LaTeX quote syntax that would appear verbatim in the PDF outline; ` +
+    `give each a \\texorpdfstring with the characters a reader should see:\n  ` +
+    quoted.map((m) => m[2]).join('\n  '),
 )
 
-const expectedTitle = `${titleFirst} ${titleSecond}`
+// --- Property 2: the deposit metadata agrees --------------------------------
 
-// The deposit metadata is the third place the title is written down, and the
-// only one a reader of the Zenodo record sees before opening the file. It is
-// typed by hand there, so it is compared here rather than trusted.
 const zenodo = JSON.parse(readFileSync(join(root, 'paper/.zenodo.json'), 'utf8'))
 assert.equal(
   zenodo.title,
-  expectedTitle,
+  expected.Title,
   'paper/.zenodo.json title must be the title the tex names; one of the two has drifted',
 )
+assert.ok(Array.isArray(zenodo.keywords), 'paper/.zenodo.json must list keywords')
+assert.equal(
+  zenodo.keywords.join(', '),
+  expected.Keywords,
+  'paper/.zenodo.json keywords must be the keywords the tex names, in the same order',
+)
+assert.ok(
+  typeof zenodo.license === 'string' && zenodo.license.length > 0,
+  'paper/.zenodo.json must name a license',
+)
+// The licence travels with the file, not only with the record.
+const licenceInTex = new RegExp(zenodo.license.replace(/-/g, '[ -]?'), 'i')
+assert.ok(
+  licenceInTex.test(tex),
+  `main.tex must state the ${zenodo.license} licence on the page itself; ` +
+    'a PDF copied away from its record otherwise carries no terms',
+)
 
-// Property 2 — the built artefact, when there is one.
-const argPath = process.argv[2]
-const pdfPath = argPath
-  ? (isAbsolute(argPath) ? argPath : join(process.cwd(), argPath))
+// --- Property 3: the artefact ------------------------------------------------
+
+const releasePath = argValue('--release')
+const releaseHash = argValue('--sha256')
+if (process.argv.includes('--release') || process.argv.includes('--sha256')) {
+  assert.ok(releasePath, '--release needs the path of the PDF that is being published')
+  assert.ok(releaseHash, '--release also needs --sha256: the hash the build record names')
+  assert.ok(/^[0-9a-f]{64}$/.test(releaseHash), '--sha256 must be 64 lowercase hex characters')
+}
+
+const pdfPath = releasePath
+  ? (isAbsolute(releasePath) ? releasePath : resolvePath(process.cwd(), releasePath))
   : join(root, 'paper/build/main.pdf')
 
 if (!existsSync(pdfPath)) {
-  assert.ok(!argPath, `no PDF at ${pdfPath}`)
+  // Release mode is fail-closed: no artefact, no pass.
+  assert.ok(!releasePath, `no PDF at ${pdfPath} — release mode cannot vouch for a file that is not there`)
   console.log(
-    `paper pdf metadata GREEN (source only, no build present) ` +
-      `title="${expectedTitle}" author="${author}"`,
+    `paper pdf metadata GREEN (source and deposit only, no build present) title="${expected.Title}"`,
   )
   process.exit(0)
 }
 
 const bytes = readFileSync(pdfPath)
-const raw = bytes.toString('latin1')
-
-const SHORTHAND = { n: 0x0a, r: 0x0d, t: 0x09, b: 0x08, f: 0x0c }
-
-/** Undo the escaping of a PDF literal string, byte for byte. */
-function unescapeLiteral(body) {
-  const bytes = []
-  for (let i = 0; i < body.length; i += 1) {
-    if (body[i] !== '\\') {
-      bytes.push(body.charCodeAt(i) & 0xff)
-      continue
-    }
-    const next = body[(i += 1)]
-    if (next === undefined) break
-    if (next >= '0' && next <= '7') {
-      // \ddd — one to three octal digits. This is how pdfTeX writes every
-      // byte of a UTF-16BE string, the BOM included.
-      let octal = next
-      while (octal.length < 3 && body[i + 1] >= '0' && body[i + 1] <= '7') octal += body[(i += 1)]
-      bytes.push(parseInt(octal, 8) & 0xff)
-    } else if (SHORTHAND[next] !== undefined) {
-      bytes.push(SHORTHAND[next])
-    } else if (next === '\n') {
-      // a backslash at end of line continues the string; it adds nothing
-    } else if (next === '\r') {
-      if (body[i + 1] === '\n') i += 1
-    } else {
-      bytes.push(body.charCodeAt(i) & 0xff)
-    }
-  }
-  return Buffer.from(bytes)
-}
-
-/** A text string is UTF-16BE when it opens with a byte order mark. */
-function decodeTextString(buf) {
-  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
-    const body = Buffer.from(buf.subarray(2))
-    if (body.length % 2 === 1) body.writeUInt8(0, body.length - 1)
-    return body.swap16().toString('utf16le')
-  }
-  return buf.toString('latin1')
-}
-
-function pdfString(key) {
-  // hyperref writes a literal string or a hex string, and with the unicode
-  // option the bytes inside are UTF-16BE. Read whichever this file carries.
-  const re = new RegExp(`/${key}\\s*(?:\\(((?:\\\\[\\s\\S]|[^\\\\)])*)\\)|<([0-9A-Fa-f\\s]*)>)`, 'g')
-  const found = []
-  for (const match of raw.matchAll(re)) {
-    const buf = match[1] !== undefined
-      ? unescapeLiteral(match[1])
-      : Buffer.from(match[2].replace(/\s+/g, ''), 'hex')
-    found.push(decodeTextString(buf))
-  }
-  assert.ok(found.length > 0, `${relative(root, pdfPath)} has no /${key} entry at all`)
-  return found
-}
-
-for (const [key, expected] of [['Title', expectedTitle], ['Author', author]]) {
-  const found = pdfString(key)
-  assert.ok(
-    !found.every((value) => value.trim() === ''),
-    `/${key} is present but empty in ${relative(root, pdfPath)} — pdfTeX wrote /${key}()`,
-  )
-  assert.ok(
-    found.includes(expected),
-    `/${key} must read ${JSON.stringify(expected)}; the file carries ${JSON.stringify(found)}`,
+const digest = createHash('sha256').update(bytes).digest('hex')
+if (releaseHash) {
+  assert.equal(
+    digest,
+    releaseHash,
+    `${pdfPath} is not the file the build record names`,
   )
 }
 
+const info = readInfoDict(bytes)
+assert.ok(info, `${relative(root, pdfPath) || pdfPath} has no /Info dictionary at all`)
+for (const [key, want] of Object.entries(expected)) {
+  const got = info[key]
+  assert.ok(got !== undefined, `the information dictionary has no /${key}`)
+  assert.notEqual(got.trim(), '', `/${key} is present but empty — pdfTeX wrote /${key}()`)
+  assert.equal(got, want, `/${key} must read ${JSON.stringify(want)}, not ${JSON.stringify(got)}`)
+}
+
+const where = releasePath ? pdfPath : relative(root, pdfPath)
 console.log(
-  `paper pdf metadata GREEN ${relative(root, pdfPath) || pdfPath} ` +
-    `/Title="${expectedTitle}" /Author="${author}"`,
+  `paper pdf metadata GREEN ${where} sha256=${digest.slice(0, 16)}… ` +
+    `/Title /Author /Subject /Keywords all resolved from the trailer's /Info`,
 )

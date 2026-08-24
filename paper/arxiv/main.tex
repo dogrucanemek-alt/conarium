@@ -10,26 +10,38 @@
 \emergencystretch=3em
 \tolerance=2000
 
-% The title and the author are written once and read twice: on the title page,
-% and in the document information dictionary the PDF carries. A reader who has
-% only the file, and every archive that indexes it, sees the second one.
+% Each of these is written once and read twice: on the title page, and in the
+% document information dictionary the PDF carries. A copy of this file that has
+% travelled away from its record has only the second one to say what it is.
 \newcommand{\papertitlefirst}{Two ledgers, one window:}
 \newcommand{\papertitlesecond}{integrity of a mediator's record does not establish its completeness}
 \newcommand{\paperauthorname}{Emek Can Doğru}
+\newcommand{\paperaffiliation}{VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Turkey}
+\newcommand{\papersubject}{A conditional impossibility result and two normative principles for judging a mediator's record against a second book}
+\newcommand{\paperkeywords}{audit, completeness, coverage reconciliation, provenance, receipts, transparency, two clocks}
 
 \title{\papertitlefirst\\
 \papertitlesecond}
 \author{\paperauthorname\\
-VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey}
+\paperaffiliation}
 \date{}
 
 \hypersetup{
   pdftitle={\papertitlefirst{} \papertitlesecond},
   pdfauthor={\paperauthorname},
+  pdfsubject={\papersubject},
+  pdfkeywords={\paperkeywords},
 }
 
 \begin{document}
 \maketitle
+
+% A copy of this file in a mailbox or a reference manager has left the record
+% page, and its terms, behind. The licence travels with the file.
+\begin{center}
+\copyright{} 2026 \paperauthorname. Licensed under CC BY 4.0
+(\href{https://creativecommons.org/licenses/by/4.0/}{creativecommons.org/licenses/by/4.0}).
+\end{center}
 
 \section{Abstract}
 
@@ -143,7 +155,7 @@ Each class is a statement about the comparison. None is a statement about intent
 
 A comparison with no ``observed without a mediator row'' items establishes that each observed source item is attributable to a mediator row naming the same object, under the declared correspondence. It does not establish that the source's book has no gaps, or that the mediator's file has no gaps, or that nothing happened off both books.
 
-\subsection{Why undecided is mandatory, and why ``clean'' is forbidden}
+\subsection{\texorpdfstring{Why undecided is mandatory, and why ``clean'' is forbidden}{Why undecided is mandatory, and why “clean” is forbidden}}
 
 Two facts force the fifth class.
 
