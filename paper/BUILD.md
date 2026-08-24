@@ -9,6 +9,8 @@ This machine has no `pandoc`, no `xelatex`, and no `tectonic` (`where.exe` was e
 - **23 August 2026** — first build. 15 pages, exit 0, no undefined references. Not published; see the superseded row at the end of this file for the three faults it carried.
 - **24 August 2026** — the build this file describes. 16 pages, exit 0, no undefined references. The preamble names title, author, subject and keywords once each and `\hypersetup` reads them, so the document information dictionary is filled. The licence is stated on the page. Both artefacts are produced inside the pinned container and reproduce byte for byte.
 
+**Published 24 August 2026, 17:51:52 UTC** as DOI [`10.5281/zenodo.22071429`](https://doi.org/10.5281/zenodo.22071429). `10.5281/zenodo.22071428` is the concept DOI and resolves to whichever version is current. The two files on that record are the two the build record below names: the PDF was downloaded back from the published record and hashed to `767251a0bc9404cad97d2e30f71bde7aff864ccb938024ea85e79f74be95ba1d`, which is the value in the row. Zenodo does not allow the files of a published record to be replaced, so a correction is a new version rather than an edit, and it gets its own row here.
+
 The 16th page is what the additions to the front matter push over: a date line, a licence line, and an abstract set as an environment rather than as a numbered section. Page 16 carries the tail of the bibliography and nothing else — no heading was orphaned and no table was split, which was checked by rendering the pages rather than by counting them. The abstract stopping being a `\section` is why the tex now has ten of those and not eleven; the subsection count is unchanged.
 
 ## Correspondence (source vs tex)
@@ -102,6 +104,8 @@ The checks above measure the files and the repository. They do not measure the Z
 4. Run the fail-closed check above against the file being uploaded.
 
 A DOI is permanent and the files cannot be swapped after publication. Everything above is cheaper than a second record correcting the first.
+
+Run for version 1.0 on 24 August 2026, immediately before publishing. The draft's title, description and notes matched this repository to the byte, compared by hash rather than by eye; publication date, version, language, resource type, licence, access, creator and affiliation, seven keywords in order and three related works all agreed; and the two files carried the MD5s of the two files the build record names. The draft reported no validation errors. Two things were found by that comparison rather than by the checks in this file: the deposit form had "I already have a DOI" selected with an empty box, which would have published the record without minting one, and the affiliation in `paper/.zenodo.json` still carried a city the tex had already dropped.
 
 ## Build record
 
