@@ -15,7 +15,8 @@ The 16th page is the licence line's doing: three lines added at the top of the b
 
 Measured on the tree that carries this file:
 
-- Markdown `##` headings map to LaTeX `\section`.
+- The markdown's `## Abstract` maps to the LaTeX `abstract` environment, not to a `\section`. The abstract is not a numbered section in either file; numbering it would make the introduction section 2 and shift every cross-reference in the paper by one.
+- The markdown's ten numbered `##` headings map to ten LaTeX `\section`s.
 - Markdown `###` headings map to LaTeX `\subsection`.
 
 Run, from the repository root:
@@ -28,7 +29,7 @@ Run, from the repository root:
 (Select-String -Path paper/arxiv/main.tex -Pattern '\\subsection' -AllMatches).Count
 ```
 
-Those four numbers must pair: 11 sections with 11 sections, 3 subsections with 3 subsections. If they do not, the tex has drifted and is not a build of the markdown.
+The markdown has 11 `##` headings and the tex has 10 `\section`s; the difference is the abstract, which the tex writes as an environment. The subsection counts must pair exactly: 3 with 3. If either relationship breaks, the tex has drifted and is not a build of the markdown.
 
 ## The build
 

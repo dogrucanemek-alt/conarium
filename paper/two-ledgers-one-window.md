@@ -4,11 +4,11 @@ Emek Can Doğru
 VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey  
 
 
-## 1. Abstract
+## Abstract
 
 Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as one conditional impossibility result (Proposition 1) and two normative principles (Principles 2a and 2b). Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions, a bypass path yields two worlds that differ in whether an occurrence happened and share the same record \(R\); no judgement whose only input is \(R\) can distinguish them. Principle 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Principle 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes. A worked example of four desk rows and six source rows (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.
 
-## 2. Introduction
+## 1. Introduction
 
 A mediator \(G\) writes a record \(R\) of the events it sees. Integrity marks on \(R\) — a sequence \(G\) assigned, a hash \(G\) chained, a signature \(G\) produced — show that the rows still in \(R\) were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written.
 
@@ -18,7 +18,7 @@ That is the single-ledger blindness proposition: a bypass path plus a record tha
 
 The rest of the paper states the assumptions that carry that proposition, two normative principles that cap how a result may label the standing of its bounds, a four-step comparison that uses two books and one window, a classroom example that breaks the usual wrong answers in order, and the cases the method does not catch. The last sentence of this introduction is the standing of the whole: it is a conditional impossibility result under seven explicit assumptions, not an unconditional completeness theorem.
 
-## 3. Setting and assumptions
+## 2. Setting and assumptions
 
 Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(E\) be the multiset of occurrences that actually happened. The propositions below rest on seven assumptions. Each is required for the two-world construction; dropping one changes what the construction may say.
 
@@ -38,7 +38,7 @@ Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(
 
 A5 is listed with the others because the construction fails without it, and because its failure is useful rather than fatal. The usefulness is a design remark. The frequency of the failure is not measured.
 
-## 4. Proposition 1 — Single-Ledger Insufficiency
+## 3. Proposition 1 — Single-Ledger Insufficiency
 
 **Proposition 1 (Single-Ledger Insufficiency).**
 Let \(G\) be a mediator producing record \(R\) of events it observes, and let \(E\) be the multiset of occurrences that actually happened. Under assumptions A1–A7 above, if there exists a path by which an occurrence can happen without \(G\) observing it, then **there exist two worlds \(W_0\), \(W_1\) differing in whether that occurrence happened, for which \(R\) is identical.** Consequently no judgement whose only input is \(R\) can distinguish them.
@@ -49,7 +49,7 @@ Fix a bypass path satisfying A2, and an occurrence \(e\) that can take that path
 
 The sketch does not generalise past A1–A7. It does not say that two books suffice: both can be short. It does not say that a bypass occurred: only that \(R\) cannot tell the two worlds apart. It does not say that a sequence number is useless: a sequence \(G\) assigned shows what was dropped from the set \(G\) produced, and is silent about what \(G\) did not produce.
 
-## 5. Principle 2 — Provenance Ceiling (2a) and Undeclared Does Not Decide (2b)
+## 4. Principle 2 — Provenance Ceiling (2a) and Undeclared Does Not Decide (2b)
 
 **Principle 2a (Provenance Ceiling, per bound).**
 Each bound (multiplicity, skew, exclusion, population) carries an origin class: `undeclared < operator-declared < measured < protocol-enforced`. A result MUST NOT label a bound's standing above the origin of the input it rests on.
@@ -70,7 +70,7 @@ Outcome classes (`attributed`, `indeterminate`, and the rest) and origin labels 
 
 The ceiling applies to world-claims, not to account-claims. Principle 2b forces `indeterminate` as an outcome class when a required bound is undeclared. It does not force every item into that class. An operator-declared correspondence may still attribute. It may not print that attribution as a measurement.
 
-## 6. Method — two ledgers, one window
+## 5. Method — two ledgers, one window
 
 Two accounts, two custodians. Postgres and a shell are enough.
 
@@ -124,7 +124,7 @@ What is forbidden is resolving the undecided class by assumption in either direc
 
 The same discipline applies one layer up to labels. A bound is undeclared, operator-declared, measured, or protocol-enforced. The result states which. It does not print an operator-declared skew as measured. An operator-declared correspondence may still attribute. It may not call the attribution a measurement. That is a ceiling on labels, not a demand that every outcome be undecided.
 
-## 7. Worked example — one book, two books, two clocks
+## 6. Worked example — one book, two books, two clocks
 
 The example is a clinic front desk and the clinic's own activity book. Times are naive local timestamps; each is read on the clock named in its column. The source window is `2026-08-20 10:00:00` through `2026-08-20 10:10:00` (declared), start-inclusive and end-exclusive. An item is in the window on the desk side only if the desk timestamp falls in that same civil interval.
 
@@ -179,7 +179,7 @@ A later declared skew bound of 7 minutes (declared, illustrative) still does not
 
 **Extension — the second book is short too.** A reporting replica whose statements do not increment this source book can carry a read of `labs` inside the window. No class in the given files changes: the replica read is on neither side. Completeness was with respect to this source book. A path the book does not count is out of scope. The method does not upgrade a gap it cannot see into a finding, and it does not call the window clean because it cannot see it.
 
-## 8. What the method does not catch
+## 7. What the method does not catch
 
 The method's own limit list, and the measured limits of a published reconciliation tool that implements the same comparison, are the same shape.
 
@@ -196,7 +196,7 @@ The method's own limit list, and the measured limits of a published reconciliati
 
 The output is a classified comparison of two short books over a window that sits on two clocks. Absence becomes checkable. An undecided comparison is not rewritten as clean.
 
-## 9. Relation to prior work
+## 8. Relation to prior work
 
 This section uses only a dated project scan of adjacent implementations and patents, plus two papers that scan named. It is a relation, not a priority claim.
 
@@ -204,7 +204,7 @@ Hash-chained, MAC-protected log entries are old public art. United States patent
 
 Receiver-attested receipts invert the trust boundary: the service that receives a call signs what it observed. Figuera's *Notarized Agents / Sello* states the residual that remains after inclusion: an inclusion proof answers whether a receipt is in the log; it does not answer whether the log returned every matching receipt. The three remedies proposed there (declared) stay on the log side — a signed exhaustive answer from the log, downloading the whole log, or submitting to several independent logs. Sello v0.1 declines to speak for set completeness. Independently, Nian et al., *Auditable Agents*, name evidence integrity and lifecycle coverage among the most neglected dimensions of current audit approaches.
 
-A scan dated 6 August 2026 (declared), amended 19 August 2026 (declared) after a related mechanism was raised on the SCITT mailing list, looked at project documentation for enforcement, portable signed receipts, and coverage reconciliation against the data source's own bookkeeping. Source-code-level search was not performed on any repository in the original pass. One row, Vaara, was later scored from source at commit `befdced` (declared): its design document specifies a join from each used credential to a receipt, and reads a used credential with no matching receipt as a bypassed broker, with the stated limit that this is detection of a defeated broker, not a mathematical-completeness claim. At that commit the scan found no collector, join, command, or test implementing the join. That is the only such design the scan found outside the artefacts of Section 10. Reconciling against the data source's own counters was not among the proposals found in the Sello paper or elsewhere in that scan.
+A scan dated 6 August 2026 (declared), amended 19 August 2026 (declared) after a related mechanism was raised on the SCITT mailing list, looked at project documentation for enforcement, portable signed receipts, and coverage reconciliation against the data source's own bookkeeping. Source-code-level search was not performed on any repository in the original pass. One row, Vaara, was later scored from source at commit `befdced` (declared): its design document specifies a join from each used credential to a receipt, and reads a used credential with no matching receipt as a bypassed broker, with the stated limit that this is detection of a defeated broker, not a mathematical-completeness claim. At that commit the scan found no collector, join, command, or test implementing the join. That is the only such design the scan found outside the artefacts of Section 9. Reconciling against the data source's own counters was not among the proposals found in the Sello paper or elsewhere in that scan.
 
 Two near misses are worth naming because they use the same words for different objects. One governance toolkit publishes a "completeness score" that measures how many required fields it populated from signals it already collected, and a "reconciliation" of discovered agents against a registry. Neither asks whether the data source saw access the chain has no receipt for. A commercial agent monitor that tracks calls made outside a gateway through hooks in client tools sees what the client tells it. That is not the data source's own telemetry, and it comes with no signed receipt.
 
@@ -214,7 +214,7 @@ Patent claim charts in the same scan (Microsoft access-logging, OneTrust consent
 
 None of enforcement, signed receipts, or query counters is an invention. The combination the scan could not find implemented — masking or mediation before disclosure, a portable receipt of that act, and a comparison against the source's own book — is the unusual part, in the same sense that a software-bill-of-materials format did not invent dependency lists. The scan will not support "the only one in existence". The honest form is the dated search record.
 
-## 10. Artefacts
+## 9. Artefacts
 
 The following artefacts implement or specify the method. The product name appears only in this section.
 
@@ -224,6 +224,6 @@ The following artefacts implement or specify the method. The product name appear
 - Software Heritage snapshot `swh:1:snp:d60322ed2ea0b1cd4a3e75847677e9a04e18b65a` (measured: save request 2449665, visit 2026-08-22T20:36:29Z, resolved through the archive's API; `refs/heads/main` at `3c7536c`, release tags through `v0.2.46`). The snapshot covers the release this preprint describes; the commit carrying the preprint itself is later than the snapshot and is archived by the repository's next save.
 - A Go verifier lives in the same repository, under the same maintenance, at `verifiers/go/` (declared). It is a second implementation of the receipt checks, not an independently governed project.
 
-## 11. Conclusion
+## 10. Conclusion
 
 A record can be intact and still silent about what was not written. Under the seven assumptions of Proposition 1, a bypass path produces two worlds that share \(R\). Integrity marks do not close that gap. A second book under other custody can make a missing row visible relative to that book. If the second book is also short, or if membership in the window is a cross-clock question whose skew bound is undeclared, the comparison does not get to print a pass. Principle 2a forbids inflating the standing of a bound. Principle 2b forbids deciding from an undeclared bound. The method is the comparison, the five classes, and the refusal to fold `indeterminate` into clean. That is the claim. It is a conditional impossibility result under seven explicit assumptions, not an unconditional completeness theorem.
