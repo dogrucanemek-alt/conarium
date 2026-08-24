@@ -92,6 +92,8 @@ arXiv compiles the source itself, on its own TeX distribution, and requires the 
 
 ## Before the Zenodo record is made public
 
+`paper/.zenodo.json` records what the deposit should say, field for field, so the draft can be compared against something rather than remembered. It lives under `paper/` and not at the repository root on purpose: a root `.zenodo.json` is the file Zenodo's GitHub integration would apply to a release of the *software*, and this one describes the *preprint*. Two things in it are shaped by what the deposit form actually accepts rather than by preference: the Software Heritage snapshot is named by its resolvable `archive.softwareheritage.org` URL, because the related-works form has no `swh` scheme; and `notes` holds only what a reader of the record needs, since that is the field the form writes.
+
 The checks above measure the files and the repository. They do not measure the Zenodo draft, which is edited in a browser and can differ from anything here. Before pressing Publish:
 
 1. Set `publication_date` in `paper/.zenodo.json` to the day the record is actually being made public, and set the same date in the draft. Zenodo defines that field as the date of first public release, so a value left over from an earlier day is wrong.
