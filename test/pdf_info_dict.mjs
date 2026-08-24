@@ -332,11 +332,26 @@ function decodeStream(stream) {
 }
 
 function lastStartXref(buf) {
-  const tail = buf.toString('latin1', Math.max(0, buf.length - 4096))
-  const at = tail.lastIndexOf('startxref')
-  assert.ok(at !== -1, 'no startxref: this is not a PDF this check can read')
-  const match = tail.slice(at + 'startxref'.length).match(/\s*(\d+)/)
-  assert.ok(match, 'startxref is not followed by an offset')
+  // A revision ends `startxref <offset> %%EOF`. Reading the last `startxref`
+  // in the file instead lets anyone append a cross-reference section, name
+  // their own /Info in it, and never write the terminator — bytes that no
+  // reader would treat as a revision. The last %%EOF is where the file ends;
+  // what follows it is not part of the document.
+  const text = buf.toString('latin1')
+  const eof = text.lastIndexOf('%%EOF')
+  assert.ok(eof !== -1, 'no %%EOF: this is not a PDF this check can read')
+  assert.equal(
+    text.slice(eof + '%%EOF'.length).trim(),
+    '',
+    'there are bytes after the last %%EOF; the file does not end where it says it does',
+  )
+  const at = text.lastIndexOf('startxref', eof)
+  assert.ok(at !== -1, 'the last %%EOF has no startxref before it')
+  const match = text.slice(at + 'startxref'.length, eof).match(/^\s*(\d+)\s*$/)
+  assert.ok(
+    match,
+    'the bytes between startxref and %%EOF are not an offset on its own',
+  )
   return Number(match[1])
 }
 
@@ -430,13 +445,18 @@ function readXrefChain(buf) {
   return { entries, trailers }
 }
 
-function objectAt(buf, offset, expectedNum) {
+function objectAt(buf, offset, expectedNum, expectedGen) {
   const lexer = new Lexer(buf, offset)
   const num = Number(lexer.readToken())
-  lexer.readToken() // generation
+  const gen = Number(lexer.readToken())
   const keyword = lexer.readToken()
   assert.equal(keyword, 'obj', `offset ${offset} does not begin an object`)
   assert.equal(num, expectedNum, `offset ${offset} holds object ${num}, not ${expectedNum}`)
+  assert.equal(
+    gen,
+    expectedGen,
+    `offset ${offset} holds ${num} ${gen}, but the reference names ${expectedNum} ${expectedGen}`,
+  )
   return lexer.readObject()
 }
 
@@ -445,7 +465,17 @@ function resolve(buf, entries, ref) {
   const entry = entries.get(ref.num)
   assert.ok(entry, `object ${ref.num} is not in any cross-reference section`)
   assert.notEqual(entry.type, 0, `object ${ref.num} is marked free`)
-  if (entry.type === 1) return objectAt(buf, entry.offset, ref.num)
+  if (entry.type === 1) {
+    // A reference names a generation as well as a number. An entry at another
+    // generation is a different object, however convenient its contents.
+    assert.equal(
+      entry.gen ?? 0,
+      ref.gen,
+      `the cross-reference entry for object ${ref.num} is generation ${entry.gen}, ` +
+        `but the reference names generation ${ref.gen}`,
+    )
+    return objectAt(buf, entry.offset, ref.num, ref.gen)
+  }
   // type 2: the object lives inside a compressed object stream
   const container = resolve(buf, entries, new Ref(entry.container, 0))
   assert.ok(container instanceof Stream, `object stream ${entry.container} is not a stream`)
@@ -512,13 +542,13 @@ export function readInfoDict(buf) {
 // ---------------------------------------------------------------------------
 
 /** Assemble a minimal but structurally valid PDF with a classic xref table. */
-function buildPdf({ title, author, infoBody, extraObjects = '', decoy = null }) {
+function buildPdf({ title, author, infoBody, extraObjects = '', decoy = null, infoGen = 0, refGen = 0 }) {
   const info = infoBody ?? `/Title (${title}) /Author (${author})`
   const objects = [
     '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
     '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
     '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>\nendobj\n',
-    `4 0 obj\n<< ${info} >>\nendobj\n`,
+    `4 ${infoGen} obj\n<< ${info} >>\nendobj\n`,
   ]
   let body = '%PDF-1.4\n'
   const offsets = [0]
@@ -532,9 +562,10 @@ function buildPdf({ title, author, infoBody, extraObjects = '', decoy = null }) 
   const startxref = body.length
   body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
   for (let i = 1; i <= objects.length; i += 1) {
-    body += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`
+    const gen = i === objects.length ? infoGen : 0
+    body += `${String(offsets[i]).padStart(10, '0')} ${String(gen).padStart(5, '0')} n \n`
   }
-  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R /Info 4 0 R >>\nstartxref\n${startxref}\n%%EOF\n`
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R /Info 4 ${refGen} R >>\nstartxref\n${startxref}\n%%EOF\n`
   return Buffer.from(body, 'latin1')
 }
 
@@ -676,7 +707,34 @@ function runFixtures() {
     'a self-referential /Prev must be refused rather than followed forever',
   )
 
-  console.log('pdf info dict GREEN 9 fixtures (litter, nesting, escapes, utf-16, update, objstm, duplicate, loop)')
+  // 10 — a reference names a generation; an object at another one is not it
+  assert.throws(
+    () => readInfoDict(buildPdf({ title: 'Wrong generation', author: 'Ada', infoGen: 1, refGen: 0 })),
+    /generation/,
+    'an /Info whose generation does not match the reference must be refused',
+  )
+
+  // 11 — a cross-reference section appended without a terminating %%EOF is not
+  // a revision. Reading it lets appended bytes name their own /Info.
+  const honest = buildPdf({ title: '', author: '' })
+  let littered2 = honest.toString('latin1')
+  const decoyAt = littered2.length
+  littered2 += '9 0 obj\n<< /Title (Litter) /Author (Litter) >>\nendobj\n'
+  const decoyXref = littered2.length
+  littered2 +=
+    `xref\n0 1\n0000000000 65535 f \n9 1\n${String(decoyAt).padStart(10, '0')} 00000 n \n` +
+    `trailer\n<< /Size 10 /Root 1 0 R /Info 9 0 R /Prev ${lastStartXref(honest)} >>\n` +
+    `startxref\n${decoyXref}\n`
+  assert.throws(
+    () => readInfoDict(Buffer.from(littered2, 'latin1')),
+    /bytes after the last %%EOF/,
+    'a cross-reference section appended after the last %%EOF must not be read',
+  )
+
+  console.log(
+    'pdf info dict GREEN 11 fixtures (litter, nesting, escapes, utf-16, update, objstm, ' +
+      'duplicate, loop, generation, trailing bytes)',
+  )
 }
 
 if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}` || process.argv[1]?.endsWith('pdf_info_dict.mjs')) {

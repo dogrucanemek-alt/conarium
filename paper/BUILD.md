@@ -58,6 +58,8 @@ Three things in that command are load-bearing.
 
 Three container runs from this commit, each into its own empty directory, produced the same PDF SHA-256 and the same tarball SHA-256. That is reproducibility *with this image*; it is not a claim about other TeX distributions, and the build under arXiv's own compiler is a separate thing that this file does not measure.
 
+The tarball was also unpacked on its own, into an empty directory, and compiled there with nothing else present. It produced the same PDF SHA-256 as the row below. The source package is therefore enough on its own to make the published file, which is the property a reader who has only the deposit can check.
+
 ### Checks
 
 ```
@@ -118,7 +120,7 @@ node paper/record-build.mjs --container <registry@sha256:...> --epoch <seconds>
 | container digest | ghcr.io/xu-cheng/texlive-small@sha256:495075f44d717e3d801f1817eedfb95254e16789e5cb12d357f3c3938ccf9b9d |
 | SOURCE_DATE_EPOCH | 1787529600 |
 
-A rebuild from a different commit gets its own row. A rebuild from this commit, with the command above and the epoch in this row, reproduces both hashes.
+A rebuild whose sources differ — anything under `paper/arxiv/` or `paper/LICENSE` — gets its own row. A later commit that changes only checks or prose leaves this row true, and the commit named here is the one whose sources the two files were built from. A rebuild from it, with the command above and the epoch in this row, reproduces both hashes.
 
 ### 23 August 2026 — superseded, never published
 
