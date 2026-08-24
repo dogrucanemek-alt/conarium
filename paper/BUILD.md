@@ -102,7 +102,14 @@ A DOI is permanent and the files cannot be swapped after publication. Everything
 
 ## Build record
 
-The row is written by `paper/record-build.mjs` at final build. Do not fill the value cells by hand. The script refuses to print a row it cannot stand behind: the container must be named by digest, both artefacts must exist, the PDF's `/CreationDate` and `/ModDate` must match the epoch given, every tar member must be normalised, and the working tree must be clean.
+The row is written by `paper/record-build.mjs` at final build. Do not fill the value cells by hand. The script refuses to print a row it cannot stand behind:
+
+- the container must be named by digest, since a tag moves;
+- both artefacts must exist — a missing one is an error, not a cell reading "not present";
+- the PDF's `/CreationDate` and `/ModDate` must match the epoch given, which is what makes its hash reproducible;
+- the package must hold exactly `main.tex`, `refs.bib`, `main.bbl` and `LICENSE`, in that order, each normalised to one owner, one mode and that epoch;
+- the three of those that are tracked must match the commit's blobs byte for byte, so the row cannot name a commit whose sources the package does not carry (`main.bbl` is bibtex output and is not in the repository, so it is the one member this cannot bind);
+- and the working tree must be clean, counting untracked files under `paper/` as dirty, since one of those could have been compiled in.
 
 ```
 node paper/record-build.mjs --container <registry@sha256:...> --epoch <seconds>
@@ -112,11 +119,11 @@ node paper/record-build.mjs --container <registry@sha256:...> --epoch <seconds>
 
 | Field | Value |
 |---|---|
-| commit | e00aa3f4480acbca2f34d8e6c9726dcab77f1d30 |
+| commit | 7468e5872a9e0485a75dc94608832380e9142e60 |
 | PDF SHA-256 | c851c1fd19ccaedce31a54b866ba5adb8b5a44bc6f3143a3948d24ffedf53eb2 |
 | source tarball SHA-256 | 5bf5ebdb04dd6e2f4b24e6d998490df735cd04aa64e2fb0ea9fc1dffaf6c08b5 |
 | tarball members | main.tex, refs.bib, main.bbl, LICENSE |
-| date | 2026-08-24T14:54:31.933Z |
+| date | 2026-08-24T15:55:40.494Z |
 | container digest | ghcr.io/xu-cheng/texlive-small@sha256:495075f44d717e3d801f1817eedfb95254e16789e5cb12d357f3c3938ccf9b9d |
 | SOURCE_DATE_EPOCH | 1787529600 |
 
