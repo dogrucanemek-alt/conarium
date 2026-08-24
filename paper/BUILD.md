@@ -52,7 +52,7 @@ Three things in that command are load-bearing.
 
 **`SOURCE_DATE_EPOCH` fixes the dates pdfTeX stamps into the PDF.** Left unset, `/CreationDate` and `/ModDate` hold the wall clock of that run, so a rebuild produces a different hash and a reader comparing hashes cannot tell a changed clock from a changed paper. `1787529600` is 2026-08-24T00:00:00Z. It must be passed as written; `paper/record-build.mjs` refuses a row whose epoch does not match the dates in the PDF.
 
-**The tarball is built in the same container, from the same directory.** Its members are sorted by name and normalised to one owner, one mode and that same epoch. Building it on the host instead was the earlier mistake: the hash then depended on whichever tar and gzip the host happened to have, and on the mode the files happened to carry.
+**The tarball is built in the same container, from the same directory.** Its members appear in the order the command names them — `--sort=name` orders what tar walks for itself, not arguments given explicitly — and each is normalised to one owner, one mode and that same epoch. Building it on the host instead was the earlier mistake: the hash then depended on whichever tar and gzip the host happened to have, and on the modes the files happened to carry. `paper/record-build.mjs` reads the member names, modes, owners and times back out of the finished tarball and refuses a row if any of them drifted.
 
 ### What was measured
 
@@ -110,13 +110,13 @@ node paper/record-build.mjs --container <registry@sha256:...> --epoch <seconds>
 
 | Field | Value |
 |---|---|
-| commit | |
-| PDF SHA-256 | |
-| source tarball SHA-256 | |
-| tarball members | |
-| date | |
-| container digest | |
-| SOURCE_DATE_EPOCH | |
+| commit | e00aa3f4480acbca2f34d8e6c9726dcab77f1d30 |
+| PDF SHA-256 | c851c1fd19ccaedce31a54b866ba5adb8b5a44bc6f3143a3948d24ffedf53eb2 |
+| source tarball SHA-256 | 5bf5ebdb04dd6e2f4b24e6d998490df735cd04aa64e2fb0ea9fc1dffaf6c08b5 |
+| tarball members | main.tex, refs.bib, main.bbl, LICENSE |
+| date | 2026-08-24T14:54:31.933Z |
+| container digest | ghcr.io/xu-cheng/texlive-small@sha256:495075f44d717e3d801f1817eedfb95254e16789e5cb12d357f3c3938ccf9b9d |
+| SOURCE_DATE_EPOCH | 1787529600 |
 
 A rebuild from a different commit gets its own row. A rebuild from this commit, with the command above and the epoch in this row, reproduces both hashes.
 
