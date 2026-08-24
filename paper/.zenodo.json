@@ -8,7 +8,7 @@
   "creators": [
     {
       "name": "Doğru, Emek Can",
-      "affiliation": "VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey"
+      "affiliation": "VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Turkey"
     }
   ],
   "description": "Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as one conditional impossibility result (Proposition 1) and two normative principles (Principles 2a and 2b). Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions, a bypass path yields two worlds that differ in whether an occurrence happened and share the same record R; no judgement whose only input is R can distinguish them. Principle 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Principle 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes. A worked example of four desk rows and six source rows (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.",
@@ -23,7 +23,7 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "https://www.npmjs.com/package/@conarium-ai/core",
+      "identifier": "https://www.npmjs.com/package/@conarium-ai/core/v/0.2.46",
       "relation": "isSupplementedBy",
       "resource_type": "software",
       "scheme": "url"
@@ -42,5 +42,5 @@
     }
   ],
   "license": "CC-BY-4.0",
-  "notes": "Text of the preprint: CC BY 4.0. The implementing software cited under related_identifiers is MIT-licensed in its own repository. ORCID: not yet supplied."
+  "notes": "Text of the preprint: CC BY 4.0. The implementing software cited under related_identifiers is MIT-licensed in its own repository, and is cited at the version this paper describes rather than at whatever version is latest. ORCID: not yet supplied. This file lives under paper/ and not at the repository root on purpose: it describes the preprint, and a root .zenodo.json is what Zenodo's GitHub integration would apply to a release of the software. publication_date must be re-set to the day the record is actually made public; see paper/BUILD.md."
 }

@@ -2,7 +2,7 @@
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[hidelinks]{hyperref}
+\usepackage[hidelinks,unicode]{hyperref}
 \usepackage{booktabs}
 \usepackage{url}
 \usepackage{amsmath}
@@ -10,18 +10,48 @@
 \emergencystretch=3em
 \tolerance=2000
 
-\title{Two ledgers, one window:\\
-integrity of a mediator's record does not establish its completeness}
-\author{Emek Can Doğru\\
-VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey}
-\date{}
+% Each of these is written once and read twice: on the title page, and in the
+% document information dictionary the PDF carries. A copy of this file that has
+% travelled away from its record has only the second one to say what it is.
+\newcommand{\papertitlefirst}{Two ledgers, one window:}
+\newcommand{\papertitlesecond}{integrity of a mediator's record does not establish its completeness}
+\newcommand{\paperauthorname}{Emek Can Doğru}
+\newcommand{\paperaffiliation}{VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Turkey}
+\newcommand{\papersubject}{A conditional impossibility result and two normative principles for judging a mediator's record against a second book}
+\newcommand{\paperkeywords}{audit, completeness, coverage reconciliation, provenance, receipts, transparency, two clocks}
+
+\title{\papertitlefirst\\
+\papertitlesecond}
+\author{\paperauthorname\\
+\paperaffiliation}
+% A preprint that carries no date leaves a reader holding a copy with no way to
+% tell which draft it is. This is the day these sources were finalised, not the
+% day the record is deposited; those are allowed to differ and usually do.
+\date{Draft of 24 August 2026}
+
+\hypersetup{
+  pdftitle={\papertitlefirst{} \papertitlesecond},
+  pdfauthor={\paperauthorname},
+  pdfsubject={\papersubject},
+  pdfkeywords={\paperkeywords},
+}
 
 \begin{document}
 \maketitle
 
-\section{Abstract}
-
+% The abstract is not a numbered section. Numbering it makes the introduction
+% section 2 and shifts every cross-reference in the paper by one, which is not
+% how the field reads a preprint.
+\begin{abstract}
 Integrity marks on a mediator's record show that the rows still present were not altered, reordered, or removed from the middle after they were written. They do not show that every event that happened was written. This paper states that distinction as one conditional impossibility result (Proposition 1) and two normative principles (Principles 2a and 2b). Proposition 1 (Single-Ledger Insufficiency): under seven stated assumptions, a bypass path yields two worlds that differ in whether an occurrence happened and share the same record $R$; no judgement whose only input is $R$ can distinguish them. Principle 2a (Provenance Ceiling) forbids labelling a bound's standing above the origin of the input it rests on. Principle 2b (Undeclared Does Not Decide) leaves items whose required bound is undeclared indeterminate. The method compares a source activity book against a mediator record over one window on two clocks, and assigns every remaining item to one of five outcome classes. A worked example of four desk rows and six source rows (measured) shows how a second book can decide a miss relative to that book, and how two clocks can take that decision away. Implementing artefacts are listed at the end.
+\end{abstract}
+
+% A copy of this file in a mailbox or a reference manager has left the record
+% page, and its terms, behind. The licence travels with the file.
+\begin{center}
+\copyright{} 2026 \paperauthorname. Licensed under CC BY 4.0
+(\href{https://creativecommons.org/licenses/by/4.0/}{creativecommons.org/licenses/by/4.0}).
+\end{center}
 
 \section{Introduction}
 
@@ -131,7 +161,7 @@ Each class is a statement about the comparison. None is a statement about intent
 
 A comparison with no ``observed without a mediator row'' items establishes that each observed source item is attributable to a mediator row naming the same object, under the declared correspondence. It does not establish that the source's book has no gaps, or that the mediator's file has no gaps, or that nothing happened off both books.
 
-\subsection{Why undecided is mandatory, and why ``clean'' is forbidden}
+\subsection{\texorpdfstring{Why undecided is mandatory, and why ``clean'' is forbidden}{Why undecided is mandatory, and why “clean” is forbidden}}
 
 Two facts force the fifth class.
 
@@ -251,7 +281,7 @@ Hash-chained, MAC-protected log entries are old public art. United States patent
 
 Receiver-attested receipts invert the trust boundary: the service that receives a call signs what it observed. Figuera's \emph{Notarized Agents / Sello} states the residual that remains after inclusion: an inclusion proof answers whether a receipt is in the log; it does not answer whether the log returned every matching receipt~\cite{figuera2026notarized}. The three remedies proposed there (declared) stay on the log side --- a signed exhaustive answer from the log, downloading the whole log, or submitting to several independent logs. Sello v0.1 declines to speak for set completeness. Independently, Nian et al., \emph{Auditable Agents}, name evidence integrity and lifecycle coverage among the most neglected dimensions of current audit approaches~\cite{nian2026auditable}.
 
-A scan dated 6 August 2026 (declared), amended 19 August 2026 (declared) after a related mechanism was raised on the SCITT mailing list, looked at project documentation for enforcement, portable signed receipts, and coverage reconciliation against the data source's own bookkeeping. Source-code-level search was not performed on any repository in the original pass. One row, Vaara, was later scored from source at commit \texttt{befdced} (declared): its design document specifies a join from each used credential to a receipt, and reads a used credential with no matching receipt as a bypassed broker, with the stated limit that this is detection of a defeated broker, not a mathematical-completeness claim~\cite{vaara2026}. At that commit the scan found no collector, join, command, or test implementing the join. That is the only such design the scan found outside the artefacts of Section 10. Reconciling against the data source's own counters was not among the proposals found in the Sello paper or elsewhere in that scan.
+A scan dated 6 August 2026 (declared), amended 19 August 2026 (declared) after a related mechanism was raised on the SCITT mailing list, looked at project documentation for enforcement, portable signed receipts, and coverage reconciliation against the data source's own bookkeeping. Source-code-level search was not performed on any repository in the original pass. One row, Vaara, was later scored from source at commit \texttt{befdced} (declared): its design document specifies a join from each used credential to a receipt, and reads a used credential with no matching receipt as a bypassed broker, with the stated limit that this is detection of a defeated broker, not a mathematical-completeness claim~\cite{vaara2026}. At that commit the scan found no collector, join, command, or test implementing the join. That is the only such design the scan found outside the artefacts of Section 9. Reconciling against the data source's own counters was not among the proposals found in the Sello paper or elsewhere in that scan.
 
 Two near misses are worth naming because they use the same words for different objects. One governance toolkit publishes a ``completeness score'' that measures how many required fields it populated from signals it already collected, and a ``reconciliation'' of discovered agents against a registry. Neither asks whether the data source saw access the chain has no receipt for. A commercial agent monitor that tracks calls made outside a gateway through hooks in client tools sees what the client tells it. That is not the data source's own telemetry, and it comes with no signed receipt.
 
