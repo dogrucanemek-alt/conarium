@@ -2,7 +2,7 @@
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[hidelinks]{hyperref}
+\usepackage[hidelinks,unicode]{hyperref}
 \usepackage{booktabs}
 \usepackage{url}
 \usepackage{amsmath}
@@ -10,11 +10,23 @@
 \emergencystretch=3em
 \tolerance=2000
 
-\title{Two ledgers, one window:\\
-integrity of a mediator's record does not establish its completeness}
-\author{Emek Can Doğru\\
+% The title and the author are written once and read twice: on the title page,
+% and in the document information dictionary the PDF carries. A reader who has
+% only the file, and every archive that indexes it, sees the second one.
+\newcommand{\papertitlefirst}{Two ledgers, one window:}
+\newcommand{\papertitlesecond}{integrity of a mediator's record does not establish its completeness}
+\newcommand{\paperauthorname}{Emek Can Doğru}
+
+\title{\papertitlefirst\\
+\papertitlesecond}
+\author{\paperauthorname\\
 VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, Izmir, Turkey}
 \date{}
+
+\hypersetup{
+  pdftitle={\papertitlefirst{} \papertitlesecond},
+  pdfauthor={\paperauthorname},
+}
 
 \begin{document}
 \maketitle

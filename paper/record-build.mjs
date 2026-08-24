@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 /**
  * Print a markdown build-record table for the preprint PDF.
- * Hashes and the commit are read from the tree. The container digest is
- * supplied with --container; this script does not invent one.
+ * Hashes and the commit are read from the tree. The container digest and the
+ * SOURCE_DATE_EPOCH the build ran under are supplied as arguments; this script
+ * does not invent either. Both belong in the row: pdfTeX stamps that epoch into
+ * /CreationDate, so a reader who rebuilds without it gets a different PDF hash
+ * and cannot tell a moved timestamp from a moved paper.
  */
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -27,8 +30,13 @@ function sha256OrMissing(rel) {
 }
 
 const container = argValue('--container')
-if (!container) {
-  console.error('usage: node paper/record-build.mjs --container <digest>')
+const epoch = argValue('--epoch')
+if (!container || !epoch) {
+  console.error('usage: node paper/record-build.mjs --container <digest> --epoch <SOURCE_DATE_EPOCH>')
+  process.exit(2)
+}
+if (!/^\d+$/.test(epoch)) {
+  console.error(`--epoch must be the integer passed as SOURCE_DATE_EPOCH, not ${JSON.stringify(epoch)}`)
   process.exit(2)
 }
 
@@ -50,6 +58,7 @@ process.stdout.write(
     `| source tarball SHA-256 | ${tarball} |`,
     `| date | ${date} |`,
     `| container digest | ${container} |`,
+    `| SOURCE_DATE_EPOCH | ${epoch} |`,
     '',
   ].join('\n'),
 )
