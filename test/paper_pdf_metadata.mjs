@@ -34,7 +34,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readInfoDict } from './pdf_info_dict.mjs'
+import { readInfoDict, readOutlineTitles } from './pdf_info_dict.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const tex = readFileSync(join(root, 'paper/arxiv/main.tex'), 'utf8')
@@ -57,6 +57,7 @@ function command(name) {
 const titleFirst = command('papertitlefirst')
 const titleSecond = command('papertitlesecond')
 const author = command('paperauthorname')
+const affiliation = command('paperaffiliation')
 const subject = command('papersubject')
 const keywords = command('paperkeywords')
 
@@ -72,8 +73,8 @@ const expected = {
 const wiring = [
   [/\\title\{\s*\\papertitlefirst\\\\\s*\\papertitlesecond\s*\}/,
     'the title page must expand the title macros, not a second hand-typed copy'],
-  [/\\author\{\s*\\paperauthorname\\\\/,
-    'the title page must expand \\paperauthorname, not a second hand-typed copy'],
+  [/\\author\{\s*\\paperauthorname\\\\\s*\\paperaffiliation\s*\}/,
+    'the title page must expand \\paperauthorname and \\paperaffiliation, not hand-typed copies'],
   [/pdftitle=\{\\papertitlefirst\{\}\s\\papertitlesecond\}/,
     'hypersetup pdftitle must expand the same two title macros'],
   [/pdfauthor=\{\\paperauthorname\}/, 'hypersetup pdfauthor must expand the author macro'],
@@ -85,6 +86,30 @@ const wiring = [
     'hyperref must be loaded with the unicode option — the author name is not PDFDocEncoding'],
 ]
 for (const [pattern, message] of wiring) assert.ok(pattern.test(tex), message)
+
+// Finding the right \title is not enough. LaTeX takes the last declaration, so
+// a second \title further down sets what the page shows while \hypersetup, and
+// therefore the dictionary, still reads the macros. The page and the metadata
+// would then disagree and both checks above would pass. Each of these may be
+// declared once and only once.
+for (const [name, count] of [
+  ['title', 1], ['author', 1], ['date', 1], ['hypersetup', 1], ['maketitle', 1],
+]) {
+  const found = [...tex.matchAll(new RegExp(`(?<!\\\\newcommand\\{)\\\\${name}(?![a-zA-Z])`, 'g'))].length
+  assert.equal(
+    found,
+    count,
+    `main.tex declares \\${name} ${found} times; the last declaration is the one that ` +
+      `takes effect, so more than ${count} means the page and the dictionary can disagree`,
+  )
+}
+// The same hole, reached the other way: redefining a macro after it is read.
+const redefined = [...tex.matchAll(/\\renewcommand\{\\paper[a-z]*\}/g)].map((m) => m[0])
+assert.equal(
+  redefined.length,
+  0,
+  `these redefine a name the metadata is built from: ${redefined.join(', ')}`,
+)
 
 // A bookmark is built from the section title, and LaTeX quoting survives into
 // it unless the heading says what the bookmark should read instead. One such
@@ -105,6 +130,13 @@ assert.equal(
   zenodo.title,
   expected.Title,
   'paper/.zenodo.json title must be the title the tex names; one of the two has drifted',
+)
+assert.ok(Array.isArray(zenodo.creators) && zenodo.creators.length > 0, 'paper/.zenodo.json must list creators')
+assert.equal(
+  zenodo.creators[0].affiliation,
+  affiliation,
+  'paper/.zenodo.json affiliation must be the affiliation the tex names; ' +
+    'the deposit record and the title page would otherwise place the author differently',
 )
 assert.ok(Array.isArray(zenodo.keywords), 'paper/.zenodo.json must list keywords')
 assert.equal(
@@ -165,6 +197,19 @@ for (const [key, want] of Object.entries(expected)) {
   assert.notEqual(got.trim(), '', `/${key} is present but empty — pdfTeX wrote /${key}()`)
   assert.equal(got, want, `/${key} must read ${JSON.stringify(want)}, not ${JSON.stringify(got)}`)
 }
+
+// The outline is the other place the artefact speaks for itself. The tex check
+// above looks for quote syntax in headings; this reads what the contents pane
+// will actually show, which is the thing that was wrong before anyone looked.
+const outline = readOutlineTitles(bytes)
+assert.ok(outline.length > 0, 'the PDF has no outline; the headings produced no bookmarks')
+const rawSyntax = outline.filter((title) => /``|''|\\[a-zA-Z]+/.test(title))
+assert.equal(
+  rawSyntax.length,
+  0,
+  `these bookmark titles carry LaTeX source syntax rather than the characters a reader ` +
+    `should see:\n  ${rawSyntax.join('\n  ')}`,
+)
 
 const where = releasePath ? pdfPath : relative(root, pdfPath)
 console.log(

@@ -438,6 +438,16 @@ function readXrefChain(buf) {
       trailer = stream.dict
     }
     assert.ok(trailer instanceof Map, 'cross-reference section has no trailer dictionary')
+    // A hybrid-reference file carries a classic table for old readers and an
+    // /XRefStm that newer ones prefer. The two can disagree about where an
+    // object lives, so a reader that ignores /XRefStm resolves a different
+    // object than the reader the artefact is meant for. This one does ignore
+    // it, so it refuses the file rather than answering for the wrong reader.
+    assert.ok(
+      !trailer.has('XRefStm'),
+      'this file is hybrid-reference (/XRefStm). A reader that honours /XRefStm may resolve ' +
+        'different objects than this one does, so no answer given here would be trustworthy.',
+    )
     trailers.push(trailer)
     const prev = trailer.get('Prev')
     offset = typeof prev === 'number' ? prev : undefined
@@ -537,6 +547,61 @@ export function readInfoDict(buf) {
   return out
 }
 
+/**
+ * Every bookmark title in the document outline, in order. This is what a reader
+ * sees in the contents pane — built from the section headings, and a place
+ * where LaTeX source syntax has appeared verbatim before now.
+ */
+export function readOutlineTitles(buf) {
+  const { entries, trailers } = readXrefChain(buf)
+  let rootRef
+  for (const trailer of trailers) {
+    if (trailer.has('Root')) {
+      rootRef = trailer.get('Root')
+      break
+    }
+  }
+  assert.ok(rootRef !== undefined, 'no trailer names a /Root')
+  const catalog = resolve(buf, entries, rootRef)
+  assert.ok(catalog instanceof Map, '/Root does not resolve to a dictionary')
+  assert.ok(
+    catalog.has('Outlines'),
+    `the catalogue names no /Outlines; it carries ${[...catalog.keys()].join(', ')}`,
+  )
+  const outlines = resolve(buf, entries, catalog.get('Outlines'))
+  assert.ok(outlines instanceof Map, '/Outlines does not resolve to a dictionary')
+  const titles = []
+  const seen = new Set()
+  const walk = (ref, depth) => {
+    let current = ref
+    while (current !== undefined && current !== null) {
+      const key = current instanceof Ref ? `${current.num} ${current.gen}` : null
+      if (key !== null) {
+        assert.ok(!seen.has(key), `the outline revisits object ${key}`)
+        seen.add(key)
+      }
+      const item = resolve(buf, entries, current)
+      assert.ok(item instanceof Map, 'an outline entry does not resolve to a dictionary')
+      // The title is usually an indirect reference to a string object, not the
+      // string itself. Reading only the direct case finds nothing and says so
+      // as an empty outline, which is the wrong answer rather than no answer.
+      if (item.has('Title')) {
+        const title = resolve(buf, entries, item.get('Title'))
+        assert.ok(title instanceof PdfString, 'an outline /Title is not a string')
+        titles.push(decodeTextString(title.bytes))
+      }
+      if (item.has('First') && depth < 32) walk(item.get('First'), depth + 1)
+      current = item.get('Next')
+    }
+  }
+  assert.ok(
+    outlines.has('First'),
+    `/Outlines names no /First; it carries ${[...outlines.keys()].join(', ')}`,
+  )
+  walk(outlines.get('First'), 0)
+  return titles
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures. Run this file directly to execute them.
 // ---------------------------------------------------------------------------
@@ -566,6 +631,48 @@ function buildPdf({ title, author, infoBody, extraObjects = '', decoy = null, in
     body += `${String(offsets[i]).padStart(10, '0')} ${String(gen).padStart(5, '0')} n \n`
   }
   body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R /Info 4 ${refGen} R >>\nstartxref\n${startxref}\n%%EOF\n`
+  return Buffer.from(body, 'latin1')
+}
+
+/**
+ * A PDF with an outline whose titles are indirect references to UTF-16BE
+ * strings — the shape hyperref produces, and the one an earlier version of the
+ * outline reader walked straight past.
+ */
+function buildOutlinedPdf(titles) {
+  const n = titles.length
+  const itemAt = (i) => 6 + i
+  const stringAt = (i) => 6 + n + i
+  const bodies = [
+    '<< /Type /Catalog /Pages 2 0 R /Outlines 5 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>',
+    '<< /Title (doc) /Author (Ada) >>',
+    `<< /Type /Outlines /First ${itemAt(0)} 0 R /Last ${itemAt(n - 1)} 0 R /Count ${n} >>`,
+  ]
+  for (let i = 0; i < n; i += 1) {
+    const links = [
+      i > 0 ? `/Prev ${itemAt(i - 1)} 0 R` : '',
+      i < n - 1 ? `/Next ${itemAt(i + 1)} 0 R` : '',
+    ].filter(Boolean).join(' ')
+    bodies.push(`<< /Title ${stringAt(i)} 0 R /Parent 5 0 R ${links} >>`)
+  }
+  for (const title of titles) {
+    const utf16 = Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(title, 'utf16le').swap16()])
+    bodies.push(`<${utf16.toString('hex').toUpperCase()}>`)
+  }
+  let body = '%PDF-1.4\n'
+  const offsets = [0]
+  bodies.forEach((dict, index) => {
+    offsets.push(body.length)
+    body += `${index + 1} 0 obj\n${dict}\nendobj\n`
+  })
+  const startxref = body.length
+  body += `xref\n0 ${bodies.length + 1}\n0000000000 65535 f \n`
+  for (let i = 1; i <= bodies.length; i += 1) {
+    body += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`
+  }
+  body += `trailer\n<< /Size ${bodies.length + 1} /Root 1 0 R /Info 4 0 R >>\nstartxref\n${startxref}\n%%EOF\n`
   return Buffer.from(body, 'latin1')
 }
 
@@ -731,9 +838,27 @@ function runFixtures() {
     'a cross-reference section appended after the last %%EOF must not be read',
   )
 
+  // 12 — a hybrid-reference file. The classic table this reader understands and
+  // the /XRefStm a newer reader prefers can point at different objects, so an
+  // answer from here would be an answer for the wrong reader.
+  const hybridSource = buildPdf({ title: 'Hybrid', author: 'Ada' }).toString('latin1')
+  const hybrid = Buffer.from(
+    hybridSource.replace('/Info 4 0 R >>', '/Info 4 0 R /XRefStm 9 >>'),
+    'latin1',
+  )
+  assert.throws(
+    () => readInfoDict(hybrid),
+    /hybrid-reference/,
+    'a file carrying /XRefStm must be refused rather than read with half its cross-references',
+  )
+
+  // 13 — the outline, and its titles held as indirect references
+  const outlined = readOutlineTitles(buildOutlinedPdf(['Alpha', 'Beta “quoted”']))
+  assert.deepEqual(outlined, ['Alpha', 'Beta “quoted”'])
+
   console.log(
-    'pdf info dict GREEN 11 fixtures (litter, nesting, escapes, utf-16, update, objstm, ' +
-      'duplicate, loop, generation, trailing bytes)',
+    'pdf info dict GREEN 13 fixtures (litter, nesting, escapes, utf-16, update, objstm, ' +
+      'duplicate, loop, generation, trailing bytes, hybrid, outline)',
   )
 }
 

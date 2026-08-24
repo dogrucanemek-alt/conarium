@@ -69,15 +69,21 @@ if (!/^\d+$/.test(epoch)) {
   fail(`--epoch must be the integer passed as SOURCE_DATE_EPOCH, not ${JSON.stringify(epoch)}`)
 }
 
-// The commit only describes the artefacts if nothing is uncommitted.
-const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' })
+// The commit only describes the artefacts if nothing is uncommitted. Untracked
+// files elsewhere in the repository are somebody's scratch and do not touch the
+// build; an untracked file under paper/ could have been compiled into it, so
+// those count as dirty too.
+const status = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' })
   .split('\n')
   .filter((line) => line.trim() !== '')
-  .filter((line) => !line.startsWith('?? '))
+const dirty = status.filter((line) => {
+  if (!line.startsWith('?? ')) return true
+  const path = line.slice(3).replace(/^"|"$/g, '')
+  return path.startsWith('paper/') && !path.startsWith('paper/build/')
+})
 if (dirty.length > 0) {
   fail(
-    `the working tree has uncommitted changes, so a commit hash would not describe ` +
-      `what was built:\n  ${dirty.join('\n  ')}`,
+    `the working tree has changes the commit would not describe:\n  ${dirty.join('\n  ')}`,
   )
 }
 
@@ -123,11 +129,44 @@ for (let at = 0; at + 512 <= tar.length; ) {
     gid: octal(116, 8),
     size: octal(124, 12),
     mtime: octal(136, 12),
+    content: tar.subarray(at + 512, at + 512 + octal(124, 12)),
   }
   members.push(member)
   at += 512 + Math.ceil(member.size / 512) * 512
 }
 if (members.length === 0) fail(`${tarPath} has no members`)
+
+// What is in the package, and nothing else. Without this the tarball could
+// carry anything at all and still be recorded, as long as the bytes it carried
+// were normalised.
+const ALLOWED = ['main.tex', 'refs.bib', 'main.bbl', 'LICENSE']
+const names = members.map((m) => m.name)
+if (names.length !== ALLOWED.length || names.some((name, i) => name !== ALLOWED[i])) {
+  fail(
+    `${tarPath} holds ${names.join(', ')}; the package is exactly ${ALLOWED.join(', ')} ` +
+      `in that order`,
+  )
+}
+
+// And it must be *this* commit's sources, not whatever was lying in the build
+// directory. main.bbl is bibtex output and is not in the repository, so it is
+// the one member this cannot bind; the PDF date check above is what ties the
+// compile to the epoch.
+const fromCommit = { 'main.tex': 'paper/arxiv/main.tex', 'refs.bib': 'paper/arxiv/refs.bib', LICENSE: 'paper/LICENSE' }
+for (const [member, tracked] of Object.entries(fromCommit)) {
+  const packaged = members.find((m) => m.name === member).content
+  const committed = execFileSync('git', ['show', `${commit}:${tracked}`], {
+    cwd: root,
+    encoding: 'buffer',
+    maxBuffer: 64 * 1024 * 1024,
+  })
+  if (Buffer.compare(packaged, committed) !== 0) {
+    fail(
+      `${tarPath} member ${member} is not ${tracked} at ${commit.slice(0, 12)}. ` +
+        `The package would name a commit whose sources it does not carry.`,
+    )
+  }
+}
 for (const member of members) {
   const wrong = []
   if (member.mtime !== Number(epoch)) wrong.push(`mtime ${member.mtime} (expected ${epoch})`)
