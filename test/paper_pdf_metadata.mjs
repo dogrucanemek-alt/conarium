@@ -66,6 +66,16 @@ assert.ok(
 
 const expectedTitle = `${titleFirst} ${titleSecond}`
 
+// The deposit metadata is the third place the title is written down, and the
+// only one a reader of the Zenodo record sees before opening the file. It is
+// typed by hand there, so it is compared here rather than trusted.
+const zenodo = JSON.parse(readFileSync(join(root, 'paper/.zenodo.json'), 'utf8'))
+assert.equal(
+  zenodo.title,
+  expectedTitle,
+  'paper/.zenodo.json title must be the title the tex names; one of the two has drifted',
+)
+
 // Property 2 — the built artefact, when there is one.
 const argPath = process.argv[2]
 const pdfPath = argPath
