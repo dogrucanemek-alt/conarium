@@ -9,7 +9,7 @@ This machine has no `pandoc`, no `xelatex`, and no `tectonic` (`where.exe` was e
 - **23 August 2026** — first build. 15 pages, exit 0, no undefined references. Not published; see the superseded row at the end of this file for the three faults it carried.
 - **24 August 2026** — the build this file describes. 16 pages, exit 0, no undefined references. The preamble names title, author, subject and keywords once each and `\hypersetup` reads them, so the document information dictionary is filled. The licence is stated on the page. Both artefacts are produced inside the pinned container and reproduce byte for byte.
 
-The 16th page is the licence line's doing: three lines added at the top of the body push the tail of the paper over. Section and subsection counts did not change.
+The 16th page is what the additions to the front matter push over: a date line, a licence line, and an abstract set as an environment rather than as a numbered section. Page 16 carries the tail of the bibliography and nothing else — no heading was orphaned and no table was split, which was checked by rendering the pages rather than by counting them. The abstract stopping being a `\section` is why the tex now has ten of those and not eleven; the subsection count is unchanged.
 
 ## Correspondence (source vs tex)
 
@@ -120,11 +120,11 @@ node paper/record-build.mjs --container <registry@sha256:...> --epoch <seconds>
 
 | Field | Value |
 |---|---|
-| commit | 7468e5872a9e0485a75dc94608832380e9142e60 |
-| PDF SHA-256 | c851c1fd19ccaedce31a54b866ba5adb8b5a44bc6f3143a3948d24ffedf53eb2 |
-| source tarball SHA-256 | 5bf5ebdb04dd6e2f4b24e6d998490df735cd04aa64e2fb0ea9fc1dffaf6c08b5 |
+| commit | 2a2b63edd655ae3cd5df333f2e9d105e179a3efa |
+| PDF SHA-256 | 767251a0bc9404cad97d2e30f71bde7aff864ccb938024ea85e79f74be95ba1d |
+| source tarball SHA-256 | eda47237a5afc908e3ca39c55d344301b1b007b9160ad4ca035fcf576659f51d |
 | tarball members | main.tex, refs.bib, main.bbl, LICENSE |
-| date | 2026-08-24T15:55:40.494Z |
+| date | 2026-08-24T16:20:26.946Z |
 | container digest | ghcr.io/xu-cheng/texlive-small@sha256:495075f44d717e3d801f1817eedfb95254e16789e5cb12d357f3c3938ccf9b9d |
 | SOURCE_DATE_EPOCH | 1787529600 |
 
