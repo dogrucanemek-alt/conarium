@@ -117,11 +117,11 @@ Both files are replaced by the row below. Nothing that cites them needs revising
 
 | Field | Value |
 |---|---|
-| commit | |
-| PDF SHA-256 | |
-| source tarball SHA-256 | |
-| date | |
-| container digest | |
-| SOURCE_DATE_EPOCH | |
+| commit | 9e6f695a465a6c81a2b73436d85544eea324fe3c |
+| PDF SHA-256 | 05135c589990b0f9136866fec4b23edfbb4353a6b4a069e2475960fe921e739d |
+| source tarball SHA-256 | bc311a8b4daae5b41744f7c84c0fcf54390fb32df8f1ab2534091bd911eb63e0 |
+| date | 2026-08-24T13:47:45.905Z |
+| container digest | ghcr.io/xu-cheng/texlive-small@sha256:495075f44d717e3d801f1817eedfb95254e16789e5cb12d357f3c3938ccf9b9d |
+| SOURCE_DATE_EPOCH | 1787529600 |
 
 A rebuild from a different commit gets its own row. A rebuild from *this* commit, with the commands above and the epoch in this row, reproduces both hashes — measured, not assumed. If it does not, one of the two files is not what this file says it is, and that is the answer the check is there to give.
