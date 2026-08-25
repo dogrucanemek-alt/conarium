@@ -31,24 +31,33 @@ const (
 var metaV3 = map[string]bool{"protocol": true, "operator-declared": true, "undeclared": true}
 
 type options struct {
-	target          string
-	pubkeys         []string
-	countersign     bool
-	inclusion       string
-	expectSeqFrom   *int
-	expectCount     *int
-	expectLastHash  string
-	strict          bool
-	jsonOut         bool
+	target         string
+	pubkeys        []string
+	countersign    bool
+	inclusion      string
+	expectSeqFrom  *int
+	expectCount    *int
+	expectLastHash string
+	strict         bool
+	jsonOut        bool
+	help           bool
+}
+
+func printUsage() {
+	fmt.Fprintln(os.Stderr, "Usage: verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--strict] [--json]")
+	fmt.Fprintln(os.Stderr, "       verify --countersign <record.json> --pubkey <path> [--inclusion <proof.json>]")
 }
 
 func main() {
 	opts, err := parseArgs(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, "Usage: verify <file|dir> --pubkey <path> [--pubkey <path2> ...] [--expect-seq-from N] [--expect-count N] [--expect-last-hash sha256:…] [--strict] [--json]")
-		fmt.Fprintln(os.Stderr, "       verify --countersign <record.json> --pubkey <path> [--inclusion <proof.json>]")
-		os.Exit(20)
+		printUsage()
+		os.Exit(2)
+	}
+	if opts.help {
+		printUsage()
+		return
 	}
 	if opts.countersign {
 		os.Exit(runCountersign(opts))
@@ -116,7 +125,7 @@ func parseArgs(argv []string) (options, error) {
 		case "--json":
 			o.jsonOut = true
 		case "--help", "-h":
-			return o, fmt.Errorf("help")
+			o.help = true
 		default:
 			if strings.HasPrefix(a, "-") {
 				return o, fmt.Errorf("unknown flag: %s", a)
@@ -126,6 +135,9 @@ func parseArgs(argv []string) (options, error) {
 			}
 			o.target = a
 		}
+	}
+	if o.help {
+		return o, nil
 	}
 	if o.target == "" {
 		return o, fmt.Errorf("missing <file|dir>")
@@ -352,10 +364,11 @@ func loadPubkeys(paths []string) (map[string]ed25519.PublicKey, int, string) {
 func loadReceipts(target string) ([]map[string]any, int, string) {
 	st, err := os.Stat(target)
 	if err != nil {
-		return nil, 20, fmt.Sprintf("path not found: %s", target)
+		return nil, 2, fmt.Sprintf("path not found: %s", target)
 	}
+	isDir := st.IsDir()
 	var files []string
-	if st.IsDir() {
+	if isDir {
 		_ = filepath.WalkDir(target, func(p string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return err
@@ -395,6 +408,18 @@ func loadReceipts(target string) ([]map[string]any, int, string) {
 		for i, line := range lines {
 			v, err := decodeJSON([]byte(line))
 			if err != nil {
+				if json.Valid(bytes.TrimSpace(raw)) {
+					msg := fmt.Sprintf(
+						"%s is JSON but not JSONL: this reads one receipt per line, and line %d is not a complete JSON document on its own. Convert it with `jq -c .`, or pass a file that already has one receipt per line.",
+						file,
+						i+1,
+					)
+					if isDir {
+						fmt.Fprintf(os.Stderr, "skipped, not receipts: %s\n", msg)
+						break
+					}
+					return nil, 2, msg
+				}
 				return nil, 20, fmt.Sprintf("invalid JSON in %s:%d: %v", file, i+1, err)
 			}
 			if arr, ok := v.([]any); ok {
@@ -631,11 +656,11 @@ func runReceipts(opts options) int {
 	if opts.strict && !tailPinned {
 		return fail(11, "strict mode requires a tail pin: --expect-count, --expect-last-hash, or --anchor-check", opts.jsonOut, nil)
 	}
-	keys, code, msg := loadPubkeys(opts.pubkeys)
+	receipts, code, msg := loadReceipts(opts.target)
 	if code != 0 {
 		return fail(code, msg, opts.jsonOut, nil)
 	}
-	receipts, code, msg := loadReceipts(opts.target)
+	keys, code, msg := loadPubkeys(opts.pubkeys)
 	if code != 0 {
 		return fail(code, msg, opts.jsonOut, nil)
 	}
