@@ -4,7 +4,8 @@
  * One exit-code mismatch is a failure. The vectors are the contract.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -24,7 +25,11 @@ function builtVerifier() {
 }
 
 function runNode(file, args) {
-  const r = spawnSync(process.execPath, [nodeBin, file, ...args], {
+  return runNodeArgs([file, ...args])
+}
+
+function runNodeArgs(args) {
+  const r = spawnSync(process.execPath, [nodeBin, ...args], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -33,7 +38,11 @@ function runNode(file, args) {
 }
 
 function runGo(file, args) {
-  const r = spawnSync(builtVerifier(), [file, ...args], {
+  return runGoArgs([file, ...args])
+}
+
+function runGoArgs(args) {
+  const r = spawnSync(builtVerifier(), args, {
     cwd: goDir,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -61,6 +70,31 @@ for (const c of manifest.cases) {
   const go = runGo(file, args)
   const ok = node === c.exitCode && go === c.exitCode && node === go
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${c.name}  expected ${c.exitCode}  node ${node}  go ${go}`)
+  if (!ok) failed++
+}
+
+const tmp = mkdtempSync(join(tmpdir(), 'cnr-go-diff-'))
+const pretty = join(tmp, 'pretty.json')
+writeFileSync(pretty, '{\n  "a": 1\n}\n')
+const mixed = join(tmp, 'mixed')
+mkdirSync(mixed)
+copyFileSync(join(root, 'test-vectors', '001-single-receipt', 'receipts.jsonl'), join(mixed, 'receipts.jsonl'))
+writeFileSync(join(mixed, 'expected-hashes.json'), '{\n  "note": "not a receipt"\n}\n')
+const key = join(root, 'test-vectors', 'keys', 'vector-key.pub.pem')
+const invocationCases = [
+  ['help', ['--help'], 0],
+  ['no arguments', [], 2],
+  ['unknown flag', ['--not-a-real-flag'], 2],
+  ['missing target', [join(tmp, 'missing.jsonl'), '--pubkey', key], 2],
+  ['missing target without unrelated key flag', [join(tmp, 'missing.jsonl')], 2],
+  ['valid JSON that is not JSONL', [pretty, '--pubkey', key], 2],
+  ['directory skips named non-receipt JSON', [mixed, '--pubkey', key], 0],
+]
+for (const [name, args, expected] of invocationCases) {
+  const node = runNodeArgs(args)
+  const go = runGoArgs(args)
+  const ok = node === expected && go === expected && node === go
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  expected ${expected}  node ${node}  go ${go}`)
   if (!ok) failed++
 }
 
