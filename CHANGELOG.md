@@ -11,6 +11,15 @@ The preprint's text is CC BY 4.0 (`paper/LICENSE`); the software stays
 MIT. The Zenodo record carries that licence. Nothing here changes a
 tool.
 
+**The Go verifier now exits like the Node verifier everywhere, not just
+on the vectors.** Outside the thirteen frozen vectors, seven invocation
+cases diverged: help and usage exits, a missing target, valid JSON that
+is not JSONL, and directory mode beside a non-receipt JSON file. The
+finding, the differential guard that pins all seven, and the fix are
+Iman Schrock's (EMILIA Protocol), PR #72. The guard landed first and
+failed 7/7 against the unpatched tree; the fix landed second and the
+same guard passes.
+
 ## 0.2.47 - a number for the paper and the kit
 
 v0.2.46 is on npm. Two things that are not that package now exist in
