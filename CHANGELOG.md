@@ -13,12 +13,13 @@ tool.
 
 **The Go verifier now exits like the Node verifier everywhere, not just
 on the vectors.** Outside the thirteen frozen vectors, seven invocation
-cases diverged: help and usage exits, a missing target, valid JSON that
-is not JSONL, and directory mode beside a non-receipt JSON file. The
-finding, the differential guard that pins all seven, and the fix are
-Iman Schrock's (EMILIA Protocol), PR #72. The guard landed first and
-failed 7/7 against the unpatched tree; the fix landed second and the
-same guard passes.
+cases diverged: three usage exits (`--help`, no arguments, an unknown
+flag), two missing targets (with and without an unrelated key flag),
+valid JSON that is not JSONL, and directory mode beside a named
+non-receipt JSON file. The finding, the differential guard that pins all
+seven, and the fix are Iman Schrock's (EMILIA Protocol), PR #72. The
+guard landed first and failed 7/7 against the unpatched tree; the fix
+landed second and the same guard passes.
 
 ## 0.2.47 - a number for the paper and the kit
 
