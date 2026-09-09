@@ -50,20 +50,26 @@ function caretCovers(range, version) {
 }
 
 // ---------------------------------------------------------------- 1. coverage
-// Every `npx <command>` in the README must have a launcher. This is the check
-// that would have caught the original bug on the day it shipped.
-const readme = readFileSync(join(root, 'README.md'), 'utf8')
-const documented = new Set(
-  [...readme.matchAll(/npx\s+(?:-p\s+\S+\s+)?(conarium[a-z-]*)/g)].map((m) => m[1])
-)
+// The line is every bin the core package publishes, not every bin the README
+// happens to mention: the bin map ships inside the public tarball, so those
+// names are readable by anyone, and an edit to the docs must not be able to
+// move a name out of our control without this going red.
 const present = new Set(
   readdirSync(wrappersDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)
 )
-for (const cmd of documented) {
+for (const cmd of Object.keys(core.bin || {})) {
   if (!present.has(cmd)) {
-    fail(`README documents \`npx ${cmd}\` but wrappers/${cmd} does not exist — that command answers E404.`)
+    fail(`${core.name} ships a bin called "${cmd}" but wrappers/${cmd} does not exist — \`npx ${cmd}\` answers E404 and the name is free for anyone to take.`)
+  }
+}
+
+// The other direction: docs pointing at a command the package does not ship.
+const readme = readFileSync(join(root, 'README.md'), 'utf8')
+for (const [, cmd] of readme.matchAll(/npx\s+(?:-p\s+\S+\s+)?(conarium[a-z-]*)/g)) {
+  if (!(core.bin || {})[cmd]) {
+    fail(`README documents \`npx ${cmd}\` but ${core.name} does not ship that bin.`)
   }
 }
 
@@ -153,5 +159,5 @@ if (failures.length) {
   process.exit(1)
 }
 console.log(
-  `wrapper_launchers: ok (${present.size} launchers, ${EXPECTED.length} exit codes forwarded, README coverage checked)`
+  `wrapper_launchers: ok (${present.size} launchers covering ${Object.keys(core.bin || {}).length} core bins, ${EXPECTED.length} exit codes forwarded)`
 )

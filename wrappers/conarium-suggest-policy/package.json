@@ -1,0 +1,36 @@
+{
+  "name": "conarium-suggest-policy",
+  "version": "1.0.0",
+  "description": "Launcher for the conarium-suggest-policy command from @conarium-ai/core (suggest a policy from observed traffic).",
+  "keywords": [
+    "conarium",
+    "cli",
+    "audit",
+    "receipts",
+    "verification"
+  ],
+  "license": "MIT",
+  "homepage": "https://conarium.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dogrucanemek-alt/conarium.git",
+    "directory": "wrappers/conarium-suggest-policy"
+  },
+  "bugs": {
+    "url": "https://github.com/dogrucanemek-alt/conarium/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "conarium-suggest-policy": "bin/cli.cjs"
+  },
+  "files": [
+    "bin/cli.cjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@conarium-ai/core": "^0.2.48"
+  }
+}

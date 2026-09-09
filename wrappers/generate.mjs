@@ -23,8 +23,10 @@ const CORE_RANGE = `^${core.version}`
 // LF, whatever the checkout did to the source file: these are published artefacts.
 const LICENSE = readFileSync(join(repoRoot, 'LICENSE'), 'utf8').split('\r\n').join('\n')
 
-// Only commands that appear in public documentation are published. A launcher
-// for a command nobody is told to run buys nothing and still has to be kept alive.
+// The line is every bin @conarium-ai/core publishes, not every bin the README
+// happens to mention. The bin map ships inside the public package, so these
+// names are already readable by anyone — and a documentation edit should never
+// silently move a name out of our control.
 const COMMANDS = [
   ['conarium', 'the Conarium gateway'],
   ['conarium-verify', 'verify a receipt chain'],
@@ -37,6 +39,8 @@ const COMMANDS = [
   ['conarium-reconcile', 'reconcile a chain against the source database'],
   ['conarium-anchor-service', 'submit a chain head for anchoring'],
   ['conarium-anchor-upgrade', 'upgrade pending anchor proofs'],
+  ['conarium-token-sync', 'sync API tokens'],
+  ['conarium-suggest-policy', 'suggest a policy from observed traffic'],
 ]
 
 const cli = (name) => `#!/usr/bin/env node
