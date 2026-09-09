@@ -36,6 +36,19 @@ const core = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const failures = []
 const fail = (msg) => failures.push(msg)
 
+// Enough of caret semantics for this check, without pulling in a dependency:
+// ^1.2.3 allows <2.0.0, ^0.2.3 allows <0.3.0, ^0.0.3 allows only 0.0.3.
+function caretCovers(range, version) {
+  if (!range.startsWith('^')) return range === version
+  const [rMajor, rMinor, rPatch] = range.slice(1).split('.').map(Number)
+  const [vMajor, vMinor, vPatch] = version.split('.').map(Number)
+  if ([rMajor, rMinor, rPatch, vMajor, vMinor, vPatch].some(Number.isNaN)) return false
+  if (vMajor !== rMajor) return false
+  if (rMajor > 0) return vMinor > rMinor || (vMinor === rMinor && vPatch >= rPatch)
+  if (vMinor !== rMinor) return false
+  return rMinor > 0 ? vPatch >= rPatch : vPatch === rPatch
+}
+
 // ---------------------------------------------------------------- 1. coverage
 // Every `npx <command>` in the README must have a launcher. This is the check
 // that would have caught the original bug on the day it shipped.
@@ -77,6 +90,11 @@ for (const name of present) {
   const dep = (pkg.dependencies || {})[core.name]
   if (!dep) {
     fail(`wrappers/${name}: does not depend on ${core.name}, so the command it forwards to is not installed.`)
+  } else if (!caretCovers(dep, core.version)) {
+    // A caret range on a 0.x version stops at the minor. Once core moves to
+    // 0.3.0 every launcher silently keeps installing 0.2.x, and `npx` starts
+    // handing people an old tool while every other check stays green.
+    fail(`wrappers/${name}: depends on ${core.name}@${dep}, which does not cover the current ${core.version}. Re-run node wrappers/generate.mjs and republish.`)
   }
   const files = pkg.files || []
   if (!files.length || files.some((f) => f.startsWith('!'))) {
