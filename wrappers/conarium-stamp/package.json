@@ -1,0 +1,36 @@
+{
+  "name": "conarium-stamp",
+  "version": "1.0.0",
+  "description": "Launcher for the conarium-stamp command from @conarium-ai/core (stamp a document).",
+  "keywords": [
+    "conarium",
+    "cli",
+    "audit",
+    "receipts",
+    "verification"
+  ],
+  "license": "MIT",
+  "homepage": "https://conarium.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dogrucanemek-alt/conarium.git",
+    "directory": "wrappers/conarium-stamp"
+  },
+  "bugs": {
+    "url": "https://github.com/dogrucanemek-alt/conarium/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "conarium-stamp": "bin/cli.cjs"
+  },
+  "files": [
+    "bin/cli.cjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@conarium-ai/core": "^0.2.48"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "conarium-anchor-upgrade",
+  "version": "1.0.0",
+  "description": "Launcher for the conarium-anchor-upgrade command from @conarium-ai/core (upgrade pending anchor proofs).",
+  "keywords": [
+    "conarium",
+    "cli",
+    "audit",
+    "receipts",
+    "verification"
+  ],
+  "license": "MIT",
+  "homepage": "https://conarium.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dogrucanemek-alt/conarium.git",
+    "directory": "wrappers/conarium-anchor-upgrade"
+  },
+  "bugs": {
+    "url": "https://github.com/dogrucanemek-alt/conarium/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "conarium-anchor-upgrade": "bin/cli.cjs"
+  },
+  "files": [
+    "bin/cli.cjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@conarium-ai/core": "^0.2.48"
+  }
+}

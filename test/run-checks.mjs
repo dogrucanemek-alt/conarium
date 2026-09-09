@@ -33,6 +33,7 @@ export const CHECKS = [
   'test/release_record.mjs',
   'test/release_notes.mjs',
   'test/bin_claims.mjs',
+  'test/wrapper_launchers.mjs',
   'test/console_cli.mjs',
   'test/console_policy.mjs',
   'test/console_handoff.mjs',
