@@ -1,0 +1,36 @@
+{
+  "name": "conarium-reconcile",
+  "version": "1.0.0",
+  "description": "Launcher for the conarium-reconcile command from @conarium-ai/core (reconcile a chain against the source database).",
+  "keywords": [
+    "conarium",
+    "cli",
+    "audit",
+    "receipts",
+    "verification"
+  ],
+  "license": "MIT",
+  "homepage": "https://conarium.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dogrucanemek-alt/conarium.git",
+    "directory": "wrappers/conarium-reconcile"
+  },
+  "bugs": {
+    "url": "https://github.com/dogrucanemek-alt/conarium/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "conarium-reconcile": "bin/cli.cjs"
+  },
+  "files": [
+    "bin/cli.cjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@conarium-ai/core": "^0.2.48"
+  }
+}
