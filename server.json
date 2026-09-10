@@ -1,7 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.dogrucanemek-alt/conarium",
+  "title": "Conarium",
   "description": "Governed database access for AI assistants: masking, signed receipts, coverage reconciliation.",
+  "websiteUrl": "https://conarium.dev",
   "repository": {
     "url": "https://github.com/dogrucanemek-alt/conarium",
     "source": "github"
