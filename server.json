@@ -8,12 +8,12 @@
     "url": "https://github.com/dogrucanemek-alt/conarium",
     "source": "github"
   },
-  "version": "0.2.48",
+  "version": "0.2.49",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@conarium-ai/core",
-      "version": "0.2.48",
+      "version": "0.2.49",
       "transport": {
         "type": "stdio"
       },
