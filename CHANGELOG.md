@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.49 - the registry entry carries a name and an address
+
+Nothing in the tool changed. The MCP registry entry for this package carried
+neither a display title nor a website, so directories and assistants reading
+the registry showed the bare package name and never pointed anyone at
+conarium.dev. `server.json` now sets both.
+
+The correction needed a version of its own: the registry refuses to accept a
+version number it already holds, and 0.2.48 was published. The claims review
+for this release records an empty surface diff — the surface hash matches
+0.2.48 byte for byte.
+
 ## 0.2.48 - the preprint is a claim surface
 
 `paper/two-ledgers-one-window.md` joined `docs/claims/surfaces.json`. That
