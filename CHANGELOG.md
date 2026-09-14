@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.50 - the README names who maintains it
+
+Nothing in the tool's behaviour changed. Two things reach the tarball:
+
+- `README.md` carries one line under the tagline: Conarium is part of
+  VERAX (verax-ai.com), by VERAX Teknoloji, with links to the sister
+  projects Tugra and Cedulon. The README ships, so the line needs a
+  version of its own; a tree that differs in a shipped file from the tag
+  it names is what `version_claim` refuses.
+- The runtime dependency `zod` moves from 4.4.3 to 4.5.4 (merged from
+  Dependabot after 0.2.49). The other dependency updates since 0.2.49 are
+  development tooling and do not ship.
+
 ## 0.2.49 - the registry entry carries a name and an address
 
 Nothing in the tool changed. The MCP registry entry for this package carried
