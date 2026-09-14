@@ -98,7 +98,7 @@ const EXPECTED = {
   'The release tag must be free': ['publish'],
   'Publish with provenance': ['publish'],
   'Tag the release': ['publish'],
-  'Software bill of materials': ['publish'],
+  'Software bill of materials': ['publish', 'artefacts'],
   'Publish to the MCP Registry': ['publish', 'registry'],
   'The release must have a note': ['publish', 'artefacts'],
   'Fetch the published artefact and check its digest': ['publish', 'artefacts'],
@@ -116,6 +116,16 @@ for (const [name, expected] of Object.entries(EXPECTED)) {
     `"${name}" runs in [${actual}], expected [${expected}]`,
   )
 }
+
+// npm accepts a version minutes before its CDN serves the tarball. A single
+// download attempt failed 0.2.49 and 0.2.50 after they had published, and every
+// step after it was skipped.
+const fetchStep = steps.find((s) => s.name === 'Fetch the published artefact and check its digest')
+assert.match(
+  executable(fetchStep.body),
+  /curl\b[^\n]*--retry\s+\d+[^\n]*--retry-all-errors/,
+  'the tarball download must retry: the registry serves a new tarball minutes after publish reports success',
+)
 
 console.log(
   `publish modes GREEN — ${steps.length} steps, no publishing step reachable in artefacts mode, ` +
