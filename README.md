@@ -1,6 +1,7 @@
 <div align="center">
   <h1>Conarium</h1>
   <p><strong>The Third Eye for Your Company's Data.</strong></p>
+  <p><sub>Part of <a href="https://verax-ai.com">VERAX</a>, by VERAX Teknoloji. Sister projects: <a href="https://github.com/dogrucanemek-alt/tugra">Tugra</a> · <a href="https://github.com/dogrucanemek-alt/cedulon">Cedulon</a>.</sub></p>
   <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data under a policy you write—protected values masked before they leave. When a receipt sink is configured it writes a signed, independently verifiable receipt of every access it mediates; <code>conarium-init</code> sets that sink, so the default layout does.</p>
   
   <p>
