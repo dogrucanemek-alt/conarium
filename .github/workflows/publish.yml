@@ -214,19 +214,27 @@ jobs:
           VERSION="${{ steps.ver.outputs.version }}"
           SLUG="$(node -p "require('./package.json').name.replace('@','').replace('/','-')")"
           TARBALL="${RUNNER_TEMP}/${SLUG}-${VERSION}.tgz"
-          # The registry needs a moment to serve a version it has just accepted.
+          # The registry needs time to serve a version it has just accepted, and it
+          # answers in two stages: the version's metadata first, the tarball later.
+          # 0.2.49 and 0.2.50 both published and then failed here, because this step
+          # waited 25 seconds for the metadata and asked for the tarball once. For
+          # 0.2.50 the tarball URL answered 404 for about ten minutes after
+          # `+ @conarium-ai/core@0.2.50`. The skipped steps below took the bill of
+          # materials, the attestation, the release and the registry entry with them.
           URL=""; EXPECTED=""
-          for _ in 1 2 3 4 5; do
+          for _ in $(seq 1 40); do
             URL="$(npm view "${PKG}@${VERSION}" dist.tarball 2>/dev/null || true)"
             EXPECTED="$(npm view "${PKG}@${VERSION}" dist.integrity 2>/dev/null || true)"
             [ -n "$URL" ] && [ -n "$EXPECTED" ] && break
-            sleep 5
+            sleep 15
           done
           if [ -z "$URL" ] || [ -z "$EXPECTED" ]; then
             echo "::error::npm did not report a tarball and integrity digest for ${PKG}@${VERSION}"
             exit 1
           fi
-          curl -sSLf -o "$TARBALL" "$URL"
+          # -f turns the 404 into an error and --retry-all-errors retries it:
+          # up to fifteen minutes for the tarball to reach the registry's CDN.
+          curl -sSLf --retry 60 --retry-delay 15 --retry-all-errors -o "$TARBALL" "$URL"
           ACTUAL="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | base64 -w0)"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
             echo "::error::the downloaded tarball does not match the digest npm reports"
@@ -248,18 +256,24 @@ jobs:
       # version drifts from its declared range, which turns a documentation step
       # into a way to fail a release that has already published.
       #
-      # Publish mode only, and not by oversight. The lockfile in this tree is the
-      # one the version in package.json was built from. In artefacts mode the
-      # version being attached is an older one, so an SBOM generated here would
-      # describe a different tree than the tarball it sits beside — the same
-      # lookalike problem the fetch above exists to avoid, one file over. An
-      # artefacts run therefore leaves this step untested, which is stated in the
-      # release step's output rather than left for a reader to notice.
+      # The manifest and lockfile are read from the release tag, not from the
+      # checked-out tree. In artefacts mode the checkout is whatever main is now,
+      # and a bill of materials generated from it would describe a different tree
+      # than the tarball it sits beside — the lookalike problem the fetch above
+      # exists to avoid, one file over. This step used to be publish-only for that
+      # reason, which left 0.2.49 and 0.2.50 without one when their publish runs
+      # failed downstream. Reading `v<version>` gives the same answer in both modes:
+      # in publish mode the tag was written above at this very commit.
       - name: Software bill of materials
-        if: ${{ github.event.inputs.confirm == 'publish' }}
+        if: ${{ github.event.inputs.confirm == 'publish' || github.event.inputs.confirm == 'artefacts' }}
         run: |
           set -euo pipefail
-          npm sbom --sbom-format cyclonedx --sbom-type library --omit dev --package-lock-only \
+          VERSION="${{ steps.ver.outputs.version }}"
+          TREE="${RUNNER_TEMP}/sbom-tree"
+          mkdir -p "$TREE"
+          git show "v${VERSION}:package.json" > "$TREE/package.json"
+          git show "v${VERSION}:package-lock.json" > "$TREE/package-lock.json"
+          (cd "$TREE" && npm sbom --sbom-format cyclonedx --sbom-type library --omit dev --package-lock-only) \
             > "${{ steps.artefact.outputs.sbom }}"
           node -e "
             const s = require(process.argv[1])
@@ -287,9 +301,8 @@ jobs:
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
           cp "${{ steps.attest.outputs.bundle-path }}" "${{ steps.artefact.outputs.provenance }}"
-          # The bill of materials is not produced in artefacts mode — see the
-          # comment on that step — so the upload list is built from what exists
-          # rather than from what the publish path would have written.
+          # The upload list is built from what exists rather than from what the
+          # steps above were meant to write, so a missing file shows as a warning.
           ASSETS=("${{ steps.artefact.outputs.tarball }}" "${{ steps.artefact.outputs.provenance }}")
           if [ -f "${{ steps.artefact.outputs.sbom }}" ]; then
             ASSETS+=("${{ steps.artefact.outputs.sbom }}")
