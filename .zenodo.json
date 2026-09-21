@@ -1,0 +1,18 @@
+{
+  "upload_type": "software",
+  "license": "mit",
+  "creators": [
+    {
+      "name": "Doğru, Emek Can",
+      "affiliation": "VERAX TEKNOLOJİ LİMİTED ŞİRKETİ",
+      "orcid": "0009-0005-4823-4468"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Schrock, Iman",
+      "affiliation": "EMILIA Protocol",
+      "type": "Other"
+    }
+  ]
+}
