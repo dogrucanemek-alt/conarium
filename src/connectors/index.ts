@@ -7,6 +7,7 @@ import { SlackConnector } from './slack.js'
 import { JiraConnector } from './jira.js'
 import { SupabaseRestConnector } from './supabase_rest.js'
 import { CustomSqlConnector } from './custom-sql.js'
+import { DemoConnector } from './demo.js'
 import { ConnectorConfigSchema } from '../config.js'
 
 export { PostgresConnector } from './postgres.js'
@@ -17,8 +18,14 @@ export { SlackConnector } from './slack.js'
 export { JiraConnector } from './jira.js'
 export { SupabaseRestConnector } from './supabase_rest.js'
 export { CustomSqlConnector } from './custom-sql.js'
+export { DemoConnector } from './demo.js'
 
 export function createConnector(config: ConnectorConfig): Connector {
+  // File configs cannot name this type (`parseConariumConfig` refuses it).
+  // `--demo` builds the connector in memory and reaches here directly.
+  if (config.type === 'demo') {
+    return new DemoConnector(config)
+  }
   const parsed = ConnectorConfigSchema.parse(config)
   switch (parsed.type) {
     case 'postgres':

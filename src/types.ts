@@ -159,7 +159,7 @@ export interface AuditConfig {
 }
 
 export interface ConnectorConfig {
-  type: 'postgres' | 'supabase' | 'supabase-rest' | 'openapi' | 'files' | 'docs' | 'slack' | 'jira' | 'custom-sql'
+  type: 'postgres' | 'supabase' | 'supabase-rest' | 'openapi' | 'files' | 'docs' | 'slack' | 'jira' | 'custom-sql' | 'demo'
   name: string
   description: string
   config: Record<string, string>

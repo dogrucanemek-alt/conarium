@@ -217,6 +217,16 @@ Damgalama yerleşik takvim istemcisiyle yapılır (Node `crypto` + herkese açı
 Bitcoin onayı yine saatler sürebilir; `pending` yalnız damga gönderildikten sonra görünür.
 Bitcoin blok doğrulaması `blockstream.info`'ya sorar. O host yoksa doğrulayıcı "kontrol edemedim" der, "geçerli" demez.
 
+## Demo kipi örnek satır kullanır
+<!-- s: demo-mode -->
+
+`conarium --demo` bellek içi örnek satır sunar. Veritabanı açmaz; dağıtılan
+bağlayıcıların hiçbirini çalıştırmaz. Yapılandırma dosyasında `type: "demo"`
+reddedilir; o bağlayıcı `--demo` bayrağıyla kurulur. Örnek bağlayıcı yalnız
+`SELECT <sütunlar | *> FROM <örnek tablo>` biçimini cevaplar ve ifadenin adını
+verdiği sütunları döndürür, fazlasını değil; `WHERE`, `JOIN`, hesaplanmış ifade
+ve takma ad yok sayılmaz, reddedilir.
+
 ## Mutabakat, kayan saatle geç yazılmış makbuzu ayıramaz
 <!-- s: reconcile-trailing-clock -->
 

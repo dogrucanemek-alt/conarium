@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.51 - try it without a database
+
+`conarium --demo` starts the stdio MCP server with in-memory sample rows: allowed tables return masked rows, a denied table is refused, the row cap is applied, and both outcomes are recorded on a signed chain in a temporary directory. `type: "demo"` in a config file is refused. The README now has [Try it without a database](#try-it-without-a-database) and names the VERAX body next to the maintainer line.
+
 ## 0.2.50 - the README names who maintains it
 
 Nothing in the tool's behaviour changed. Two things reach the tarball:

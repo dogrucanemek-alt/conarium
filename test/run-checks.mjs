@@ -35,6 +35,7 @@ export const CHECKS = [
   'test/bin_claims.mjs',
   'test/wrapper_launchers.mjs',
   'test/console_cli.mjs',
+  'test/demo_cli.mjs',
   'test/console_policy.mjs',
   'test/console_handoff.mjs',
   'test/console_receipts.mjs',

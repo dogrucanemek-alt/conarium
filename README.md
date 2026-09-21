@@ -1,7 +1,7 @@
 <div align="center">
   <h1>Conarium</h1>
   <p><strong>The Third Eye for Your Company's Data.</strong></p>
-  <p><sub>Part of <a href="https://verax-ai.com">VERAX</a>, by VERAX Teknoloji. Sister projects: <a href="https://github.com/dogrucanemek-alt/tugra">Tugra</a> · <a href="https://github.com/dogrucanemek-alt/cedulon">Cedulon</a>.</sub></p>
+  <p><sub>Part of <a href="https://verax-ai.com">VERAX</a>, by VERAX Teknoloji. Start with the VERAX body: <a href="https://github.com/verax-ai/verax">verax-ai/verax</a>. Sister projects: <a href="https://github.com/dogrucanemek-alt/tugra">Tugra</a> · <a href="https://github.com/dogrucanemek-alt/cedulon">Cedulon</a>.</sub></p>
   <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data under a policy you write—protected values masked before they leave. When a receipt sink is configured it writes a signed, independently verifiable receipt of every access it mediates; <code>conarium-init</code> sets that sink, so the default layout does.</p>
   
   <p>
@@ -466,6 +466,25 @@ graph LR
 3. **The Ledger:** A tamper-evident audit log recording every query and decision it mediates.
 
 ---
+
+## Try it without a database
+
+```bash
+npx -y --package=@conarium-ai/core conarium --demo
+```
+
+Starts a local MCP server on sample rows, not a database. An allowed table returns rows with email and card values masked before the rows leave the gate; a denied table is refused; the row cap is applied; allowed and refused calls are recorded on a signed chain. None of the shipped connectors is exercised.
+
+```json
+{
+  "mcpServers": {
+    "conarium": {
+      "command": "npx",
+      "args": ["-y", "--package=@conarium-ai/core", "conarium", "--demo"]
+    }
+  }
+}
+```
 
 ## 🚀 Quick Start
 
