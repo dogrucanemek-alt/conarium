@@ -18,7 +18,7 @@ import {
   main,
   parseCliFlags,
   attachStdio,
-} from './index.js'
+} from './cli.js'
 import { parseConariumConfig } from './config.js'
 import { loadConfig } from './server.js'
 import { createConnector } from './connectors/index.js'
@@ -59,10 +59,10 @@ function handlersOf(server: {
     async listTools(): Promise<string[]> {
       const h = handlers.get(ListToolsRequestSchema.shape.method.value)
       if (!h) throw new Error('ListTools handler missing')
-      const sonuc = (await h({ method: 'tools/list', params: {} })) as {
+      const listed = (await h({ method: 'tools/list', params: {} })) as {
         tools: { name: string }[]
       }
-      return sonuc.tools.map((t) => t.name)
+      return listed.tools.map((t) => t.name)
     },
     async call(name: string, args: Record<string, unknown> = {}): Promise<ToolResult> {
       const h = handlers.get(CallToolRequestSchema.shape.method.value)
