@@ -130,7 +130,22 @@ export function resolveHttpRatePerMin(cfg?: { profile?: string } | null): number
   return isProductionProfile(cfg) ? 60 : 0
 }
 
+/** `type: "demo"` is started with `--demo`, not a config file. */
+export function rejectFileDemoConnector(raw: unknown): void {
+  if (!raw || typeof raw !== 'object') return
+  const connectors = (raw as { connectors?: unknown }).connectors
+  if (!Array.isArray(connectors)) return
+  for (const item of connectors) {
+    if (item && typeof item === 'object' && (item as { type?: unknown }).type === 'demo') {
+      throw new Error(
+        'connector type "demo" cannot be set in a config file; start the process with --demo',
+      )
+    }
+  }
+}
+
 export function parseConariumConfig(raw: unknown): ConariumConfig {
+  rejectFileDemoConnector(raw)
   let cfg: ConariumConfig
   try {
     cfg = ConariumConfigSchema.parse(raw)

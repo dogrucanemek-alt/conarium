@@ -1,32 +1,15 @@
 #!/usr/bin/env node
 /**
  * Conarium stdio entrypoint (local MCP for Cursor / Claude Code / Codex).
- * Server core lives in server.ts — shared with the remote HTTP entrypoint (http.ts).
+ *
+ * This file always runs main(): it is reached directly, through the npm bin
+ * link, and by being imported from bin/conarium-docker-entry.mjs, and in the last
+ * two process.argv[1] is not this file. The logic lives in cli.ts, which starts
+ * nothing on import.
  */
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { loadConfig, bootDeps, buildServer } from './server.js'
-import { announceUpdate } from './update-check.js'
+import { main } from './cli.js'
 
-async function main() {
-  const config = loadConfig()
-  const deps = await bootDeps(config)
-  const server = buildServer(deps)
-
-  const transport = new StdioServerTransport()
-  await server.connect(transport)
-  console.error(`[conarium] MCP server running - ${deps.connectors.length} connector(s) active`)
-  // stderr only: stdout carries the MCP protocol. Never blocks the handshake —
-  // the notice arrives when the registry answers, or never.
-  announceUpdate()
-
-  process.on('SIGINT', async () => {
-    for (const conn of deps.connectors) await conn.disconnect().catch(() => {})
-    deps.audit.close()
-    process.exit(0)
-  })
-}
-
-main().catch(err => {
+main().catch((err) => {
   console.error('[conarium] Fatal:', err)
   process.exit(1)
 })

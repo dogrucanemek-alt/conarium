@@ -248,3 +248,13 @@ Stamping uses a built-in calendar client (Node `crypto` + HTTPS to the public ca
 `javascript-opentimestamps` is not a dependency. The `web3` / `elliptic` / `crypto-js` / `request` / `lodash` tree is not installed.
 Bitcoin confirmation still takes hours; a submitted stamp stays `pending` until upgrade.
 Bitcoin-block verification talks to `blockstream.info`. If that host is unreachable the verifier reports "could not check", not "valid".
+
+## Demo mode uses sample rows
+<!-- s: demo-mode -->
+
+`conarium --demo` serves in-memory sample rows. It does not open a database
+and it does not exercise any shipped connector. `type: "demo"` in a
+configuration file is refused; that connector is started from the `--demo`
+flag. The sample connector answers `SELECT <columns | *> FROM <sample table>`
+and returns the columns the statement named and no others; `WHERE`, `JOIN`,
+expressions and aliases are refused rather than ignored.
