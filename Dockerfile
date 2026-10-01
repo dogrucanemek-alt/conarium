@@ -12,7 +12,7 @@
 # and opens the bump as a reviewable pull request.
 
 # --- build stage ---
-FROM node:26-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS build
+FROM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -21,7 +21,7 @@ COPY src ./src
 RUN npm run build            # tsc -> dist/
 
 # --- runtime stage ---
-FROM node:26-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS runtime
+FROM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package*.json ./
