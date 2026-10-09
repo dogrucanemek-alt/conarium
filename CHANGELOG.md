@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.53 - two more listings in the README
+
+Nothing in the tool's behaviour changed. The README's listing line adds MCP
+Market and LobeHub next to npm, Glama, the MCP Registry and Zenodo. The README
+ships, so the line needs a version of its own.
+
 ## 0.2.52 - listing links, and four dependency advisories closed
 
 Nothing in the tool's behaviour changed. `README.md` carries one more line under
