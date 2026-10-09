@@ -2,6 +2,7 @@
   <h1>Conarium</h1>
   <p><strong>The Third Eye for Your Company's Data.</strong></p>
   <p><sub>Part of <a href="https://verax-ai.com">VERAX</a>, by VERAX Teknoloji. Start with the VERAX body: <a href="https://github.com/verax-ai/verax">verax-ai/verax</a>. Sister projects: <a href="https://github.com/dogrucanemek-alt/tugra">Tugra</a> · <a href="https://github.com/dogrucanemek-alt/cedulon">Cedulon</a>.</sub></p>
+  <p><sub>Listed on: <a href="https://www.npmjs.com/package/@conarium-ai/core">npm</a> · <a href="https://glama.ai/mcp/servers/dogrucanemek-alt/conarium">Glama</a> · <a href="https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dogrucanemek-alt/conarium">MCP Registry</a> · <a href="https://doi.org/10.5281/zenodo.22238913">Zenodo</a></sub></p>
   <p>A self-hosted, governed gateway that lets AI coding assistants (Cursor, Copilot, Claude) touch your real data under a policy you write—protected values masked before they leave. When a receipt sink is configured it writes a signed, independently verifiable receipt of every access it mediates; <code>conarium-init</code> sets that sink, so the default layout does.</p>
   
   <p>
