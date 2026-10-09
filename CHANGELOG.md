@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.52 - listing links, and four dependency advisories closed
+
+Nothing in the tool's behaviour changed. `README.md` carries one more line under
+the maintainer line, linking the npm package, the Glama listing, the MCP
+Registry entry and the Zenodo record. The README ships, so the line needs a
+version of its own.
+
+The lockfile moves four production dependencies past advisories published
+since 0.2.51: `@modelcontextprotocol/sdk` 1.30.0 → 1.32.1 (high),
+`proxy-addr` 2.0.7 → 2.0.8 (critical), `fast-uri` 3.1.7 → 3.1.8 and
+`ip-address` 10.5.0 → 10.7.3 (moderate). `npm audit --omit=dev` reports none
+after the change. `package.json` ranges are unchanged.
+
 ## 0.2.51 - try it without a database
 
 `conarium --demo` starts the stdio MCP server with in-memory sample rows: allowed tables return masked rows, a denied table is refused, the row cap is applied, and both outcomes are recorded on a signed chain in a temporary directory. `type: "demo"` in a config file is refused. The README now has [Try it without a database](#try-it-without-a-database) and names the VERAX body next to the maintainer line.
