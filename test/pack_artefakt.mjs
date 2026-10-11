@@ -121,6 +121,14 @@ try {
   else if (absent.length) fail(`beklenen ornek dosyasi pakete girmedi: ${absent.join(', ')}`)
   else pass(`examples/ tam olarak izin verilen ${EXAMPLES_ALLOWLIST.length} dosyayi tasiyor`)
 
+  // A script that names one machine's home directory is an operator's own tool,
+  // not part of the package.
+  const machineBound = files.filter(
+    (f) => f.startsWith('scripts/') && /[A-Za-z]:[\\/]+Users[\\/]/.test(readFileSync(join(root, f), 'utf8')),
+  )
+  if (machineBound.length) fail(`scripts carrying one machine's paths were packed: ${machineBound.join(', ')}`)
+  else pass('no packed script names a machine-specific home directory')
+
   const vectorReceipts = files.filter((f) => f.startsWith('test-vectors/') && f.endsWith('.jsonl'))
   const vectorKeys = files.filter((f) => f.startsWith('test-vectors/') && (f.endsWith('.pub.pem') || f.endsWith('.keyid')))
   if (!vectorReceipts.length) fail('test-vectors/*.jsonl tarball\'dan dustu — ucuncu taraf vektorleri kosturamaz')
