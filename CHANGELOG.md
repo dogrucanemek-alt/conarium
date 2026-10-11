@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.54 - two operator scripts leave the tarball
+
+Nothing in the tool's behaviour changed. `scripts/conarium_sabah_brief.mjs` and
+`scripts/start-mcp-c1.mjs` are one operator's own tools: they name a home
+directory on one machine, and the second names a local environment file. They
+were shipping through the `scripts` entry of `files` and are now excluded; the
+pack check fails on any packed script that names a home directory. The
+per-user identity example uses `alice` and `owner` as its actor and profile.
+
 ## 0.2.53 - two more listings in the README
 
 Nothing in the tool's behaviour changed. The README's listing line adds MCP

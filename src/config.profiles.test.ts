@@ -32,14 +32,14 @@ describe('parseConariumConfig — profiles survive loadConfig', () => {
         maskColumns: ['*.email'],
         maskLabelledNames: true,
         profiles: {
-          patron: { maskColumns: ['*.email'], maskLabelledNames: false, maxRows: 20 },
+          owner: { maskColumns: ['*.email'], maskLabelledNames: false, maxRows: 20 },
         },
-        actorProfiles: { emekcan: 'patron' },
+        actorProfiles: { alice: 'owner' },
       },
     })
-    expect(cfg.policy?.profiles?.patron?.maskLabelledNames).toBe(false)
-    expect(cfg.policy?.profiles?.patron?.maxRows).toBe(20)
-    expect(cfg.policy?.actorProfiles?.emekcan).toBe('patron')
+    expect(cfg.policy?.profiles?.owner?.maskLabelledNames).toBe(false)
+    expect(cfg.policy?.profiles?.owner?.maxRows).toBe(20)
+    expect(cfg.policy?.actorProfiles?.alice).toBe('owner')
     expect(cfg.policy?.maskLabelledNames).toBe(true)
   })
 
@@ -48,10 +48,10 @@ describe('parseConariumConfig — profiles survive loadConfig', () => {
       ...BASE,
       policy: {
         maskColumns: ['*.email'],
-        profiles: { patron: { maskLabelledNames: false } },
+        profiles: { owner: { maskLabelledNames: false } },
       },
     })
-    expect(cfg.policy?.profiles?.patron?.maskColumns).toBeUndefined()
+    expect(cfg.policy?.profiles?.owner?.maskColumns).toBeUndefined()
   })
 
   it('rejects a profile field that would widen reach (allowTables)', () => {
@@ -59,7 +59,7 @@ describe('parseConariumConfig — profiles survive loadConfig', () => {
       parseConariumConfig({
         ...BASE,
         policy: {
-          profiles: { patron: { allowTables: ['*'] } },
+          profiles: { owner: { allowTables: ['*'] } },
         },
       }),
     ).toThrow(/Unrecognized key/)

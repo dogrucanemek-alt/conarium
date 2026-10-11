@@ -5,7 +5,7 @@
  * The file stores SHA-256 only. The raw token is printed once, to stdout,
  * and is never written. 0600 on POSIX.
  *
- *   node mint-token.mjs --id emekcan [--file ./conarium.tokens.json]
+ *   node mint-token.mjs --id alice [--file ./conarium.tokens.json]
  *
  * Exit: 0 wrote · 1 refused · 2 could not run
  */

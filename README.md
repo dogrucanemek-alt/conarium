@@ -159,7 +159,7 @@ disable the product's only real guarantee, so masking resolves **per person**:
       // The controller sees customer names; email and phone stay masked.
       "controller-full": { "maskColumns": ["*.email", "*.phone"], "maxRows": 1000 }
     },
-    "actorProfiles": { "emekcan": "controller-full" }
+    "actorProfiles": { "alice": "controller-full" }
   }
 }
 ```
