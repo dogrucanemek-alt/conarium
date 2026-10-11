@@ -34,11 +34,11 @@ const receiptSink = join(dir, 'receipts.jsonl')
 const auditSink = join(dir, 'audit.jsonl')
 mkdirSync(dir, { recursive: true })
 
-const patronRaw = randomBytes(32).toString('base64url')
+const ownerRaw = randomBytes(32).toString('base64url')
 const aiRaw = randomBytes(32).toString('base64url')
 writeFileSync(tokensFile, JSON.stringify({
   tokens: [
-    { sha256: createHash('sha256').update(patronRaw).digest('hex'), id: 'emekcan' },
+    { sha256: createHash('sha256').update(ownerRaw).digest('hex'), id: 'alice' },
     { sha256: createHash('sha256').update(aiRaw).digest('hex'), id: 'copilot' },
   ],
 }) + '\n')
@@ -52,38 +52,38 @@ const policy = {
   allowTables: ['public.customers'],
   maskColumns: ['*.customer_name', '*.email', '*.phone', '*.tckn', '*.iban'],
   profiles: {
-    patron: {
+    owner: {
       maskColumns: ['*.email', '*.phone', '*.tckn', '*.iban'],
       maskLabelledNames: false,
     },
   },
-  actorProfiles: { emekcan: 'patron' },
+  actorProfiles: { alice: 'owner' },
 }
 
 const store = loadTokenStore(tokensFile)
-const patron = resolveActor(patronRaw, store, 'conarium_c2')
+const owner = resolveActor(ownerRaw, store, 'conarium_c2')
 const ai = resolveActor(aiRaw, store, 'conarium_c2')
-if (patron.assurance !== 'per-user-token' || patron.id !== 'emekcan') fail(`patron resolve: ${JSON.stringify(patron)}`)
+if (owner.assurance !== 'per-user-token' || owner.id !== 'alice') fail(`owner resolve: ${JSON.stringify(owner)}`)
 if (ai.assurance !== 'per-user-token' || ai.id !== 'copilot') fail(`ai resolve: ${JSON.stringify(ai)}`)
 
 const row = { _table: 'public.customers', customer_name: 'Ayşe Yılmaz', email: 'a@b.com', city: 'İzmir' }
 const base = new Governance(policy)
-const asPatron = base.forActor(patron)
+const asOwner = base.forActor(owner)
 const asAi = base.forActor(ai)
 
-const patronOut = asPatron.redact({ rows: [row], rowCount: 1, fields: Object.keys(row) })
+const ownerOut = asOwner.redact({ rows: [row], rowCount: 1, fields: Object.keys(row) })
 const aiOut = asAi.redact({ rows: [row], rowCount: 1, fields: Object.keys(row) })
-const pName = patronOut.rows[0].customer_name
+const pName = ownerOut.rows[0].customer_name
 const aName = aiOut.rows[0].customer_name
 
-console.log(`patron name  ${pName}`)
+console.log(`owner name  ${pName}`)
 console.log(`ai name      ${aName}`)
-console.log(`patron email ${patronOut.rows[0].email}`)
+console.log(`owner email ${ownerOut.rows[0].email}`)
 console.log(`ai email     ${aiOut.rows[0].email}`)
 
-if (pName !== 'Ayşe Yılmaz') fail(`patron should see the name, got ${pName}`)
+if (pName !== 'Ayşe Yılmaz') fail(`owner should see the name, got ${pName}`)
 if (aName !== '[MASKED_PII]') fail(`ai should see [MASKED_PII], got ${aName}`)
-if (patronOut.rows[0].email !== '[MASKED_PII]' || aiOut.rows[0].email !== '[MASKED_PII]') {
+if (ownerOut.rows[0].email !== '[MASKED_PII]' || aiOut.rows[0].email !== '[MASKED_PII]') {
   fail('email must stay masked for both (content scanner / remaining maskColumns)')
 }
 
@@ -92,9 +92,9 @@ audit.log({
   tool: 'query',
   target: 'public.customers',
   denied: false,
-  actor: patron.id,
-  actorAssurance: patron.assurance,
-  policyProfile: asPatron.appliedProfile() || undefined,
+  actor: owner.id,
+  actorAssurance: owner.assurance,
+  policyProfile: asOwner.appliedProfile() || undefined,
   rowsReturned: 1,
   source: 'postgres',
 })
@@ -112,15 +112,15 @@ audit.log({
 const receipts = readFileSync(receiptSink, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
 if (receipts.length !== 2) fail(`expected 2 receipts, got ${receipts.length}`)
 
-const [rPatron, rAi] = receipts
-console.log(`patron policy.id   ${rPatron.policy.id}`)
-console.log(`patron assurance   ${rPatron.actor.assurance}  actor.id=${rPatron.actor.id}`)
+const [rOwner, rAi] = receipts
+console.log(`owner policy.id   ${rOwner.policy.id}`)
+console.log(`owner assurance   ${rOwner.actor.assurance}  actor.id=${rOwner.actor.id}`)
 console.log(`ai policy.id       ${rAi.policy.id}`)
 console.log(`ai assurance       ${rAi.actor.assurance}  actor.id=${rAi.actor.id}`)
 
-if (rPatron.policy.id !== 'conarium.policy/patron') fail(`patron policy.id ${rPatron.policy.id}`)
+if (rOwner.policy.id !== 'conarium.policy/owner') fail(`owner policy.id ${rOwner.policy.id}`)
 if (rAi.policy.id !== 'conarium.policy') fail(`ai (no profile) policy.id ${rAi.policy.id}`)
-if (rPatron.actor.assurance !== 'per-user-token' || rAi.actor.assurance !== 'per-user-token') {
+if (rOwner.actor.assurance !== 'per-user-token' || rAi.actor.assurance !== 'per-user-token') {
   fail('both receipts must carry per-user-token')
 }
 

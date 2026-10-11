@@ -8,6 +8,8 @@
     "dist",
     "bin",
     "scripts",
+    "!scripts/conarium_sabah_brief.mjs",
+    "!scripts/start-mcp-c1.mjs",
     "docs",
     "!docs/reviews",
     "!docs/teaching",
