@@ -8,6 +8,6 @@
     "down": "docker compose down -v"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.0"
+    "@modelcontextprotocol/sdk": "^1.31.0"
   }
 }
