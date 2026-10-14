@@ -98,12 +98,30 @@ describe('custom patterns match like String.prototype.replace', () => {
   })
 })
 
-describe('the multiline flag has no counterpart in the engine', () => {
+const modifierGroups = (() => {
+  try {
+    new RegExp('(?i:a)', 'u')
+    return true
+  } catch {
+    return false
+  }
+})()
+
+describe.skipIf(!modifierGroups)('the multiline flag has no counterpart in the engine', () => {
   // JavaScript's multiline `^` and `$` also stop at a carriage return and at
   // U+2028 and U+2029; the engine's stop only at a line feed.
   for (const pattern of ['(?m:^a$)', '(?im:^a)', '(?m-s:a$)']) {
     it(`${pattern} is refused, and the reason names the flag`, () => {
       expect(() => compileCustomPatterns([{ name: 'r', pattern }])).toThrow(/multiline|\bm\b/)
+    })
+  }
+})
+
+describe.skipIf(modifierGroups)('a Node without modifier groups', () => {
+  // JavaScript itself rejects the syntax there, as it did under 0.2.54.
+  for (const pattern of ['(?m:^a$)', '(?i:a)', '(?s:.)']) {
+    it(`${pattern} is not a valid regular expression`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).toThrow(/not a valid regular expression/)
     })
   }
 })

@@ -123,14 +123,17 @@ describe.skipIf(!modifierGroups)('modifier text inside a class', () => {
 describe('a class that holds its own brackets or carets', () => {
   // `[^^]` is a negated class of one caret; what follows it is outside the
   // class and is translated and checked like any other part of the pattern.
-  same(['[^^].', `[^^]${B}s`, `[^^]${B}S`, `[^^]${B}b`, `[^^]${B}p{ASCII}`, `[^^]${B}P{Any}`, '[^^](?s:.)(?-s:.)',
-    `[${B}]]${B}s`, `[^${B}]]${B}s`, `[a${B}[]${B}s`, `[^${B}^]${B}s`, `[${B}^^]${B}s`],
-  ['a b', 'aa', `a${String.fromCharCode(0x2028)}`, `a${String.fromCharCode(10)}${String.fromCharCode(0x2028)}`, '] a', '^ a', '[ a'])
-  for (const [source, reason] of [[`[^^](?i:a)${B}w`, /word/], ['[^^](?m:^a)', /multiline/], [`[${B}]](?i:a)${B}b`, /word/]] as const) {
-    it(`${JSON.stringify(source)} is refused`, () => {
-      expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(reason)
-    })
-  }
+  const texts = ['a b', 'aa', `a${String.fromCharCode(0x2028)}`, `a${String.fromCharCode(10)}${String.fromCharCode(0x2028)}`, '] a', '^ a', '[ a']
+  same(['[^^].', `[^^]${B}s`, `[^^]${B}S`, `[^^]${B}b`, `[^^]${B}p{ASCII}`, `[^^]${B}P{Any}`,
+    `[${B}]]${B}s`, `[^${B}]]${B}s`, `[a${B}[]${B}s`, `[^${B}^]${B}s`, `[${B}^^]${B}s`], texts)
+  describe.skipIf(!modifierGroups)('with modifier groups after the class', () => {
+    same(['[^^](?s:.)(?-s:.)'], texts)
+    for (const [source, reason] of [[`[^^](?i:a)${B}w`, /word/], ['[^^](?m:^a)', /multiline/], [`[${B}]](?i:a)${B}b`, /word/]] as const) {
+      it(`${JSON.stringify(source)} is refused`, () => {
+        expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(reason)
+      })
+    }
+  })
 })
 
 describe('more corners', () => {
