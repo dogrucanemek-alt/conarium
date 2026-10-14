@@ -93,11 +93,14 @@ Custom patterns run on a linear-time regular expression engine (re2js), so no
 accepted pattern can hold a field's masking for minutes; in 0.2.54 some could.
 The patterns refused when the policy loads are the ones 0.2.54 refused
 (lookaround, backreferences, `+`, `*`, an open-ended `{n,}`, and the older group
-rules), plus one: a Unicode `Script_Extensions` (`scx=`) property, which the
-engine has no counterpart for. Matches are meant to equal JavaScript's with the
-`u` flag. That was tested on generated patterns over letters, digits, classes,
-negated classes, `.`, `\s`, `\d`, `\w`, `\b`, `^`, `$`, bounded quantifiers and
-alternation, with line breaks and no-break spaces in the text, and on 25
+rules), plus two the engine has no counterpart for: a Unicode
+`Script_Extensions` (`scx=`) property, and a modifier group that turns on the
+multiline flag (`(?m:…)`; JavaScript's multiline `^` and `$` also stop at a
+carriage return, U+2028 and U+2029). Matches are meant to equal JavaScript's
+with the `u` flag. That was tested on generated patterns over letters, digits,
+classes and negated classes (with `\s` and `\S` inside them), `.`, `\s`, `\d`,
+`\w`, `\b`, `^`, `$`, bounded quantifiers, alternation and `i`/`s` modifier
+groups, with line breaks, no-break and other Unicode spaces in the text, and on 25
 Unicode property classes (general categories by short and long name, scripts
 written `Script=` or `sc=`, `ASCII`, `Any`, `Alphabetic`, `White_Space`,
 `Emoji`) over one sample of mixed scripts. Other properties were not tested.

@@ -91,12 +91,15 @@ ya da kaynak metinde aynen geçen bir özel kural etiketi.
 yüzden kabul edilen hiçbir desen bir alanın maskelenmesini dakikalarca
 kilitleyemez. 0.2.54'te bazıları kilitleyebiliyordu. Politika yüklenirken
 reddedilen desenler 0.2.54'ün reddettikleridir (ileri/geri bakış, geri başvuru,
-`+`, `*`, üst sınırı olmayan `{n,}` ve eski grup kuralları); buna bir tane
-eklendi: motorda karşılığı olmayan Unicode `Script_Extensions` (`scx=`) özelliği.
+`+`, `*`, üst sınırı olmayan `{n,}` ve eski grup kuralları); buna motorda
+karşılığı olmayan iki tane eklendi: Unicode `Script_Extensions` (`scx=`) özelliği
+ve çok satır bayrağını açan bir değiştirici grup (`(?m:…)`; JavaScript'in çok
+satırlı `^` ve `$`'ı satır başı karakterinde, U+2028 ve U+2029'da da durur).
 Eşleşmelerin JavaScript'in `u` bayraklı eşleşmeleriyle aynı olması amaçlanır. Bu,
-harf, rakam, sınıf, olumsuz sınıf, `.`, `\s`, `\d`, `\w`, `\b`, `^`, `$`, sınırlı
-niceleyici ve alternasyon içeren üretilmiş desenlerde, metinde satır sonu ve
-bölünmez boşlukla; ayrıca 25 Unicode özellik sınıfında (kısa ve uzun adıyla genel
+harf, rakam, sınıf ve olumsuz sınıf (içlerinde `\s` ve `\S` ile), `.`, `\s`, `\d`,
+`\w`, `\b`, `^`, `$`, sınırlı niceleyici, alternasyon ve `i`/`s` değiştirici
+grupları içeren üretilmiş desenlerde, metinde satır sonu, bölünmez boşluk ve diğer
+Unicode boşluklarıyla; ayrıca 25 Unicode özellik sınıfında (kısa ve uzun adıyla genel
 kategoriler, `Script=` ya da `sc=` ile yazılan betikler, `ASCII`, `Any`,
 `Alphabetic`, `White_Space`, `Emoji`) karışık yazılı bir örnek metin üzerinde
 sınandı. Diğer özellikler sınanmadı.
