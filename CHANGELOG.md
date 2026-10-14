@@ -39,9 +39,14 @@ Changes an operator can see:
 - The audit path now also masks `sk_test_` keys, names after a title or a field
   label, and a field that is entirely base64 of a personal value. The model path
   already did.
-- A custom pattern that can backtrack without bound is refused when the policy
-  loads (see LIMITATIONS, "Some custom patterns are refused"). 0.2.54 accepted
-  these, and one could hold a field's masking for minutes.
+- Custom patterns run on a linear-time regular expression engine (`re2js`, a new
+  dependency with no dependencies of its own). In 0.2.54 an accepted pattern
+  such as `(?:a?){30}z` could hold a field's masking for minutes. The refusal
+  rules are 0.2.54's, plus one: a Unicode `Script_Extensions` property is
+  refused when the policy loads. Over the patterns compared (about fifty
+  syntax forms and 25 Unicode properties), every other pattern 0.2.54 accepted
+  is accepted (see LIMITATIONS, "Custom patterns: what is refused, and the
+  engine they run on").
 - If masking throws, the field is masked whole and counted once.
 - The connection-string step no longer takes quadratic time on a long run of
   scheme characters before `://`; it is one linear pass with the same matches.

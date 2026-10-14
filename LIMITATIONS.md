@@ -86,14 +86,21 @@ field is masked. Some text next to a masked value can then be hidden although it
 is not personal: a title without a dot (`Bay`, `Bayan`) next to a masked number,
 or a custom rule's label written literally in the source text.
 
-## Some custom patterns are refused
+## Custom patterns: what is refused, and the engine they run on
 <!-- s: custom-pattern-shapes -->
 
-A custom pattern is refused when the policy loads if it can backtrack without
-bound: a quantified group that holds a quantifier or an alternation
-(`(?:a?){30}z`, `((?:[A-Z]|[A-Z0-9])){14}Z`), or two adjacent variable-width
-quantifiers over overlapping characters (`[0-9]{0,64}[0-9]{0,64}X`). 0.2.54
-accepted these, and one of them could hold a field's masking for minutes.
+Custom patterns run on a linear-time regular expression engine (re2js), so no
+accepted pattern can hold a field's masking for minutes; in 0.2.54 some could.
+The patterns refused when the policy loads are the ones 0.2.54 refused
+(lookaround, backreferences, `+`, `*`, an open-ended `{n,}`, and the older group
+rules), plus one: a Unicode `Script_Extensions` (`scx=`) property, which the
+engine has no counterpart for. Matches are meant to equal JavaScript's with the
+`u` flag. That was tested on generated patterns over letters, digits, classes,
+negated classes, `.`, `\s`, `\d`, `\w`, `\b`, `^`, `$`, bounded quantifiers and
+alternation, with line breaks and no-break spaces in the text, and on 25
+Unicode property classes (general categories by short and long name, scripts
+written `Script=` or `sc=`, `ASCII`, `Any`, `Alphabetic`, `White_Space`,
+`Emoji`) over one sample of mixed scripts. Other properties were not tested.
 
 ## One production install
 <!-- s: one-prod-install -->
