@@ -103,9 +103,16 @@ JavaScript:
   Kelvin sign and the long s, outside the group as well);
 - an optional or repeated group that lists an empty choice before a non-empty
   one, such as `(?:|a)?` or `(?:a??)?` (JavaScript skips the empty choice in
-  that position, the engine takes it);
+  that position, the engine takes it). The rule is structural, so it also
+  refuses some groups both engines would match the same way, such as
+  `(?:$|a)?`;
 - a surrogate escape that is not half of a `\uHHHH\uLLLL` pair, such as
-  `\u{D83D}`.
+  `\u{D83D}`, or a lone surrogate typed as a raw character.
+
+The 0.2.54 quantifier cap also reads a braced escape written with decimal
+digits only as a quantifier: `\u{100}`, `\u{65}` and `\u{2028}` are refused as
+unbounded or nested quantifiers, in 0.2.54 as now; `\u0100`, `\u0065` and
+`\u2028` are accepted.
 
 Modifier groups compile only on Node versions that support them, in 0.2.54 as
 now. Unicode property classes (`\p{…}`, `\P{…}`) take their code points from
@@ -121,9 +128,17 @@ on listed surrogate-pair and class corners; and on every Unicode property name
 JavaScript accepts on Node 24: all general categories by short and long name,
 every binary property in the ECMAScript table with its alias, and 175 scripts
 with 169 four-letter aliases under `Script=`, `sc=`, `Script_Extensions=` and
-`scx=`. One difference stays: a match of nothing (for example `\B`) between the
-two halves of an emoji, which JavaScript reports and the engine does not; it
-hides no text either way.
+`scx=`. Two differences stay:
+
+- a match of nothing (for example `\B`) between the two halves of an emoji,
+  which JavaScript reports and the engine does not; it hides no text either way;
+- inside a case-insensitive modifier group and outside a class, seven letters
+  beyond Latin-1, typed or escaped (Ÿ, ſ, Μ, μ, ẞ, the Kelvin sign `\u212A` and
+  the Ångström sign `\u212B`), match their Latin-1 case partners (ÿ; s and S;
+  µ; µ; ß; k and K; å and Å) in the engine on every text. On Node 24,
+  JavaScript matches them only when the text also holds a character beyond
+  Latin-1. The engine masks more there; it shows nothing JavaScript would hide.
+  Inside a class (`(?i:[\u212A])`) both match the partners.
 
 ## One production install
 <!-- s: one-prod-install -->

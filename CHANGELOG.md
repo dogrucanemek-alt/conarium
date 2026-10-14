@@ -41,12 +41,14 @@ Changes an operator can see:
   already did.
 - Custom patterns run on a linear-time regular expression engine (`re2js`, a new
   dependency with no dependencies of its own). In 0.2.54 an accepted pattern
-  such as `(?:a?){30}z` could hold a field's masking for minutes. The refusal
-  rules are 0.2.54's, plus four forms where the engine would match differently
-  from JavaScript: a multiline modifier group `(?m:…)`, a case-insensitive
-  modifier group in a pattern that uses `\w`, `\W`, `\b` or `\B`, an optional or
-  repeated group that lists an empty choice before a non-empty one (`(?:|a)?`),
-  and a surrogate escape that is not half of a pair. Unicode property classes
+  such as `(?:a?){30}z` could hold a field's masking for minutes. Each pattern
+  is parsed once with `@eslint-community/regexpp` (also new, also without
+  dependencies of its own) and written out for the engine from that parse. The
+  refusal rules are 0.2.54's, plus four forms where the engine would match
+  differently from JavaScript: a multiline modifier group `(?m:…)`, a
+  case-insensitive modifier group in a pattern that uses `\w`, `\W`, `\b` or
+  `\B`, an optional or repeated group that lists an empty choice before a
+  non-empty one (`(?:|a)?`), and a lone surrogate, escaped or typed. Unicode property classes
   take their code points from the running JavaScript engine; every property
   name JavaScript accepts on Node 24 was compared and is accepted (see
   LIMITATIONS, "Custom patterns: what is refused, and the engine they run on").

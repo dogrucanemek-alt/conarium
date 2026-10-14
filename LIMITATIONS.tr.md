@@ -102,9 +102,15 @@ JavaScript'ten farklı eşleşeceği dört biçim eklendi:
   açar);
 - boş bir seçeneği boş olmayan bir seçenekten önce sayan isteğe bağlı ya da
   yinelenen bir grup, örneğin `(?:|a)?` veya `(?:a??)?` (JavaScript o konumda
-  boş seçeneği atlar, motor alır);
+  boş seçeneği atlar, motor alır). Kural yapısaldır; bu yüzden iki motorun aynı
+  eşleyeceği bazı grupları da reddeder, örneğin `(?:$|a)?`;
 - bir `\uHHHH\uLLLL` çiftinin yarısı olmayan bir vekil kaçışı, örneğin
-  `\u{D83D}`.
+  `\u{D83D}`, ya da ham karakter olarak yazılmış tek bir vekil.
+
+0.2.54'ün niceleyici sınırı, yalnız ondalık rakamlarla yazılmış süslü
+parantezli bir kaçışı da niceleyici sayar: `\u{100}`, `\u{65}` ve `\u{2028}`,
+0.2.54'te olduğu gibi, sınırsız ya da iç içe niceleyici diye reddedilir;
+`\u0100`, `\u0065` ve `\u2028` kabul edilir.
 
 Değiştirici gruplar, 0.2.54'te olduğu gibi, yalnız bunları destekleyen Node
 sürümlerinde derlenir. Unicode özellik sınıfları (`\p{…}`, `\P{…}`) kod
@@ -120,9 +126,18 @@ ile; listelenmiş vekil çifti ve sınıf kenar durumlarında; ve JavaScript'in 
 24'te kabul ettiği her Unicode özellik adında sınandı: kısa ve uzun adıyla bütün
 genel kategoriler, ECMAScript tablosundaki her ikili özellik ve kısaltması, ve
 `Script=`, `sc=`, `Script_Extensions=` ve `scx=` altında 175 betik ile 169 dört
-harfli kısaltması. Bir fark kalır: bir emojinin iki yarısı arasındaki boş eşleşme
-(örneğin `\B`); JavaScript bunu bildirir, motor bildirmez. İki durumda da hiçbir
-metin gizlenmez.
+harfli kısaltması. İki fark kalır:
+
+- bir emojinin iki yarısı arasındaki boş eşleşme (örneğin `\B`); JavaScript bunu
+  bildirir, motor bildirmez. İki durumda da hiçbir metin gizlenmez;
+- büyük/küçük harf duyarsız bir değiştirici grubun içinde ve bir sınıfın
+  dışında, Latin-1 dışındaki yedi harf, ister harf ister kaçış olarak yazılsın
+  (Ÿ, ſ, Μ, μ, ẞ, Kelvin işareti `\u212A` ve Ångström işareti `\u212B`), motorda
+  her metinde Latin-1'deki büyük/küçük eşleriyle (ÿ; s ve S; µ; µ; ß; k ve K; å
+  ve Å) eşleşir. Node 24'te JavaScript bunları yalnız metinde Latin-1 dışında
+  bir karakter de varsa eşler. Motor orada daha çok maskeler; JavaScript'in
+  gizleyeceği hiçbir şeyi açık bırakmaz. Bir sınıfın içinde (`(?i:[\u212A])`)
+  ikisi de eşleri eşler.
 
 ## Tek üretim kurulumu
 <!-- s: one-prod-install -->
