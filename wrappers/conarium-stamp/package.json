@@ -31,6 +31,6 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@conarium-ai/core": "^0.2.48"
+    "@conarium-ai/core": "^0.3.0"
   }
 }
