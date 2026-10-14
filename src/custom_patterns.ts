@@ -25,6 +25,7 @@ export type CustomPatternReject =
   | 'too-long'
   | 'bad-name'
   | 'bad-label'
+  | 'unsupported-property'
 
 const REJECT_MESSAGE: Record<CustomPatternReject, (name: string) => string> = {
   invalid: (name) => `customPatterns: rule "${name}" is not a valid regular expression`,
@@ -34,6 +35,8 @@ const REJECT_MESSAGE: Record<CustomPatternReject, (name: string) => string> = {
   'too-long': (name) => `customPatterns: rule "${name}" exceeds the pattern length cap`,
   'bad-name': (name) => `customPatterns: rule name "${name}" is not allowed`,
   'bad-label': (name) => `customPatterns: rule "${name}" has an invalid mask label`,
+  'unsupported-property': (name) =>
+    `customPatterns: rule "${name}" was rejected (Script_Extensions)`,
 }
 
 export class CustomPatternError extends Error {
@@ -114,8 +117,9 @@ function compileOne(item: CustomPiiPattern): CompiledCustomPattern {
 
   let engine: RE2JS
   try {
-    engine = RE2JS.compile(toEngineSource(source))
-  } catch {
+    engine = RE2JS.compile(toEngineSource(source, item.name))
+  } catch (err) {
+    if (err instanceof CustomPatternError) throw err
     throw new CustomPatternError(item.name, 'invalid')
   }
 
@@ -161,14 +165,177 @@ export function looksUnsafe(source: string): boolean {
 /**
  * re2js source for a pattern JS already accepted with the `u` flag.
  * `\u` escapes become `\x{…}`. `.` and `\s` / `\S` are rewritten where their
- * default re2js sets differ from JS `u`.
+ * default re2js sets differ from JS `u`. `\p` / `\P` names are folded to the
+ * forms re2js compiles; `Script_Extensions` is refused by name.
  */
-function toEngineSource(source: string): string {
+function toEngineSource(source: string, ruleName = ''): string {
   const translated = RE2JS.translateRegExp(source)
-  return rewriteUnicode(translated, !/\(\?[-a-zA-Z]*s/.test(translated))
+  return rewriteUnicode(translated, !/\(\?[-a-zA-Z]*s/.test(translated), ruleName)
 }
 
-function rewriteUnicode(source: string, rewriteDot: boolean): string {
+/** JS property names ignore case, `_`, `-`, and spaces. */
+function canonUnicodeName(name: string): string {
+  return name.replace(/[\s_-]/g, '').toLowerCase()
+}
+
+/** Script name or abbreviation → the script name re2js looks up. */
+const SCRIPT_NAMES: Record<string, string> = {
+  latin: 'Latin',
+  latn: 'Latin',
+  greek: 'Greek',
+  grek: 'Greek',
+  cyrillic: 'Cyrillic',
+  cyrl: 'Cyrillic',
+  arabic: 'Arabic',
+  arab: 'Arabic',
+  hebrew: 'Hebrew',
+  hebr: 'Hebrew',
+  han: 'Han',
+  hani: 'Han',
+  hiragana: 'Hiragana',
+  hira: 'Hiragana',
+  katakana: 'Katakana',
+  kana: 'Katakana',
+  hangul: 'Hangul',
+  hang: 'Hangul',
+  devanagari: 'Devanagari',
+  deva: 'Devanagari',
+  thai: 'Thai',
+  armenian: 'Armenian',
+  armn: 'Armenian',
+  georgian: 'Georgian',
+  geor: 'Georgian',
+  common: 'Common',
+  zyyy: 'Common',
+  inherited: 'Inherited',
+  zinh: 'Inherited',
+  qaai: 'Inherited',
+}
+
+/** General category, long or short → the short name re2js looks up. */
+const CATEGORY_NAMES: Record<string, string> = {
+  letter: 'L',
+  l: 'L',
+  casedletter: 'LC',
+  lc: 'LC',
+  uppercaseletter: 'Lu',
+  lu: 'Lu',
+  lowercaseletter: 'Ll',
+  ll: 'Ll',
+  titlecaseletter: 'Lt',
+  lt: 'Lt',
+  modifierletter: 'Lm',
+  lm: 'Lm',
+  otherletter: 'Lo',
+  lo: 'Lo',
+  mark: 'M',
+  m: 'M',
+  nonspacingmark: 'Mn',
+  mn: 'Mn',
+  spacingmark: 'Mc',
+  mc: 'Mc',
+  enclosingmark: 'Me',
+  me: 'Me',
+  number: 'N',
+  n: 'N',
+  decimalnumber: 'Nd',
+  nd: 'Nd',
+  letternumber: 'Nl',
+  nl: 'Nl',
+  othernumber: 'No',
+  no: 'No',
+  punctuation: 'P',
+  p: 'P',
+  connectorpunctuation: 'Pc',
+  pc: 'Pc',
+  dashpunctuation: 'Pd',
+  pd: 'Pd',
+  openpunctuation: 'Ps',
+  ps: 'Ps',
+  closepunctuation: 'Pe',
+  pe: 'Pe',
+  initialpunctuation: 'Pi',
+  pi: 'Pi',
+  finalpunctuation: 'Pf',
+  pf: 'Pf',
+  otherpunctuation: 'Po',
+  po: 'Po',
+  symbol: 'S',
+  s: 'S',
+  mathsymbol: 'Sm',
+  sm: 'Sm',
+  currencysymbol: 'Sc',
+  sc: 'Sc',
+  modifiersymbol: 'Sk',
+  sk: 'Sk',
+  othersymbol: 'So',
+  so: 'So',
+  separator: 'Z',
+  z: 'Z',
+  spaceseparator: 'Zs',
+  zs: 'Zs',
+  lineseparator: 'Zl',
+  zl: 'Zl',
+  paragraphseparator: 'Zp',
+  zp: 'Zp',
+  other: 'C',
+  c: 'C',
+  control: 'Cc',
+  cc: 'Cc',
+  format: 'Cf',
+  cf: 'Cf',
+  surrogate: 'Cs',
+  cs: 'Cs',
+  privateuse: 'Co',
+  co: 'Co',
+  unassigned: 'Cn',
+  cn: 'Cn',
+}
+
+function propertyAtom(name: string, negated: boolean): string {
+  return `${negated ? '\\P' : '\\p'}{${name}}`
+}
+
+/** JS `ASCII` is U+0000–U+007F. re2js has no property by that spelling. */
+function asciiAtom(negated: boolean, inClass: boolean): string {
+  if (inClass) return negated ? '\\x{80}-\\x{10ffff}' : '\\x{0}-\\x{7f}'
+  return negated ? '[^\\x{0}-\\x{7f}]' : '[\\x{0}-\\x{7f}]'
+}
+
+function rewriteUnicodeProperty(
+  body: string,
+  negated: boolean,
+  inClass: boolean,
+  ruleName: string,
+): string {
+  const eq = body.indexOf('=')
+  if (eq >= 0) {
+    const key = canonUnicodeName(body.slice(0, eq))
+    if (key === 'scriptextensions' || key === 'scx') {
+      throw new CustomPatternError(ruleName, 'unsupported-property')
+    }
+    const value = body.slice(eq + 1).trim()
+    const valueKey = canonUnicodeName(value)
+    if (key === 'script' || key === 'sc') {
+      return propertyAtom(SCRIPT_NAMES[valueKey] ?? value, negated)
+    }
+    if (key === 'generalcategory' || key === 'gc') {
+      return propertyAtom(CATEGORY_NAMES[valueKey] ?? value, negated)
+    }
+    return propertyAtom(body, negated)
+  }
+
+  const key = canonUnicodeName(body)
+  if (key === 'scriptextensions' || key === 'scx') {
+    throw new CustomPatternError(ruleName, 'unsupported-property')
+  }
+  if (key === 'ascii') return asciiAtom(negated, inClass)
+  const category = CATEGORY_NAMES[key]
+  if (category) return propertyAtom(category, negated)
+  return propertyAtom(body, negated)
+}
+
+function rewriteUnicode(source: string, rewriteDot: boolean, ruleName: string): string {
   let out = ''
   let i = 0
   let inClass = false
@@ -182,6 +349,15 @@ function rewriteUnicode(source: string, rewriteDot: boolean): string {
         i += 2
         atClassStart = false
         continue
+      }
+      if ((next === 'p' || next === 'P') && source[i + 2] === '{') {
+        const end = source.indexOf('}', i + 3)
+        if (end !== -1) {
+          out += rewriteUnicodeProperty(source.slice(i + 3, end), next === 'P', inClass, ruleName)
+          i = end + 1
+          atClassStart = false
+          continue
+        }
       }
       out += '\\'
       if (next === undefined) {
