@@ -1,0 +1,420 @@
+/**
+ * Every Unicode property name JavaScript accepts in a `u`-flag pattern is
+ * accepted in a custom pattern and matches the same code points: all general
+ * category values by short and long name (bare, `gc=`, `General_Category=`),
+ * every binary property in the ECMAScript table with its alias, and every
+ * script by long name and four-letter alias under `Script=`, `sc=`,
+ * `Script_Extensions=` and `scx=`. The script names are the ones both the
+ * engine's tables and JavaScript know; the aliases are every four-letter name
+ * JavaScript accepts for one of them.
+ */
+import { describe, expect, it } from 'vitest'
+import { compileCustomPatterns } from './custom_patterns.js'
+
+const B = String.fromCharCode(92)
+
+// Every code point below U+3000 and every 37th above, surrogates left out.
+const SAMPLE = (() => {
+  const out: string[] = []
+  for (let cp = 0; cp < 0x110000; cp += cp < 0x3000 ? 1 : 37) {
+    if (cp >= 0xd800 && cp < 0xe000) continue
+    out.push(String.fromCodePoint(cp))
+  }
+  return out.join('')
+})()
+
+const GENERAL_CATEGORY = [
+  'L', 'Letter', 'gc=L', 'gc=Letter', 'General_Category=L', 'General_Category=Letter', 'LC',
+  'Cased_Letter', 'gc=LC', 'gc=Cased_Letter', 'General_Category=LC', 'General_Category=Cased_Letter',
+  'Lu', 'Uppercase_Letter', 'gc=Lu', 'gc=Uppercase_Letter', 'General_Category=Lu',
+  'General_Category=Uppercase_Letter', 'Ll', 'Lowercase_Letter', 'gc=Ll', 'gc=Lowercase_Letter',
+  'General_Category=Ll', 'General_Category=Lowercase_Letter', 'Lt', 'Titlecase_Letter', 'gc=Lt',
+  'gc=Titlecase_Letter', 'General_Category=Lt', 'General_Category=Titlecase_Letter', 'Lm',
+  'Modifier_Letter', 'gc=Lm', 'gc=Modifier_Letter', 'General_Category=Lm',
+  'General_Category=Modifier_Letter', 'Lo', 'Other_Letter', 'gc=Lo', 'gc=Other_Letter',
+  'General_Category=Lo', 'General_Category=Other_Letter', 'M', 'Mark', 'gc=M', 'gc=Mark',
+  'General_Category=M', 'General_Category=Mark', 'Mn', 'Nonspacing_Mark', 'gc=Mn',
+  'gc=Nonspacing_Mark', 'General_Category=Mn', 'General_Category=Nonspacing_Mark', 'Mc',
+  'Spacing_Mark', 'gc=Mc', 'gc=Spacing_Mark', 'General_Category=Mc', 'General_Category=Spacing_Mark',
+  'Me', 'Enclosing_Mark', 'gc=Me', 'gc=Enclosing_Mark', 'General_Category=Me',
+  'General_Category=Enclosing_Mark', 'N', 'Number', 'gc=N', 'gc=Number', 'General_Category=N',
+  'General_Category=Number', 'Nd', 'Decimal_Number', 'gc=Nd', 'gc=Decimal_Number',
+  'General_Category=Nd', 'General_Category=Decimal_Number', 'Nl', 'Letter_Number', 'gc=Nl',
+  'gc=Letter_Number', 'General_Category=Nl', 'General_Category=Letter_Number', 'No', 'Other_Number',
+  'gc=No', 'gc=Other_Number', 'General_Category=No', 'General_Category=Other_Number', 'P',
+  'Punctuation', 'gc=P', 'gc=Punctuation', 'General_Category=P', 'General_Category=Punctuation', 'Pc',
+  'Connector_Punctuation', 'gc=Pc', 'gc=Connector_Punctuation', 'General_Category=Pc',
+  'General_Category=Connector_Punctuation', 'Pd', 'Dash_Punctuation', 'gc=Pd', 'gc=Dash_Punctuation',
+  'General_Category=Pd', 'General_Category=Dash_Punctuation', 'Ps', 'Open_Punctuation', 'gc=Ps',
+  'gc=Open_Punctuation', 'General_Category=Ps', 'General_Category=Open_Punctuation', 'Pe',
+  'Close_Punctuation', 'gc=Pe', 'gc=Close_Punctuation', 'General_Category=Pe',
+  'General_Category=Close_Punctuation', 'Pi', 'Initial_Punctuation', 'gc=Pi', 'gc=Initial_Punctuation',
+  'General_Category=Pi', 'General_Category=Initial_Punctuation', 'Pf', 'Final_Punctuation', 'gc=Pf',
+  'gc=Final_Punctuation', 'General_Category=Pf', 'General_Category=Final_Punctuation', 'Po',
+  'Other_Punctuation', 'gc=Po', 'gc=Other_Punctuation', 'General_Category=Po',
+  'General_Category=Other_Punctuation', 'S', 'Symbol', 'gc=S', 'gc=Symbol', 'General_Category=S',
+  'General_Category=Symbol', 'Sm', 'Math_Symbol', 'gc=Sm', 'gc=Math_Symbol', 'General_Category=Sm',
+  'General_Category=Math_Symbol', 'Sc', 'Currency_Symbol', 'gc=Sc', 'gc=Currency_Symbol',
+  'General_Category=Sc', 'General_Category=Currency_Symbol', 'Sk', 'Modifier_Symbol', 'gc=Sk',
+  'gc=Modifier_Symbol', 'General_Category=Sk', 'General_Category=Modifier_Symbol', 'So',
+  'Other_Symbol', 'gc=So', 'gc=Other_Symbol', 'General_Category=So', 'General_Category=Other_Symbol',
+  'Z', 'Separator', 'gc=Z', 'gc=Separator', 'General_Category=Z', 'General_Category=Separator', 'Zs',
+  'Space_Separator', 'gc=Zs', 'gc=Space_Separator', 'General_Category=Zs',
+  'General_Category=Space_Separator', 'Zl', 'Line_Separator', 'gc=Zl', 'gc=Line_Separator',
+  'General_Category=Zl', 'General_Category=Line_Separator', 'Zp', 'Paragraph_Separator', 'gc=Zp',
+  'gc=Paragraph_Separator', 'General_Category=Zp', 'General_Category=Paragraph_Separator', 'C',
+  'Other', 'gc=C', 'gc=Other', 'General_Category=C', 'General_Category=Other', 'Cc', 'Control',
+  'gc=Cc', 'gc=Control', 'General_Category=Cc', 'General_Category=Control', 'Cf', 'Format', 'gc=Cf',
+  'gc=Format', 'General_Category=Cf', 'General_Category=Format', 'Cs', 'Surrogate', 'gc=Cs',
+  'gc=Surrogate', 'General_Category=Cs', 'General_Category=Surrogate', 'Co', 'Private_Use', 'gc=Co',
+  'gc=Private_Use', 'General_Category=Co', 'General_Category=Private_Use', 'Cn', 'Unassigned', 'gc=Cn',
+  'gc=Unassigned', 'General_Category=Cn', 'General_Category=Unassigned',
+]
+
+const BINARY = [
+  'ASCII', 'ASCII_Hex_Digit', 'AHex', 'Alphabetic', 'Alpha', 'Any', 'Assigned', 'Bidi_Control',
+  'Bidi_C', 'Bidi_Mirrored', 'Bidi_M', 'Case_Ignorable', 'CI', 'Cased', 'Changes_When_Casefolded',
+  'CWCF', 'Changes_When_Casemapped', 'CWCM', 'Changes_When_Lowercased', 'CWL',
+  'Changes_When_NFKC_Casefolded', 'CWKCF', 'Changes_When_Titlecased', 'CWT', 'Changes_When_Uppercased',
+  'CWU', 'Dash', 'Default_Ignorable_Code_Point', 'DI', 'Deprecated', 'Dep', 'Diacritic', 'Dia',
+  'Emoji', 'Emoji_Component', 'EComp', 'Emoji_Modifier', 'EMod', 'Emoji_Modifier_Base', 'EBase',
+  'Emoji_Presentation', 'EPres', 'Extended_Pictographic', 'ExtPict', 'Extender', 'Ext',
+  'Grapheme_Base', 'Gr_Base', 'Grapheme_Extend', 'Gr_Ext', 'Hex_Digit', 'Hex', 'IDS_Binary_Operator',
+  'IDSB', 'IDS_Trinary_Operator', 'IDST', 'ID_Continue', 'IDC', 'ID_Start', 'IDS', 'Ideographic',
+  'Ideo', 'Join_Control', 'Join_C', 'Logical_Order_Exception', 'LOE', 'Lowercase', 'Lower', 'Math',
+  'Noncharacter_Code_Point', 'NChar', 'Pattern_Syntax', 'Pat_Syn', 'Pattern_White_Space', 'Pat_WS',
+  'Quotation_Mark', 'QMark', 'Radical', 'Regional_Indicator', 'RI', 'Sentence_Terminal', 'STerm',
+  'Soft_Dotted', 'SD', 'Terminal_Punctuation', 'Term', 'Unified_Ideograph', 'UIdeo', 'Uppercase',
+  'Upper', 'Variation_Selector', 'VS', 'White_Space', 'space', 'XID_Continue', 'XIDC', 'XID_Start',
+  'XIDS',
+]
+
+const SCRIPT = [
+  'Script=Adlam', 'sc=Adlam', 'Script_Extensions=Adlam', 'scx=Adlam', 'Script=Ahom', 'sc=Ahom',
+  'Script_Extensions=Ahom', 'scx=Ahom', 'Script=Anatolian_Hieroglyphs', 'sc=Anatolian_Hieroglyphs',
+  'Script_Extensions=Anatolian_Hieroglyphs', 'scx=Anatolian_Hieroglyphs', 'Script=Arabic', 'sc=Arabic',
+  'Script_Extensions=Arabic', 'scx=Arabic', 'Script=Armenian', 'sc=Armenian',
+  'Script_Extensions=Armenian', 'scx=Armenian', 'Script=Avestan', 'sc=Avestan',
+  'Script_Extensions=Avestan', 'scx=Avestan', 'Script=Balinese', 'sc=Balinese',
+  'Script_Extensions=Balinese', 'scx=Balinese', 'Script=Bamum', 'sc=Bamum', 'Script_Extensions=Bamum',
+  'scx=Bamum', 'Script=Bassa_Vah', 'sc=Bassa_Vah', 'Script_Extensions=Bassa_Vah', 'scx=Bassa_Vah',
+  'Script=Batak', 'sc=Batak', 'Script_Extensions=Batak', 'scx=Batak', 'Script=Bengali', 'sc=Bengali',
+  'Script_Extensions=Bengali', 'scx=Bengali', 'Script=Beria_Erfe', 'sc=Beria_Erfe',
+  'Script_Extensions=Beria_Erfe', 'scx=Beria_Erfe', 'Script=Bhaiksuki', 'sc=Bhaiksuki',
+  'Script_Extensions=Bhaiksuki', 'scx=Bhaiksuki', 'Script=Bopomofo', 'sc=Bopomofo',
+  'Script_Extensions=Bopomofo', 'scx=Bopomofo', 'Script=Brahmi', 'sc=Brahmi',
+  'Script_Extensions=Brahmi', 'scx=Brahmi', 'Script=Braille', 'sc=Braille',
+  'Script_Extensions=Braille', 'scx=Braille', 'Script=Buginese', 'sc=Buginese',
+  'Script_Extensions=Buginese', 'scx=Buginese', 'Script=Buhid', 'sc=Buhid', 'Script_Extensions=Buhid',
+  'scx=Buhid', 'Script=Canadian_Aboriginal', 'sc=Canadian_Aboriginal',
+  'Script_Extensions=Canadian_Aboriginal', 'scx=Canadian_Aboriginal', 'Script=Carian', 'sc=Carian',
+  'Script_Extensions=Carian', 'scx=Carian', 'Script=Caucasian_Albanian', 'sc=Caucasian_Albanian',
+  'Script_Extensions=Caucasian_Albanian', 'scx=Caucasian_Albanian', 'Script=Chakma', 'sc=Chakma',
+  'Script_Extensions=Chakma', 'scx=Chakma', 'Script=Cham', 'sc=Cham', 'Script_Extensions=Cham',
+  'scx=Cham', 'Script=Cherokee', 'sc=Cherokee', 'Script_Extensions=Cherokee', 'scx=Cherokee',
+  'Script=Chorasmian', 'sc=Chorasmian', 'Script_Extensions=Chorasmian', 'scx=Chorasmian',
+  'Script=Common', 'sc=Common', 'Script_Extensions=Common', 'scx=Common', 'Script=Coptic', 'sc=Coptic',
+  'Script_Extensions=Coptic', 'scx=Coptic', 'Script=Cuneiform', 'sc=Cuneiform',
+  'Script_Extensions=Cuneiform', 'scx=Cuneiform', 'Script=Cypriot', 'sc=Cypriot',
+  'Script_Extensions=Cypriot', 'scx=Cypriot', 'Script=Cypro_Minoan', 'sc=Cypro_Minoan',
+  'Script_Extensions=Cypro_Minoan', 'scx=Cypro_Minoan', 'Script=Cyrillic', 'sc=Cyrillic',
+  'Script_Extensions=Cyrillic', 'scx=Cyrillic', 'Script=Deseret', 'sc=Deseret',
+  'Script_Extensions=Deseret', 'scx=Deseret', 'Script=Devanagari', 'sc=Devanagari',
+  'Script_Extensions=Devanagari', 'scx=Devanagari', 'Script=Dives_Akuru', 'sc=Dives_Akuru',
+  'Script_Extensions=Dives_Akuru', 'scx=Dives_Akuru', 'Script=Dogra', 'sc=Dogra',
+  'Script_Extensions=Dogra', 'scx=Dogra', 'Script=Duployan', 'sc=Duployan',
+  'Script_Extensions=Duployan', 'scx=Duployan', 'Script=Egyptian_Hieroglyphs',
+  'sc=Egyptian_Hieroglyphs', 'Script_Extensions=Egyptian_Hieroglyphs', 'scx=Egyptian_Hieroglyphs',
+  'Script=Elbasan', 'sc=Elbasan', 'Script_Extensions=Elbasan', 'scx=Elbasan', 'Script=Elymaic',
+  'sc=Elymaic', 'Script_Extensions=Elymaic', 'scx=Elymaic', 'Script=Ethiopic', 'sc=Ethiopic',
+  'Script_Extensions=Ethiopic', 'scx=Ethiopic', 'Script=Garay', 'sc=Garay', 'Script_Extensions=Garay',
+  'scx=Garay', 'Script=Georgian', 'sc=Georgian', 'Script_Extensions=Georgian', 'scx=Georgian',
+  'Script=Glagolitic', 'sc=Glagolitic', 'Script_Extensions=Glagolitic', 'scx=Glagolitic',
+  'Script=Gothic', 'sc=Gothic', 'Script_Extensions=Gothic', 'scx=Gothic', 'Script=Grantha',
+  'sc=Grantha', 'Script_Extensions=Grantha', 'scx=Grantha', 'Script=Greek', 'sc=Greek',
+  'Script_Extensions=Greek', 'scx=Greek', 'Script=Gujarati', 'sc=Gujarati',
+  'Script_Extensions=Gujarati', 'scx=Gujarati', 'Script=Gunjala_Gondi', 'sc=Gunjala_Gondi',
+  'Script_Extensions=Gunjala_Gondi', 'scx=Gunjala_Gondi', 'Script=Gurmukhi', 'sc=Gurmukhi',
+  'Script_Extensions=Gurmukhi', 'scx=Gurmukhi', 'Script=Gurung_Khema', 'sc=Gurung_Khema',
+  'Script_Extensions=Gurung_Khema', 'scx=Gurung_Khema', 'Script=Han', 'sc=Han',
+  'Script_Extensions=Han', 'scx=Han', 'Script=Hangul', 'sc=Hangul', 'Script_Extensions=Hangul',
+  'scx=Hangul', 'Script=Hanifi_Rohingya', 'sc=Hanifi_Rohingya', 'Script_Extensions=Hanifi_Rohingya',
+  'scx=Hanifi_Rohingya', 'Script=Hanunoo', 'sc=Hanunoo', 'Script_Extensions=Hanunoo', 'scx=Hanunoo',
+  'Script=Hatran', 'sc=Hatran', 'Script_Extensions=Hatran', 'scx=Hatran', 'Script=Hebrew', 'sc=Hebrew',
+  'Script_Extensions=Hebrew', 'scx=Hebrew', 'Script=Hiragana', 'sc=Hiragana',
+  'Script_Extensions=Hiragana', 'scx=Hiragana', 'Script=Imperial_Aramaic', 'sc=Imperial_Aramaic',
+  'Script_Extensions=Imperial_Aramaic', 'scx=Imperial_Aramaic', 'Script=Inherited', 'sc=Inherited',
+  'Script_Extensions=Inherited', 'scx=Inherited', 'Script=Inscriptional_Pahlavi',
+  'sc=Inscriptional_Pahlavi', 'Script_Extensions=Inscriptional_Pahlavi', 'scx=Inscriptional_Pahlavi',
+  'Script=Inscriptional_Parthian', 'sc=Inscriptional_Parthian',
+  'Script_Extensions=Inscriptional_Parthian', 'scx=Inscriptional_Parthian', 'Script=Javanese',
+  'sc=Javanese', 'Script_Extensions=Javanese', 'scx=Javanese', 'Script=Kaithi', 'sc=Kaithi',
+  'Script_Extensions=Kaithi', 'scx=Kaithi', 'Script=Kannada', 'sc=Kannada',
+  'Script_Extensions=Kannada', 'scx=Kannada', 'Script=Katakana', 'sc=Katakana',
+  'Script_Extensions=Katakana', 'scx=Katakana', 'Script=Kawi', 'sc=Kawi', 'Script_Extensions=Kawi',
+  'scx=Kawi', 'Script=Kayah_Li', 'sc=Kayah_Li', 'Script_Extensions=Kayah_Li', 'scx=Kayah_Li',
+  'Script=Kharoshthi', 'sc=Kharoshthi', 'Script_Extensions=Kharoshthi', 'scx=Kharoshthi',
+  'Script=Khitan_Small_Script', 'sc=Khitan_Small_Script', 'Script_Extensions=Khitan_Small_Script',
+  'scx=Khitan_Small_Script', 'Script=Khmer', 'sc=Khmer', 'Script_Extensions=Khmer', 'scx=Khmer',
+  'Script=Khojki', 'sc=Khojki', 'Script_Extensions=Khojki', 'scx=Khojki', 'Script=Khudawadi',
+  'sc=Khudawadi', 'Script_Extensions=Khudawadi', 'scx=Khudawadi', 'Script=Kirat_Rai', 'sc=Kirat_Rai',
+  'Script_Extensions=Kirat_Rai', 'scx=Kirat_Rai', 'Script=Lao', 'sc=Lao', 'Script_Extensions=Lao',
+  'scx=Lao', 'Script=Latin', 'sc=Latin', 'Script_Extensions=Latin', 'scx=Latin', 'Script=Lepcha',
+  'sc=Lepcha', 'Script_Extensions=Lepcha', 'scx=Lepcha', 'Script=Limbu', 'sc=Limbu',
+  'Script_Extensions=Limbu', 'scx=Limbu', 'Script=Linear_A', 'sc=Linear_A',
+  'Script_Extensions=Linear_A', 'scx=Linear_A', 'Script=Linear_B', 'sc=Linear_B',
+  'Script_Extensions=Linear_B', 'scx=Linear_B', 'Script=Lisu', 'sc=Lisu', 'Script_Extensions=Lisu',
+  'scx=Lisu', 'Script=Lycian', 'sc=Lycian', 'Script_Extensions=Lycian', 'scx=Lycian', 'Script=Lydian',
+  'sc=Lydian', 'Script_Extensions=Lydian', 'scx=Lydian', 'Script=Mahajani', 'sc=Mahajani',
+  'Script_Extensions=Mahajani', 'scx=Mahajani', 'Script=Makasar', 'sc=Makasar',
+  'Script_Extensions=Makasar', 'scx=Makasar', 'Script=Malayalam', 'sc=Malayalam',
+  'Script_Extensions=Malayalam', 'scx=Malayalam', 'Script=Mandaic', 'sc=Mandaic',
+  'Script_Extensions=Mandaic', 'scx=Mandaic', 'Script=Manichaean', 'sc=Manichaean',
+  'Script_Extensions=Manichaean', 'scx=Manichaean', 'Script=Marchen', 'sc=Marchen',
+  'Script_Extensions=Marchen', 'scx=Marchen', 'Script=Masaram_Gondi', 'sc=Masaram_Gondi',
+  'Script_Extensions=Masaram_Gondi', 'scx=Masaram_Gondi', 'Script=Medefaidrin', 'sc=Medefaidrin',
+  'Script_Extensions=Medefaidrin', 'scx=Medefaidrin', 'Script=Meetei_Mayek', 'sc=Meetei_Mayek',
+  'Script_Extensions=Meetei_Mayek', 'scx=Meetei_Mayek', 'Script=Mende_Kikakui', 'sc=Mende_Kikakui',
+  'Script_Extensions=Mende_Kikakui', 'scx=Mende_Kikakui', 'Script=Meroitic_Cursive',
+  'sc=Meroitic_Cursive', 'Script_Extensions=Meroitic_Cursive', 'scx=Meroitic_Cursive',
+  'Script=Meroitic_Hieroglyphs', 'sc=Meroitic_Hieroglyphs', 'Script_Extensions=Meroitic_Hieroglyphs',
+  'scx=Meroitic_Hieroglyphs', 'Script=Miao', 'sc=Miao', 'Script_Extensions=Miao', 'scx=Miao',
+  'Script=Modi', 'sc=Modi', 'Script_Extensions=Modi', 'scx=Modi', 'Script=Mongolian', 'sc=Mongolian',
+  'Script_Extensions=Mongolian', 'scx=Mongolian', 'Script=Mro', 'sc=Mro', 'Script_Extensions=Mro',
+  'scx=Mro', 'Script=Multani', 'sc=Multani', 'Script_Extensions=Multani', 'scx=Multani',
+  'Script=Myanmar', 'sc=Myanmar', 'Script_Extensions=Myanmar', 'scx=Myanmar', 'Script=Nabataean',
+  'sc=Nabataean', 'Script_Extensions=Nabataean', 'scx=Nabataean', 'Script=Nag_Mundari',
+  'sc=Nag_Mundari', 'Script_Extensions=Nag_Mundari', 'scx=Nag_Mundari', 'Script=Nandinagari',
+  'sc=Nandinagari', 'Script_Extensions=Nandinagari', 'scx=Nandinagari', 'Script=New_Tai_Lue',
+  'sc=New_Tai_Lue', 'Script_Extensions=New_Tai_Lue', 'scx=New_Tai_Lue', 'Script=Newa', 'sc=Newa',
+  'Script_Extensions=Newa', 'scx=Newa', 'Script=Nko', 'sc=Nko', 'Script_Extensions=Nko', 'scx=Nko',
+  'Script=Nushu', 'sc=Nushu', 'Script_Extensions=Nushu', 'scx=Nushu', 'Script=Nyiakeng_Puachue_Hmong',
+  'sc=Nyiakeng_Puachue_Hmong', 'Script_Extensions=Nyiakeng_Puachue_Hmong',
+  'scx=Nyiakeng_Puachue_Hmong', 'Script=Ogham', 'sc=Ogham', 'Script_Extensions=Ogham', 'scx=Ogham',
+  'Script=Ol_Chiki', 'sc=Ol_Chiki', 'Script_Extensions=Ol_Chiki', 'scx=Ol_Chiki', 'Script=Ol_Onal',
+  'sc=Ol_Onal', 'Script_Extensions=Ol_Onal', 'scx=Ol_Onal', 'Script=Old_Hungarian', 'sc=Old_Hungarian',
+  'Script_Extensions=Old_Hungarian', 'scx=Old_Hungarian', 'Script=Old_Italic', 'sc=Old_Italic',
+  'Script_Extensions=Old_Italic', 'scx=Old_Italic', 'Script=Old_North_Arabian', 'sc=Old_North_Arabian',
+  'Script_Extensions=Old_North_Arabian', 'scx=Old_North_Arabian', 'Script=Old_Permic', 'sc=Old_Permic',
+  'Script_Extensions=Old_Permic', 'scx=Old_Permic', 'Script=Old_Persian', 'sc=Old_Persian',
+  'Script_Extensions=Old_Persian', 'scx=Old_Persian', 'Script=Old_Sogdian', 'sc=Old_Sogdian',
+  'Script_Extensions=Old_Sogdian', 'scx=Old_Sogdian', 'Script=Old_South_Arabian',
+  'sc=Old_South_Arabian', 'Script_Extensions=Old_South_Arabian', 'scx=Old_South_Arabian',
+  'Script=Old_Turkic', 'sc=Old_Turkic', 'Script_Extensions=Old_Turkic', 'scx=Old_Turkic',
+  'Script=Old_Uyghur', 'sc=Old_Uyghur', 'Script_Extensions=Old_Uyghur', 'scx=Old_Uyghur',
+  'Script=Oriya', 'sc=Oriya', 'Script_Extensions=Oriya', 'scx=Oriya', 'Script=Osage', 'sc=Osage',
+  'Script_Extensions=Osage', 'scx=Osage', 'Script=Osmanya', 'sc=Osmanya', 'Script_Extensions=Osmanya',
+  'scx=Osmanya', 'Script=Pahawh_Hmong', 'sc=Pahawh_Hmong', 'Script_Extensions=Pahawh_Hmong',
+  'scx=Pahawh_Hmong', 'Script=Palmyrene', 'sc=Palmyrene', 'Script_Extensions=Palmyrene',
+  'scx=Palmyrene', 'Script=Pau_Cin_Hau', 'sc=Pau_Cin_Hau', 'Script_Extensions=Pau_Cin_Hau',
+  'scx=Pau_Cin_Hau', 'Script=Phags_Pa', 'sc=Phags_Pa', 'Script_Extensions=Phags_Pa', 'scx=Phags_Pa',
+  'Script=Phoenician', 'sc=Phoenician', 'Script_Extensions=Phoenician', 'scx=Phoenician',
+  'Script=Psalter_Pahlavi', 'sc=Psalter_Pahlavi', 'Script_Extensions=Psalter_Pahlavi',
+  'scx=Psalter_Pahlavi', 'Script=Rejang', 'sc=Rejang', 'Script_Extensions=Rejang', 'scx=Rejang',
+  'Script=Runic', 'sc=Runic', 'Script_Extensions=Runic', 'scx=Runic', 'Script=Samaritan',
+  'sc=Samaritan', 'Script_Extensions=Samaritan', 'scx=Samaritan', 'Script=Saurashtra', 'sc=Saurashtra',
+  'Script_Extensions=Saurashtra', 'scx=Saurashtra', 'Script=Sharada', 'sc=Sharada',
+  'Script_Extensions=Sharada', 'scx=Sharada', 'Script=Shavian', 'sc=Shavian',
+  'Script_Extensions=Shavian', 'scx=Shavian', 'Script=Siddham', 'sc=Siddham',
+  'Script_Extensions=Siddham', 'scx=Siddham', 'Script=Sidetic', 'sc=Sidetic',
+  'Script_Extensions=Sidetic', 'scx=Sidetic', 'Script=SignWriting', 'sc=SignWriting',
+  'Script_Extensions=SignWriting', 'scx=SignWriting', 'Script=Sinhala', 'sc=Sinhala',
+  'Script_Extensions=Sinhala', 'scx=Sinhala', 'Script=Sogdian', 'sc=Sogdian',
+  'Script_Extensions=Sogdian', 'scx=Sogdian', 'Script=Sora_Sompeng', 'sc=Sora_Sompeng',
+  'Script_Extensions=Sora_Sompeng', 'scx=Sora_Sompeng', 'Script=Soyombo', 'sc=Soyombo',
+  'Script_Extensions=Soyombo', 'scx=Soyombo', 'Script=Sundanese', 'sc=Sundanese',
+  'Script_Extensions=Sundanese', 'scx=Sundanese', 'Script=Sunuwar', 'sc=Sunuwar',
+  'Script_Extensions=Sunuwar', 'scx=Sunuwar', 'Script=Syloti_Nagri', 'sc=Syloti_Nagri',
+  'Script_Extensions=Syloti_Nagri', 'scx=Syloti_Nagri', 'Script=Syriac', 'sc=Syriac',
+  'Script_Extensions=Syriac', 'scx=Syriac', 'Script=Tagalog', 'sc=Tagalog',
+  'Script_Extensions=Tagalog', 'scx=Tagalog', 'Script=Tagbanwa', 'sc=Tagbanwa',
+  'Script_Extensions=Tagbanwa', 'scx=Tagbanwa', 'Script=Tai_Le', 'sc=Tai_Le',
+  'Script_Extensions=Tai_Le', 'scx=Tai_Le', 'Script=Tai_Tham', 'sc=Tai_Tham',
+  'Script_Extensions=Tai_Tham', 'scx=Tai_Tham', 'Script=Tai_Viet', 'sc=Tai_Viet',
+  'Script_Extensions=Tai_Viet', 'scx=Tai_Viet', 'Script=Tai_Yo', 'sc=Tai_Yo',
+  'Script_Extensions=Tai_Yo', 'scx=Tai_Yo', 'Script=Takri', 'sc=Takri', 'Script_Extensions=Takri',
+  'scx=Takri', 'Script=Tamil', 'sc=Tamil', 'Script_Extensions=Tamil', 'scx=Tamil', 'Script=Tangsa',
+  'sc=Tangsa', 'Script_Extensions=Tangsa', 'scx=Tangsa', 'Script=Tangut', 'sc=Tangut',
+  'Script_Extensions=Tangut', 'scx=Tangut', 'Script=Telugu', 'sc=Telugu', 'Script_Extensions=Telugu',
+  'scx=Telugu', 'Script=Thaana', 'sc=Thaana', 'Script_Extensions=Thaana', 'scx=Thaana', 'Script=Thai',
+  'sc=Thai', 'Script_Extensions=Thai', 'scx=Thai', 'Script=Tibetan', 'sc=Tibetan',
+  'Script_Extensions=Tibetan', 'scx=Tibetan', 'Script=Tifinagh', 'sc=Tifinagh',
+  'Script_Extensions=Tifinagh', 'scx=Tifinagh', 'Script=Tirhuta', 'sc=Tirhuta',
+  'Script_Extensions=Tirhuta', 'scx=Tirhuta', 'Script=Todhri', 'sc=Todhri', 'Script_Extensions=Todhri',
+  'scx=Todhri', 'Script=Tolong_Siki', 'sc=Tolong_Siki', 'Script_Extensions=Tolong_Siki',
+  'scx=Tolong_Siki', 'Script=Toto', 'sc=Toto', 'Script_Extensions=Toto', 'scx=Toto',
+  'Script=Tulu_Tigalari', 'sc=Tulu_Tigalari', 'Script_Extensions=Tulu_Tigalari', 'scx=Tulu_Tigalari',
+  'Script=Ugaritic', 'sc=Ugaritic', 'Script_Extensions=Ugaritic', 'scx=Ugaritic', 'Script=Unknown',
+  'sc=Unknown', 'Script_Extensions=Unknown', 'scx=Unknown', 'Script=Vai', 'sc=Vai',
+  'Script_Extensions=Vai', 'scx=Vai', 'Script=Vithkuqi', 'sc=Vithkuqi', 'Script_Extensions=Vithkuqi',
+  'scx=Vithkuqi', 'Script=Wancho', 'sc=Wancho', 'Script_Extensions=Wancho', 'scx=Wancho',
+  'Script=Warang_Citi', 'sc=Warang_Citi', 'Script_Extensions=Warang_Citi', 'scx=Warang_Citi',
+  'Script=Yezidi', 'sc=Yezidi', 'Script_Extensions=Yezidi', 'scx=Yezidi', 'Script=Yi', 'sc=Yi',
+  'Script_Extensions=Yi', 'scx=Yi', 'Script=Zanabazar_Square', 'sc=Zanabazar_Square',
+  'Script_Extensions=Zanabazar_Square', 'scx=Zanabazar_Square', 'Script=Adlm', 'sc=Adlm',
+  'Script_Extensions=Adlm', 'scx=Adlm', 'Script=Aghb', 'sc=Aghb', 'Script_Extensions=Aghb', 'scx=Aghb',
+  'Script=Arab', 'sc=Arab', 'Script_Extensions=Arab', 'scx=Arab', 'Script=Armi', 'sc=Armi',
+  'Script_Extensions=Armi', 'scx=Armi', 'Script=Armn', 'sc=Armn', 'Script_Extensions=Armn', 'scx=Armn',
+  'Script=Avst', 'sc=Avst', 'Script_Extensions=Avst', 'scx=Avst', 'Script=Bali', 'sc=Bali',
+  'Script_Extensions=Bali', 'scx=Bali', 'Script=Bamu', 'sc=Bamu', 'Script_Extensions=Bamu', 'scx=Bamu',
+  'Script=Bass', 'sc=Bass', 'Script_Extensions=Bass', 'scx=Bass', 'Script=Batk', 'sc=Batk',
+  'Script_Extensions=Batk', 'scx=Batk', 'Script=Beng', 'sc=Beng', 'Script_Extensions=Beng', 'scx=Beng',
+  'Script=Berf', 'sc=Berf', 'Script_Extensions=Berf', 'scx=Berf', 'Script=Bhks', 'sc=Bhks',
+  'Script_Extensions=Bhks', 'scx=Bhks', 'Script=Bopo', 'sc=Bopo', 'Script_Extensions=Bopo', 'scx=Bopo',
+  'Script=Brah', 'sc=Brah', 'Script_Extensions=Brah', 'scx=Brah', 'Script=Brai', 'sc=Brai',
+  'Script_Extensions=Brai', 'scx=Brai', 'Script=Bugi', 'sc=Bugi', 'Script_Extensions=Bugi', 'scx=Bugi',
+  'Script=Buhd', 'sc=Buhd', 'Script_Extensions=Buhd', 'scx=Buhd', 'Script=Cakm', 'sc=Cakm',
+  'Script_Extensions=Cakm', 'scx=Cakm', 'Script=Cans', 'sc=Cans', 'Script_Extensions=Cans', 'scx=Cans',
+  'Script=Cari', 'sc=Cari', 'Script_Extensions=Cari', 'scx=Cari', 'Script=Cher', 'sc=Cher',
+  'Script_Extensions=Cher', 'scx=Cher', 'Script=Chrs', 'sc=Chrs', 'Script_Extensions=Chrs', 'scx=Chrs',
+  'Script=Copt', 'sc=Copt', 'Script_Extensions=Copt', 'scx=Copt', 'Script=Cpmn', 'sc=Cpmn',
+  'Script_Extensions=Cpmn', 'scx=Cpmn', 'Script=Cprt', 'sc=Cprt', 'Script_Extensions=Cprt', 'scx=Cprt',
+  'Script=Cyrl', 'sc=Cyrl', 'Script_Extensions=Cyrl', 'scx=Cyrl', 'Script=Deva', 'sc=Deva',
+  'Script_Extensions=Deva', 'scx=Deva', 'Script=Diak', 'sc=Diak', 'Script_Extensions=Diak', 'scx=Diak',
+  'Script=Dogr', 'sc=Dogr', 'Script_Extensions=Dogr', 'scx=Dogr', 'Script=Dsrt', 'sc=Dsrt',
+  'Script_Extensions=Dsrt', 'scx=Dsrt', 'Script=Dupl', 'sc=Dupl', 'Script_Extensions=Dupl', 'scx=Dupl',
+  'Script=Egyp', 'sc=Egyp', 'Script_Extensions=Egyp', 'scx=Egyp', 'Script=Elba', 'sc=Elba',
+  'Script_Extensions=Elba', 'scx=Elba', 'Script=Elym', 'sc=Elym', 'Script_Extensions=Elym', 'scx=Elym',
+  'Script=Ethi', 'sc=Ethi', 'Script_Extensions=Ethi', 'scx=Ethi', 'Script=Gara', 'sc=Gara',
+  'Script_Extensions=Gara', 'scx=Gara', 'Script=Geor', 'sc=Geor', 'Script_Extensions=Geor', 'scx=Geor',
+  'Script=Glag', 'sc=Glag', 'Script_Extensions=Glag', 'scx=Glag', 'Script=Gong', 'sc=Gong',
+  'Script_Extensions=Gong', 'scx=Gong', 'Script=Gonm', 'sc=Gonm', 'Script_Extensions=Gonm', 'scx=Gonm',
+  'Script=Goth', 'sc=Goth', 'Script_Extensions=Goth', 'scx=Goth', 'Script=Gran', 'sc=Gran',
+  'Script_Extensions=Gran', 'scx=Gran', 'Script=Grek', 'sc=Grek', 'Script_Extensions=Grek', 'scx=Grek',
+  'Script=Gujr', 'sc=Gujr', 'Script_Extensions=Gujr', 'scx=Gujr', 'Script=Gukh', 'sc=Gukh',
+  'Script_Extensions=Gukh', 'scx=Gukh', 'Script=Guru', 'sc=Guru', 'Script_Extensions=Guru', 'scx=Guru',
+  'Script=Hang', 'sc=Hang', 'Script_Extensions=Hang', 'scx=Hang', 'Script=Hani', 'sc=Hani',
+  'Script_Extensions=Hani', 'scx=Hani', 'Script=Hano', 'sc=Hano', 'Script_Extensions=Hano', 'scx=Hano',
+  'Script=Hatr', 'sc=Hatr', 'Script_Extensions=Hatr', 'scx=Hatr', 'Script=Hebr', 'sc=Hebr',
+  'Script_Extensions=Hebr', 'scx=Hebr', 'Script=Hira', 'sc=Hira', 'Script_Extensions=Hira', 'scx=Hira',
+  'Script=Hluw', 'sc=Hluw', 'Script_Extensions=Hluw', 'scx=Hluw', 'Script=Hmng', 'sc=Hmng',
+  'Script_Extensions=Hmng', 'scx=Hmng', 'Script=Hmnp', 'sc=Hmnp', 'Script_Extensions=Hmnp', 'scx=Hmnp',
+  'Script=Hung', 'sc=Hung', 'Script_Extensions=Hung', 'scx=Hung', 'Script=Ital', 'sc=Ital',
+  'Script_Extensions=Ital', 'scx=Ital', 'Script=Java', 'sc=Java', 'Script_Extensions=Java', 'scx=Java',
+  'Script=Kali', 'sc=Kali', 'Script_Extensions=Kali', 'scx=Kali', 'Script=Kana', 'sc=Kana',
+  'Script_Extensions=Kana', 'scx=Kana', 'Script=Khar', 'sc=Khar', 'Script_Extensions=Khar', 'scx=Khar',
+  'Script=Khmr', 'sc=Khmr', 'Script_Extensions=Khmr', 'scx=Khmr', 'Script=Khoj', 'sc=Khoj',
+  'Script_Extensions=Khoj', 'scx=Khoj', 'Script=Kits', 'sc=Kits', 'Script_Extensions=Kits', 'scx=Kits',
+  'Script=Knda', 'sc=Knda', 'Script_Extensions=Knda', 'scx=Knda', 'Script=Krai', 'sc=Krai',
+  'Script_Extensions=Krai', 'scx=Krai', 'Script=Kthi', 'sc=Kthi', 'Script_Extensions=Kthi', 'scx=Kthi',
+  'Script=Lana', 'sc=Lana', 'Script_Extensions=Lana', 'scx=Lana', 'Script=Laoo', 'sc=Laoo',
+  'Script_Extensions=Laoo', 'scx=Laoo', 'Script=Latn', 'sc=Latn', 'Script_Extensions=Latn', 'scx=Latn',
+  'Script=Lepc', 'sc=Lepc', 'Script_Extensions=Lepc', 'scx=Lepc', 'Script=Limb', 'sc=Limb',
+  'Script_Extensions=Limb', 'scx=Limb', 'Script=Lina', 'sc=Lina', 'Script_Extensions=Lina', 'scx=Lina',
+  'Script=Linb', 'sc=Linb', 'Script_Extensions=Linb', 'scx=Linb', 'Script=Lyci', 'sc=Lyci',
+  'Script_Extensions=Lyci', 'scx=Lyci', 'Script=Lydi', 'sc=Lydi', 'Script_Extensions=Lydi', 'scx=Lydi',
+  'Script=Mahj', 'sc=Mahj', 'Script_Extensions=Mahj', 'scx=Mahj', 'Script=Maka', 'sc=Maka',
+  'Script_Extensions=Maka', 'scx=Maka', 'Script=Mand', 'sc=Mand', 'Script_Extensions=Mand', 'scx=Mand',
+  'Script=Mani', 'sc=Mani', 'Script_Extensions=Mani', 'scx=Mani', 'Script=Marc', 'sc=Marc',
+  'Script_Extensions=Marc', 'scx=Marc', 'Script=Medf', 'sc=Medf', 'Script_Extensions=Medf', 'scx=Medf',
+  'Script=Mend', 'sc=Mend', 'Script_Extensions=Mend', 'scx=Mend', 'Script=Merc', 'sc=Merc',
+  'Script_Extensions=Merc', 'scx=Merc', 'Script=Mero', 'sc=Mero', 'Script_Extensions=Mero', 'scx=Mero',
+  'Script=Mlym', 'sc=Mlym', 'Script_Extensions=Mlym', 'scx=Mlym', 'Script=Mong', 'sc=Mong',
+  'Script_Extensions=Mong', 'scx=Mong', 'Script=Mroo', 'sc=Mroo', 'Script_Extensions=Mroo', 'scx=Mroo',
+  'Script=Mtei', 'sc=Mtei', 'Script_Extensions=Mtei', 'scx=Mtei', 'Script=Mult', 'sc=Mult',
+  'Script_Extensions=Mult', 'scx=Mult', 'Script=Mymr', 'sc=Mymr', 'Script_Extensions=Mymr', 'scx=Mymr',
+  'Script=Nagm', 'sc=Nagm', 'Script_Extensions=Nagm', 'scx=Nagm', 'Script=Nand', 'sc=Nand',
+  'Script_Extensions=Nand', 'scx=Nand', 'Script=Narb', 'sc=Narb', 'Script_Extensions=Narb', 'scx=Narb',
+  'Script=Nbat', 'sc=Nbat', 'Script_Extensions=Nbat', 'scx=Nbat', 'Script=Nkoo', 'sc=Nkoo',
+  'Script_Extensions=Nkoo', 'scx=Nkoo', 'Script=Nshu', 'sc=Nshu', 'Script_Extensions=Nshu', 'scx=Nshu',
+  'Script=Ogam', 'sc=Ogam', 'Script_Extensions=Ogam', 'scx=Ogam', 'Script=Olck', 'sc=Olck',
+  'Script_Extensions=Olck', 'scx=Olck', 'Script=Onao', 'sc=Onao', 'Script_Extensions=Onao', 'scx=Onao',
+  'Script=Orkh', 'sc=Orkh', 'Script_Extensions=Orkh', 'scx=Orkh', 'Script=Orya', 'sc=Orya',
+  'Script_Extensions=Orya', 'scx=Orya', 'Script=Osge', 'sc=Osge', 'Script_Extensions=Osge', 'scx=Osge',
+  'Script=Osma', 'sc=Osma', 'Script_Extensions=Osma', 'scx=Osma', 'Script=Ougr', 'sc=Ougr',
+  'Script_Extensions=Ougr', 'scx=Ougr', 'Script=Palm', 'sc=Palm', 'Script_Extensions=Palm', 'scx=Palm',
+  'Script=Pauc', 'sc=Pauc', 'Script_Extensions=Pauc', 'scx=Pauc', 'Script=Perm', 'sc=Perm',
+  'Script_Extensions=Perm', 'scx=Perm', 'Script=Phag', 'sc=Phag', 'Script_Extensions=Phag', 'scx=Phag',
+  'Script=Phli', 'sc=Phli', 'Script_Extensions=Phli', 'scx=Phli', 'Script=Phlp', 'sc=Phlp',
+  'Script_Extensions=Phlp', 'scx=Phlp', 'Script=Phnx', 'sc=Phnx', 'Script_Extensions=Phnx', 'scx=Phnx',
+  'Script=Plrd', 'sc=Plrd', 'Script_Extensions=Plrd', 'scx=Plrd', 'Script=Prti', 'sc=Prti',
+  'Script_Extensions=Prti', 'scx=Prti', 'Script=Qaac', 'sc=Qaac', 'Script_Extensions=Qaac', 'scx=Qaac',
+  'Script=Qaai', 'sc=Qaai', 'Script_Extensions=Qaai', 'scx=Qaai', 'Script=Rjng', 'sc=Rjng',
+  'Script_Extensions=Rjng', 'scx=Rjng', 'Script=Rohg', 'sc=Rohg', 'Script_Extensions=Rohg', 'scx=Rohg',
+  'Script=Runr', 'sc=Runr', 'Script_Extensions=Runr', 'scx=Runr', 'Script=Samr', 'sc=Samr',
+  'Script_Extensions=Samr', 'scx=Samr', 'Script=Sarb', 'sc=Sarb', 'Script_Extensions=Sarb', 'scx=Sarb',
+  'Script=Saur', 'sc=Saur', 'Script_Extensions=Saur', 'scx=Saur', 'Script=Sgnw', 'sc=Sgnw',
+  'Script_Extensions=Sgnw', 'scx=Sgnw', 'Script=Shaw', 'sc=Shaw', 'Script_Extensions=Shaw', 'scx=Shaw',
+  'Script=Shrd', 'sc=Shrd', 'Script_Extensions=Shrd', 'scx=Shrd', 'Script=Sidd', 'sc=Sidd',
+  'Script_Extensions=Sidd', 'scx=Sidd', 'Script=Sidt', 'sc=Sidt', 'Script_Extensions=Sidt', 'scx=Sidt',
+  'Script=Sind', 'sc=Sind', 'Script_Extensions=Sind', 'scx=Sind', 'Script=Sinh', 'sc=Sinh',
+  'Script_Extensions=Sinh', 'scx=Sinh', 'Script=Sogd', 'sc=Sogd', 'Script_Extensions=Sogd', 'scx=Sogd',
+  'Script=Sogo', 'sc=Sogo', 'Script_Extensions=Sogo', 'scx=Sogo', 'Script=Sora', 'sc=Sora',
+  'Script_Extensions=Sora', 'scx=Sora', 'Script=Soyo', 'sc=Soyo', 'Script_Extensions=Soyo', 'scx=Soyo',
+  'Script=Sund', 'sc=Sund', 'Script_Extensions=Sund', 'scx=Sund', 'Script=Sunu', 'sc=Sunu',
+  'Script_Extensions=Sunu', 'scx=Sunu', 'Script=Sylo', 'sc=Sylo', 'Script_Extensions=Sylo', 'scx=Sylo',
+  'Script=Syrc', 'sc=Syrc', 'Script_Extensions=Syrc', 'scx=Syrc', 'Script=Tagb', 'sc=Tagb',
+  'Script_Extensions=Tagb', 'scx=Tagb', 'Script=Takr', 'sc=Takr', 'Script_Extensions=Takr', 'scx=Takr',
+  'Script=Tale', 'sc=Tale', 'Script_Extensions=Tale', 'scx=Tale', 'Script=Talu', 'sc=Talu',
+  'Script_Extensions=Talu', 'scx=Talu', 'Script=Taml', 'sc=Taml', 'Script_Extensions=Taml', 'scx=Taml',
+  'Script=Tang', 'sc=Tang', 'Script_Extensions=Tang', 'scx=Tang', 'Script=Tavt', 'sc=Tavt',
+  'Script_Extensions=Tavt', 'scx=Tavt', 'Script=Tayo', 'sc=Tayo', 'Script_Extensions=Tayo', 'scx=Tayo',
+  'Script=Telu', 'sc=Telu', 'Script_Extensions=Telu', 'scx=Telu', 'Script=Tfng', 'sc=Tfng',
+  'Script_Extensions=Tfng', 'scx=Tfng', 'Script=Tglg', 'sc=Tglg', 'Script_Extensions=Tglg', 'scx=Tglg',
+  'Script=Thaa', 'sc=Thaa', 'Script_Extensions=Thaa', 'scx=Thaa', 'Script=Tibt', 'sc=Tibt',
+  'Script_Extensions=Tibt', 'scx=Tibt', 'Script=Tirh', 'sc=Tirh', 'Script_Extensions=Tirh', 'scx=Tirh',
+  'Script=Tnsa', 'sc=Tnsa', 'Script_Extensions=Tnsa', 'scx=Tnsa', 'Script=Todr', 'sc=Todr',
+  'Script_Extensions=Todr', 'scx=Todr', 'Script=Tols', 'sc=Tols', 'Script_Extensions=Tols', 'scx=Tols',
+  'Script=Tutg', 'sc=Tutg', 'Script_Extensions=Tutg', 'scx=Tutg', 'Script=Ugar', 'sc=Ugar',
+  'Script_Extensions=Ugar', 'scx=Ugar', 'Script=Vaii', 'sc=Vaii', 'Script_Extensions=Vaii', 'scx=Vaii',
+  'Script=Vith', 'sc=Vith', 'Script_Extensions=Vith', 'scx=Vith', 'Script=Wara', 'sc=Wara',
+  'Script_Extensions=Wara', 'scx=Wara', 'Script=Wcho', 'sc=Wcho', 'Script_Extensions=Wcho', 'scx=Wcho',
+  'Script=Xpeo', 'sc=Xpeo', 'Script_Extensions=Xpeo', 'scx=Xpeo', 'Script=Xsux', 'sc=Xsux',
+  'Script_Extensions=Xsux', 'scx=Xsux', 'Script=Yezi', 'sc=Yezi', 'Script_Extensions=Yezi', 'scx=Yezi',
+  'Script=Yiii', 'sc=Yiii', 'Script_Extensions=Yiii', 'scx=Yiii', 'Script=Zanb', 'sc=Zanb',
+  'Script_Extensions=Zanb', 'scx=Zanb', 'Script=Zinh', 'sc=Zinh', 'Script_Extensions=Zinh', 'scx=Zinh',
+  'Script=Zyyy', 'sc=Zyyy', 'Script_Extensions=Zyyy', 'scx=Zyyy', 'Script=Zzzz', 'sc=Zzzz',
+  'Script_Extensions=Zzzz', 'scx=Zzzz',
+]
+
+// Match positions, compared directly: the field-level cap on matches would
+// otherwise turn a whole sample into one label on both sides.
+function viaJs(source: string): string {
+  return [...SAMPLE.matchAll(new RegExp(source, 'gu'))].map(m => `${m.index}+${m[0].length}`).join(',')
+}
+
+// Each body is checked as \p{…}; the complement forms (\P{…} and a negated
+// class) take turns, so every form is exercised across the list.
+function forms(body: string, i: number): string[] {
+  const third = [`${B}P{${body}}`, `[^${B}p{${body}}]`, `[${B}P{${body}}0]`][i % 3]
+  return [`${B}p{${body}}`, third]
+}
+
+function check(bodies: string[]): string[] {
+  const mismatches: string[] = []
+  bodies.forEach((body, i) => {
+    for (const source of forms(body, i)) {
+      const want = viaJs(source)
+      let got: string
+      try {
+        const [rule] = compileCustomPatterns([{ name: 'r', pattern: source, label: '[R]' }])
+        got = rule.matches(SAMPLE).map(m => `${m.start}+${m.end - m.start}`).join(',')
+      } catch (e) {
+        mismatches.push(`${source}: refused (${(e as Error).message})`)
+        continue
+      }
+      if (got !== want) {
+        mismatches.push(`${source}: js ${want.split(',').length} matches, got ${got.split(',').length}`)
+      }
+    }
+  })
+  return mismatches
+}
+
+describe('every Unicode property name JavaScript accepts', () => {
+  it('general categories', { timeout: 300_000 }, () => {
+    expect(check(GENERAL_CATEGORY)).toEqual([])
+  })
+  it('binary properties', { timeout: 300_000 }, () => {
+    expect(check(BINARY)).toEqual([])
+  })
+  it('scripts and script extensions', { timeout: 300_000 }, () => {
+    expect(check(SCRIPT)).toEqual([])
+  })
+  it('a name JavaScript refuses is refused', () => {
+    for (const body of ['Greek', 'Script=greek', 'script=Greek', 'Foo', 'sc=Xxxx', 'gc=Letter_Mark', 'Alpha=Yes']) {
+      expect(() => new RegExp(`${B}p{${body}}`, 'u')).toThrow()
+      expect(() => compileCustomPatterns([{ name: 'r', pattern: `${B}p{${body}}` }])).toThrow()
+    }
+  })
+})

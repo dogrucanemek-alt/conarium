@@ -1,8 +1,8 @@
 /**
  * Unicode property classes in custom patterns, after the move to a linear-time
  * engine. A pattern 0.2.54 accepted is accepted, and matches what JavaScript's
- * `u`-flag RegExp matches; the one form with no linear-engine counterpart is
- * refused by name.
+ * `u`-flag RegExp matches. The exhaustive list is in
+ * custom_patterns.unicode_all.test.ts.
  */
 import { describe, expect, it } from 'vitest'
 import { applyCustomPatterns, compileCustomPatterns } from './custom_patterns.js'
@@ -33,6 +33,7 @@ const ACCEPTED_BY_0254 = [
   'Script=Greek', 'sc=Greek', 'Script=Latin', 'sc=Han', 'Script=Arabic',
   'gc=Lu', 'General_Category=Lu', 'gc=Nd',
   'ASCII', 'Any', 'Alphabetic', 'White_Space', 'Emoji',
+  'Script_Extensions=Greek', 'scx=Greek', 'scx=Grek', 'sc=Beng',
 ]
 
 describe('Unicode property classes 0.2.54 accepted', () => {
@@ -44,13 +45,5 @@ describe('Unicode property classes 0.2.54 accepted', () => {
         expect({ text: got.text, count: got.count }).toEqual(viaJs(source, SAMPLE))
       })
     }
-  }
-})
-
-describe('Script_Extensions has no counterpart in the engine', () => {
-  for (const name of ['Script_Extensions=Greek', 'scx=Greek']) {
-    it(`${p(name)} is refused, and the reason names the property`, () => {
-      expect(() => compileCustomPatterns([{ name: 'r', pattern: p(name) }])).toThrow(/Script_Extensions|scx/)
-    })
   }
 })
