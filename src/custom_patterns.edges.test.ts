@@ -119,3 +119,29 @@ describe.skipIf(!modifierGroups)('modifier text inside a class', () => {
     })
   }
 })
+
+describe('a class that holds its own brackets or carets', () => {
+  // `[^^]` is a negated class of one caret; what follows it is outside the
+  // class and is translated and checked like any other part of the pattern.
+  same(['[^^].', `[^^]${B}s`, `[^^]${B}S`, `[^^]${B}b`, `[^^]${B}p{ASCII}`, `[^^]${B}P{Any}`, '[^^](?s:.)(?-s:.)',
+    `[${B}]]${B}s`, `[^${B}]]${B}s`, `[a${B}[]${B}s`, `[^${B}^]${B}s`, `[${B}^^]${B}s`],
+  ['a b', 'aa', `a${String.fromCharCode(0x2028)}`, `a${String.fromCharCode(10)}${String.fromCharCode(0x2028)}`, '] a', '^ a', '[ a'])
+  for (const [source, reason] of [[`[^^](?i:a)${B}w`, /word/], ['[^^](?m:^a)', /multiline/], [`[${B}]](?i:a)${B}b`, /word/]] as const) {
+    it(`${JSON.stringify(source)} is refused`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(reason)
+    })
+  }
+})
+
+describe('more corners', () => {
+  // A raw surrogate in the pattern text is a lone surrogate too.
+  for (const source of [HIGH, `[${HIGH}]`, `a${LOW}`]) {
+    it(`${JSON.stringify(source)} is refused, and the reason names the surrogate`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(/surrogate/)
+    })
+  }
+  // Empty sets inside a class, and an empty class under a quantifier.
+  same([`[${B}P{Any}]`, `[^${B}P{Any}]`, `[${B}P{Any}a]`, '[]{0,2}a', '[]?a', '(?:[]|a){1,2}'], ['a', 'ab', ''])
+  // Zero-width parts ahead of a greedy optional part leave the empty choice last.
+  same(['(?:^a?)?', `(?:${B}ba?)?`, `(?:${B}b${B}ba?b?)?`], ['a', 'ab', ' a', ''])
+})
