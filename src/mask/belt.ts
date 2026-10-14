@@ -200,14 +200,15 @@ function applyRules(
     }
     const matches = collectReplaceMatches(current, rule.re, budget)
     if (matches.length === 0) continue
+    if (matches.length > CUSTOM_PATTERN_MAX_MATCHES) {
+      const frozen = applyCustomPatterns(current, [rule], column)
+      if (frozen.text !== rule.label) return { ok: false, reason: 'exception' }
+      return { ok: true, text: rule.label, wholeField: rule.label }
+    }
     if (chainHit(current, matches, tokens, exact, budget)) {
       return { ok: false, reason: 'custom-chain' }
     }
     const frozen = applyCustomPatterns(current, [rule], column)
-    if (matches.length > CUSTOM_PATTERN_MAX_MATCHES) {
-      if (frozen.text !== rule.label) return { ok: false, reason: 'exception' }
-      return { ok: true, text: rule.label, wholeField: rule.label }
-    }
     const tracked = applyTracked(current, matches, rule.label, exact)
     if (tracked.text !== frozen.text) return { ok: false, reason: 'exception' }
     current = tracked.text
@@ -243,12 +244,16 @@ function chainHit(
   budget: Budget,
 ): boolean {
   const spans = tokenSpans(text, tokens, budget)
-  for (const match of matches) {
-    for (const span of spans) {
-      const rel = relate(match.start, match.end, span[0], span[1])
-      if (rel === 'overlap') return true
-      if (rel === 'adjacent' && !isExact(span, exact)) return true
-    }
+  let i = 0
+  let j = 0
+  while (i < matches.length && j < spans.length) {
+    const match = matches[i]
+    const span = spans[j]
+    const rel = relate(match.start, match.end, span[0], span[1])
+    if (rel === 'overlap') return true
+    if (rel === 'adjacent' && !isExact(span, exact)) return true
+    if (match.end <= span[0]) i++
+    else j++
   }
   return false
 }
@@ -769,10 +774,11 @@ function earliestLiteral(
     if (at < 0) return null
     return { start: at, endMin: at + lit.text.length, endMax: at + lit.text.length }
   }
-  for (let at = from; at <= source.length; at++) {
+  const floor = Math.max(0, from)
+  for (let at = floor; at <= source.length; at++) {
     budget.tick(1)
     const match = matchLiteral(source, at, lit, budget)
-    if (match) return match
+    if (match && match.start >= floor) return match
   }
   return null
 }
@@ -795,12 +801,11 @@ function latestLiteral(
     if (at < 0) return null
     return { start: at, endMin: at + lit.text.length, endMax: at + lit.text.length }
   }
-  let best: LitMatch | null = null
-  for (let at = 0; at <= endLimit; at++) {
+  for (let at = Math.min(endLimit, source.length); at >= 0; at--) {
     budget.tick(1)
     const match = matchLiteral(source, at, lit, budget)
     if (!match || match.endMin > endLimit) continue
-    if (!best || match.start >= best.start) best = match
+    return match
   }
-  return best
+  return null
 }

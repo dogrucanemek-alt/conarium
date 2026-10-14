@@ -105,6 +105,25 @@ function pushSpan(out: Span[], start: number, end: number, cls: SpanClass): void
   out.push({ start, end, cls, token: PII, source: 'numeric' })
 }
 
+interface WindowCover {
+  start: number
+  end: number
+  cls: SpanClass
+}
+
+function absorbWindow(covers: WindowCover[], start: number, end: number, cls: SpanClass): void {
+  for (let i = 0; i < covers.length; i++) {
+    const cover = covers[i]
+    if (cover.cls !== cls) continue
+    if (start <= cover.end && end >= cover.start) {
+      if (start < cover.start) cover.start = start
+      if (end > cover.end) cover.end = end
+      return
+    }
+  }
+  covers.push({ start, end, cls })
+}
+
 function findPhones(text: string): Span[] {
   const out: Span[] = []
   if (/[+()\s-]/.test(text) && /\d/.test(text)) {
@@ -192,6 +211,7 @@ export function detectNumericSpans(text: string): Span[] {
     }
     const groups = groupsOf(text, start, runEnd)
     if (groups.length > 1) {
+      const covers: WindowCover[] = []
       for (let a = 0; a < groups.length; a++) {
         let count = 0
         for (let b = a; b < groups.length; b++) {
@@ -208,8 +228,11 @@ export function detectNumericSpans(text: string): Span[] {
           if (b === groups.length - 1) {
             while (spanEnd < text.length && !blocked(spanEnd) && isWord(text[spanEnd])) spanEnd++
           }
-          pushSpan(out, wStart, spanEnd, win.cls)
+          absorbWindow(covers, wStart, spanEnd, win.cls)
         }
+      }
+      for (let c = 0; c < covers.length; c++) {
+        pushSpan(out, covers[c].start, covers[c].end, covers[c].cls)
       }
     }
   }
