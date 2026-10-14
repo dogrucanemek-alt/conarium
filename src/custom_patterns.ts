@@ -28,6 +28,7 @@ export type CustomPatternReject =
   | 'unsupported-flag'
   | 'unsupported-case-word'
   | 'unsupported-empty-choice'
+  | 'unsupported-surrogate'
 
 const REJECT_MESSAGE: Record<CustomPatternReject, (name: string) => string> = {
   invalid: (name) => `customPatterns: rule "${name}" is not a valid regular expression`,
@@ -43,6 +44,8 @@ const REJECT_MESSAGE: Record<CustomPatternReject, (name: string) => string> = {
     `customPatterns: rule "${name}" was rejected (case-insensitive word characters)`,
   'unsupported-empty-choice': (name) =>
     `customPatterns: rule "${name}" was rejected (empty choice inside a repeated group)`,
+  'unsupported-surrogate': (name) =>
+    `customPatterns: rule "${name}" was rejected (lone surrogate escape)`,
 }
 
 export class CustomPatternError extends Error {
@@ -188,7 +191,10 @@ export function looksUnsafe(source: string): boolean {
  * default re2js sets differ from JS `u`. `\p` / `\P` become the code-point
  * ranges JavaScript accepts for that body, cached per body. re2js never sees
  * `\p` and never uses its own Unicode tables.
- * A `\u` lead surrogate glued to a `\u` trail surrogate is one code point.
+ * A `\uHHHH\uLLLL` lead+trail pair (both four hex digits, nothing between
+ * them) is one code point. Any other `\u` escape whose value is
+ * U+D800–U+DFFF — `\u{…}`, a mixed pair, a split pair, a class member, or a
+ * range end — is refused.
  * `[]`, `[^]` and in-class `\b` are rewritten to sets re2js parses the way
  * JavaScript does. An `i`-enabling group anywhere next to a word escape, and
  * a variable quantifier whose body prefers an empty choice, are refused.
@@ -196,7 +202,7 @@ export function looksUnsafe(source: string): boolean {
 function toEngineSource(source: string, ruleName = ''): string {
   rejectCaseInsensitiveWord(source, ruleName)
   rejectEmptyPreferringRepeat(source, ruleName)
-  return rewriteUnicode(RE2JS.translateRegExp(foldSurrogatePairs(source)), ruleName)
+  return rewriteUnicode(RE2JS.translateRegExp(foldSurrogatePairs(source, ruleName)), ruleName)
 }
 
 /** `(?ims-ims:…)` at `open`, or null when this `(` is some other group. */
@@ -266,11 +272,28 @@ function readBmpEscape(source: string, i: number): { value: number; end: number 
   return { value: Number.parseInt(source.slice(i + 2, i + 6), 16), end: i + 6 }
 }
 
+/** `\u{hex}` form. A surrogate value here is never half of a `\uHHHH\uLLLL` pair. */
+function readBraceEscape(source: string, i: number): { value: number; end: number } | null {
+  if (source[i] !== '\\' || source[i + 1] !== 'u' || source[i + 2] !== '{') return null
+  const end = source.indexOf('}', i + 3)
+  if (end === -1) return null
+  const hex = source.slice(i + 3, end)
+  if (!/^[0-9A-Fa-f]+$/.test(hex)) return null
+  const value = Number.parseInt(hex, 16)
+  if (!Number.isFinite(value)) return null
+  return { value, end: end + 1 }
+}
+
+function isSurrogateValue(value: number): boolean {
+  return value >= 0xd800 && value <= 0xdfff
+}
+
 /**
  * In the `u` flag, `\u` lead + `\u` trail glued together is one code point.
- * `\u{…}`, a mixed form, or a group between the halves stays two escapes.
+ * A surrogate escape that is not half of that four-digit pair is refused:
+ * JavaScript never matches it against half of a real pair, and re2js would.
  */
-function foldSurrogatePairs(source: string): string {
+function foldSurrogatePairs(source: string, ruleName: string): string {
   let out = ''
   let i = 0
   while (i < source.length) {
@@ -288,6 +311,14 @@ function foldSurrogatePairs(source: string): string {
         i = lo.end
         continue
       }
+      throw new CustomPatternError(ruleName, 'unsupported-surrogate')
+    }
+    if (hi && hi.value >= 0xdc00 && hi.value <= 0xdfff) {
+      throw new CustomPatternError(ruleName, 'unsupported-surrogate')
+    }
+    const brace = readBraceEscape(source, i)
+    if (brace && isSurrogateValue(brace.value)) {
+      throw new CustomPatternError(ruleName, 'unsupported-surrogate')
     }
     out += source[i]
     i++
