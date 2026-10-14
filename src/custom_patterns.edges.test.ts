@@ -168,9 +168,11 @@ describe('nested repeats', () => {
   // A repeat whose largest count is zero matches only the empty string; the
   // engine does not look below it, so what it holds does not count.
   same(['(?:(?:(?:a{64})){0}){16}', '(?:(?:(?:a{64})){0,0}){16}', '(?:x(?:(?:a{64})){0}|b){16}'], ['a'.repeat(70), 'xb', ''])
-  // A count of zero does not divide the budget; the counts around it still do.
+  // A count of zero hides what it holds from the repeats around it, but a nest
+  // inside it is still checked on its own, from a fresh budget.
   for (const source of ['(?:(?:a{32})){32}', '(?:(?:a{25})){41}', '(?:(?:a{2,25})){41}', '(?:(?:a?){64}){16}',
-    '(?:(?:a{0,16})){63}', '(?:x(?:a{32})|b){32}', '(?:(?:a{0}){64}){16}']) {
+    '(?:(?:a{0,16})){63}', '(?:x(?:a{32})|b){32}', '(?:(?:a{0}){64}){16}', '(?:(?:(?:a{64})){16}){0}',
+    '(?:x(?:(?:a{64})){16}|b){0,0}']) {
     it(`${JSON.stringify(source)} is refused as nested quantifiers`, () => {
       expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(/unbounded or nested/)
     })
