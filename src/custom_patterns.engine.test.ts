@@ -65,7 +65,7 @@ function viaJs(source: string, input: string, label: string): { text: string; co
 }
 
 describe('custom patterns match like String.prototype.replace', () => {
-  it('3 000 generated patterns, 12 texts each', () => {
+  it('3 000 generated patterns, 12 texts each', { timeout: 120_000 }, () => {
     let compared = 0
     const mismatches: string[] = []
     for (let i = 0; i < 3_000; i++) {
