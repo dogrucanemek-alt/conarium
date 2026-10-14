@@ -56,6 +56,9 @@ Changes an operator can see:
   name JavaScript accepts on Node 24 was compared and is accepted (see
   LIMITATIONS, "Custom patterns: what is refused, and the engine they run on").
 - If masking throws, the field is masked whole and counted once.
+- Between a title or label and a masked name, the space is kept as written:
+  `Yetkili:` followed by a tab and a name gives `Yetkili:` a tab and
+  `[MASKED_PII]`. 0.2.54 wrote one space there on the model path.
 - The connection-string step no longer takes quadratic time on a long run of
   scheme characters before `://`; it is one linear pass with the same matches.
 
