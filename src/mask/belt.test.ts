@@ -80,6 +80,49 @@ describe('beltCover', () => {
     expect(covered(result.spans, 2)).toEqual(new Set([0, 1]))
   })
 
+  it('aligns a title or label glued to the previous token', () => {
+    const iban = 'TR330006100519786457841326'
+    const titled = `${iban}Dr. Ahmet`
+    const labelled = `${iban}name: Ahmet`
+    expect(beltCover(govInput(titled))).toEqual({
+      ok: true,
+      spans: [
+        { start: 0, end: iban.length },
+        { start: iban.length + 'Dr.'.length, end: titled.length },
+      ],
+      added: 2,
+    })
+    expect(beltCover(govInput(labelled))).toEqual({
+      ok: true,
+      spans: [
+        { start: 0, end: iban.length },
+        { start: labelled.indexOf(':') + 1, end: labelled.length },
+      ],
+      added: 2,
+    })
+    const email = 'a@b.comDr. Ahmet'
+    expect(beltCover(govInput(email))).toEqual({
+      ok: true,
+      spans: [{ start: 0, end: email.length - '. Ahmet'.length }],
+      added: 1,
+    })
+    const between = `${iban}Dr. a@b.com`
+    const pair = beltCover(govInput(between))
+    expect(pair).toEqual({
+      ok: true,
+      spans: [
+        { start: 0, end: iban.length },
+        { start: iban.length + 'Dr.'.length, end: between.length },
+      ],
+      added: 2,
+    })
+    if (!pair.ok) return
+    const markerAt = between.indexOf('Dr.')
+    for (let i = markerAt; i < markerAt + 'Dr.'.length; i++) {
+      expect(pair.spans.some((span) => i >= span.start && i < span.end), `Dr. ${i}`).toBe(false)
+    }
+  })
+
   it('covers the name and not the label', () => {
     const cases = ['Dr.\tAhmet', 'name:Ahmet', 'name :Ahmet', 'full name:Ahmet']
     for (const raw of cases) {
@@ -229,6 +272,8 @@ function shortSamples(): Sample[] {
   const rows: Array<{ raw: string; rules?: CustomPiiPattern[]; pipeline?: 'text' | 'governance' }> = [
     { raw: 'TR330006100519786457841326Dr. Ahmet', pipeline: 'governance' },
     { raw: 'TR330006100519786457841326name: Ahmet', pipeline: 'governance' },
+    { raw: 'a@b.comDr. Ahmet', pipeline: 'governance' },
+    { raw: 'TR330006100519786457841326Dr. a@b.com', pipeline: 'governance' },
     { raw: '1234567890 555 123 4567' },
     { raw: '12345678901 555 123 4567' },
     { raw: 'a@b.com PRIVATE', rules: [{ name: 'tail', pattern: '\\[MASKED_PII\\] PRIVATE', label: '[PRIV]' }] },

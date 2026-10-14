@@ -448,7 +448,7 @@ function matchLabel(source: string, at: number, literal: string): LitMatch | nul
   if (!parts) return null
   if (!source.startsWith(parts.rigid, at)) return null
   const labelAt = at + parts.rigid.length - labelLength(parts.rigid)
-  if (!boundaryOk(source, labelAt)) return null
+  if (!markerBoundaryOk(source, labelAt, literal, 'label')) return null
   let cursor = at + parts.rigid.length
   while (cursor < source.length && isWs(source[cursor])) cursor++
   if (source[cursor] !== ':') return null
@@ -471,7 +471,7 @@ function matchTitle(source: string, at: number, literal: string): LitMatch | nul
   if (!parts) return null
   if (!source.startsWith(parts.rigid, at)) return null
   const titleAt = at + parts.rigid.length - titleLength(parts.rigid)
-  if (!boundaryOk(source, titleAt)) return null
+  if (!markerBoundaryOk(source, titleAt, literal, 'title')) return null
   const after = at + parts.rigid.length
   let endMax = after
   while (endMax < source.length && isWs(source[endMax])) endMax++
@@ -483,6 +483,20 @@ function titleLength(rigid: string): number {
     if (rigid.endsWith(title)) return title.length
   }
   return 0
+}
+
+function markerBoundaryOk(source: string, at: number, literal: string, kind: 'label' | 'title'): boolean {
+  if (gluedAfterToken(literal, kind)) return true
+  return boundaryOk(source, at)
+}
+
+function gluedAfterToken(literal: string, kind: 'label' | 'title'): boolean {
+  if (kind === 'label') {
+    const parts = labelParts(literal)
+    return parts !== null && labelLength(parts.rigid) === parts.rigid.length
+  }
+  const parts = titleParts(literal)
+  return parts !== null && titleLength(parts.rigid) === parts.rigid.length
 }
 
 function matchLiteralEnding(
