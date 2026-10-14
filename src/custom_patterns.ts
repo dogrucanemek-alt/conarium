@@ -9,6 +9,8 @@
  * backreferences, `+` / `*`, open `{n,}`, source and quantifier caps, the two
  * old group rules). Accepted patterns are parsed once and emitted as re2js
  * source, which matches in linear time.
+ * Nested repeats whose written maxima divide a budget of 1000 down to zero
+ * are rejected, because re2js refuses that product while parsing.
  * A broken rule fails the config (silent drop = leak).
  */
 import { RegExpParser } from '@eslint-community/regexpp'
@@ -114,6 +116,11 @@ const JS_DOT = '[^\\n\\r\\x{2028}\\x{2029}]'
 /** `[]` matches nothing. `[^]` matches every code point, line breaks included. */
 const JS_NEVER = '[^\\x{0}-\\x{10ffff}]'
 const JS_ANY = '[\\x{0}-\\x{10ffff}]'
+/**
+ * re2js refuses a nest of repeats once this budget hits zero. Each written
+ * quantifier integer-divides it by its maximum (`?` is 1; `{0}` does not divide).
+ */
+const NESTED_REPEAT_BUDGET = 1000
 
 export function compileCustomPatterns(
   list: CustomPiiPattern[] | undefined,
@@ -207,9 +214,13 @@ export function looksUnsafe(source: string): boolean {
  * One parse and one walk. The walk carries an `i` / `s` stack (both start
  * off; the compile flags are `gu`) and, on every node, the empty-choice
  * attributes and the re2js text. `s` only chooses which set `.` becomes.
- * `s` and `m` are never written out. Refusals are thrown in order:
+ * `s` and `m` are never written out. A quantifier that is written passes its
+ * child a budget of 1000 divided by that quantifier's maximum (its minimum
+ * when the repeat is open; `{0}` does not divide), and a zero budget is
+ * rejected because re2js will not parse the nest.
+ * Refusals are thrown in order:
  * case-insensitive word characters, an empty choice in a repeated group,
- * a lone surrogate, the multiline flag, then `invalid`.
+ * a lone surrogate, the multiline flag, nested repeats, then `invalid`.
  * A node that matches nothing is a single never-set and is never left under
  * a quantifier. Characters are `\x{…}`. `\s` / `\S` / `\p` / `\P` become
  * the ranges JavaScript uses; a property is cached by its raw brace text.
@@ -234,10 +245,12 @@ function toEngineSource(source: string, ruleName = ''): string {
       emptyChoice: false,
       surrogate: false,
       multiline: false,
+      nestedRepeat: false,
       invalid: false,
     },
   }
-  const walked = walkNode(pattern, { ignoreCase: false, dotAll: false }, ctx)
+  const walked = walkNode(pattern, { ignoreCase: false, dotAll: false }, ctx, NESTED_REPEAT_BUDGET)
+  if (walked.repeatOver) ctx.refusals.nestedRepeat = true
   throwCollected(ruleName, ctx.refusals)
   // `[]|` drops the nothing branch and leaves only an empty alternative.
   return walked.text === '' ? '(?:)' : walked.text
@@ -252,7 +265,7 @@ function toEngineSource(source: string, ruleName = ''): string {
  * alternative before a non-empty one still does.
  */
 type EmptyLast = { el: boolean; canEmpty: boolean; canNonEmpty: boolean }
-type Walked = { attr: EmptyLast; text: string }
+type Walked = { attr: EmptyLast; text: string; repeatOver?: boolean }
 type FlagState = { ignoreCase: boolean; dotAll: boolean }
 type Refusals = {
   caseIgnore: boolean
@@ -260,6 +273,7 @@ type Refusals = {
   emptyChoice: boolean
   surrogate: boolean
   multiline: boolean
+  nestedRepeat: boolean
   invalid: boolean
 }
 type WalkContext = { ruleName: string; refusals: Refusals }
@@ -289,6 +303,7 @@ function throwCollected(ruleName: string, refusals: Refusals): void {
   if (refusals.emptyChoice) throw new CustomPatternError(ruleName, 'unsupported-empty-choice')
   if (refusals.surrogate) throw new CustomPatternError(ruleName, 'unsupported-surrogate')
   if (refusals.multiline) throw new CustomPatternError(ruleName, 'unsupported-flag')
+  if (refusals.nestedRepeat) throw new CustomPatternError(ruleName, 'unsafe')
   if (refusals.invalid) throw new CustomPatternError(ruleName, 'invalid')
 }
 
@@ -339,10 +354,14 @@ function altNode(branches: EmptyLast[]): EmptyLast {
   }
 }
 
+function repeatOver(parts: readonly Walked[]): boolean {
+  return parts.some((p) => p.repeatOver === true)
+}
+
 function concatAll(parts: Walked[]): Walked {
   const attr = concatNode(parts.map((p) => p.attr))
   if (isNothing(attr)) return { attr, text: JS_NEVER }
-  return { attr, text: parts.map((p) => p.text).join('') }
+  return { attr, text: parts.map((p) => p.text).join(''), repeatOver: repeatOver(parts) }
 }
 
 function emitAlt(branches: Walked[]): Walked {
@@ -350,10 +369,11 @@ function emitAlt(branches: Walked[]): Walked {
   if (isNothing(attr)) return { attr, text: JS_NEVER }
   const kept = branches.filter((b) => !isNothing(b.attr))
   if (kept.length === 0) return { attr, text: JS_NEVER }
-  if (kept.length === 1) return { attr, text: kept[0].text }
+  if (kept.length === 1) return { attr, text: kept[0].text, repeatOver: kept[0].repeatOver }
   return {
     attr,
     text: kept.map((b) => (b.text.length === 0 ? '(?:)' : b.text)).join('|'),
+    repeatOver: repeatOver(kept),
   }
 }
 
@@ -481,40 +501,57 @@ function wrapGroup(text: string, parent: FlagState, child: FlagState): string {
   return child.ignoreCase ? `(?i:${body})` : `(?-i:${body})`
 }
 
-function walkAlts(alts: readonly AST.Alternative[], flags: FlagState, ctx: WalkContext): Walked {
-  return emitAlt(alts.map((alt) => walkNode(alt, flags, ctx)))
+function walkAlts(
+  alts: readonly AST.Alternative[],
+  flags: FlagState,
+  ctx: WalkContext,
+  budget: number,
+): Walked {
+  return emitAlt(alts.map((alt) => walkNode(alt, flags, ctx, budget)))
 }
 
-function walkNode(node: AST.Node, flags: FlagState, ctx: WalkContext): Walked {
+/** Largest count of a repeat: its max, or its min when the repeat is open. `{0}` is 0. */
+function repeatMax(min: number, max: number): number {
+  const m = Number.isFinite(max) ? max : min
+  return m > 0 ? m : 0
+}
+
+function walkNode(node: AST.Node, flags: FlagState, ctx: WalkContext, budget: number): Walked {
   switch (node.type) {
     case 'Pattern':
     case 'Group': {
       if (node.type === 'Group') {
         const inner = flagsAfterGroup(node, flags, ctx)
-        const body = walkAlts(node.alternatives, inner, ctx)
+        const body = walkAlts(node.alternatives, inner, ctx, budget)
         if (isNothing(body.attr)) return { attr: body.attr, text: JS_NEVER }
-        return { attr: body.attr, text: wrapGroup(body.text, flags, inner) }
+        return { attr: body.attr, text: wrapGroup(body.text, flags, inner), repeatOver: body.repeatOver }
       }
-      return walkAlts(node.alternatives, flags, ctx)
+      return walkAlts(node.alternatives, flags, ctx, budget)
     }
     case 'CapturingGroup': {
-      const body = walkAlts(node.alternatives, flags, ctx)
+      const body = walkAlts(node.alternatives, flags, ctx, budget)
       if (isNothing(body.attr)) return { attr: body.attr, text: JS_NEVER }
-      return { attr: body.attr, text: `(?:${body.text})` }
+      return { attr: body.attr, text: `(?:${body.text})`, repeatOver: body.repeatOver }
     }
     case 'Alternative':
-      return concatAll(node.elements.map((el) => walkNode(el, flags, ctx)))
+      return concatAll(node.elements.map((el) => walkNode(el, flags, ctx, budget)))
     case 'Quantifier': {
       if (!Number.isFinite(node.min) || !Number.isFinite(node.max) || node.max < node.min) {
         ctx.refusals.invalid = true
       }
-      const body = walkNode(node.element, flags, ctx)
+      const m = repeatMax(node.min, node.max)
+      const childBudget = m > 0 ? Math.floor(budget / m) : budget
+      const body = walkNode(node.element, flags, ctx, childBudget)
       const attr = quantify(body.attr, node.min, node.max, !node.greedy, ctx)
       // An unsatisfiable body under `{0,n}` (n ≥ 2) makes re2js throw
       // `unexpected InstFail`. Nothing is rewritten, never quantified.
       if (isNothing(body.attr)) return { attr, text: node.min === 0 ? '(?:)' : JS_NEVER }
       const suffix = node.min === 0 && node.max === 1 ? '?' : `{${node.min},${node.max}}`
-      return { attr, text: body.text + suffix + (node.greedy ? '' : '?') }
+      return {
+        attr,
+        text: body.text + suffix + (node.greedy ? '' : '?'),
+        repeatOver: (m > 0 && childBudget === 0) || body.repeatOver === true,
+      }
     }
     case 'Character':
       noteSurrogate(node.value, ctx)
