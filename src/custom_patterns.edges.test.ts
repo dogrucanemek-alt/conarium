@@ -160,6 +160,20 @@ describe('a part that can never match, under a quantifier', () => {
   }
 })
 
+describe('nested repeats', () => {
+  // The engine refuses repeats nested so that their largest counts multiply
+  // past 1000. Up to 1000 the pattern is accepted and matches like JavaScript;
+  // past it the refusal names nested quantifiers, not an invalid expression.
+  same(['(?:(?:a{25})){40}', '(?:(?:a{2,25})){40}', '(?:(?:a{0,25})){40}'], ['a'.repeat(999), 'a'.repeat(1000), 'a'.repeat(1001), 'b'])
+  // A count of zero does not divide the budget; the counts around it still do.
+  for (const source of ['(?:(?:a{32})){32}', '(?:(?:a{25})){41}', '(?:(?:a{2,25})){41}', '(?:(?:a?){64}){16}',
+    '(?:(?:a{0,16})){63}', '(?:x(?:a{32})|b){32}', '(?:(?:a{0}){64}){16}']) {
+    it(`${JSON.stringify(source)} is refused as nested quantifiers`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(/unbounded or nested/)
+    })
+  }
+})
+
 describe.skipIf(!modifierGroups)('letters V8 folds by the subject string', () => {
   // Inside `(?i:…)`, V8 lets these seven letters match their Latin-1 case
   // partners only when the subject holds a character beyond Latin-1. The engine
