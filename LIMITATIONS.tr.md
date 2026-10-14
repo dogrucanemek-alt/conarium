@@ -91,18 +91,38 @@ ya da kaynak metinde aynen geçen bir özel kural etiketi.
 yüzden kabul edilen hiçbir desen bir alanın maskelenmesini dakikalarca
 kilitleyemez. 0.2.54'te bazıları kilitleyebiliyordu. Politika yüklenirken
 reddedilen desenler 0.2.54'ün reddettikleridir (ileri/geri bakış, geri başvuru,
-`+`, `*`, üst sınırı olmayan `{n,}` ve eski grup kuralları); buna motorda
-karşılığı olmayan iki tane eklendi: Unicode `Script_Extensions` (`scx=`) özelliği
-ve çok satır bayrağını açan bir değiştirici grup (`(?m:…)`; JavaScript'in çok
-satırlı `^` ve `$`'ı satır başı karakterinde, U+2028 ve U+2029'da da durur).
-Eşleşmelerin JavaScript'in `u` bayraklı eşleşmeleriyle aynı olması amaçlanır. Bu,
-harf, rakam, sınıf ve olumsuz sınıf (içlerinde `\s` ve `\S` ile), `.`, `\s`, `\d`,
-`\w`, `\b`, `^`, `$`, sınırlı niceleyici, alternasyon ve `i`/`s` değiştirici
-grupları içeren üretilmiş desenlerde, metinde satır sonu, bölünmez boşluk ve diğer
-Unicode boşluklarıyla; ayrıca 25 Unicode özellik sınıfında (kısa ve uzun adıyla genel
-kategoriler, `Script=` ya da `sc=` ile yazılan betikler, `ASCII`, `Any`,
-`Alphabetic`, `White_Space`, `Emoji`) karışık yazılı bir örnek metin üzerinde
-sınandı. Diğer özellikler sınanmadı.
+`+`, `*`, üst sınırı olmayan `{n,}` ve eski grup kuralları); buna, motorun
+JavaScript'ten farklı eşleşeceği dört biçim eklendi:
+
+- çok satır bayrağını açan bir değiştirici grup (`(?m:…)`; JavaScript'in çok
+  satırlı `^` ve `$`'ı satır başı karakterinde, U+2028 ve U+2029'da da durur);
+- büyük/küçük harf duyarsız bir değiştirici grup (`(?i:…)`) içeren ve herhangi
+  bir yerinde `\w`, `\W`, `\b` ya da `\B` kullanan bir desen (Node 24'te böyle bir
+  grup, `\w`'nin grubun dışında da Kelvin işaretini ve uzun s'yi almasına yol
+  açar);
+- boş bir seçeneği boş olmayan bir seçenekten önce sayan isteğe bağlı ya da
+  yinelenen bir grup, örneğin `(?:|a)?` veya `(?:a??)?` (JavaScript o konumda
+  boş seçeneği atlar, motor alır);
+- bir `\uHHHH\uLLLL` çiftinin yarısı olmayan bir vekil kaçışı, örneğin
+  `\u{D83D}`.
+
+Değiştirici gruplar, 0.2.54'te olduğu gibi, yalnız bunları destekleyen Node
+sürümlerinde derlenir. Unicode özellik sınıfları (`\p{…}`, `\P{…}`) kod
+noktalarını Conarium'un çalıştığı JavaScript motorundan alır; bu yüzden aynı
+Node'da 0.2.54'ün eşlediğini eşler. Her özelliğin ilk kullanımı politika
+yüklenirken süreç başına bir kez yaklaşık 25–45 ms tutar. Eşleşmelerin
+JavaScript'in `u` bayraklı eşleşmeleriyle aynı olması amaçlanır. Bu, harf, rakam,
+sınıf ve olumsuz sınıf (içlerinde `\s`, `\S` ve `\b` ile), `[^]`, `.`, `\s`, `\d`,
+`\w`, `\b`, `^`, `$`, `\u` kaçışları, sınırlı ve tembel niceleyici, boş seçenekli
+alternasyon ve `i`/`s` değiştirici grupları içeren üretilmiş desenlerde, metinde
+satır sonu, bölünmez boşluk ve diğer Unicode boşlukları, Kelvin işareti ve uzun s
+ile; listelenmiş vekil çifti ve sınıf kenar durumlarında; ve JavaScript'in Node
+24'te kabul ettiği her Unicode özellik adında sınandı: kısa ve uzun adıyla bütün
+genel kategoriler, ECMAScript tablosundaki her ikili özellik ve kısaltması, ve
+`Script=`, `sc=`, `Script_Extensions=` ve `scx=` altında 175 betik ile 169 dört
+harfli kısaltması. Bir fark kalır: bir emojinin iki yarısı arasındaki boş eşleşme
+(örneğin `\B`); JavaScript bunu bildirir, motor bildirmez. İki durumda da hiçbir
+metin gizlenmez.
 
 ## Tek üretim kurulumu
 <!-- s: one-prod-install -->

@@ -42,13 +42,14 @@ Changes an operator can see:
 - Custom patterns run on a linear-time regular expression engine (`re2js`, a new
   dependency with no dependencies of its own). In 0.2.54 an accepted pattern
   such as `(?:a?){30}z` could hold a field's masking for minutes. The refusal
-  rules are 0.2.54's, plus two refused when the policy loads: a Unicode
-  `Script_Extensions` property, and a modifier group that turns on the
-  multiline flag (`(?m:…)`, which only Node versions with modifier groups
-  accepted). Over the patterns compared (about fifty syntax forms and 25
-  Unicode properties), every other pattern 0.2.54 accepted
-  is accepted (see LIMITATIONS, "Custom patterns: what is refused, and the
-  engine they run on").
+  rules are 0.2.54's, plus four forms where the engine would match differently
+  from JavaScript: a multiline modifier group `(?m:…)`, a case-insensitive
+  modifier group in a pattern that uses `\w`, `\W`, `\b` or `\B`, an optional or
+  repeated group that lists an empty choice before a non-empty one (`(?:|a)?`),
+  and a surrogate escape that is not half of a pair. Unicode property classes
+  take their code points from the running JavaScript engine; every property
+  name JavaScript accepts on Node 24 was compared and is accepted (see
+  LIMITATIONS, "Custom patterns: what is refused, and the engine they run on").
 - If masking throws, the field is masked whole and counted once.
 - The connection-string step no longer takes quadratic time on a long run of
   scheme characters before `://`; it is one linear pass with the same matches.

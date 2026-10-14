@@ -93,17 +93,37 @@ Custom patterns run on a linear-time regular expression engine (re2js), so no
 accepted pattern can hold a field's masking for minutes; in 0.2.54 some could.
 The patterns refused when the policy loads are the ones 0.2.54 refused
 (lookaround, backreferences, `+`, `*`, an open-ended `{n,}`, and the older group
-rules), plus two the engine has no counterpart for: a Unicode
-`Script_Extensions` (`scx=`) property, and a modifier group that turns on the
-multiline flag (`(?m:…)`; JavaScript's multiline `^` and `$` also stop at a
-carriage return, U+2028 and U+2029). Matches are meant to equal JavaScript's
-with the `u` flag. That was tested on generated patterns over letters, digits,
-classes and negated classes (with `\s` and `\S` inside them), `.`, `\s`, `\d`,
-`\w`, `\b`, `^`, `$`, bounded quantifiers, alternation and `i`/`s` modifier
-groups, with line breaks, no-break and other Unicode spaces in the text, and on 25
-Unicode property classes (general categories by short and long name, scripts
-written `Script=` or `sc=`, `ASCII`, `Any`, `Alphabetic`, `White_Space`,
-`Emoji`) over one sample of mixed scripts. Other properties were not tested.
+rules), plus four forms where the engine would match differently from
+JavaScript:
+
+- a modifier group that turns on the multiline flag (`(?m:…)`; JavaScript's
+  multiline `^` and `$` also stop at a carriage return, U+2028 and U+2029);
+- a pattern with a case-insensitive modifier group (`(?i:…)`) that also uses
+  `\w`, `\W`, `\b` or `\B` anywhere (on Node 24 such a group makes `\w` take the
+  Kelvin sign and the long s, outside the group as well);
+- an optional or repeated group that lists an empty choice before a non-empty
+  one, such as `(?:|a)?` or `(?:a??)?` (JavaScript skips the empty choice in
+  that position, the engine takes it);
+- a surrogate escape that is not half of a `\uHHHH\uLLLL` pair, such as
+  `\u{D83D}`.
+
+Modifier groups compile only on Node versions that support them, in 0.2.54 as
+now. Unicode property classes (`\p{…}`, `\P{…}`) take their code points from
+the JavaScript engine Conarium runs on, so they match what 0.2.54 matched on
+the same Node; the first use of each property costs about 25 to 45 ms when the
+policy loads, once per process. Matches are meant to equal JavaScript's with the
+`u` flag. That was tested on generated patterns over letters, digits, classes
+and negated classes (with `\s`, `\S` and `\b` inside them), `[^]`, `.`, `\s`,
+`\d`, `\w`, `\b`, `^`, `$`, `\u` escapes, bounded and lazy quantifiers,
+alternation with empty choices and `i`/`s` modifier groups, with line breaks,
+no-break and other Unicode spaces, the Kelvin sign and the long s in the text;
+on listed surrogate-pair and class corners; and on every Unicode property name
+JavaScript accepts on Node 24: all general categories by short and long name,
+every binary property in the ECMAScript table with its alias, and 175 scripts
+with 169 four-letter aliases under `Script=`, `sc=`, `Script_Extensions=` and
+`scx=`. One difference stays: a match of nothing (for example `\B`) between the
+two halves of an emoji, which JavaScript reports and the engine does not; it
+hides no text either way.
 
 ## One production install
 <!-- s: one-prod-install -->
