@@ -274,7 +274,12 @@ describe('embedded and whole-field base64', () => {
     expect(embedded.spans.some((s) => s.cls === 'embedded')).toBe(true)
     expect(masked(`id ${emailB64}`)).toBe('id [MASKED_PII]')
     expect(masked(`id ${emailHex}`)).toBe('id [MASKED_PII]')
-    expect(masked(`id ${plainHex}`)).toBe(`id ${plainHex}`)
+    expect(masked(`ref: ${plainHex}`)).toBe(`ref: ${plainHex}`)
+  })
+
+  it('matches 0.2.54 on an id-prefixed hex that happens to pass the IBAN checksum', () => {
+    // maskSensitiveText and maskPII both returned [MASKED_PII]69. ID68… satisfies mod-97 by chance.
+    expect(masked('id 68656c6c6f2068656c6c6f206869')).toBe('[MASKED_PII]69')
   })
 })
 
