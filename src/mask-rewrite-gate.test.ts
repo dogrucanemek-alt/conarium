@@ -81,6 +81,21 @@ describe('G3 — a Turkish mobile number in 3-3-2-2 groups', () => {
   }
 })
 
+describe('G7 — a custom pattern that can backtrack without bound is refused when compiled', () => {
+  // `(?:a?){22}z` on twenty-two `a` takes seconds and doubles with every
+  // character; no per-call budget can stop a single exec. Refuse the shape.
+  for (const pattern of ['(?:a?){30}z', '(a?){25}b', '(?:ab?){20}c', '(?:a{0,1}){30}z', '(?:a?b?){12}c']) {
+    it(`refuses ${pattern}`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).toThrow()
+    })
+  }
+  for (const pattern of ['(?:abc){2}', 'zq[0-9]{4}', 'CUST-[0-9]{5}', 'a?', 'TR[0-9]{2} ?[0-9]{4}', '(?:INV|FAT)-[0-9]{6}']) {
+    it(`still accepts ${pattern}`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).not.toThrow()
+    })
+  }
+})
+
 describe('G6 — a field at the largest scan cap is masked, not thrown on', () => {
   // About 140 000 masks in one field. The scan cap allows it; the engine has
   // to hand back a masked string for it, not a stack overflow.
