@@ -48,7 +48,10 @@ Changes an operator can see:
   differently from JavaScript: a multiline modifier group `(?m:…)`, a
   case-insensitive modifier group in a pattern that uses `\w`, `\W`, `\b` or
   `\B`, an optional or repeated group that lists an empty choice before a
-  non-empty one (`(?:|a)?`), and a lone surrogate, escaped or typed. Unicode property classes
+  non-empty one (`(?:|a)?`), and a lone surrogate, escaped or typed. Repeats
+  nested so that their counts multiply past 1000 (`(?:(?:a{32})){32}`), which
+  0.2.54 accepted, are refused as nested quantifiers: the engine cannot compile
+  them. Unicode property classes
   take their code points from the running JavaScript engine; every property
   name JavaScript accepts on Node 24 was compared and is accepted (see
   LIMITATIONS, "Custom patterns: what is refused, and the engine they run on").

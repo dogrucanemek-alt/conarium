@@ -114,6 +114,11 @@ digits only as a quantifier: `\u{100}`, `\u{65}` and `\u{2028}` are refused as
 unbounded or nested quantifiers, in 0.2.54 as now; `\u0100`, `\u0065` and
 `\u2028` are accepted.
 
+One more refusal comes from the engine itself: repeats nested so that their
+largest counts multiply past 1000, such as `(?:(?:a{32})){32}`, are refused as
+unbounded or nested quantifiers. 0.2.54 accepted them. Up to 1000, such as
+`(?:(?:a{25})){40}`, they are accepted.
+
 Modifier groups compile only on Node versions that support them, in 0.2.54 as
 now. Unicode property classes (`\p{…}`, `\P{…}`) take their code points from
 the JavaScript engine Conarium runs on, so they match what 0.2.54 matched on

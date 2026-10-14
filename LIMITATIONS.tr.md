@@ -112,6 +112,11 @@ parantezli bir kaçışı da niceleyici sayar: `\u{100}`, `\u{65}` ve `\u{2028}`
 0.2.54'te olduğu gibi, sınırsız ya da iç içe niceleyici diye reddedilir;
 `\u0100`, `\u0065` ve `\u2028` kabul edilir.
 
+Bir ret de motorun kendisinden gelir: en büyük sayılarının çarpımı 1000'i
+aşacak biçimde iç içe geçmiş tekrarlar, örneğin `(?:(?:a{32})){32}`, sınırsız ya
+da iç içe niceleyici diye reddedilir. 0.2.54 bunları kabul ediyordu. 1000'e
+kadar olanlar, örneğin `(?:(?:a{25})){40}`, kabul edilir.
+
 Değiştirici gruplar, 0.2.54'te olduğu gibi, yalnız bunları destekleyen Node
 sürümlerinde derlenir. Unicode özellik sınıfları (`\p{…}`, `\P{…}`) kod
 noktalarını Conarium'un çalıştığı JavaScript motorundan alır; bu yüzden aynı
