@@ -38,10 +38,22 @@ function same(sources: string[], texts: string[]) {
 describe('surrogate-pair escapes and edge classes', () => {
   same([
     `[${B}uD83D${B}uDE00]`, `[^${B}uD83D${B}uDE00]`, `${B}uD83D${B}uDE00?`, `${B}uD83D${B}uDE00{2}`,
-    `${B}u{D83D}${B}u{DE00}`, `${B}uD83D${B}u{DE00}`, `${B}u{D83D}${B}uDE00`, `(?:${B}uD83D)${B}uDE00`,
-    `[${B}uD83D${B}uDE00-${B}uD83D${B}uDE01]`, `${B}u{1F600}`, `[${B}u{1F600}a]`, `[${B}uD83D]`,
+    `[${B}uD83D${B}uDE00-${B}uD83D${B}uDE01]`, `${B}u{1F600}`, `[${B}u{1F600}a]`,
     `[${B}b]`, `[^${B}b]`, `[^]`, `[^]{2}`, `[]|a`, `a[]`, `[^a${B}b]`,
   ], [GRIN, GRIN + GRIN, GRIN2, HIGH, LOW, GRIN + LOW, HIGH + GRIN, `a${GRIN}b`, String.fromCharCode(8), 'ab', `a${String.fromCharCode(8)}b`])
+
+  // A surrogate escape that is not half of a `\uHHHH\uLLLL` pair is a lone
+  // surrogate to JavaScript, which never matches half of a pair; the engine
+  // matches it inside a pair. Such a pattern is refused.
+  for (const source of [`${B}u{D83D}${B}u{DE00}`, `${B}uD83D${B}u{DE00}`, `${B}u{D83D}${B}uDE00`, `(?:${B}uD83D)${B}uDE00`,
+    `[${B}uD83D]`, `${B}uDE00`, `[^${B}u{D83D}]`, `a${B}uD83D`, `[${B}uD800-${B}uDBFF]`]) {
+    it(`${JSON.stringify(source)} is refused, and the reason names the surrogate`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(/surrogate/)
+    })
+  }
+  // Classes whose set holds surrogates by property or by a wide range agree.
+  same([`${B}p{Cs}`, `[${B}u0000-${B}uFFFF]`, `[^${B}u0061]`, `${B}P{L}`],
+    [GRIN, `a${GRIN}`, HIGH, LOW, GRIN + LOW])
 })
 
 const modifierGroups = (() => {
