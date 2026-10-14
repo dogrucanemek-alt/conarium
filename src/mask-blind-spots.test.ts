@@ -158,6 +158,15 @@ describe('B3 — a passport MRZ is masked whole, whatever its fields hold', () =
     }
   }
 
+  it('with the MRZ detector switched off a valid TD3 is left as it is, in both pipelines', () => {
+    const { line1, line2 } = td3('L898902C3', 'ZE184226B')
+    const block = `${line1}\n${line2}`
+    expect(isTd3Mrz(line1, line2)).toBe(true)
+    expect(maskSensitiveText(block, { detectors: { mrz: false } })).toBe(block)
+    const off = new Governance({ detectors: { mrz: false } })
+    expect(off.maskPII(block).masked).toBe(block)
+  })
+
   it('a TD3 that fails its checksum is still not an MRZ', () => {
     const { line1, line2 } = td3('L898902C3', '')
     const bad = line2.slice(0, 9) + ((Number(line2[9]) + 1) % 10).toString() + line2.slice(10)
@@ -219,4 +228,71 @@ describe('B5 — a custom pattern is counted under its own name, whatever the na
       expect(res.byClass[name]).toBe(2)
     })
   }
+})
+
+describe('B6 — a value that is masked on its own is masked behind any label', () => {
+  // Each value is masked whole when it stands alone. A secret label, a Bearer
+  // prefix or plain words in front of it must not leave part of it readable:
+  // the label step takes the first word after the label, and a value written
+  // in groups is more than one word.
+  const values = [
+    'GB82 WEST 1234 5698 7654 32',
+    'GB82WEST12345698765432',
+    'GB82-WEST-1234-5698-7654-32',
+    'TR33 0006 1005 1978 6457 8413 26',
+    '4111 1111 1111 1111',
+    '4111-1111-1111-1111',
+    '4111111111111111',
+    '0532 123 45 67',
+    '(532) 123-4567',
+    '+90 532 123 4567',
+    '10000000146',
+    'ahmet@example.com',
+    '123-45-6789',
+  ]
+  const wrappers: ReadonlyArray<readonly [string, (value: string) => string]> = [
+    ['bare', (value) => value],
+    ['words', (value) => `musteri ${value} kayitli`],
+    ['password:', (value) => `password: ${value}`],
+    ['token=', (value) => `token=${value}`],
+    ['secret =', (value) => `secret = ${value}`],
+    ['"api_key":', (value) => `{"api_key": "${value}"}`],
+    ['Bearer', (value) => `Bearer ${value}`],
+    ['Authorization: Bearer', (value) => `Authorization: Bearer ${value}`],
+    ['authorization:', (value) => `authorization: ${value}`],
+  ]
+
+  for (const [name, mask] of PIPELINES) {
+    for (const [label, wrap] of wrappers) {
+      it(`${name}: ${label}`, () => {
+        const open: string[] = []
+        for (const value of values) {
+          const out = mask(wrap(value))
+          if (longestSurvivingRun(value, out) >= 4) open.push(`${wrap(value)} -> ${out}`)
+        }
+        expect(open).toEqual([])
+      })
+    }
+  }
+})
+
+describe('B7 — the label step still sees what it saw before, and counts a secret once', () => {
+  // The IBAN pass sets aside a span that starts at an IBAN-shaped word and runs
+  // on through the words after it. While that span is set aside the label step
+  // takes it whole; once it is back, the label step takes only its first word.
+  const input = 'api_key": "Wn16ajFynghkzfB6jPVt 05321234567 ve siparis 2024'
+
+  for (const [name, mask] of PIPELINES) {
+    it(`${name}: a number after an IBAN-shaped token behind a label is not left readable`, () => {
+      const out = mask(input)
+      expect(out).not.toContain('05321234567')
+      expect(out).not.toContain('Wn16ajFynghkzfB6jPVt')
+    })
+  }
+
+  it('a labelled secret is one masked value in the count, whether or not it is IBAN-shaped', () => {
+    expect(gov.maskPII('password: hunter2secret').count).toBe(1)
+    expect(gov.maskPII('api_key=tr33abcdefghijklmnop').count).toBe(1)
+    expect(gov.maskPII('pwd: 4111 1111 1111 1111').count).toBe(2)
+  })
 })
