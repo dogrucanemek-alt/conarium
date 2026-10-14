@@ -67,8 +67,8 @@ de aynısını yapıyordu.
 Bir numara çevresindeki kelimelere ya da numaralara tek ayırıcıyla bitişikse,
 içindeki bir parça ancak sağlamadan geçerse (kart, T.C. kimlik numarası) ya da
 Türk cep telefonu numarasıysa maskelenir. Bitişik bir sabit hat (`siparis 2024
-02321234567`), kimlik sağlamasından geçmeyen on bir haneli bir numara ve önünde
-ayırıcı olmayan bir numara (`siparis 202410000000146`) okunur kalır. Bazı
+02321234567`) ve önünde ayırıcı olmayan bir numara (`siparis 202410000000146`)
+okunur kalır. Bazı
 grupları tesadüfen sağlamadan geçen uzun bir grup dizisi, tek bir numara olmadığı
 hâlde maskelenebilir.
 

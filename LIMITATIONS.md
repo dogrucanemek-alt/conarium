@@ -69,8 +69,8 @@ readable, because that card number fails its checksum. 0.2.54 did the same.
 When a number is joined to the words or numbers around it by single separators,
 a part of it is masked only when that part passes a checksum (card, Turkish ID
 number) or is a Turkish mobile number. A joined landline (`siparis 2024
-02321234567`), an eleven-digit number that fails the ID checksum, and a number
-with no separator before it (`siparis 202410000000146`) stay readable. A long
+02321234567`) and a number with no separator before it
+(`siparis 202410000000146`) stay readable. A long
 run of groups can be masked although it is not one number, when some of its
 groups happen to pass a checksum.
 
