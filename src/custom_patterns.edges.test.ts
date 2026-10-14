@@ -100,3 +100,22 @@ describe('a repeated group that prefers to match nothing', () => {
   same(['(?:a|)?', '(?:a?)?', '(?:a?b?)?', `(?:${B}b)?a`, '(?:a?){2}', '(?:a?){1,2}', '(?:a|b?)?', '(?:ab|a?)?', '(?:a|b)??', `(?:a${B}b)?`],
     ['a', 'ab', 'ba', 'aab', 'b', '', 'a b'])
 })
+
+describe('forms the refusals must not catch', () => {
+  // A group that cannot match the empty string has no empty choice, whatever
+  // zero-width parts it holds.
+  same([`(?:${B}ba)?`, '(?:^a)?', `(?:${B}b${B}ba|b)?`, `(?:^${B}ba){1,2}`, `(?:a|${B}bb)?`],
+    ['a', 'ab', ' a', 'b a', 'aa'])
+})
+
+describe.skipIf(!modifierGroups)('modifier text inside a class', () => {
+  // `(?i:` inside a class is three literal characters, and `\b` inside a class
+  // is a backspace: neither is a case-insensitive group or a word boundary.
+  same([`[(?i:)]${B}w`, `(?i:[${B}b])`, `(?i:a)[${B}b]`, `(?i:${B}p{ASCII})`],
+    ['(w', 'i', String.fromCharCode(8), `a${String.fromCharCode(8)}`, KELVIN, 'k'])
+  for (const source of [`[${B}w](?i:a)`, `(?i:[${B}w])`, `[(]${B}w(?i:a)`]) {
+    it(`${JSON.stringify(source)} is still refused`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(/word/)
+    })
+  }
+})
