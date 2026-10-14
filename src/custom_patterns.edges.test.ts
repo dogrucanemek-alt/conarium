@@ -168,8 +168,9 @@ describe('nested repeats', () => {
   // past 1000. Up to 1000 the pattern is accepted and matches like JavaScript;
   // past it the refusal names nested quantifiers, not an invalid expression.
   same(['(?:(?:a{25})){40}', '(?:(?:a{2,25})){40}', '(?:(?:a{0,25})){40}'], ['a'.repeat(999), 'a'.repeat(1000), 'a'.repeat(1001), 'b'])
-  // A repeat whose largest count is zero matches only the empty string; the
-  // engine does not look below it, so what it holds does not count.
+  // A repeat whose largest count is zero matches only the empty string; what
+  // it holds does not count against the repeats around it. A nest inside it
+  // is still checked on its own (below).
   same(['(?:(?:(?:a{64})){0}){16}', '(?:(?:(?:a{64})){0,0}){16}', '(?:x(?:(?:a{64})){0}|b){16}'], ['a'.repeat(70), 'xb', ''])
   // A count of zero hides what it holds from the repeats around it, but a nest
   // inside it is still checked on its own, from a fresh budget.

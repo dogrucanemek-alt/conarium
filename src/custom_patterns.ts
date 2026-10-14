@@ -219,8 +219,9 @@ export function looksUnsafe(source: string): boolean {
  * One parse and one walk. The walk carries an `i` / `s` stack (both start
  * off; the compile flags are `gu`) and, on every node, the empty-choice
  * attributes and the re2js text. `s` only chooses which set `.` becomes.
- * `s` and `m` are never written out. A quantifier that is written passes its
- * child a budget of 1000 divided by that quantifier's maximum (its minimum
+ * `s` and `m` are never written out. The walk starts with a budget of 1000;
+ * a quantifier that is written passes its child the budget it received,
+ * integer-divided by that quantifier's maximum (its minimum
  * when the repeat is open). A zero-count repeat (`{0}`, `{0,0}`) only cuts
  * the count coming from outside: its body starts again at 1000, and a nested
  * repeat found there is still carried upward. A zero budget is rejected
