@@ -10,7 +10,9 @@
  * old group rules). Accepted patterns are parsed once and emitted as re2js
  * source, which matches in linear time.
  * Nested repeats whose written maxima divide a budget of 1000 down to zero
- * are rejected, because re2js refuses that product while parsing.
+ * are rejected, because re2js refuses that product while parsing. re2js checks
+ * each repeat on its own from 1000; a zero-count repeat only cuts the count
+ * coming from outside, and the nest inside is still checked.
  * A broken rule fails the config (silent drop = leak).
  */
 import { RegExpParser } from '@eslint-community/regexpp'
@@ -117,8 +119,11 @@ const JS_DOT = '[^\\n\\r\\x{2028}\\x{2029}]'
 const JS_NEVER = '[^\\x{0}-\\x{10ffff}]'
 const JS_ANY = '[\\x{0}-\\x{10ffff}]'
 /**
- * re2js refuses a nest of repeats once this budget hits zero. Each written
- * quantifier integer-divides it by its maximum (`?` is 1; `{0}` does not divide).
+ * re2js checks each repeat on its own from this budget. Each written
+ * quantifier integer-divides it by its maximum (`?` is 1). A zero-count
+ * repeat (`{0}`, `{0,0}`) does not divide: it only cuts the count coming
+ * from outside, and the body is checked again from 1000. A budget of zero
+ * is a refusal.
  */
 const NESTED_REPEAT_BUDGET = 1000
 
@@ -216,8 +221,10 @@ export function looksUnsafe(source: string): boolean {
  * attributes and the re2js text. `s` only chooses which set `.` becomes.
  * `s` and `m` are never written out. A quantifier that is written passes its
  * child a budget of 1000 divided by that quantifier's maximum (its minimum
- * when the repeat is open; `{0}` does not divide), and a zero budget is
- * rejected because re2js will not parse the nest.
+ * when the repeat is open). A zero-count repeat (`{0}`, `{0,0}`) only cuts
+ * the count coming from outside: its body starts again at 1000, and a nested
+ * repeat found there is still carried upward. A zero budget is rejected
+ * because re2js will not parse the nest.
  * Refusals are thrown in order:
  * case-insensitive word characters, an empty choice in a repeated group,
  * a lone surrogate, the multiline flag, nested repeats, then `invalid`.
@@ -540,7 +547,10 @@ function walkNode(node: AST.Node, flags: FlagState, ctx: WalkContext, budget: nu
         ctx.refusals.invalid = true
       }
       const m = repeatMax(node.min, node.max)
-      const childBudget = m > 0 ? Math.floor(budget / m) : budget
+      // re2js checks every repeat from 1000 on its own. A zero-count repeat
+      // only cuts the count coming from outside, so the body starts again at
+      // 1000; the nest that walk finds is carried upward as usual.
+      const childBudget = m > 0 ? Math.floor(budget / m) : NESTED_REPEAT_BUDGET
       const body = walkNode(node.element, flags, ctx, childBudget)
       const attr = quantify(body.attr, node.min, node.max, !node.greedy, ctx)
       // An unsatisfiable body under `{0,n}` (n ≥ 2) makes re2js throw
@@ -550,6 +560,8 @@ function walkNode(node: AST.Node, flags: FlagState, ctx: WalkContext, budget: nu
       return {
         attr,
         text: body.text + suffix + (node.greedy ? '' : '?'),
+        // A zero-count repeat does not hide body.repeatOver: it only cuts
+        // the outside count.
         repeatOver: (m > 0 && childBudget === 0) || body.repeatOver === true,
       }
     }
