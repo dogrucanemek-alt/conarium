@@ -50,7 +50,8 @@ export function maskSensitiveText(text: string, opts: MaskTextOptions = {}): str
   if (opts.detectors?.ip === true) masked = maskIps(masked).text
   if (opts.detectors?.mrz !== false) masked = maskMrz(masked).text
   masked = maskSecretShapedValues(masked)
-  masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, '$1[MASKED_SECRET]$2')
+  // The expression cannot match without "://", so this guard is output-equivalent and skips its quadratic backtracking on a long letter run.
+  if (masked.includes('://')) masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, '$1[MASKED_SECRET]$2')
   masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, '$1[MASKED_SECRET]')
   masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, '$1[MASKED_SECRET]')
   masked = ibanPass.restore(masked)

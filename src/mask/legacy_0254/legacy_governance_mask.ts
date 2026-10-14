@@ -131,7 +131,8 @@ export function legacyMaskPiiString(
   if (/[A-Za-z]/.test(masked)) {
     const secretRe = /\b(?:sk-[A-Za-z0-9_-]{12,}|sk_live_[A-Za-z0-9]{6,}|sk_test_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|eyJ[A-Za-z0-9._-]{20,})\b/g;
     masked = masked.replace(secretRe, () => { count++; return '[MASKED_SECRET]'; });
-    masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, (_m, p1, p2) => { count++; return `${p1}[MASKED_SECRET]${p2}`; });
+    // The expression cannot match without "://", so this guard is output-equivalent and skips its quadratic backtracking on a long letter run.
+    if (masked.includes('://')) masked = masked.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g, (_m, p1, p2) => { count++; return `${p1}[MASKED_SECRET]${p2}`; });
     masked = masked.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi, (_m, p1) => { count++; return `${p1}[MASKED_SECRET]`; });
     masked = masked.replace(/((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization)["'\s]*[:=]["'\s]*)[^"'\s,;}]{4,}/gi, (_m, p1) => { count++; return `${p1}[MASKED_SECRET]`; });
   }

@@ -151,7 +151,7 @@ describe('beltCover', () => {
   })
 
   it('refuses when the work budget is exhausted', () => {
-    const raw = 'x'.repeat(80)
+    const raw = 'user@example.com '.repeat(40)
     const result = beltCover({ ...textInput(raw), budget: 1 })
     expect(result).toEqual({ ok: false, reason: 'budget' })
   })
@@ -255,6 +255,21 @@ describe('brute-force alignment', () => {
     const result = beltCover({ ...textInput(raw), scanCharCap: 1_048_576 })
     expect(result).toEqual({ ok: true, spans: [], added: 0 })
     expect(alignCallCount()).toBe(0)
+  })
+
+  it('covers a 200k letter run within two seconds', { timeout: 60_000 }, () => {
+    const plain = 'm'.repeat(200_000)
+    const withScheme = `${plain} x://y`
+    const plainStarted = Date.now()
+    const plainResult = beltCover({ ...textInput(plain), scanCharCap: 1_048_576 })
+    const plainMs = Date.now() - plainStarted
+    const schemeStarted = Date.now()
+    const schemeResult = beltCover({ ...textInput(withScheme), scanCharCap: 1_048_576 })
+    const schemeMs = Date.now() - schemeStarted
+    expect(plainMs).toBeLessThan(2_000)
+    expect(schemeMs).toBeLessThan(2_000)
+    expect(plainResult).toEqual({ ok: true, spans: [], added: 0 })
+    expect(schemeResult.ok).toBe(true)
   })
 })
 
