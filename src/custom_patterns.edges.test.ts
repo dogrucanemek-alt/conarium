@@ -141,7 +141,40 @@ describe('more corners', () => {
     })
   }
   // Empty sets inside a class, and an empty class under a quantifier.
-  same([`[${B}P{Any}]`, `[^${B}P{Any}]`, `[${B}P{Any}a]`, '[]{0,2}a', '[]?a', '(?:[]|a){1,2}'], ['a', 'ab', ''])
+  same([`[${B}P{Any}]`, `[^${B}P{Any}]`, `[${B}P{Any}a]`, '[]{0,2}a', '[]?a', '(?:[]|a)?'], ['a', 'ab', ''])
   // Zero-width parts ahead of a greedy optional part leave the empty choice last.
   same(['(?:^a?)?', `(?:${B}ba?)?`, `(?:${B}b${B}ba?b?)?`], ['a', 'ab', ' a', ''])
+})
+
+describe('a part that can never match, under a quantifier', () => {
+  // Nested or not, and whether the empty set is written or comes from a
+  // property, a part that matches nothing under `{0,n}` is the empty match.
+  same(['(?:(?:[]){1,2}){0,2}a', '(?:[]x){0,2}a', '(?:x[]){0,2}a', '(?:(?:[]|[])c){0,2}a', '[]{0,1}a',
+    `[${B}P{Any}]{0,3}a`, '(?:(?:[]|b)c){0,2}a', '(?:(?:x[]|b)c){1,2}a', '(?:[]|[])?a', '[]{2}a|b'],
+  ['a', 'ab', 'bca', 'bcbca', 'xa', ''])
+  // A quantified group holding `|` is still refused by the 0.2.54 rule.
+  for (const source of ['(?:[]|a){1,2}', '(?:[]|b){0,2}a']) {
+    it(`${JSON.stringify(source)} is refused as unsafe`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern: source }])).toThrow(/unbounded or nested/)
+    })
+  }
+})
+
+describe.skipIf(!modifierGroups)('letters V8 folds by the subject string', () => {
+  // Inside `(?i:…)`, V8 lets these seven letters match their Latin-1 case
+  // partners only when the subject holds a character beyond Latin-1. The engine
+  // always does: a documented over-mask, never a leak.
+  const WIDE = cp(0x4e00)
+  for (const [letter, partners] of [
+    [0x178, [0xff]], [0x17f, [0x53, 0x73]], [0x39c, [0xb5]], [0x3bc, [0xb5]],
+    [0x1e9e, [0xdf]], [0x212a, [0x4b, 0x6b]], [0x212b, [0xc5, 0xe5]],
+  ] as const) {
+    const source = `(?i:${cp(letter)})`
+    it(`${JSON.stringify(source)} matches its Latin-1 partners in any subject`, () => {
+      for (const partner of partners) {
+        expect(viaEngine(source, cp(partner))).toBe('0+1')
+        expect(viaEngine(source, WIDE + cp(partner))).toBe(viaJs(source, WIDE + cp(partner)))
+      }
+    })
+  }
 })
