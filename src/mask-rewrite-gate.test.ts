@@ -81,6 +81,20 @@ describe('G3 — a Turkish mobile number in 3-3-2-2 groups', () => {
   }
 })
 
+describe('G6 — a field at the largest scan cap is masked, not thrown on', () => {
+  // About 140 000 masks in one field. The scan cap allows it; the engine has
+  // to hand back a masked string for it, not a stack overflow.
+  const big = 'a@b.co '.repeat(150_000).slice(0, 1_000_000)
+  it('maskSensitiveText', () => {
+    const out = maskSensitiveText(big, { scanCharCap: 1_048_576 })
+    expect(out).not.toContain('a@b.co')
+  })
+  it('Governance.maskPII', () => {
+    const out = String(new Governance({ scanCharCap: 1_048_576 }).maskPII(big).masked)
+    expect(out).not.toContain('a@b.co')
+  })
+})
+
 describe('G5 — an IBAN-shaped run before a real IBAN does not uncover its tail', () => {
   // "er 0532…2024 GB82 WES" passes the IBAN checksum by chance. Taken first
   // and skipped past, it hides where the real IBAN starts, and the real IBAN's
