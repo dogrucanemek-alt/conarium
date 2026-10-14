@@ -81,33 +81,44 @@ describe('G3 — a Turkish mobile number in 3-3-2-2 groups', () => {
   }
 })
 
-describe('G7 — a custom pattern that can backtrack without bound is refused when compiled', () => {
-  // `(?:a?){22}z` on twenty-two `a` takes seconds and doubles with every
-  // character; no per-call budget can stop a single exec. Refuse the shape.
-  for (const pattern of ['(?:a?){30}z', '(a?){25}b', '(?:ab?){20}c', '(?:a{0,1}){30}z', '(?:a?b?){12}c']) {
-    it(`refuses ${pattern}`, () => {
-      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).toThrow()
+describe('G7 — custom patterns 0.2.54 accepted are accepted, and run in linear time', () => {
+  // A backtracking engine took seconds on these and grew far faster than the
+  // text; refusing shapes one by one kept missing new ones and started refusing
+  // harmless patterns. Custom patterns now run on a linear-time engine.
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ['(?:a?){30}z', 'a'],
+    ['(a?){25}b', 'a'],
+    ['(?:ab?){20}c', 'ab'],
+    ['(?:a?b?){12}c', 'ab'],
+    ['((?:[A-Z]|[A-Z0-9])){14}Z', 'A'],
+    ['[0-9]{0,64}[0-9]{0,64}[0-9]{0,64}X', '1'],
+    ['[a-z]{1,40}[a-z]{1,40}!', 'a'],
+    ['[0-9]{0,64}a?[0-9]{0,64}a?[0-9]{0,64}X', '1'],
+    ['(?:a|ab)(?:a|ab)(?:a|ab)(?:a|ab)(?:a|ab)(?:a|ab)(?:a|ab)(?:a|ab)(?:a|ab)(?:a|ab)c', 'ab'],
+  ]
+  for (const [pattern, unit] of cases) {
+    it(`accepts ${pattern} and masks 16 000 characters quickly in both paths`, () => {
+      const rules = [{ name: 'r', pattern }]
+      const compiled = compileCustomPatterns(rules)
+      const text = unit.repeat(Math.ceil(16_000 / unit.length)).slice(0, 16_000)
+      const t = performance.now()
+      maskSensitiveText(text, { customPatterns: compiled })
+      new Governance({ customPatterns: rules }).maskPII(text)
+      expect(performance.now() - t).toBeLessThan(1_000)
     })
   }
-  for (const pattern of ['(?:abc){2}', 'zq[0-9]{4}', 'CUST-[0-9]{5}', 'a?', 'TR[0-9]{2} ?[0-9]{4}', '(?:INV|FAT)-[0-9]{6}']) {
-    it(`still accepts ${pattern}`, () => {
-      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).not.toThrow()
-    })
-  }
-})
 
-describe('G8 — two more custom pattern shapes that backtrack without bound are refused', () => {
-  // Alternation inside a quantified group, and adjacent variable-width
-  // quantifiers over the same characters: both took most of a second on a
-  // few thousand characters and grow far faster than the text.
-  for (const pattern of ['((?:[A-Z]|[A-Z0-9])){14}Z', '(?:a|ab){20}c', '[0-9]{0,64}[0-9]{0,64}[0-9]{0,64}X', '[a-z]{1,40}[a-z]{1,40}!']) {
-    it(`refuses ${pattern}`, () => {
-      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).toThrow()
+  for (const pattern of ['(?:https?)?://[a-z]{1,20}', 'CUST-?[0-9]{5,8}', '(?:INV|FAT)-[0-9]{6}', 'zq[0-9]{4}', 'a?']) {
+    it(`accepts ${pattern}`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).not.toThrow()
     })
   }
-  for (const pattern of ['(?:INV|FAT)-[0-9]{6}', 'CUST-?[0-9]{5,8}', '[A-Z]{2}[0-9]{2,4}', '[0-9]{4}-[0-9]{4}']) {
-    it(`still accepts ${pattern}`, () => {
-      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).not.toThrow()
+
+  // Refused by 0.2.54 and still refused: the engine change adds nothing a
+  // 0.2.54 policy could not load, and takes nothing away from one that could.
+  for (const pattern of ['(?:a|ab){20}c', '(?:a{0,1}){30}z', 'a+', 'a*b', '(?=x)a', '(a)\\1']) {
+    it(`still refuses ${pattern}`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).toThrow()
     })
   }
 })
