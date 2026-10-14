@@ -196,8 +196,10 @@ export function looksUnsafe(source: string): boolean {
  * U+D800–U+DFFF — `\u{…}`, a mixed pair, a split pair, a class member, or a
  * range end — is refused.
  * `[]`, `[^]` and in-class `\b` are rewritten to sets re2js parses the way
- * JavaScript does. An `i`-enabling group anywhere next to a word escape, and
- * a variable quantifier whose body prefers an empty choice, are refused.
+ * JavaScript does. An `i`-enabling group next to a word escape is refused;
+ * `(?i:` inside a class is literal text, and `\b` inside a class is a
+ * backspace. A variable quantifier is refused only when its body can match
+ * empty and prefers that empty choice.
  */
 function toEngineSource(source: string, ruleName = ''): string {
   rejectCaseInsensitiveWord(source, ruleName)
@@ -329,23 +331,55 @@ function foldSurrogatePairs(source: string, ruleName: string): string {
 /**
  * V8, once any group turns `i` on, treats `\w` / `\W` / `\b` / `\B` as
  * Unicode word characters everywhere in the pattern. re2js keeps them ASCII.
+ * Inside a class, `(?i:` is three literal characters and `\b` is U+0008, so
+ * neither opens an `i` group nor counts as a word boundary. `\w` / `\W` in a
+ * class are still word classes. `\[` and an in-class `\]` are escapes.
  */
 function rejectCaseInsensitiveWord(source: string, ruleName: string): void {
   let enableI = false
   let word = false
+  let inClass = false
+  let atClassStart = false
   let i = 0
   while (i < source.length) {
-    if (source[i] === '\\') {
+    const ch = source[i]
+    if (ch === '\\') {
       const n = source[i + 1]
-      if (n === 'w' || n === 'W' || n === 'b' || n === 'B') word = true
+      const boundaryInClass = inClass && (n === 'b' || n === 'B')
+      if ((n === 'w' || n === 'W' || n === 'b' || n === 'B') && !boundaryInClass) word = true
       i += escapeLength(source, i)
+      atClassStart = false
       continue
     }
-    if (source[i] === '(') {
+    if (!inClass && ch === '[') {
+      if (source[i + 1] === ']') {
+        i += 2
+        continue
+      }
+      if (source[i + 1] === '^' && source[i + 2] === ']') {
+        i += 3
+        continue
+      }
+      inClass = true
+      atClassStart = true
+      i++
+      continue
+    }
+    if (inClass && atClassStart && ch === '^') {
+      i++
+      continue
+    }
+    if (inClass && ch === ']' && !atClassStart) {
+      inClass = false
+      i++
+      continue
+    }
+    if (!inClass && ch === '(') {
       const mods = modifierGroup(source, i)
       if (mods?.enableI) enableI = true
     }
     i++
+    atClassStart = false
   }
   if (enableI && word) throw new CustomPatternError(ruleName, 'unsupported-case-word')
 }
@@ -354,7 +388,9 @@ function rejectCaseInsensitiveWord(source: string, ruleName: string): void {
  * Whether a node is "empty-last": an empty match is not chosen while a
  * non-empty one is still available later. re2js takes that empty choice;
  * JavaScript backtracks into the repeated group. A quantifier whose upper
- * bound is above its lower bound is refused when its body is not empty-last.
+ * bound is above its lower bound is refused when its body can match empty
+ * and is not empty-last. A concatenation that cannot match empty stays
+ * empty-last even when it holds `\b`, `^` or `$`.
  */
 type EmptyLast = { el: boolean; canEmpty: boolean; canNonEmpty: boolean }
 
@@ -461,15 +497,16 @@ function rejectEmptyPreferringRepeat(source: string, ruleName: string): void {
   }
 
   const quantify = (atom: EmptyLast, q: { min: number; max: number; lazy: boolean }): EmptyLast => {
-    if (q.max > q.min && !atom.el) throw new CustomPatternError(ruleName, 'unsupported-empty-choice')
+    if (q.max > q.min && atom.canEmpty && !atom.el) {
+      throw new CustomPatternError(ruleName, 'unsupported-empty-choice')
+    }
     const nothing = !atom.canEmpty && !atom.canNonEmpty
     const canEmpty = nothing ? q.min === 0 : q.min === 0 || atom.canEmpty
     const canNonEmpty = !nothing && atom.canNonEmpty && q.max >= 1
     const variable = q.max > q.min
     let el: boolean
-    if (q.lazy && variable && atom.canNonEmpty) el = false
-    else if (variable) el = atom.el
-    else if (!canEmpty) el = true
+    if (!canEmpty) el = true
+    else if (q.lazy && variable && atom.canNonEmpty) el = false
     else el = atom.el
     return { el, canEmpty, canNonEmpty }
   }
@@ -483,23 +520,30 @@ function rejectEmptyPreferringRepeat(source: string, ruleName: string): void {
   const concatNode = (items: EmptyLast[]): EmptyLast => {
     if (items.length === 0) return emptyNode()
     const parts = items.map((item) => ({ ...item }))
-    for (let p = 0; p < parts.length; p++) {
-      const onlyEmpty = parts[p].canEmpty && !parts[p].canNonEmpty
-      if (!onlyEmpty) continue
-      let later = false
-      for (let q = p + 1; q < parts.length; q++) {
-        if (parts[q].canNonEmpty) {
-          later = true
-          break
-        }
-      }
-      if (later) parts[p].el = false
-    }
     const blocked = parts.some((p) => !p.canEmpty && !p.canNonEmpty)
+    const canEmpty = !blocked && parts.every((p) => p.canEmpty)
+    const canNonEmpty = !blocked && parts.some((p) => p.canNonEmpty)
+    // Zero-width `\b` / `^` / `$` is an empty choice only when this
+    // concatenation can still match empty. Otherwise every path consumes a
+    // character, and the assertion is not a reason to refuse.
+    if (canEmpty) {
+      for (let p = 0; p < parts.length; p++) {
+        const onlyEmpty = parts[p].canEmpty && !parts[p].canNonEmpty
+        if (!onlyEmpty) continue
+        let later = false
+        for (let q = p + 1; q < parts.length; q++) {
+          if (parts[q].canNonEmpty) {
+            later = true
+            break
+          }
+        }
+        if (later) parts[p].el = false
+      }
+    }
     return {
-      el: parts.every((p) => p.el),
-      canEmpty: !blocked && parts.every((p) => p.canEmpty),
-      canNonEmpty: !blocked && parts.some((p) => p.canNonEmpty),
+      el: !canEmpty || parts.every((p) => p.el),
+      canEmpty,
+      canNonEmpty,
     }
   }
 
@@ -514,10 +558,12 @@ function rejectEmptyPreferringRepeat(source: string, ruleName: string): void {
         }
       }
     }
+    const canEmpty = branches.some((b) => b.canEmpty)
+    const canNonEmpty = branches.some((b) => b.canNonEmpty)
     return {
-      el: branches.every((b) => b.el) && !emptyThenFull,
-      canEmpty: branches.some((b) => b.canEmpty),
-      canNonEmpty: branches.some((b) => b.canNonEmpty),
+      el: !canEmpty || (branches.every((b) => b.el) && !emptyThenFull),
+      canEmpty,
+      canNonEmpty,
     }
   }
 
