@@ -143,7 +143,22 @@ function cover(input: BeltInput): BeltResult {
   if (stepped.text === input.normalized) return { ok: true, spans: [], added: 0 }
   const aligned = alignTrimmed(input.normalized, stepped.text, tokens, budget)
   if (!aligned.ok) return aligned
-  return { ok: true, spans: aligned.spans, added: aligned.spans.length }
+  const spans = trimSpanEdges(input.normalized, aligned.spans)
+  return { ok: true, spans, added: spans.length }
+}
+
+// A space is not a value. A span that starts on one is glued to the word
+// on its left, and apply then swallows that word.
+function trimSpanEdges(source: string, spans: BeltSpan[]): BeltSpan[] {
+  const kept: BeltSpan[] = []
+  for (let i = 0; i < spans.length; i++) {
+    let start = spans[i].start
+    let end = spans[i].end
+    while (start < end && isWs(source[start])) start++
+    while (end > start && isWs(source[end - 1])) end--
+    if (start < end) kept.push({ start, end })
+  }
+  return kept
 }
 
 function whole(token: string): BeltResult {
