@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { beltCover, type BeltInput, type BeltSpan } from './belt.js'
+import { alignCallCount, alignRegions, beltCover, resetAlignCalls, type BeltInput, type BeltSpan } from './belt.js'
 import {
   applyCustomPatterns,
   compileCustomPatterns,
@@ -209,6 +209,53 @@ describe('brute-force alignment', () => {
       }
     }
   })
+
+  it('covers every brute-force wildcard on the trimmed path', () => {
+    const seeds = randomSeeds(200)
+    const rows = [...samples, ...seeds]
+    expect(seeds.length).toBe(200)
+    for (const row of rows) {
+      if ([...row.raw].length > 40) continue
+      const source = row.input.normalized
+      const output = legacyOutput(row.input)
+      const tokens = vocab(row.rules)
+      const trimmed = alignRegions(source, output, tokens, 'trim')
+      const brute = bruteJokers(source, output, tokens)
+      if (brute.count === 0n) {
+        expect(trimmed.ok, row.raw).toBe(false)
+        continue
+      }
+      if (!trimmed.ok) {
+        expect(trimmed.reason, row.raw).not.toBe('unaligned')
+        continue
+      }
+      const mask = covered(trimmed.spans, source.length)
+      for (const index of brute.jokers) {
+        expect(mask.has(index), `${row.raw} @${index}`).toBe(true)
+      }
+    }
+  })
+
+  it('matches untrimmed spans on 500 inputs', () => {
+    const rows = trimEqualityInputs()
+    expect(rows).toHaveLength(500)
+    for (const row of rows) {
+      const source = row.input.normalized
+      const output = legacyOutput(row.input)
+      const tokens = vocab(row.rules)
+      const plain = alignRegions(source, output, tokens, 'plain')
+      const trimmed = alignRegions(source, output, tokens, 'trim')
+      expect(trimmed, row.raw).toEqual(plain)
+    }
+  })
+
+  it('does not align a million characters the old line left unchanged', { timeout: 60_000 }, () => {
+    resetAlignCalls()
+    const raw = 'm'.repeat(1_000_000)
+    const result = beltCover({ ...textInput(raw), scanCharCap: 1_048_576 })
+    expect(result).toEqual({ ok: true, spans: [], added: 0 })
+    expect(alignCallCount()).toBe(0)
+  })
 })
 
 function textInput(raw: string, rules: CustomPiiPattern[] = []): BeltInput {
@@ -293,6 +340,58 @@ function shortSamples(): Sample[] {
     { raw: 'hello' },
   ]
   return rows.map((row) => {
+    const rules = compileCustomPatterns(row.rules ?? [])
+    const input = row.pipeline === 'governance' ? govInput(row.raw, row.rules ?? []) : textInput(row.raw, row.rules ?? [])
+    return { raw: row.raw, rules, input }
+  })
+}
+
+function trimEqualityInputs(): Sample[] {
+  const specs: Array<{ raw: string; rules?: CustomPiiPattern[]; pipeline?: 'text' | 'governance' }> = []
+  const pads = ['', 'k ', 'not ', 'ref ', 'id:', 'xx ', 'son ', 'a ']
+  const bodies: Array<[string, 'text' | 'governance']> = [
+    ['a@b.co', 'text'],
+    ['05321234567', 'text'],
+    ['name:Ahmet', 'governance'],
+    ['name :Ahmet', 'governance'],
+    ['name: Ahmet', 'governance'],
+    ['name:  Ahmet', 'governance'],
+    ['full name:Ahmet', 'governance'],
+    ['adı soyadı:Ahmet', 'governance'],
+    ['Dr. Ahmet', 'governance'],
+    ['Dr.\tAhmet', 'governance'],
+    ['Sayın Ayşe Yılmaz', 'governance'],
+    ['TR330006100519786457841326Dr. Ahmet', 'governance'],
+  ]
+  for (const pad of pads) {
+    for (const [body, pipeline] of bodies) {
+      specs.push({ raw: pad + body, pipeline })
+      specs.push({ raw: `${pad}${body} bitti`, pipeline })
+      specs.push({ raw: `${pad}${body}]`, pipeline })
+    }
+  }
+  for (let i = 0; i < 60; i++) {
+    specs.push({
+      raw: `p${i}ABC]`,
+      rules: [{ name: 'cut', pattern: 'ABC\\]', label: '[MASKED]' }],
+    })
+    specs.push({
+      raw: `[ABC${i}x`,
+      rules: [{ name: 'cut', pattern: '\\[ABC', label: '[ABC]' }],
+    })
+  }
+  const rand = mulberry32(500)
+  const alphabet = 'abcxyz .,:'
+  while (specs.length < 500) {
+    const n = specs.length
+    let raw = ''
+    const length = 8 + (n % 24)
+    for (let i = 0; i < length; i++) raw += alphabet[Math.floor(rand() * alphabet.length)]
+    if (n % 2 === 0) raw = `${raw.slice(0, 4)}a@b.co${raw.slice(4)}`
+    if (n % 5 === 0) raw = `on ${raw} name:Ahmet`
+    specs.push({ raw, pipeline: n % 5 === 0 ? 'governance' : 'text' })
+  }
+  return specs.slice(0, 500).map((row) => {
     const rules = compileCustomPatterns(row.rules ?? [])
     const input = row.pipeline === 'governance' ? govInput(row.raw, row.rules ?? []) : textInput(row.raw, row.rules ?? [])
     return { raw: row.raw, rules, input }

@@ -81,6 +81,32 @@ class Budget {
   }
 }
 
+let alignCalls = 0
+
+export function alignCallCount(): number {
+  return alignCalls
+}
+
+export function resetAlignCalls(): void {
+  alignCalls = 0
+}
+
+export function alignRegions(
+  source: string,
+  output: string,
+  tokens: string[],
+  mode: 'plain' | 'trim',
+): { ok: true; spans: BeltSpan[] } | { ok: false; reason: string } {
+  const budget = new Budget(1_000_000_000)
+  try {
+    if (mode === 'plain') return alignOutput(source, output, tokens, budget)
+    return alignTrimmed(source, output, tokens, budget)
+  } catch (err) {
+    if (err instanceof BudgetExceeded) return { ok: false, reason: 'budget' }
+    return { ok: false, reason: 'exception' }
+  }
+}
+
 export function beltCover(input: BeltInput): BeltResult {
   try {
     return cover(input)
@@ -114,7 +140,8 @@ function cover(input: BeltInput): BeltResult {
   if (!stepped.ok) return stepped
   if (stepped.wholeField) return whole(stepped.wholeField)
 
-  const aligned = alignOutput(input.normalized, stepped.text, tokens, budget)
+  if (stepped.text === input.normalized) return { ok: true, spans: [], added: 0 }
+  const aligned = alignTrimmed(input.normalized, stepped.text, tokens, budget)
   if (!aligned.ok) return aligned
   return { ok: true, spans: aligned.spans, added: aligned.spans.length }
 }
@@ -301,12 +328,210 @@ interface LitMatch {
   endMax: number
 }
 
+interface TokenHit {
+  start: number
+  end: number
+  text: string
+}
+
+const LABEL_EDGE = 48
+
+function alignTrimmed(
+  source: string,
+  output: string,
+  tokens: string[],
+  budget: Budget,
+): { ok: true; spans: BeltSpan[] } | { ok: false; reason: string } {
+  const bounds = trimmedBounds(source, output, tokens, budget)
+  if (!bounds) return alignOutput(source, output, tokens, budget)
+  const aligned = alignOutput(
+    source.slice(bounds.srcLo, bounds.srcHi),
+    output.slice(bounds.outLo, bounds.outHi),
+    tokens,
+    budget,
+  )
+  if (!aligned.ok || bounds.srcLo === 0) return aligned
+  const spans: BeltSpan[] = []
+  for (let i = 0; i < aligned.spans.length; i++) {
+    const span = aligned.spans[i]
+    spans.push({ start: span.start + bounds.srcLo, end: span.end + bounds.srcLo })
+  }
+  return { ok: true, spans }
+}
+
+function trimmedBounds(
+  source: string,
+  output: string,
+  tokens: string[],
+  budget: Budget,
+): { srcLo: number; srcHi: number; outLo: number; outHi: number } | null {
+  if (source === output) return null
+  let outLo = 0
+  const head = Math.min(source.length, output.length)
+  while (outLo < head && source.charCodeAt(outLo) === output.charCodeAt(outLo)) {
+    budget.tick(1)
+    outLo++
+  }
+  let suffix = 0
+  while (
+    suffix < source.length - outLo &&
+    suffix < output.length - outLo &&
+    source.charCodeAt(source.length - 1 - suffix) === output.charCodeAt(output.length - 1 - suffix)
+  ) {
+    budget.tick(1)
+    suffix++
+  }
+  if (outLo === 0 && suffix === 0) return null
+  let outHi = output.length - suffix
+  snapTokenEdges(output, tokens, (lo, hi) => {
+    outLo = lo
+    outHi = hi
+  }, outLo, outHi)
+  coverDiscardedTokens(output, tokens, budget, (lo, hi) => {
+    outLo = lo
+    outHi = hi
+  }, outLo, outHi)
+  outLo = pullLabelEdge(output, outLo, tokens)
+  outHi = pushLabelEdge(output, outHi, tokens)
+  snapTokenEdges(output, tokens, (lo, hi) => {
+    outLo = lo
+    outHi = hi
+  }, outLo, outHi)
+  coverDiscardedTokens(output, tokens, budget, (lo, hi) => {
+    outLo = lo
+    outHi = hi
+  }, outLo, outHi)
+  if (outLo < 0) outLo = 0
+  if (outHi > output.length) outHi = output.length
+  const suffixLen = output.length - outHi
+  const srcLo = outLo
+  const srcHi = source.length - suffixLen
+  if (srcHi < srcLo || outHi < outLo || suffixLen < 0) return null
+  if (srcLo === 0 && suffixLen === 0) return null
+  return { srcLo, srcHi, outLo, outHi }
+}
+
+function snapTokenEdges(
+  output: string,
+  tokens: string[],
+  write: (lo: number, hi: number) => void,
+  outLo: number,
+  outHi: number,
+): void {
+  const loHit = tokenCovering(output, outLo, tokens)
+  if (loHit) outLo = loHit.start
+  const hiHit = tokenCovering(output, outHi, tokens)
+  if (hiHit) outHi = hiHit.end
+  write(outLo, outHi)
+}
+
+function coverDiscardedTokens(
+  output: string,
+  tokens: string[],
+  budget: Budget,
+  write: (lo: number, hi: number) => void,
+  outLo: number,
+  outHi: number,
+): void {
+  const before = scanTokens(output, 0, outLo, tokens, budget)
+  if (before.length > 0) outLo = before[0].start
+  const after = scanTokens(output, outHi, output.length, tokens, budget)
+  if (after.length > 0) outHi = after[after.length - 1].end
+  write(outLo, outHi)
+}
+
+function tokenCovering(output: string, index: number, tokens: string[]): { start: number; end: number } | null {
+  if (index <= 0 || index >= output.length) return null
+  let max = 1
+  for (let t = 0; t < tokens.length; t++) {
+    if (tokens[t].length > max) max = tokens[t].length
+  }
+  const from = Math.max(0, index - max + 1)
+  for (let s = from; s < index; s++) {
+    if (output.charCodeAt(s) !== 91) continue
+    const text = tokens.find((token) => token.length > 0 && output.startsWith(token, s))
+    if (!text) continue
+    const end = s + text.length
+    if (index < end) return { start: s, end }
+  }
+  return null
+}
+
+function scanTokens(
+  output: string,
+  from: number,
+  to: number,
+  tokens: string[],
+  budget: Budget,
+): TokenHit[] {
+  const found: TokenHit[] = []
+  const end = Math.min(to, output.length)
+  let i = Math.max(0, from)
+  while (i < end) {
+    budget.tick(1)
+    if (output.charCodeAt(i) !== 91) {
+      i++
+      continue
+    }
+    const text = tokens.find((token) => token.length > 0 && output.startsWith(token, i))
+    if (!text) {
+      i++
+      continue
+    }
+    found.push({ start: i, end: i + text.length, text })
+    i += text.length
+  }
+  return found
+}
+
+function pullLabelEdge(output: string, outLo: number, tokens: string[]): number {
+  const found = nextPiiToken(output, outLo, tokens)
+  if (!found) return outLo
+  const from = Math.max(0, found.start - LABEL_EDGE)
+  const at = markerIndex(output.slice(from, found.start), from)
+  // endMin sits on the canonical space before [MASKED_PII]. Leaving that
+  // space in the trimmed prefix drops it from the span.
+  if (at !== null && outLo > at) return at
+  return outLo
+}
+
+function pushLabelEdge(output: string, outHi: number, tokens: string[]): number {
+  const found = nextPiiToken(output, outHi, tokens)
+  if (!found || found.start === outHi) return outHi
+  const from = Math.max(0, found.start - LABEL_EDGE)
+  if (outHi <= from) return outHi
+  if (markerIndex(output.slice(from, found.start), from) === null) return outHi
+  if (outHi > from && outHi < found.start) return found.start
+  return outHi
+}
+
+function nextPiiToken(output: string, from: number, tokens: string[]): TokenHit | null {
+  const hits = scanTokens(output, from, Math.min(output.length, from + LABEL_EDGE), tokens, new Budget(1_000_000))
+  for (let i = 0; i < hits.length; i++) {
+    if (hits[i].text === '[MASKED_PII]') return hits[i]
+  }
+  return null
+}
+
+function markerIndex(tail: string, tailAt: number): number | null {
+  if (labelParts(tail)) {
+    const head = tail.slice(0, -2)
+    return tailAt + head.length - labelLength(head)
+  }
+  if (titleParts(tail)) {
+    const head = tail.slice(0, -1)
+    return tailAt + head.length - titleLength(head)
+  }
+  return null
+}
+
 function alignOutput(
   source: string,
   output: string,
   tokens: string[],
   budget: Budget,
 ): { ok: true; spans: BeltSpan[] } | { ok: false; reason: string } {
+  alignCalls++
   const pieces = parsePieces(output, tokens, budget)
   const literals = pieces.filter((piece): piece is Extract<Piece, { kind: 'lit' }> => piece.kind === 'lit')
   const earliestEnd = new Array<number>(literals.length).fill(0)

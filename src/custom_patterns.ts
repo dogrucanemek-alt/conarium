@@ -117,6 +117,7 @@ export function looksUnsafe(source: string): boolean {
   if (/\([^)]*[+*{][^)]*\)[+*{?]/.test(source)) return true
   if (/\([^)]*\|[^)]*\)[+*{]/.test(source)) return true
   if (/\([^)]*\)[+*]/.test(source)) return true
+  if (quantifiedGroupContainsQuantifier(source)) return true
 
   for (const m of source.matchAll(/\{(\d+)(?:,(\d+))?\}/g)) {
     const lo = Number(m[1])
@@ -127,6 +128,92 @@ export function looksUnsafe(source: string): boolean {
     if (hi - lo > CUSTOM_PATTERN_MAX_QUANTIFIER) return true
   }
   return false
+}
+
+/**
+ * A group that already holds a quantifier (`?`, `{…}`, `+`, `*`) and is
+ * itself quantified explodes on backtracking: `(?:a?){n}`. The `?` that
+ * opens `(?:`, `(?=`, `(?!`, `(?<name>`, `(?<=`, `(?<!` is group syntax.
+ */
+function quantifiedGroupContainsQuantifier(source: string): boolean {
+  const stack: boolean[] = []
+  let i = 0
+  while (i < source.length) {
+    const ch = source[i]
+    if (ch === '\\') {
+      i += 2
+      continue
+    }
+    if (ch === '[') {
+      i = skipCharClass(source, i)
+      continue
+    }
+    if (ch === '(') {
+      stack.push(false)
+      i = skipGroupHead(source, i + 1)
+      continue
+    }
+    if (ch === ')') {
+      const holds = stack.pop() ?? false
+      i++
+      const q = quantifierLength(source, i)
+      if (q > 0 && holds) return true
+      if (q > 0) i += q
+      if ((q > 0 || holds) && stack.length > 0) stack[stack.length - 1] = true
+      continue
+    }
+    const q = quantifierLength(source, i)
+    if (q > 0) {
+      if (stack.length > 0) stack[stack.length - 1] = true
+      i += q
+      continue
+    }
+    i++
+  }
+  return false
+}
+
+function skipCharClass(source: string, i: number): number {
+  i++
+  if (source[i] === '^') i++
+  if (source[i] === ']') i++
+  while (i < source.length && source[i] !== ']') {
+    if (source[i] === '\\') i += 2
+    else i++
+  }
+  return i < source.length ? i + 1 : i
+}
+
+function skipGroupHead(source: string, i: number): number {
+  if (source[i] !== '?') return i
+  const next = source[i + 1]
+  if (next === ':') return i + 2
+  if (next === '=' || next === '!') return i + 2
+  if (next === '<') {
+    const after = source[i + 2]
+    if (after === '=' || after === '!') return i + 3
+    let j = i + 2
+    while (j < source.length && source[j] !== '>') j++
+    return j < source.length ? j + 1 : j
+  }
+  return i + 1
+}
+
+function quantifierLength(source: string, i: number): number {
+  const ch = source[i]
+  if (ch === '?' || ch === '+' || ch === '*') return source[i + 1] === '?' ? 2 : 1
+  if (ch !== '{') return 0
+  let j = i + 1
+  if (!/\d/.test(source[j] ?? '')) return 0
+  while (/\d/.test(source[j] ?? '')) j++
+  if (source[j] === ',') {
+    j++
+    while (/\d/.test(source[j] ?? '')) j++
+  }
+  if (source[j] !== '}') return 0
+  j++
+  if (source[j] === '?') j++
+  return j - i
 }
 
 function matchGlob(pattern: string, value: string): boolean {
