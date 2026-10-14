@@ -134,7 +134,7 @@ with 169 four-letter aliases under `Script=`, `sc=`, `Script_Extensions=` and
   which JavaScript reports and the engine does not; it hides no text either way;
 - inside a case-insensitive modifier group and outside a class, seven letters
   beyond Latin-1, typed or escaped (Ÿ, ſ, Μ, μ, ẞ, the Kelvin sign `\u212A` and
-  the Ångström sign `\u212B`), match their Latin-1 case partners (ÿ; s and S;
+  the Angstrom sign `\u212B`), match their Latin-1 case partners (ÿ; s and S;
   µ; µ; ß; k and K; å and Å) in the engine on every text. On Node 24,
   JavaScript matches them only when the text also holds a character beyond
   Latin-1. The engine masks more there; it shows nothing JavaScript would hide.
