@@ -7,9 +7,12 @@
  *
  * User regex is ReDoS-risky. Compile keeps the 0.2.54 reject list (lookaround,
  * backreferences, `+` / `*`, open `{n,}`, source and quantifier caps, the two
- * old group rules). Accepted patterns run on re2js, which matches in linear time.
+ * old group rules). Accepted patterns are parsed once and emitted as re2js
+ * source, which matches in linear time.
  * A broken rule fails the config (silent drop = leak).
  */
+import { RegExpParser } from '@eslint-community/regexpp'
+import type { AST } from '@eslint-community/regexpp'
 import { RE2JS } from 're2js'
 import type { CustomPiiPattern } from './types.js'
 
@@ -79,16 +82,33 @@ export interface CompiledCustomPattern {
 const NAME_RE = /^[A-Za-z][A-Za-z0-9._-]{0,63}$/
 const LABEL_RE = /^\[[A-Za-z][A-Za-z0-9._-]{0,61}\]$/
 
-/** JS `u` whitespace, written so re2js sees the same code points. */
-const JS_SPACE =
-  '\\t\\n\\x{0b}\\f\\r \\x{00a0}\\x{1680}\\x{2000}-\\x{200a}\\x{2028}\\x{2029}\\x{202f}\\x{205f}\\x{3000}\\x{feff}'
+/** Inclusive code-point spans, sorted and disjoint once unioned. */
+type CodeSpan = readonly [number, number]
+
 /**
- * Complement of {@link JS_SPACE}, for `\S` inside a class.
- * re2js `\S` is only the complement of Perl space, so U+00A0 and the other
- * JS spaces would be masked or leaked if the escape were left as `\S`.
+ * JS `u` whitespace, one span list. `\s` and `\S` (inside and outside a class)
+ * are both written from this list.
  */
-const JS_NON_SPACE =
-  '\\x{0}-\\x{8}\\x{e}-\\x{1f}\\x{21}-\\x{9f}\\x{a1}-\\x{167f}\\x{1681}-\\x{1fff}\\x{200b}-\\x{2027}\\x{202a}-\\x{202e}\\x{2030}-\\x{205e}\\x{2060}-\\x{2fff}\\x{3001}-\\x{fefe}\\x{ff00}-\\x{10ffff}'
+const JS_SPACE_SPANS: readonly CodeSpan[] = [
+  [0x0009, 0x000d],
+  [0x0020, 0x0020],
+  [0x00a0, 0x00a0],
+  [0x1680, 0x1680],
+  [0x2000, 0x200a],
+  [0x2028, 0x2029],
+  [0x202f, 0x202f],
+  [0x205f, 0x205f],
+  [0x3000, 0x3000],
+  [0xfeff, 0xfeff],
+]
+const DIGIT_SPANS: readonly CodeSpan[] = [[0x30, 0x39]]
+/** ASCII `\w`: digits, `A–Z`, `_`, `a–z`. Case-insensitive `\w` is refused. */
+const WORD_SPANS: readonly CodeSpan[] = [
+  [0x30, 0x39],
+  [0x41, 0x5a],
+  [0x5f, 0x5f],
+  [0x61, 0x7a],
+]
 /** JS `u` dot: any code point except LF, CR, LS, PS. */
 const JS_DOT = '[^\\n\\r\\x{2028}\\x{2029}]'
 /** `[]` matches nothing. `[^]` matches every code point, line breaks included. */
@@ -182,217 +202,67 @@ export function looksUnsafe(source: string): boolean {
 }
 
 /**
- * re2js source for a pattern JS already accepted with the `u` flag.
- * `\u` escapes become `\x{…}`. `.` is rewritten to the JS set wherever that
- * group's own `s` flag is off (`-s` turns it off, including in nested groups;
- * inside `(?s:…)` the dot stays and matches every character). An inline group
- * that turns `m` on is refused: JS multiline also stops at CR, U+2028 and
- * U+2029, and re2js stops only at LF. `\s` / `\S` are rewritten where their
- * default re2js sets differ from JS `u`. `\p` / `\P` become the code-point
- * ranges JavaScript accepts for that body, cached per body. re2js never sees
- * `\p` and never uses its own Unicode tables.
- * A `\uHHHH\uLLLL` lead+trail pair (both four hex digits, nothing between
- * them) is one code point. Any other `\u` escape whose value is
- * U+D800–U+DFFF — `\u{…}`, a mixed pair, a split pair, a class member, or a
- * range end — is refused.
- * `[]`, `[^]` and in-class `\b` are rewritten to sets re2js parses the way
- * JavaScript does. An `i`-enabling group next to a word escape is refused;
- * `(?i:` inside a class is literal text, and `\b` inside a class is a
- * backspace. A variable quantifier is refused only when its body can match
- * empty and prefers that empty choice.
+ * re2js source for a pattern JavaScript already accepted with the `u` flag.
+ *
+ * One parse and one walk. The walk carries an `i` / `s` stack (both start
+ * off; the compile flags are `gu`) and, on every node, the empty-choice
+ * attributes and the re2js text. `s` only chooses which set `.` becomes.
+ * `s` and `m` are never written out. Refusals are thrown in order:
+ * case-insensitive word characters, an empty choice in a repeated group,
+ * a lone surrogate, the multiline flag, then `invalid`.
+ * A node that matches nothing is a single never-set and is never left under
+ * a quantifier. Characters are `\x{…}`. `\s` / `\S` / `\p` / `\P` become
+ * the ranges JavaScript uses; a property is cached by its raw brace text.
+ * An assertion (`^` `$` `\b` `\B`) is not an empty choice.
  */
 function toEngineSource(source: string, ruleName = ''): string {
-  rejectCaseInsensitiveWord(source, ruleName)
-  rejectEmptyPreferringRepeat(source, ruleName)
-  return rewriteUnicode(RE2JS.translateRegExp(foldSurrogatePairs(source, ruleName)), ruleName)
+  let pattern: AST.Pattern
+  try {
+    pattern = new RegExpParser({ ecmaVersion: 2025 }).parsePattern(source, 0, source.length, {
+      unicode: true,
+    })
+  } catch {
+    // The engine accepted it and the parser did not. Fail closed; the message
+    // stays the rule name.
+    throw new CustomPatternError(ruleName, 'invalid')
+  }
+  const ctx: WalkContext = {
+    ruleName,
+    refusals: {
+      caseIgnore: false,
+      word: false,
+      emptyChoice: false,
+      surrogate: false,
+      multiline: false,
+      invalid: false,
+    },
+  }
+  const walked = walkNode(pattern, { ignoreCase: false, dotAll: false }, ctx)
+  throwCollected(ruleName, ctx.refusals)
+  // `[]|` drops the nothing branch and leaves only an empty alternative.
+  return walked.text === '' ? '(?:)' : walked.text
 }
 
-/** `(?ims-ims:…)` at `open`, or null when this `(` is some other group. */
-function modifierGroup(
-  source: string,
-  open: number,
-): { end: number; enableS: boolean; disableS: boolean; enableM: boolean; enableI: boolean } | null {
-  if (source[open + 1] !== '?') return null
-  let j = open + 2
-  let phase: 'on' | 'off' = 'on'
-  let saw = false
-  let enableS = false
-  let disableS = false
-  let enableM = false
-  let enableI = false
-  while (j < source.length) {
-    const c = source[j]
-    if (c === ':') {
-      if (!saw) return null
-      return { end: j + 1, enableS, disableS, enableM, enableI }
-    }
-    if (c === '-') {
-      if (phase === 'off') return null
-      phase = 'off'
-      saw = true
-      j++
-      continue
-    }
-    if (c !== 'i' && c !== 'm' && c !== 's') return null
-    saw = true
-    if (c === 's') {
-      if (phase === 'on') enableS = true
-      else disableS = true
-    } else if (c === 'm' && phase === 'on') {
-      enableM = true
-    } else if (c === 'i' && phase === 'on') {
-      enableI = true
-    }
-    j++
-  }
-  return null
-}
 
 /**
- * Length of one escape starting at `i` (`\`). Brace forms consume through `}`.
- * An unknown tail is two characters, which is enough to keep `\\` from
- * swallowing the next escape.
- */
-function escapeLength(source: string, i: number): number {
-  if (source[i] !== '\\') return 1
-  const n = source[i + 1]
-  if (n === undefined) return 1
-  if ((n === 'u' || n === 'x' || n === 'p' || n === 'P') && source[i + 2] === '{') {
-    const end = source.indexOf('}', i + 3)
-    return end === -1 ? 2 : end - i + 1
-  }
-  if (n === 'u' && /^[0-9A-Fa-f]{4}/.test(source.slice(i + 2, i + 6))) return 6
-  if (n === 'x' && /^[0-9A-Fa-f]{2}/.test(source.slice(i + 2, i + 4))) return 4
-  if (n === 'c' && source[i + 2] !== undefined) return 3
-  return 2
-}
-
-/** `\uHHHH` of exactly four hex digits, not the `\u{…}` form. */
-function readBmpEscape(source: string, i: number): { value: number; end: number } | null {
-  if (escapeLength(source, i) !== 6) return null
-  if (source[i + 1] !== 'u' || source[i + 2] === '{') return null
-  return { value: Number.parseInt(source.slice(i + 2, i + 6), 16), end: i + 6 }
-}
-
-/** `\u{hex}` form. A surrogate value here is never half of a `\uHHHH\uLLLL` pair. */
-function readBraceEscape(source: string, i: number): { value: number; end: number } | null {
-  if (source[i] !== '\\' || source[i + 1] !== 'u' || source[i + 2] !== '{') return null
-  const end = source.indexOf('}', i + 3)
-  if (end === -1) return null
-  const hex = source.slice(i + 3, end)
-  if (!/^[0-9A-Fa-f]+$/.test(hex)) return null
-  const value = Number.parseInt(hex, 16)
-  if (!Number.isFinite(value)) return null
-  return { value, end: end + 1 }
-}
-
-function isSurrogateValue(value: number): boolean {
-  return value >= 0xd800 && value <= 0xdfff
-}
-
-/**
- * In the `u` flag, `\u` lead + `\u` trail glued together is one code point.
- * A surrogate escape that is not half of that four-digit pair is refused:
- * JavaScript never matches it against half of a real pair, and re2js would.
- */
-function foldSurrogatePairs(source: string, ruleName: string): string {
-  let out = ''
-  let i = 0
-  while (i < source.length) {
-    if (source[i] === '\\' && source[i + 1] === '\\') {
-      out += '\\\\'
-      i += 2
-      continue
-    }
-    const hi = readBmpEscape(source, i)
-    if (hi && hi.value >= 0xd800 && hi.value <= 0xdbff) {
-      const lo = readBmpEscape(source, hi.end)
-      if (lo && lo.value >= 0xdc00 && lo.value <= 0xdfff) {
-        const cp = (hi.value - 0xd800) * 0x400 + (lo.value - 0xdc00) + 0x10000
-        out += `\\x{${cp.toString(16)}}`
-        i = lo.end
-        continue
-      }
-      throw new CustomPatternError(ruleName, 'unsupported-surrogate')
-    }
-    if (hi && hi.value >= 0xdc00 && hi.value <= 0xdfff) {
-      throw new CustomPatternError(ruleName, 'unsupported-surrogate')
-    }
-    const brace = readBraceEscape(source, i)
-    if (brace && isSurrogateValue(brace.value)) {
-      throw new CustomPatternError(ruleName, 'unsupported-surrogate')
-    }
-    out += source[i]
-    i++
-  }
-  return out
-}
-
-/**
- * V8, once any group turns `i` on, treats `\w` / `\W` / `\b` / `\B` as
- * Unicode word characters everywhere in the pattern. re2js keeps them ASCII.
- * Inside a class, `(?i:` is three literal characters and `\b` is U+0008, so
- * neither opens an `i` group nor counts as a word boundary. `\w` / `\W` in a
- * class are still word classes. `\[` and an in-class `\]` are escapes.
- */
-function rejectCaseInsensitiveWord(source: string, ruleName: string): void {
-  let enableI = false
-  let word = false
-  let inClass = false
-  let atClassStart = false
-  let i = 0
-  while (i < source.length) {
-    const ch = source[i]
-    if (ch === '\\') {
-      const n = source[i + 1]
-      const boundaryInClass = inClass && (n === 'b' || n === 'B')
-      if ((n === 'w' || n === 'W' || n === 'b' || n === 'B') && !boundaryInClass) word = true
-      i += escapeLength(source, i)
-      atClassStart = false
-      continue
-    }
-    if (!inClass && ch === '[') {
-      if (source[i + 1] === ']') {
-        i += 2
-        continue
-      }
-      if (source[i + 1] === '^' && source[i + 2] === ']') {
-        i += 3
-        continue
-      }
-      inClass = true
-      atClassStart = true
-      i++
-      continue
-    }
-    if (inClass && atClassStart && ch === '^') {
-      i++
-      continue
-    }
-    if (inClass && ch === ']' && !atClassStart) {
-      inClass = false
-      i++
-      continue
-    }
-    if (!inClass && ch === '(') {
-      const mods = modifierGroup(source, i)
-      if (mods?.enableI) enableI = true
-    }
-    i++
-    atClassStart = false
-  }
-  if (enableI && word) throw new CustomPatternError(ruleName, 'unsupported-case-word')
-}
-
-/**
- * Whether a node is "empty-last": an empty match is not chosen while a
- * non-empty one is still available later. re2js takes that empty choice;
- * JavaScript backtracks into the repeated group. A quantifier whose upper
- * bound is above its lower bound is refused when its body can match empty
- * and is not empty-last. A concatenation that cannot match empty stays
- * empty-last even when it holds `\b`, `^` or `$`.
+ * Empty-last: an empty match is not chosen while a non-empty one is still
+ * available later. A variable quantifier is refused when its body can match
+ * empty and is not empty-last. An assertion is not a choice, so `^`, `$`,
+ * `\b` and `\B` do not clear empty-last on a concatenation. An empty
+ * alternative before a non-empty one still does.
  */
 type EmptyLast = { el: boolean; canEmpty: boolean; canNonEmpty: boolean }
+type Walked = { attr: EmptyLast; text: string }
+type FlagState = { ignoreCase: boolean; dotAll: boolean }
+type Refusals = {
+  caseIgnore: boolean
+  word: boolean
+  emptyChoice: boolean
+  surrogate: boolean
+  multiline: boolean
+  invalid: boolean
+}
+type WalkContext = { ruleName: string; refusals: Refusals }
 
 function charNode(): EmptyLast {
   return { el: true, canEmpty: false, canNonEmpty: true }
@@ -404,193 +274,298 @@ function nothingNode(): EmptyLast {
   return { el: true, canEmpty: false, canNonEmpty: false }
 }
 
-function rejectEmptyPreferringRepeat(source: string, ruleName: string): void {
-  let i = 0
+function isNothing(attr: EmptyLast): boolean {
+  return !attr.canEmpty && !attr.canNonEmpty
+}
 
-  const fail = (): never => {
-    throw new CustomPatternError(ruleName, 'invalid')
+function isSurrogateValue(value: number): boolean {
+  return value >= 0xd800 && value <= 0xdfff
+}
+
+function throwCollected(ruleName: string, refusals: Refusals): void {
+  if (refusals.caseIgnore && refusals.word) {
+    throw new CustomPatternError(ruleName, 'unsupported-case-word')
   }
+  if (refusals.emptyChoice) throw new CustomPatternError(ruleName, 'unsupported-empty-choice')
+  if (refusals.surrogate) throw new CustomPatternError(ruleName, 'unsupported-surrogate')
+  if (refusals.multiline) throw new CustomPatternError(ruleName, 'unsupported-flag')
+  if (refusals.invalid) throw new CustomPatternError(ruleName, 'invalid')
+}
 
-  const escapeNode = (at: number): EmptyLast => {
-    const n = source[at + 1]
-    if (n === 'b' || n === 'B') return emptyNode()
-    return charNode()
+function quantify(atom: EmptyLast, min: number, max: number, lazy: boolean, ctx: WalkContext): EmptyLast {
+  if (max > min && atom.canEmpty && !atom.el) ctx.refusals.emptyChoice = true
+  const nothing = !atom.canEmpty && !atom.canNonEmpty
+  const canEmpty = nothing ? min === 0 : min === 0 || atom.canEmpty
+  const canNonEmpty = !nothing && atom.canNonEmpty && max >= 1
+  const variable = max > min
+  let el: boolean
+  if (!canEmpty) el = true
+  else if (lazy && variable && atom.canNonEmpty) el = false
+  else el = atom.el
+  return { el, canEmpty, canNonEmpty }
+}
+
+/** Concatenation. A leading assertion does not clear `el`. */
+function concatNode(items: EmptyLast[]): EmptyLast {
+  if (items.length === 0) return emptyNode()
+  const blocked = items.some((p) => !p.canEmpty && !p.canNonEmpty)
+  const canEmpty = !blocked && items.every((p) => p.canEmpty)
+  const canNonEmpty = !blocked && items.some((p) => p.canNonEmpty)
+  return {
+    el: !canEmpty || items.every((p) => p.el),
+    canEmpty,
+    canNonEmpty,
   }
+}
 
-  const parseClass = (): EmptyLast => {
-    if (source[i + 1] === ']') {
-      i += 2
-      return nothingNode()
-    }
-    if (source[i + 1] === '^' && source[i + 2] === ']') {
-      i += 3
-      return charNode()
-    }
-    i++
-    if (source[i] === '^') i++
-    while (i < source.length) {
-      if (source[i] === '\\') {
-        i += escapeLength(source, i)
-        continue
-      }
-      if (source[i] === ']') {
-        i++
-        return charNode()
-      }
-      const cp = source.codePointAt(i) ?? 0
-      i += cp > 0xffff ? 2 : 1
-    }
-    return fail()
-  }
-
-  const parseGroup = (): EmptyLast => {
-    if (source.startsWith('(?:', i)) {
-      i += 3
-    } else if (source[i + 1] === '?') {
-      const mods = modifierGroup(source, i)
-      if (!mods) return fail()
-      i = mods.end
-    } else {
-      i++
-    }
-    const body = parseAlt()
-    if (source[i] !== ')') return fail()
-    i++
-    return body
-  }
-
-  const parseAtom = (): EmptyLast => {
-    const c = source[i]
-    if (c === undefined || c === ')' || c === '|') return fail()
-    if (c === '(') return parseGroup()
-    if (c === '[') return parseClass()
-    if (c === '\\') {
-      const node = escapeNode(i)
-      i += escapeLength(source, i)
-      return node
-    }
-    if (c === '^' || c === '$') {
-      i++
-      return emptyNode()
-    }
-    const cp = source.codePointAt(i) ?? 0
-    i += cp > 0xffff ? 2 : 1
-    return charNode()
-  }
-
-  const parseQuantifier = (): { min: number; max: number; lazy: boolean } | null => {
-    if (source[i] === '?') {
-      i++
-      const lazy = source[i] === '?'
-      if (lazy) i++
-      return { min: 0, max: 1, lazy }
-    }
-    if (source[i] !== '{') return null
-    const m = /^\{(\d+)(?:,(\d+))?\}/.exec(source.slice(i))
-    if (!m) return null
-    i += m[0].length
-    const lazy = source[i] === '?'
-    if (lazy) i++
-    const min = Number(m[1])
-    const max = m[2] === undefined ? min : Number(m[2])
-    return { min, max, lazy }
-  }
-
-  const quantify = (atom: EmptyLast, q: { min: number; max: number; lazy: boolean }): EmptyLast => {
-    if (q.max > q.min && atom.canEmpty && !atom.el) {
-      throw new CustomPatternError(ruleName, 'unsupported-empty-choice')
-    }
-    const nothing = !atom.canEmpty && !atom.canNonEmpty
-    const canEmpty = nothing ? q.min === 0 : q.min === 0 || atom.canEmpty
-    const canNonEmpty = !nothing && atom.canNonEmpty && q.max >= 1
-    const variable = q.max > q.min
-    let el: boolean
-    if (!canEmpty) el = true
-    else if (q.lazy && variable && atom.canNonEmpty) el = false
-    else el = atom.el
-    return { el, canEmpty, canNonEmpty }
-  }
-
-  const parseQuantified = (): EmptyLast => {
-    const atom = parseAtom()
-    const q = parseQuantifier()
-    return q ? quantify(atom, q) : atom
-  }
-
-  const concatNode = (items: EmptyLast[]): EmptyLast => {
-    if (items.length === 0) return emptyNode()
-    const parts = items.map((item) => ({ ...item }))
-    const blocked = parts.some((p) => !p.canEmpty && !p.canNonEmpty)
-    const canEmpty = !blocked && parts.every((p) => p.canEmpty)
-    const canNonEmpty = !blocked && parts.some((p) => p.canNonEmpty)
-    // Zero-width `\b` / `^` / `$` is an empty choice only when this
-    // concatenation can still match empty. Otherwise every path consumes a
-    // character, and the assertion is not a reason to refuse.
-    if (canEmpty) {
-      for (let p = 0; p < parts.length; p++) {
-        const onlyEmpty = parts[p].canEmpty && !parts[p].canNonEmpty
-        if (!onlyEmpty) continue
-        let later = false
-        for (let q = p + 1; q < parts.length; q++) {
-          if (parts[q].canNonEmpty) {
-            later = true
-            break
-          }
-        }
-        if (later) parts[p].el = false
+/** Alternation. An empty branch before a later non-empty one clears `el`. */
+function altNode(branches: EmptyLast[]): EmptyLast {
+  let emptyThenFull = false
+  for (let b = 0; b < branches.length && !emptyThenFull; b++) {
+    if (!branches[b].canEmpty) continue
+    for (let a = b + 1; a < branches.length; a++) {
+      if (branches[a].canNonEmpty) {
+        emptyThenFull = true
+        break
       }
     }
-    return {
-      el: !canEmpty || parts.every((p) => p.el),
-      canEmpty,
-      canNonEmpty,
-    }
   }
+  const canEmpty = branches.some((b) => b.canEmpty)
+  const canNonEmpty = branches.some((b) => b.canNonEmpty)
+  return {
+    el: !canEmpty || (branches.every((b) => b.el) && !emptyThenFull),
+    canEmpty,
+    canNonEmpty,
+  }
+}
 
-  const altNode = (branches: EmptyLast[]): EmptyLast => {
-    let emptyThenFull = false
-    for (let b = 0; b < branches.length && !emptyThenFull; b++) {
-      if (!branches[b].canEmpty) continue
-      for (let a = b + 1; a < branches.length; a++) {
-        if (branches[a].canNonEmpty) {
-          emptyThenFull = true
+function concatAll(parts: Walked[]): Walked {
+  const attr = concatNode(parts.map((p) => p.attr))
+  if (isNothing(attr)) return { attr, text: JS_NEVER }
+  return { attr, text: parts.map((p) => p.text).join('') }
+}
+
+function emitAlt(branches: Walked[]): Walked {
+  const attr = altNode(branches.map((b) => b.attr))
+  if (isNothing(attr)) return { attr, text: JS_NEVER }
+  const kept = branches.filter((b) => !isNothing(b.attr))
+  if (kept.length === 0) return { attr, text: JS_NEVER }
+  if (kept.length === 1) return { attr, text: kept[0].text }
+  return {
+    attr,
+    text: kept.map((b) => (b.text.length === 0 ? '(?:)' : b.text)).join('|'),
+  }
+}
+
+function unionSpans(parts: readonly (readonly CodeSpan[])[]): CodeSpan[] {
+  const flat: CodeSpan[] = []
+  for (const part of parts) {
+    for (const [lo, hi] of part) flat.push([lo, hi])
+  }
+  flat.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const out: CodeSpan[] = []
+  for (const span of flat) {
+    const last = out[out.length - 1]
+    if (!last || span[0] > last[1] + 1) out.push(span)
+    else if (span[1] > last[1]) out[out.length - 1] = [last[0], span[1]]
+  }
+  return out
+}
+
+function closed(ctx: WalkContext): Walked {
+  ctx.refusals.invalid = true
+  return { attr: nothingNode(), text: JS_NEVER }
+}
+
+function unexpectedNode(_node: never, ctx: WalkContext): Walked {
+  return closed(ctx)
+}
+
+function noteSurrogate(value: number, ctx: WalkContext): void {
+  if (isSurrogateValue(value)) ctx.refusals.surrogate = true
+}
+
+function propertySpans(raw: string, negate: boolean, ctx: WalkContext): readonly CodeSpan[] {
+  try {
+    const ranges = jsPropertyRanges(raw.slice(3, -1), ctx.ruleName)
+    return negate ? complementSpans(ranges) : ranges
+  } catch (err) {
+    if (err instanceof CustomPatternError) {
+      ctx.refusals.invalid = true
+      return []
+    }
+    throw err
+  }
+}
+
+function spansOfShorthand(kind: 'digit' | 'space' | 'word', negate: boolean): readonly CodeSpan[] {
+  const base = kind === 'digit' ? DIGIT_SPANS : kind === 'word' ? WORD_SPANS : JS_SPACE_SPANS
+  return negate ? complementSpans(base) : base
+}
+
+function emitShorthand(kind: 'digit' | 'space' | 'word', negate: boolean): string {
+  if (kind === 'digit') return negate ? '[^0-9]' : '[0-9]'
+  const body = formatSpans(kind === 'word' ? WORD_SPANS : JS_SPACE_SPANS)
+  return negate ? `[^${body}]` : `[${body}]`
+}
+
+function spansOfClassSet(node: AST.CharacterSet, ctx: WalkContext): readonly CodeSpan[] {
+  if (node.kind === 'any') {
+    ctx.refusals.invalid = true
+    return []
+  }
+  if (node.kind === 'property') {
+    if (node.strings) {
+      ctx.refusals.invalid = true
+      return []
+    }
+    return propertySpans(node.raw, node.negate, ctx)
+  }
+  if (node.kind === 'word') ctx.refusals.word = true
+  return spansOfShorthand(node.kind, node.negate)
+}
+
+function walkClass(node: AST.ClassRangesCharacterClass, ctx: WalkContext): Walked {
+  const parts: (readonly CodeSpan[])[] = []
+  for (const el of node.elements) {
+    switch (el.type) {
+      case 'Character':
+        noteSurrogate(el.value, ctx)
+        parts.push([[el.value, el.value]])
+        break
+      case 'CharacterClassRange':
+        noteSurrogate(el.min.value, ctx)
+        noteSurrogate(el.max.value, ctx)
+        if (el.min.value > el.max.value) {
+          ctx.refusals.invalid = true
           break
         }
+        parts.push([[el.min.value, el.max.value]])
+        break
+      case 'CharacterSet':
+        parts.push(spansOfClassSet(el, ctx))
+        break
+      default:
+        return unexpectedNode(el, ctx)
+    }
+  }
+  const spans = unionSpans(parts)
+  if (!node.negate) {
+    if (spans.length === 0) return { attr: nothingNode(), text: JS_NEVER }
+    return { attr: charNode(), text: `[${formatSpans(spans)}]` }
+  }
+  if (spans.length === 0) return { attr: charNode(), text: JS_ANY }
+  if (complementSpans(spans).length === 0) return { attr: nothingNode(), text: JS_NEVER }
+  return { attr: charNode(), text: `[^${formatSpans(spans)}]` }
+}
+
+function flagsAfterGroup(node: AST.Group, flags: FlagState, ctx: WalkContext): FlagState {
+  const mods = node.modifiers
+  if (!mods) return flags
+  let ignoreCase = flags.ignoreCase
+  let dotAll = flags.dotAll
+  if (mods.add.ignoreCase) {
+    ignoreCase = true
+    ctx.refusals.caseIgnore = true
+  }
+  if (mods.add.dotAll) dotAll = true
+  if (mods.add.multiline) ctx.refusals.multiline = true
+  if (mods.remove?.ignoreCase) ignoreCase = false
+  if (mods.remove?.dotAll) dotAll = false
+  return { ignoreCase, dotAll }
+}
+
+function wrapGroup(text: string, parent: FlagState, child: FlagState): string {
+  if (child.ignoreCase === parent.ignoreCase) return `(?:${text})`
+  const body = text.length === 0 ? '(?:)' : text
+  return child.ignoreCase ? `(?i:${body})` : `(?-i:${body})`
+}
+
+function walkAlts(alts: readonly AST.Alternative[], flags: FlagState, ctx: WalkContext): Walked {
+  return emitAlt(alts.map((alt) => walkNode(alt, flags, ctx)))
+}
+
+function walkNode(node: AST.Node, flags: FlagState, ctx: WalkContext): Walked {
+  switch (node.type) {
+    case 'Pattern':
+    case 'Group': {
+      if (node.type === 'Group') {
+        const inner = flagsAfterGroup(node, flags, ctx)
+        const body = walkAlts(node.alternatives, inner, ctx)
+        if (isNothing(body.attr)) return { attr: body.attr, text: JS_NEVER }
+        return { attr: body.attr, text: wrapGroup(body.text, flags, inner) }
       }
+      return walkAlts(node.alternatives, flags, ctx)
     }
-    const canEmpty = branches.some((b) => b.canEmpty)
-    const canNonEmpty = branches.some((b) => b.canNonEmpty)
-    return {
-      el: !canEmpty || (branches.every((b) => b.el) && !emptyThenFull),
-      canEmpty,
-      canNonEmpty,
+    case 'CapturingGroup': {
+      const body = walkAlts(node.alternatives, flags, ctx)
+      if (isNothing(body.attr)) return { attr: body.attr, text: JS_NEVER }
+      return { attr: body.attr, text: `(?:${body.text})` }
     }
-  }
-
-  const parseConcat = (): EmptyLast => {
-    const items: EmptyLast[] = []
-    while (i < source.length && source[i] !== '|' && source[i] !== ')') items.push(parseQuantified())
-    return concatNode(items)
-  }
-
-  const parseAlt = (): EmptyLast => {
-    const branches = [parseConcat()]
-    while (source[i] === '|') {
-      i++
-      branches.push(parseConcat())
+    case 'Alternative':
+      return concatAll(node.elements.map((el) => walkNode(el, flags, ctx)))
+    case 'Quantifier': {
+      if (!Number.isFinite(node.min) || !Number.isFinite(node.max) || node.max < node.min) {
+        ctx.refusals.invalid = true
+      }
+      const body = walkNode(node.element, flags, ctx)
+      const attr = quantify(body.attr, node.min, node.max, !node.greedy, ctx)
+      // An unsatisfiable body under `{0,n}` (n ≥ 2) makes re2js throw
+      // `unexpected InstFail`. Nothing is rewritten, never quantified.
+      if (isNothing(body.attr)) return { attr, text: node.min === 0 ? '(?:)' : JS_NEVER }
+      const suffix = node.min === 0 && node.max === 1 ? '?' : `{${node.min},${node.max}}`
+      return { attr, text: body.text + suffix + (node.greedy ? '' : '?') }
     }
-    return altNode(branches)
+    case 'Character':
+      noteSurrogate(node.value, ctx)
+      return { attr: charNode(), text: `\\x{${node.value.toString(16)}}` }
+    case 'CharacterSet': {
+      if (node.kind === 'any') {
+        return { attr: charNode(), text: flags.dotAll ? JS_ANY : JS_DOT }
+      }
+      if (node.kind === 'property') {
+        if (node.strings) return closed(ctx)
+        const spans = propertySpans(node.raw, node.negate, ctx)
+        if (spans.length === 0) return { attr: nothingNode(), text: JS_NEVER }
+        return { attr: charNode(), text: `[${formatSpans(spans)}]` }
+      }
+      if (node.kind === 'word') ctx.refusals.word = true
+      return { attr: charNode(), text: emitShorthand(node.kind, node.negate) }
+    }
+    case 'CharacterClass':
+      if (node.unicodeSets) return closed(ctx)
+      return walkClass(node, ctx)
+    case 'Assertion': {
+      if (node.kind === 'lookahead' || node.kind === 'lookbehind') return closed(ctx)
+      if (node.kind === 'word') {
+        ctx.refusals.word = true
+        return { attr: emptyNode(), text: node.negate ? '\\B' : '\\b' }
+      }
+      return { attr: emptyNode(), text: node.kind === 'start' ? '^' : '$' }
+    }
+    case 'Backreference':
+    case 'CharacterClassRange':
+    case 'ClassIntersection':
+    case 'ClassStringDisjunction':
+    case 'ClassSubtraction':
+    case 'ExpressionCharacterClass':
+    case 'Flags':
+    case 'ModifierFlags':
+    case 'Modifiers':
+    case 'RegExpLiteral':
+      return closed(ctx)
+    case 'StringAlternative':
+      for (const ch of node.elements) noteSurrogate(ch.value, ctx)
+      return closed(ctx)
+    default:
+      return unexpectedNode(node, ctx)
   }
-
-  parseAlt()
-  if (i !== source.length) fail()
 }
 
 const PROPERTY_BODY_RE = /^[A-Za-z0-9_=]+$/
 const UNICODE_LAST = 0x10ffff
 
-/** Inclusive code-point spans, sorted, disjoint. One entry per BODY, for the process. */
-type CodeSpan = readonly [number, number]
+/** One entry per raw property body, for the process. */
 const propertyRangeCache = new Map<string, readonly CodeSpan[]>()
 
 /**
@@ -641,143 +616,6 @@ function formatSpans(ranges: readonly CodeSpan[]): string {
     if (hi !== lo) out += `-\\x{${hi.toString(16)}}`
   }
   return out
-}
-
-/**
- * `\P` is the negative context: those spans are the complement. A surrounding
- * `[^…]` is left as written, so it complements whatever this returns.
- * An empty set matches nothing outside a class and adds nothing inside one.
- */
-function rewriteUnicodeProperty(
-  body: string,
-  negated: boolean,
-  inClass: boolean,
-  ruleName: string,
-): string {
-  const spans = negated
-    ? complementSpans(jsPropertyRanges(body, ruleName))
-    : jsPropertyRanges(body, ruleName)
-  if (spans.length === 0) return inClass ? '' : '[^\\x{0}-\\x{10ffff}]'
-  const text = formatSpans(spans)
-  return inClass ? text : `[${text}]`
-}
-
-function rewriteUnicode(source: string, ruleName: string): string {
-  let out = ''
-  let i = 0
-  let inClass = false
-  let atClassStart = false
-  // Top level is compiled with `gu`, so `s` starts off. Each `(` pushes the
-  // dotall state of that group; `-s` clears it and `(?s:)` sets it.
-  const dotAllStack: boolean[] = [false]
-  const dotAllNow = (): boolean => dotAllStack[dotAllStack.length - 1] ?? false
-  while (i < source.length) {
-    const ch = source[i]
-    if (ch === '\\') {
-      const next = source[i + 1]
-      if (next === 's' || next === 'S') {
-        out += whitespaceEscape(next, inClass)
-        i += 2
-        atClassStart = false
-        continue
-      }
-      if (next === 'p' || next === 'P') {
-        const end = source[i + 2] === '{' ? source.indexOf('}', i + 3) : -1
-        if (end === -1) throw new CustomPatternError(ruleName, 'invalid')
-        out += rewriteUnicodeProperty(source.slice(i + 3, end), next === 'P', inClass, ruleName)
-        i = end + 1
-        atClassStart = false
-        continue
-      }
-      // In a class `\b` is U+0008. re2js rejects that escape and keeps the word boundary.
-      if (inClass && next === 'b') {
-        out += '\\x{8}'
-        i += 2
-        atClassStart = false
-        continue
-      }
-      out += '\\'
-      if (next === undefined) {
-        i += 1
-        continue
-      }
-      out += next
-      i += 2
-      atClassStart = false
-      continue
-    }
-    if (!inClass && ch === '(') {
-      const mods = modifierGroup(source, i)
-      if (mods) {
-        if (mods.enableM) throw new CustomPatternError(ruleName, 'unsupported-flag')
-        let dotAll = dotAllNow()
-        if (mods.enableS) dotAll = true
-        if (mods.disableS) dotAll = false
-        dotAllStack.push(dotAll)
-        out += source.slice(i, mods.end)
-        i = mods.end
-        continue
-      }
-      dotAllStack.push(dotAllNow())
-      out += ch
-      i++
-      continue
-    }
-    if (!inClass && ch === ')') {
-      if (dotAllStack.length > 1) dotAllStack.pop()
-      out += ch
-      i++
-      continue
-    }
-    if (!inClass && ch === '[') {
-      // `[]` matches nothing and `[^]` matches every code point. re2js treats
-      // the `]` as a literal member of the class instead.
-      if (source[i + 1] === ']') {
-        out += JS_NEVER
-        i += 2
-        continue
-      }
-      if (source[i + 1] === '^' && source[i + 2] === ']') {
-        out += JS_ANY
-        i += 3
-        continue
-      }
-      inClass = true
-      atClassStart = true
-      out += ch
-      i++
-      continue
-    }
-    if (inClass && atClassStart && ch === '^') {
-      out += ch
-      i++
-      continue
-    }
-    if (inClass && ch === ']' && !atClassStart) {
-      inClass = false
-      out += ch
-      i++
-      continue
-    }
-    if (!inClass && ch === '.' && !dotAllNow()) {
-      out += JS_DOT
-      i++
-      continue
-    }
-    out += ch
-    i++
-    atClassStart = false
-  }
-  return out
-}
-
-function whitespaceEscape(kind: 's' | 'S', inClass: boolean): string {
-  if (inClass) {
-    if (kind === 's') return JS_SPACE
-    return JS_NON_SPACE
-  }
-  if (kind === 's') return `[${JS_SPACE}]`
-  return `[^${JS_SPACE}]`
 }
 
 /** Global search: after a zero-width hit, re2js steps one code point. */
