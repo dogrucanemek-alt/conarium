@@ -96,6 +96,41 @@ describe('G7 — a custom pattern that can backtrack without bound is refused wh
   }
 })
 
+describe('G8 — two more custom pattern shapes that backtrack without bound are refused', () => {
+  // Alternation inside a quantified group, and adjacent variable-width
+  // quantifiers over the same characters: both took most of a second on a
+  // few thousand characters and grow far faster than the text.
+  for (const pattern of ['((?:[A-Z]|[A-Z0-9])){14}Z', '(?:a|ab){20}c', '[0-9]{0,64}[0-9]{0,64}[0-9]{0,64}X', '[a-z]{1,40}[a-z]{1,40}!']) {
+    it(`refuses ${pattern}`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).toThrow()
+    })
+  }
+  for (const pattern of ['(?:INV|FAT)-[0-9]{6}', 'CUST-?[0-9]{5,8}', '[A-Z]{2}[0-9]{2,4}', '[0-9]{4}-[0-9]{4}']) {
+    it(`still accepts ${pattern}`, () => {
+      expect(() => compileCustomPatterns([{ name: 'r', pattern }])).not.toThrow()
+    })
+  }
+})
+
+describe('G9 — many labelled names in one field are each masked, not the field whole', () => {
+  it('Governance.maskPII: 200 names', () => {
+    const out = String(new Governance({}).maskPII('name: Ahmet, '.repeat(200)).masked)
+    expect(out).not.toContain('Ahmet')
+    expect(out.split('[MASKED_PII]').length - 1).toBe(200)
+  })
+})
+
+describe('G10 — a custom rule with many matches stays linear in the belt', () => {
+  it('Governance.maskPII: 400 000 characters, a one-letter rule', () => {
+    const g = new Governance({ scanCharCap: 1_048_576, customPatterns: [{ name: 'x', pattern: 'x', label: '[EX]' }] })
+    const s = 'a@b.co xx '.repeat(40_000)
+    const t = performance.now()
+    const out = String(g.maskPII(s).masked)
+    expect(performance.now() - t).toBeLessThan(3_000)
+    expect(out).not.toContain('a@b.co')
+  })
+})
+
 describe('G6 — a field at the largest scan cap is masked, not thrown on', () => {
   // About 140 000 masks in one field. The scan cap allows it; the engine has
   // to hand back a masked string for it, not a stack overflow.
