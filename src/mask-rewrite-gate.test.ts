@@ -81,6 +81,18 @@ describe('G3 — a Turkish mobile number in 3-3-2-2 groups', () => {
   }
 })
 
+describe('G5 — an IBAN-shaped run before a real IBAN does not uncover its tail', () => {
+  // "er 0532…2024 GB82 WES" passes the IBAN checksum by chance. Taken first
+  // and skipped past, it hides where the real IBAN starts, and the real IBAN's
+  // tail is left as it is.
+  for (const [name, mask] of PIPELINES) {
+    it(`${name}: a lookalike that runs into the IBAN`, () => {
+      const out = mask('Authorization: Bearer 05321234567 ve siparis 2024 GB82 WEST 1234 5698 7654 32')
+      expect(longestSurvivingRun('GB82WEST12345698765432', out.replace(/ /g, ''))).toBeLessThan(4)
+    })
+  }
+})
+
 describe('G4 — a masked region is counted once', () => {
   // A value both a label and a detector cover is one masked value.
   it('token: a@b.com is one region', () => {
