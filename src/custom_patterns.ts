@@ -26,6 +26,7 @@ export type CustomPatternReject =
   | 'bad-name'
   | 'bad-label'
   | 'unsupported-property'
+  | 'unsupported-flag'
 
 const REJECT_MESSAGE: Record<CustomPatternReject, (name: string) => string> = {
   invalid: (name) => `customPatterns: rule "${name}" is not a valid regular expression`,
@@ -37,6 +38,8 @@ const REJECT_MESSAGE: Record<CustomPatternReject, (name: string) => string> = {
   'bad-label': (name) => `customPatterns: rule "${name}" has an invalid mask label`,
   'unsupported-property': (name) =>
     `customPatterns: rule "${name}" was rejected (Script_Extensions)`,
+  'unsupported-flag': (name) =>
+    `customPatterns: rule "${name}" was rejected (multiline flag m)`,
 }
 
 export class CustomPatternError extends Error {
@@ -73,6 +76,13 @@ const LABEL_RE = /^\[[A-Za-z][A-Za-z0-9._-]{0,61}\]$/
 /** JS `u` whitespace, written so re2js sees the same code points. */
 const JS_SPACE =
   '\\t\\n\\x{0b}\\f\\r \\x{00a0}\\x{1680}\\x{2000}-\\x{200a}\\x{2028}\\x{2029}\\x{202f}\\x{205f}\\x{3000}\\x{feff}'
+/**
+ * Complement of {@link JS_SPACE}, for `\S` inside a class.
+ * re2js `\S` is only the complement of Perl space, so U+00A0 and the other
+ * JS spaces would be masked or leaked if the escape were left as `\S`.
+ */
+const JS_NON_SPACE =
+  '\\x{0}-\\x{8}\\x{e}-\\x{1f}\\x{21}-\\x{9f}\\x{a1}-\\x{167f}\\x{1681}-\\x{1fff}\\x{200b}-\\x{2027}\\x{202a}-\\x{202e}\\x{2030}-\\x{205e}\\x{2060}-\\x{2fff}\\x{3001}-\\x{fefe}\\x{ff00}-\\x{10ffff}'
 /** JS `u` dot: any code point except LF, CR, LS, PS. */
 const JS_DOT = '[^\\n\\r\\x{2028}\\x{2029}]'
 
@@ -164,13 +174,54 @@ export function looksUnsafe(source: string): boolean {
 
 /**
  * re2js source for a pattern JS already accepted with the `u` flag.
- * `\u` escapes become `\x{…}`. `.` and `\s` / `\S` are rewritten where their
+ * `\u` escapes become `\x{…}`. `.` is rewritten to the JS set wherever that
+ * group's own `s` flag is off (`-s` turns it off, including in nested groups;
+ * inside `(?s:…)` the dot stays and matches every character). An inline group
+ * that turns `m` on is refused: JS multiline also stops at CR, U+2028 and
+ * U+2029, and re2js stops only at LF. `\s` / `\S` are rewritten where their
  * default re2js sets differ from JS `u`. `\p` / `\P` names are folded to the
  * forms re2js compiles; `Script_Extensions` is refused by name.
  */
 function toEngineSource(source: string, ruleName = ''): string {
-  const translated = RE2JS.translateRegExp(source)
-  return rewriteUnicode(translated, !/\(\?[-a-zA-Z]*s/.test(translated), ruleName)
+  return rewriteUnicode(RE2JS.translateRegExp(source), ruleName)
+}
+
+/** `(?ims-ims:…)` at `open`, or null when this `(` is some other group. */
+function modifierGroup(
+  source: string,
+  open: number,
+): { end: number; enableS: boolean; disableS: boolean; enableM: boolean } | null {
+  if (source[open + 1] !== '?') return null
+  let j = open + 2
+  let phase: 'on' | 'off' = 'on'
+  let saw = false
+  let enableS = false
+  let disableS = false
+  let enableM = false
+  while (j < source.length) {
+    const c = source[j]
+    if (c === ':') {
+      if (!saw) return null
+      return { end: j + 1, enableS, disableS, enableM }
+    }
+    if (c === '-') {
+      if (phase === 'off') return null
+      phase = 'off'
+      saw = true
+      j++
+      continue
+    }
+    if (c !== 'i' && c !== 'm' && c !== 's') return null
+    saw = true
+    if (c === 's') {
+      if (phase === 'on') enableS = true
+      else disableS = true
+    } else if (c === 'm' && phase === 'on') {
+      enableM = true
+    }
+    j++
+  }
+  return null
 }
 
 /** JS property names ignore case, `_`, `-`, and spaces. */
@@ -335,11 +386,15 @@ function rewriteUnicodeProperty(
   return propertyAtom(body, negated)
 }
 
-function rewriteUnicode(source: string, rewriteDot: boolean, ruleName: string): string {
+function rewriteUnicode(source: string, ruleName: string): string {
   let out = ''
   let i = 0
   let inClass = false
   let atClassStart = false
+  // Top level is compiled with `gu`, so `s` starts off. Each `(` pushes the
+  // dotall state of that group; `-s` clears it and `(?s:)` sets it.
+  const dotAllStack: boolean[] = [false]
+  const dotAllNow = (): boolean => dotAllStack[dotAllStack.length - 1] ?? false
   while (i < source.length) {
     const ch = source[i]
     if (ch === '\\') {
@@ -369,6 +424,29 @@ function rewriteUnicode(source: string, rewriteDot: boolean, ruleName: string): 
       atClassStart = false
       continue
     }
+    if (!inClass && ch === '(') {
+      const mods = modifierGroup(source, i)
+      if (mods) {
+        if (mods.enableM) throw new CustomPatternError(ruleName, 'unsupported-flag')
+        let dotAll = dotAllNow()
+        if (mods.enableS) dotAll = true
+        if (mods.disableS) dotAll = false
+        dotAllStack.push(dotAll)
+        out += source.slice(i, mods.end)
+        i = mods.end
+        continue
+      }
+      dotAllStack.push(dotAllNow())
+      out += ch
+      i++
+      continue
+    }
+    if (!inClass && ch === ')') {
+      if (dotAllStack.length > 1) dotAllStack.pop()
+      out += ch
+      i++
+      continue
+    }
     if (!inClass && ch === '[') {
       inClass = true
       atClassStart = true
@@ -387,7 +465,7 @@ function rewriteUnicode(source: string, rewriteDot: boolean, ruleName: string): 
       i++
       continue
     }
-    if (!inClass && rewriteDot && ch === '.') {
+    if (!inClass && ch === '.' && !dotAllNow()) {
       out += JS_DOT
       i++
       continue
@@ -402,7 +480,7 @@ function rewriteUnicode(source: string, rewriteDot: boolean, ruleName: string): 
 function whitespaceEscape(kind: 's' | 'S', inClass: boolean): string {
   if (inClass) {
     if (kind === 's') return JS_SPACE
-    return '\\S'
+    return JS_NON_SPACE
   }
   if (kind === 's') return `[${JS_SPACE}]`
   return `[^${JS_SPACE}]`
