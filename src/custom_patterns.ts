@@ -149,13 +149,29 @@ export function columnMatches(globs: string[], column: string): boolean {
   })
 }
 
+function ownCount(bag: Record<string, number>, key: string): number {
+  if (!Object.prototype.hasOwnProperty.call(bag, key)) return 0
+  const n = bag[key]
+  return typeof n === 'number' ? n : 0
+}
+
+function addOwnCount(bag: Record<string, number>, key: string, n: number): void {
+  Object.defineProperty(bag, key, {
+    value: ownCount(bag, key) + n,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  })
+}
+
 export function mergeByClass(
   into: Record<string, number>,
   add?: Record<string, number>,
 ): Record<string, number> {
   if (!add) return into
-  for (const [k, n] of Object.entries(add)) {
-    if (n > 0) into[k] = (into[k] ?? 0) + n
+  for (const key of Object.keys(add)) {
+    const n = ownCount(add, key)
+    if (n > 0) addOwnCount(into, key, n)
   }
   return into
 }
@@ -185,12 +201,12 @@ export function applyCustomPatterns(
 
     if (hits === 0) continue
     if (hits > CUSTOM_PATTERN_MAX_MATCHES) {
-      byClass[rule.name] = (byClass[rule.name] ?? 0) + 1
+      addOwnCount(byClass, rule.name, 1)
       return { text: rule.label, count: count + 1, byClass }
     }
     out = next
     count += hits
-    byClass[rule.name] = (byClass[rule.name] ?? 0) + hits
+    addOwnCount(byClass, rule.name, hits)
   }
 
   return { text: out, count, byClass }
