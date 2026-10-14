@@ -249,3 +249,22 @@ describe('S2 — still masked: custom patterns that work on what was already mas
     expect(() => compileCustomPatterns([{ name: '__proto__', pattern: 'zq[0-9]{4}' }])).toThrow()
   })
 })
+
+describe('G10 — a title or label before a name keeps its text and its space', () => {
+  // The 0.2.54 steps write `Label: [MASKED_PII]`; the belt lines that output up
+  // with the field and must not carry the space, or the word before it, into
+  // the mask.
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ['Yetkili: Ayse Demir', 'Yetkili: [MASKED_PII]'],
+    ['Sayin Ayse Demir', 'Sayin [MASKED_PII]'],
+    ['Musteri: Ahmet, tel: 05321234567', 'Musteri: [MASKED_PII], tel: [MASKED_PII]'],
+    ['Dr. Ayse Demir geldi', 'Dr. [MASKED_PII] geldi'],
+  ]
+  for (const [name, mask] of PIPELINES) {
+    for (const [input, out] of cases) {
+      it(`${name}: ${JSON.stringify(input)}`, () => {
+        expect(mask(input)).toBe(out)
+      })
+    }
+  }
+})
