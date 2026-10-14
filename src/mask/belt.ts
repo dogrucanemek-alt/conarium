@@ -6,11 +6,11 @@ import {
   type LegacyMaskOpts,
 } from './legacy_0254/legacy_governance_mask.js'
 import {
-  applyCustomPatterns,
   columnMatches,
   CUSTOM_PATTERN_MAX_MATCHES,
+  matchCustomPatternSource,
   type CompiledCustomPattern,
-} from './legacy_0254/custom_patterns.js'
+} from '../custom_patterns.js'
 import { resolveScanCharCap } from './legacy_0254/digit_pii.js'
 import type { GovernancePolicy } from './legacy_0254/types.js'
 
@@ -198,42 +198,30 @@ function applyRules(
     if (rule.columns.length > 0) {
       if (!column || !columnMatches(rule.columns, column)) continue
     }
-    const matches = collectReplaceMatches(current, rule.re, budget)
+    const matches = collectReplaceMatches(current, rule, budget)
     if (matches.length === 0) continue
     if (matches.length > CUSTOM_PATTERN_MAX_MATCHES) {
-      const frozen = applyCustomPatterns(current, [rule], column)
-      if (frozen.text !== rule.label) return { ok: false, reason: 'exception' }
       return { ok: true, text: rule.label, wholeField: rule.label }
     }
     if (chainHit(current, matches, tokens, exact, budget)) {
       return { ok: false, reason: 'custom-chain' }
     }
-    const frozen = applyCustomPatterns(current, [rule], column)
     const tracked = applyTracked(current, matches, rule.label, exact)
-    if (tracked.text !== frozen.text) return { ok: false, reason: 'exception' }
     current = tracked.text
     exact = tracked.exact
   }
   return { ok: true, text: current }
 }
 
-function collectReplaceMatches(text: string, re: RegExp, budget: Budget): Match[] {
-  const compiled = new RegExp(re.source, re.flags)
-  const out: Match[] = []
-  text.replace(compiled, (...args: unknown[]) => {
-    const match = String(args[0])
-    budget.tick(1)
-    let index = -1
-    for (let i = args.length - 1; i >= 1; i--) {
-      if (args[i] !== text) continue
-      const prev = args[i - 1]
-      if (typeof prev === 'number') index = prev
-      break
-    }
-    if (index >= 0) out.push({ start: index, end: index + match.length })
-    return match
-  })
-  return out
+function collectReplaceMatches(text: string, rule: CompiledCustomPattern, budget: Budget): Match[] {
+  const found = ruleMatches(rule, text)
+  for (let i = 0; i < found.length; i++) budget.tick(1)
+  return found
+}
+
+function ruleMatches(rule: CompiledCustomPattern, text: string): Match[] {
+  if (typeof rule.matches === 'function') return rule.matches(text)
+  return matchCustomPatternSource(rule.re.source, text)
 }
 
 function chainHit(

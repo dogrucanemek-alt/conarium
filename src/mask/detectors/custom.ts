@@ -24,32 +24,6 @@ function addOwn(bag: Record<string, number>, key: string, n: number): void {
   })
 }
 
-function matchRanges(text: string, re: RegExp): Array<{ start: number; end: number }> | 'overflow' {
-  const out: Array<{ start: number; end: number }> = []
-  const prev = re.lastIndex
-  re.lastIndex = 0
-  try {
-    if (!re.global) {
-      const once = re.exec(text)
-      if (once) out.push({ start: once.index, end: once.index + once[0].length })
-      return out
-    }
-    let m: RegExpExecArray | null
-    while ((m = re.exec(text)) !== null) {
-      const start = m.index
-      out.push({ start, end: start + m[0].length })
-      if (out.length > CUSTOM_PATTERN_MAX_MATCHES) return 'overflow'
-      if (re.lastIndex === start) {
-        re.lastIndex = start + 1
-        if (re.lastIndex > text.length) break
-      }
-    }
-    return out
-  } finally {
-    re.lastIndex = prev
-  }
-}
-
 export function detectCustomPatterns(
   text: string,
   compiled: CompiledCustomPattern[] | undefined,
@@ -62,8 +36,8 @@ export function detectCustomPatterns(
     if (rule.columns.length > 0) {
       if (!column || !columnMatches(rule.columns, column)) continue
     }
-    const ranges = matchRanges(text, rule.re)
-    if (ranges === 'overflow') {
+    const ranges = rule.matches(text)
+    if (ranges.length > CUSTOM_PATTERN_MAX_MATCHES) {
       addOwn(byClass, rule.name, 1)
       return { spans, wholeField: { token: rule.label, reason: rule.name }, byClass }
     }
