@@ -23,27 +23,46 @@ function decodedIsPii(token: string, encoding: 'base64' | 'hex'): boolean {
 export function detectEmbeddedSpans(text: string): Span[] {
   if (text.length > 80 && /^\d+$/.test(text)) return []
   const out: Span[] = []
-  const b64 = new RegExp(B64_RE.source, B64_RE.flags)
-  for (const m of text.matchAll(b64)) {
-    if (m.index === undefined) continue
-    const token = m[1] ?? m[0]
-    if (!decodedIsPii(token, 'base64')) continue
-    const start = m.index + m[0].indexOf(token)
-    out.push({ start, end: start + token.length, cls: 'embedded', token: PII, source: 'embedded' })
+  const prevB64 = B64_RE.lastIndex
+  B64_RE.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = B64_RE.exec(text)) !== null) {
+      const token = m[1] ?? m[0]
+      if (decodedIsPii(token, 'base64')) {
+        const start = m.index + m[0].indexOf(token)
+        out.push({ start, end: start + token.length, cls: 'embedded', token: PII, source: 'embedded' })
+      }
+      if (B64_RE.lastIndex === m.index) {
+        B64_RE.lastIndex = m.index + 1
+        if (B64_RE.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    B64_RE.lastIndex = prevB64
   }
-  const hex = new RegExp(HEX_RE.source, HEX_RE.flags)
-  for (const m of text.matchAll(hex)) {
-    if (m.index === undefined) continue
-    const token = m[1] ?? m[0]
-    if (token.length % 2 !== 0) continue
-    if (!decodedIsPii(token, 'hex')) continue
-    out.push({
-      start: m.index,
-      end: m.index + m[0].length,
-      cls: 'embedded',
-      token: PII,
-      source: 'embedded',
-    })
+  const prevHex = HEX_RE.lastIndex
+  HEX_RE.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = HEX_RE.exec(text)) !== null) {
+      const token = m[1] ?? m[0]
+      if (token.length % 2 === 0 && decodedIsPii(token, 'hex')) {
+        out.push({
+          start: m.index,
+          end: m.index + m[0].length,
+          cls: 'embedded',
+          token: PII,
+          source: 'embedded',
+        })
+      }
+      if (HEX_RE.lastIndex === m.index) {
+        HEX_RE.lastIndex = m.index + 1
+        if (HEX_RE.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    HEX_RE.lastIndex = prevHex
   }
   return out
 }

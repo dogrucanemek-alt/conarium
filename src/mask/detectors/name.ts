@@ -15,18 +15,29 @@ const LABELLED_NAME_RE = new RegExp(
 )
 
 function pushNames(text: string, re: RegExp, out: Span[]): void {
-  const copy = new RegExp(re.source, re.flags)
-  for (const m of text.matchAll(copy)) {
-    const name = m[2]
-    if (m.index === undefined || !name) continue
-    const start = m.index + m[0].length - name.length
-    out.push({
-      start,
-      end: start + name.length,
-      cls: 'name',
-      token: PII,
-      source: 'name',
-    })
+  const prev = re.lastIndex
+  re.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      const name = m[2]
+      if (name) {
+        const start = m.index + m[0].length - name.length
+        out.push({
+          start,
+          end: start + name.length,
+          cls: 'name',
+          token: PII,
+          source: 'name',
+        })
+      }
+      if (re.lastIndex === m.index) {
+        re.lastIndex = m.index + 1
+        if (re.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    re.lastIndex = prev
   }
 }
 

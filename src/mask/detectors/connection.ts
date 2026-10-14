@@ -9,13 +9,23 @@ const CONNECTION_RE = /([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^:@\s/"']+:)[^@\s/"']+(@)/g
 export function detectConnectionSpans(text: string): Span[] {
   if (!text.includes('://')) return []
   const out: Span[] = []
-  const re = new RegExp(CONNECTION_RE.source, CONNECTION_RE.flags)
-  for (const m of text.matchAll(re)) {
-    if (m.index === undefined || !m[1]) continue
-    const start = m.index + m[1].length
-    const end = m.index + m[0].length - (m[2]?.length ?? 1)
-    if (end <= start) continue
-    out.push({ start, end, cls: 'connection', token: SECRET, source: 'connection' })
+  const prev = CONNECTION_RE.lastIndex
+  CONNECTION_RE.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = CONNECTION_RE.exec(text)) !== null) {
+      if (m[1]) {
+        const start = m.index + m[1].length
+        const end = m.index + m[0].length - (m[2]?.length ?? 1)
+        if (end > start) out.push({ start, end, cls: 'connection', token: SECRET, source: 'connection' })
+      }
+      if (CONNECTION_RE.lastIndex === m.index) {
+        CONNECTION_RE.lastIndex = m.index + 1
+        if (CONNECTION_RE.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    CONNECTION_RE.lastIndex = prev
   }
   return out
 }

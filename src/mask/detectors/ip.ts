@@ -15,16 +15,27 @@ function pushValid(
   ok: (s: string) => boolean,
   out: Span[],
 ): void {
-  const copy = new RegExp(re.source, re.flags)
-  for (const m of text.matchAll(copy)) {
-    if (m.index === undefined || !ok(m[0])) continue
-    out.push({
-      start: m.index,
-      end: m.index + m[0].length,
-      cls: 'ip',
-      token: PII,
-      source: 'ip',
-    })
+  const prev = re.lastIndex
+  re.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      if (ok(m[0])) {
+        out.push({
+          start: m.index,
+          end: m.index + m[0].length,
+          cls: 'ip',
+          token: PII,
+          source: 'ip',
+        })
+      }
+      if (re.lastIndex === m.index) {
+        re.lastIndex = m.index + 1
+        if (re.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    re.lastIndex = prev
   }
 }
 

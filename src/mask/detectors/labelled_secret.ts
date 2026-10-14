@@ -11,13 +11,23 @@ const HINT = /password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|author
 export function detectLabelledSecretSpans(text: string): Span[] {
   if (!HINT.test(text)) return []
   const out: Span[] = []
-  const re = new RegExp(LABELLED_RE.source, LABELLED_RE.flags)
-  for (const m of text.matchAll(re)) {
-    if (m.index === undefined || !m[1]) continue
-    const start = m.index + m[1].length
-    const end = m.index + m[0].length
-    if (end <= start) continue
-    out.push({ start, end, cls: 'labelled-secret', token: SECRET, source: 'labelled-secret' })
+  const prev = LABELLED_RE.lastIndex
+  LABELLED_RE.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = LABELLED_RE.exec(text)) !== null) {
+      if (m[1]) {
+        const start = m.index + m[1].length
+        const end = m.index + m[0].length
+        if (end > start) out.push({ start, end, cls: 'labelled-secret', token: SECRET, source: 'labelled-secret' })
+      }
+      if (LABELLED_RE.lastIndex === m.index) {
+        LABELLED_RE.lastIndex = m.index + 1
+        if (LABELLED_RE.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    LABELLED_RE.lastIndex = prev
   }
   return out
 }

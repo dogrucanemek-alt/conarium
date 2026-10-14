@@ -11,16 +11,25 @@ const SECRET_RE =
 export function detectSecretSpans(text: string): Span[] {
   if (!/[A-Za-z]/.test(text)) return []
   const out: Span[] = []
-  const re = new RegExp(SECRET_RE.source, SECRET_RE.flags)
-  for (const m of text.matchAll(re)) {
-    if (m.index === undefined) continue
-    out.push({
-      start: m.index,
-      end: m.index + m[0].length,
-      cls: 'secret',
-      token: SECRET,
-      source: 'secret',
-    })
+  const prev = SECRET_RE.lastIndex
+  SECRET_RE.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = SECRET_RE.exec(text)) !== null) {
+      out.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        cls: 'secret',
+        token: SECRET,
+        source: 'secret',
+      })
+      if (SECRET_RE.lastIndex === m.index) {
+        SECRET_RE.lastIndex = m.index + 1
+        if (SECRET_RE.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    SECRET_RE.lastIndex = prev
   }
   return out
 }

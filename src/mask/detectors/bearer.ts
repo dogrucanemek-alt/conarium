@@ -9,13 +9,23 @@ const BEARER_RE = /(Bearer\s+)[A-Za-z0-9._~+/=-]{6,}/gi
 export function detectBearerSpans(text: string): Span[] {
   if (!/bearer/i.test(text)) return []
   const out: Span[] = []
-  const re = new RegExp(BEARER_RE.source, BEARER_RE.flags)
-  for (const m of text.matchAll(re)) {
-    if (m.index === undefined || !m[1]) continue
-    const start = m.index + m[1].length
-    const end = m.index + m[0].length
-    if (end <= start) continue
-    out.push({ start, end, cls: 'bearer', token: SECRET, source: 'bearer' })
+  const prev = BEARER_RE.lastIndex
+  BEARER_RE.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = BEARER_RE.exec(text)) !== null) {
+      if (m[1]) {
+        const start = m.index + m[1].length
+        const end = m.index + m[0].length
+        if (end > start) out.push({ start, end, cls: 'bearer', token: SECRET, source: 'bearer' })
+      }
+      if (BEARER_RE.lastIndex === m.index) {
+        BEARER_RE.lastIndex = m.index + 1
+        if (BEARER_RE.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    BEARER_RE.lastIndex = prev
   }
   return out
 }

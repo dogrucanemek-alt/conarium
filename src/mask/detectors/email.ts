@@ -14,16 +14,25 @@ const ENTITY_EMAIL = new RegExp(
 const ENCODED_AT_HINT = /&#0*64;|&#x0*40;|&commat;|\\u0040|%40/i
 
 function pushMatches(text: string, re: RegExp, cls: Span['cls'], source: string, out: Span[]): void {
-  const copy = new RegExp(re.source, re.flags)
-  for (const m of text.matchAll(copy)) {
-    if (m.index === undefined) continue
-    out.push({
-      start: m.index,
-      end: m.index + m[0].length,
-      cls,
-      token: PII,
-      source,
-    })
+  const prev = re.lastIndex
+  re.lastIndex = 0
+  try {
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      out.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        cls,
+        token: PII,
+        source,
+      })
+      if (re.lastIndex === m.index) {
+        re.lastIndex = m.index + 1
+        if (re.lastIndex > text.length) break
+      }
+    }
+  } finally {
+    re.lastIndex = prev
   }
 }
 

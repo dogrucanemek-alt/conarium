@@ -1,5 +1,10 @@
 /**
  * Checksum-valid IBAN spans. An IBAN-shaped word that fails mod-97 is not a span.
+ *
+ * Every letter-pair anchor is a start: a word-initial pair, or the same pair
+ * glued inside a word. A hit is not consumed. The next search begins one
+ * character later, so a later valid IBAN that overlaps the first is still
+ * returned. apply merges overlaps. Each start reads at most 34 alphanumerics.
  */
 import { ibanMod97Ok, looksLikeIban, normalizeIban } from '../../iban.js'
 import type { Span } from '../core.js'
@@ -58,33 +63,31 @@ function longestValid(raw: string): string | null {
 export function detectIbanSpans(text: string): Span[] {
   if (!/[A-Za-z]{2}/.test(text) || !/\d{2}/.test(text)) return []
   const out: Span[] = []
-  const anchorRe = new RegExp(ANCHOR_SRC.source, ANCHOR_SRC.flags)
-  let cursor = 0
-  let anchor: RegExpExecArray | null
-  while ((anchor = anchorRe.exec(text)) !== null) {
-    if (anchor.index < cursor) {
-      anchorRe.lastIndex = cursor
-      continue
+  const prev = ANCHOR_SRC.lastIndex
+  ANCHOR_SRC.lastIndex = 0
+  try {
+    let anchor: RegExpExecArray | null
+    while ((anchor = ANCHOR_SRC.exec(text)) !== null) {
+      const at = anchor.index
+      const run = runFrom(text, at)
+      if (run.length >= 15) {
+        const valid = longestValid(run)
+        if (valid) {
+          out.push({
+            start: at,
+            end: at + valid.length,
+            cls: 'iban',
+            token: PII,
+            source: 'iban',
+          })
+        }
+      }
+      const next = at + 1
+      if (next > text.length) break
+      ANCHOR_SRC.lastIndex = next
     }
-    const run = runFrom(text, anchor.index)
-    if (run.length < 15) {
-      anchorRe.lastIndex = anchor.index + 1
-      continue
-    }
-    const valid = longestValid(run)
-    if (!valid) {
-      anchorRe.lastIndex = anchor.index + 1
-      continue
-    }
-    out.push({
-      start: anchor.index,
-      end: anchor.index + valid.length,
-      cls: 'iban',
-      token: PII,
-      source: 'iban',
-    })
-    cursor = anchor.index + valid.length
-    anchorRe.lastIndex = cursor
+  } finally {
+    ANCHOR_SRC.lastIndex = prev
   }
   return out
 }

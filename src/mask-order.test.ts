@@ -229,6 +229,7 @@ describe('M5 — the label step still sees what it saw before, and counts a secr
 
   it('a labelled secret is one masked value in the count', () => {
     expect(gov.maskPII('password: hunter2secret').count).toBe(1)
-    expect(gov.maskPII('pwd: 4111 1111 1111 1111').count).toBe(2)
+    // One label and the card covering the same value are one region.
+    expect(gov.maskPII('pwd: 4111 1111 1111 1111').count).toBe(1)
   })
 })

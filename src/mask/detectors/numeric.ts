@@ -108,17 +108,35 @@ function pushSpan(out: Span[], start: number, end: number, cls: SpanClass): void
 function findPhones(text: string): Span[] {
   const out: Span[] = []
   if (/[+()\s-]/.test(text) && /\d/.test(text)) {
-    const re = new RegExp(PHONE_FORMATTED.source, PHONE_FORMATTED.flags)
-    for (const m of text.matchAll(re)) {
-      if (m.index === undefined || /^\d+$/.test(m[0])) continue
-      pushSpan(out, m.index, m.index + m[0].length, 'phone')
+    const prev = PHONE_FORMATTED.lastIndex
+    PHONE_FORMATTED.lastIndex = 0
+    try {
+      let m: RegExpExecArray | null
+      while ((m = PHONE_FORMATTED.exec(text)) !== null) {
+        if (!/^\d+$/.test(m[0])) pushSpan(out, m.index, m.index + m[0].length, 'phone')
+        if (PHONE_FORMATTED.lastIndex === m.index) {
+          PHONE_FORMATTED.lastIndex = m.index + 1
+          if (PHONE_FORMATTED.lastIndex > text.length) break
+        }
+      }
+    } finally {
+      PHONE_FORMATTED.lastIndex = prev
     }
   }
   if (text.includes('+90')) {
-    const re = new RegExp(TR_MOBILE_322.source, TR_MOBILE_322.flags)
-    for (const m of text.matchAll(re)) {
-      if (m.index === undefined) continue
-      pushSpan(out, m.index, m.index + m[0].length, 'phone')
+    const prev = TR_MOBILE_322.lastIndex
+    TR_MOBILE_322.lastIndex = 0
+    try {
+      let m: RegExpExecArray | null
+      while ((m = TR_MOBILE_322.exec(text)) !== null) {
+        pushSpan(out, m.index, m.index + m[0].length, 'phone')
+        if (TR_MOBILE_322.lastIndex === m.index) {
+          TR_MOBILE_322.lastIndex = m.index + 1
+          if (TR_MOBILE_322.lastIndex > text.length) break
+        }
+      }
+    } finally {
+      TR_MOBILE_322.lastIndex = prev
     }
   }
   return out

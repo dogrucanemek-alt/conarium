@@ -25,20 +25,29 @@ function addOwn(bag: Record<string, number>, key: string, n: number): void {
 }
 
 function matchRanges(text: string, re: RegExp): Array<{ start: number; end: number }> | 'overflow' {
-  const flags = re.flags.includes('g') ? re.flags : `${re.flags}g`
-  const copy = new RegExp(re.source, flags)
   const out: Array<{ start: number; end: number }> = []
-  let m: RegExpExecArray | null
-  while ((m = copy.exec(text)) !== null) {
-    const start = m.index
-    out.push({ start, end: start + m[0].length })
-    if (out.length > CUSTOM_PATTERN_MAX_MATCHES) return 'overflow'
-    if (copy.lastIndex === start) {
-      copy.lastIndex = start + 1
-      if (copy.lastIndex > text.length) break
+  const prev = re.lastIndex
+  re.lastIndex = 0
+  try {
+    if (!re.global) {
+      const once = re.exec(text)
+      if (once) out.push({ start: once.index, end: once.index + once[0].length })
+      return out
     }
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      const start = m.index
+      out.push({ start, end: start + m[0].length })
+      if (out.length > CUSTOM_PATTERN_MAX_MATCHES) return 'overflow'
+      if (re.lastIndex === start) {
+        re.lastIndex = start + 1
+        if (re.lastIndex > text.length) break
+      }
+    }
+    return out
+  } finally {
+    re.lastIndex = prev
   }
-  return out
 }
 
 export function detectCustomPatterns(
