@@ -117,6 +117,7 @@
     "bench:overhead": "node scripts/benchmark-overhead.mjs"
   },
   "dependencies": {
+    "@eslint-community/regexpp": "4.12.2",
     "@guanmingchiu/sqlparser-ts": "^0.62.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "express": "^5.2.1",
