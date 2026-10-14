@@ -69,23 +69,31 @@ function legacySpan(start: number, end: number): Span {
 /** Belt ranges carry no token. Only the part a core span does not already cover enters as PII. */
 function beltOnlySpans(core: readonly Span[], belt: readonly { start: number; end: number }[]): Span[] {
   const raw: { start: number; end: number }[] = []
-  for (const sp of core) {
+  for (let i = 0; i < core.length; i++) {
+    const sp = core[i]
     if (sp.end > sp.start) raw.push({ start: sp.start, end: sp.end })
   }
   raw.sort((a, b) => a.start - b.start || a.end - b.end)
   const merged: { start: number; end: number }[] = []
-  for (const iv of raw) {
+  for (let i = 0; i < raw.length; i++) {
+    const iv = raw[i]
     const cur = merged[merged.length - 1]
     if (!cur || iv.start > cur.end) merged.push({ start: iv.start, end: iv.end })
     else if (iv.end > cur.end) cur.end = iv.end
   }
 
+  const ordered = beltByStart(belt)
   const out: Span[] = []
-  for (const sp of belt) {
+  // `head` only moves forward. Belt ranges are in start order, so an interval
+  // that ended before this range cannot meet a later one.
+  let head = 0
+  for (let b = 0; b < ordered.length; b++) {
+    const sp = ordered[b]
     if (sp.end <= sp.start) continue
+    while (head < merged.length && merged[head].end <= sp.start) head++
     let cursor = sp.start
-    for (const iv of merged) {
-      if (iv.end <= cursor) continue
+    for (let k = head; k < merged.length; k++) {
+      const iv = merged[k]
       if (iv.start >= sp.end) break
       if (iv.start > cursor) out.push(legacySpan(cursor, Math.min(iv.start, sp.end)))
       if (iv.end > cursor) cursor = iv.end
@@ -94,6 +102,19 @@ function beltOnlySpans(core: readonly Span[], belt: readonly { start: number; en
     if (cursor < sp.end) out.push(legacySpan(cursor, sp.end))
   }
   return out
+}
+
+function beltByStart(
+  belt: readonly { start: number; end: number }[],
+): readonly { start: number; end: number }[] {
+  for (let i = 1; i < belt.length; i++) {
+    if (belt[i].start < belt[i - 1].start) {
+      const copy = belt.slice()
+      copy.sort((a, b) => a.start - b.start)
+      return copy
+    }
+  }
+  return belt
 }
 
 function ownByClass(src: Record<string, number> | undefined): Record<string, number> {
@@ -122,33 +143,37 @@ export function maskField(text: string, opts: MaskFieldOptions): {
   if (text.length > resolveScanCharCap(opts.scanCharCap)) {
     return { text: PII, count: 1, byClass: Object.create(null) }
   }
-  const normalized = normalizePiiText(text)
-  const rules = opts.customPatterns ?? []
-  const detected = detect(normalized, {
-    detectors: opts.detectors,
-    customPatterns: rules,
-    column: opts.column,
-    maskLabelledNames: opts.maskLabelledNames,
-  })
-  const belt = beltCover({
-    raw: text,
-    normalized,
-    pipeline: opts.pipeline,
-    policy: {
+  try {
+    const normalized = normalizePiiText(text)
+    const rules = opts.customPatterns ?? []
+    const detected = detect(normalized, {
       detectors: opts.detectors,
-      scanCharCap: opts.scanCharCap,
+      customPatterns: rules,
+      column: opts.column,
       maskLabelledNames: opts.maskLabelledNames,
-    },
-    customPatterns: rules,
-    column: opts.column,
-    scanCharCap: opts.scanCharCap,
-  })
-  const byClass = ownByClass(detected.byClass)
-  if (!belt.ok) return { text: PII, count: 1, byClass }
-  const whole = preferToken(detected.wholeField?.token, belt.wholeField, rules)
-  if (whole) return { text: whole, count: 1, byClass }
-  const applied = apply(normalized, detected.spans.concat(beltOnlySpans(detected.spans, belt.spans)))
-  return { text: applied.text, count: applied.regions, byClass }
+    })
+    const belt = beltCover({
+      raw: text,
+      normalized,
+      pipeline: opts.pipeline,
+      policy: {
+        detectors: opts.detectors,
+        scanCharCap: opts.scanCharCap,
+        maskLabelledNames: opts.maskLabelledNames,
+      },
+      customPatterns: rules,
+      column: opts.column,
+      scanCharCap: opts.scanCharCap,
+    })
+    const byClass = ownByClass(detected.byClass)
+    if (!belt.ok) return { text: PII, count: 1, byClass }
+    const whole = preferToken(detected.wholeField?.token, belt.wholeField, rules)
+    if (whole) return { text: whole, count: 1, byClass }
+    const applied = apply(normalized, detected.spans.concat(beltOnlySpans(detected.spans, belt.spans)))
+    return { text: applied.text, count: applied.regions, byClass }
+  } catch {
+    return { text: PII, count: 1, byClass: Object.create(null) }
+  }
 }
 
 // The core detects on its own. The belt keeps every span 0.2.54 masked.

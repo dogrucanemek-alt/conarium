@@ -144,8 +144,12 @@ function runLegacy(input: BeltInput, policy: GovernancePolicy, capArg: number | 
 }
 
 function tokenVocab(rules: CompiledCustomPattern[]): string[] {
-  const labels = rules.map((rule) => rule.label)
-  return [...new Set([...BUILTIN_TOKENS, ...labels])].sort((a, b) => b.length - a.length)
+  const seen = new Set<string>(BUILTIN_TOKENS)
+  for (let i = 0; i < rules.length; i++) seen.add(rules[i].label)
+  const out: string[] = []
+  for (const token of seen) out.push(token)
+  out.sort((a, b) => b.length - a.length)
+  return out
 }
 
 interface Match {
@@ -275,7 +279,7 @@ function applyTracked(
     if (matches.some((match) => range[0] < match.end && match.start < range[1])) continue
     mapped.push([mapPos(range[0], matches, label), mapPos(range[1], matches, label)])
   }
-  return { text: out, exact: [...inserted, ...mapped] }
+  return { text: out, exact: inserted.concat(mapped) }
 }
 
 function mapPos(pos: number, matches: Match[], label: string): number {

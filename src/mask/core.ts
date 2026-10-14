@@ -78,22 +78,26 @@ function preferWhole(a: WholeField | undefined, b: WholeField | undefined): Whol
   return tokenTier(b.token) < tokenTier(a.token) ? b : a
 }
 
+function appendSpans(into: Span[], extra: readonly Span[]): void {
+  for (let i = 0; i < extra.length; i++) into.push(extra[i])
+}
+
 export function detect(normalized: string, opts: CoreOptions = {}): DetectResult {
   const spans: Span[] = []
-  spans.push(...detectEmailSpans(normalized))
-  spans.push(...detectNumericSpans(normalized))
-  spans.push(...detectIbanSpans(normalized))
-  if (opts.detectors?.mrz !== false) spans.push(...detectMrzSpans(normalized))
-  if (opts.detectors?.ip === true) spans.push(...detectIpSpans(normalized))
-  spans.push(...detectSecretSpans(normalized))
-  spans.push(...detectConnectionSpans(normalized))
-  spans.push(...detectBearerSpans(normalized))
-  spans.push(...detectLabelledSecretSpans(normalized))
-  if (opts.maskLabelledNames !== false) spans.push(...detectNameSpans(normalized))
-  spans.push(...detectEmbeddedSpans(normalized))
+  appendSpans(spans, detectEmailSpans(normalized))
+  appendSpans(spans, detectNumericSpans(normalized))
+  appendSpans(spans, detectIbanSpans(normalized))
+  if (opts.detectors?.mrz !== false) appendSpans(spans, detectMrzSpans(normalized))
+  if (opts.detectors?.ip === true) appendSpans(spans, detectIpSpans(normalized))
+  appendSpans(spans, detectSecretSpans(normalized))
+  appendSpans(spans, detectConnectionSpans(normalized))
+  appendSpans(spans, detectBearerSpans(normalized))
+  appendSpans(spans, detectLabelledSecretSpans(normalized))
+  if (opts.maskLabelledNames !== false) appendSpans(spans, detectNameSpans(normalized))
+  appendSpans(spans, detectEmbeddedSpans(normalized))
 
   const custom = detectCustomPatterns(normalized, opts.customPatterns, opts.column)
-  spans.push(...custom.spans)
+  appendSpans(spans, custom.spans)
   const wholeField = preferWhole(detectWholeFieldBase64(normalized), custom.wholeField)
   return { spans, wholeField, byClass: custom.byClass }
 }
