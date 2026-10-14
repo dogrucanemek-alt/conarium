@@ -13,7 +13,7 @@ on the roadmap.
 ## Not 1.0
 <!-- s: not-1.0 -->
 
-Version is 0.2.x. The API can break.
+Version is 0.3.x. The API can break.
 
 ## Node 20 is the floor, and Node 20 is past end-of-life
 <!-- s: node-20-floor -->
@@ -54,6 +54,46 @@ limitation, not an oversight.
 Structured columns: deterministic (`maskColumns`).
 Free text: best effort (carry-over of values this policy already masks; labelled names).
 A bare name in running prose is not detected.
+
+## A labelled secret is masked to its first delimiter
+<!-- s: labelled-secret-first-delimiter -->
+
+After a label such as `password:` or `pwd:` the value is masked up to the first
+space, comma, semicolon, quote or brace. The rest is masked only if another
+detector recognises it. `pwd: 4111 1111 1111 1112` leaves `1111 1111 1112`
+readable, because that card number fails its checksum. 0.2.54 did the same.
+
+## A number joined to its neighbours is found only when it proves itself
+<!-- s: joined-number-windows -->
+
+When a number is joined to the words or numbers around it by single separators,
+a part of it is masked only when that part passes a checksum (card, Turkish ID
+number) or is a Turkish mobile number. A joined landline (`siparis 2024
+02321234567`), an eleven-digit number that fails the ID checksum, and a number
+with no separator before it (`siparis 202410000000146`) stay readable. A long
+run of groups can be masked although it is not one number, when some of its
+groups happen to pass a checksum.
+
+## Each field also runs the 0.2.54 masking steps
+<!-- s: legacy-belt -->
+
+Every field is also masked by a frozen copy of the 0.2.54 steps, and every span
+that copy masked is masked again. That costs time: on the comparison inputs,
+masking took up to about four times as long as 0.2.54 (a one-megabyte field of
+dense e-mail addresses, about 170 ms), and up to about three times on the
+others. Where the copy's output cannot be lined up with the text, the whole
+field is masked. Some text next to a masked value can then be hidden although it
+is not personal: a title without a dot (`Bay`, `Bayan`) next to a masked number,
+or a custom rule's label written literally in the source text.
+
+## Some custom patterns are refused
+<!-- s: custom-pattern-shapes -->
+
+A custom pattern is refused when the policy loads if it can backtrack without
+bound: a quantified group that holds a quantifier or an alternation
+(`(?:a?){30}z`, `((?:[A-Z]|[A-Z0-9])){14}Z`), or two adjacent variable-width
+quantifiers over overlapping characters (`[0-9]{0,64}[0-9]{0,64}X`). 0.2.54
+accepted these, and one of them could hold a field's masking for minutes.
 
 ## One production install
 <!-- s: one-prod-install -->

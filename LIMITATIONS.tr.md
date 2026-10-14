@@ -12,7 +12,7 @@ güvence. Bağımsız sızma testi de henüz yok — o yol haritasında.
 ## 1.0 değil
 <!-- s: not-1.0 -->
 
-Sürüm 0.2.x. API kırılabilir.
+Sürüm 0.3.x. API kırılabilir.
 
 ## Taban Node 20, ve Node 20 artık yama almıyor
 <!-- s: node-20-floor -->
@@ -51,6 +51,47 @@ sipariş numarası ve benzeri kimliklerle çakışır. Ölçülmüş sınır, un
 Yapılandırılmış kolonlar: deterministik (`maskColumns`).
 Serbest metin: en iyi çaba (bu politikanın zaten maskelediği değerlerin taşınması; etiketli isimler).
 Düz cümledeki çıplak isim yakalanmaz.
+
+## Etiketli bir sır ilk ayırıcıya kadar maskelenir
+<!-- s: labelled-secret-first-delimiter -->
+
+`password:` ya da `pwd:` gibi bir etiketten sonra değer ilk boşluğa, virgüle,
+noktalı virgüle, tırnağa ya da süslü paranteze kadar maskelenir. Kalanı ancak
+başka bir dedektör tanırsa maskelenir. `pwd: 4111 1111 1111 1112` girdisinde
+`1111 1111 1112` okunur kalır, çünkü o kart numarası sağlamadan geçmez. 0.2.54
+de aynısını yapıyordu.
+
+## Komşularına bitişik bir numara ancak kendini kanıtlarsa bulunur
+<!-- s: joined-number-windows -->
+
+Bir numara çevresindeki kelimelere ya da numaralara tek ayırıcıyla bitişikse,
+içindeki bir parça ancak sağlamadan geçerse (kart, T.C. kimlik numarası) ya da
+Türk cep telefonu numarasıysa maskelenir. Bitişik bir sabit hat (`siparis 2024
+02321234567`), kimlik sağlamasından geçmeyen on bir haneli bir numara ve önünde
+ayırıcı olmayan bir numara (`siparis 202410000000146`) okunur kalır. Bazı
+grupları tesadüfen sağlamadan geçen uzun bir grup dizisi, tek bir numara olmadığı
+hâlde maskelenebilir.
+
+## Her alan 0.2.54'ün maskeleme adımlarından da geçer
+<!-- s: legacy-belt -->
+
+Her alan 0.2.54 adımlarının dondurulmuş bir kopyasından da geçirilir ve o
+kopyanın maskelediği her aralık yeniden maskelenir. Bunun bir süre bedeli var:
+karşılaştırma girdilerinde maskeleme 0.2.54'ün en çok yaklaşık dört katı sürdü
+(yoğun e-posta adresleriyle dolu bir megabaytlık alan, yaklaşık 170 ms), diğerlerinde
+en çok yaklaşık üç katı. Kopyanın çıktısı metinle hizalanamazsa alanın tamamı
+maskelenir. O zaman maskeli bir değerin yanındaki, kişisel olmayan bir metin de
+gizlenebilir: maskeli bir numaranın yanındaki noktasız bir unvan (`Bay`, `Bayan`)
+ya da kaynak metinde aynen geçen bir özel kural etiketi.
+
+## Bazı özel desenler reddedilir
+<!-- s: custom-pattern-shapes -->
+
+Sınırsız geri izleme yapabilen bir özel desen, politika yüklenirken reddedilir:
+içinde niceleyici ya da alternasyon bulunan nicelenmiş bir grup (`(?:a?){30}z`,
+`((?:[A-Z]|[A-Z0-9])){14}Z`) ya da örtüşen karakterler üzerinde yan yana iki
+değişken genişlikli niceleyici (`[0-9]{0,64}[0-9]{0,64}X`). 0.2.54 bunları kabul
+ediyordu ve biri bir alanın maskelenmesini dakikalarca kilitleyebiliyordu.
 
 ## Tek üretim kurulumu
 <!-- s: one-prod-install -->

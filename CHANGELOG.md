@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.3.0 - masking rewritten: each detector reads the original text, and the 0.2.54 steps run alongside
+
+The masking that runs over audit arguments and error text (`maskSensitiveText`)
+and over what the model reads (`Governance.maskPII`) was two copies of one
+sequence of steps, each step reading the output of the step before it. A step
+could hide a value from the next one. Both paths now run one core: every
+detector reads the same normalised text, the spans they find are merged, and
+the text is replaced once.
+
+Values 0.2.54 left readable and 0.3.0 masks:
+
+- a Bearer token, or a value behind `api_key=` or `password:`, that is shaped
+  like an IBAN (two letters, two digits, then letters and digits);
+- a word shaped like an IBAN hiding the words after it
+  (`ref AB12cdef 05321234567`);
+- a passport MRZ whose document number starts with two letters and two digits,
+  or whose personal-number field holds a digit run of its own;
+- a number joined to the word before it by one separator
+  (`siparis 2024 10000000146`, `oda 5 4111 1111 1111 1111`), when the joined
+  part passes its checksum or is a Turkish mobile number;
+- a Turkish mobile number written `+90 532 123 45 67`;
+- the tail of an IBAN after an IBAN-shaped run that passed the checksum by
+  chance and ran into it.
+
+Each field is also run through a frozen copy of the 0.2.54 steps, and every
+span that copy masked is masked again. When that copy's output cannot be lined
+up with the text, the field is masked whole. A position-by-position comparison
+with 0.2.54 over 8 000 generated cases found no character that 0.2.54 masked and
+0.3.0 shows.
+
+Changes an operator can see:
+
+- `maskedCount` counts masked regions. A value that a label and a detector both
+  cover is one region: `token: a@b.com` was 2 and is 1.
+- `byClass` counts the custom rules the core matched on the original text. A
+  rule that matched only text 0.2.54 had already masked is no longer counted.
+- The audit path now also masks `sk_test_` keys, names after a title or a field
+  label, and a field that is entirely base64 of a personal value. The model path
+  already did.
+- A custom pattern that can backtrack without bound is refused when the policy
+  loads (see LIMITATIONS, "Some custom patterns are refused"). 0.2.54 accepted
+  these, and one could hold a field's masking for minutes.
+- If masking throws, the field is masked whole and counted once.
+- The connection-string step no longer takes quadratic time on a long run of
+  scheme characters before `://`; it is one linear pass with the same matches.
+
+Time: each field also runs the 0.2.54 copy. On the comparison inputs masking
+took up to about four times as long as 0.2.54 (a one-megabyte field of dense
+e-mail addresses, about 170 ms) and up to about three times on the others.
+
 ## 0.2.54 - two operator scripts leave the tarball
 
 Nothing in the tool's behaviour changed. `scripts/conarium_sabah_brief.mjs` and
