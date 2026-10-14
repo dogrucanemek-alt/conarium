@@ -171,7 +171,7 @@ describe('S1 — still masked: what the steps in sequence protected', () => {
     })
   }
   it('maskSensitiveText: over the scan cap before normalising, the field is masked whole', () => {
-    expect(maskSensitiveText('​'.repeat(16_385) + 'PRIVATE')).toBe('[MASKED_PII]')
+    expect(maskSensitiveText('\u200b'.repeat(16_385) + 'PRIVATE')).toBe('[MASKED_PII]')
   })
 })
 
