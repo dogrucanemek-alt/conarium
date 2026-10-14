@@ -14,7 +14,16 @@ let seed = 20261014
 const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
 const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)]
 
-const ATOMS = ['a', 'b', 'c', '1', '2', '-', '[a-c]', '[0-9]', '[ab12]', '\\d', '\\w', '.', 'ç', '\\b']
+// Characters the two engines are known to treat differently by default are in
+// both alphabets: line feed, carriage return, no-break space, line separator.
+// They are built from code points so the source file holds no raw control or
+// separator character.
+const LF = String.fromCharCode(10)
+const CR = String.fromCharCode(13)
+const NBSP = String.fromCharCode(0xa0)
+const LS = String.fromCharCode(0x2028)
+const ATOMS = ['a', 'b', 'c', '1', '2', '-', '[a-c]', '[0-9]', '[ab12]', '\\d', '\\w', '.', 'ç', '\\b',
+  '[^a]', '[^ ]', '\\s', '\\S', '[\\s1]', '[^\\s]', '^', '$']
 const QUANTS = ['', '', '', '?', '{2}', '{1,3}', '{0,2}']
 
 function atom(depth: number): string {
@@ -30,12 +39,12 @@ function seq(depth: number, n: number): string {
   let s = ''
   for (let i = 0; i < n; i++) {
     const a = atom(depth)
-    s += a === '\\b' ? a : a + pick(QUANTS)
+    s += a === '\\b' || a === '^' || a === '$' ? a : a + pick(QUANTS)
   }
   return s
 }
 
-const TEXT = ['a', 'b', 'c', '1', '2', '-', ' ', 'ç', 'x', 'é']
+const TEXT = ['a', 'b', 'c', '1', '2', '-', ' ', 'ç', 'x', 'é', LF, CR, NBSP, LS]
 const text = () => Array.from({ length: Math.floor(rnd() * 24) }, () => pick(TEXT)).join('')
 
 function viaJs(source: string, input: string, label: string): { text: string; count: number } {
