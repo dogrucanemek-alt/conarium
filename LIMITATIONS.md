@@ -13,7 +13,7 @@ on the roadmap.
 ## Not 1.0
 <!-- s: not-1.0 -->
 
-Version is 0.2.x. The API can break.
+Version is 0.3.x. The API can break.
 
 ## Node 20 is the floor, and Node 20 is past end-of-life
 <!-- s: node-20-floor -->
@@ -54,6 +54,99 @@ limitation, not an oversight.
 Structured columns: deterministic (`maskColumns`).
 Free text: best effort (carry-over of values this policy already masks; labelled names).
 A bare name in running prose is not detected.
+
+## A labelled secret is masked to its first delimiter
+<!-- s: labelled-secret-first-delimiter -->
+
+After a label such as `password:` or `pwd:` the value is masked up to the first
+space, comma, semicolon, quote or brace. The rest is masked only if another
+detector recognises it. `pwd: 4111 1111 1111 1112` leaves `1111 1111 1112`
+readable, because that card number fails its checksum. 0.2.54 did the same.
+
+## A number joined to its neighbours is found only when it proves itself
+<!-- s: joined-number-windows -->
+
+When a number is joined to the words or numbers around it by single separators,
+a part of it is masked only when that part passes a checksum (card, Turkish ID
+number) or is a Turkish mobile number. A joined landline (`siparis 2024
+02321234567`) and a number with no separator before it
+(`siparis 202410000000146`) stay readable. A long
+run of groups can be masked although it is not one number, when some of its
+groups happen to pass a checksum.
+
+## Each field also runs the 0.2.54 masking steps
+<!-- s: legacy-belt -->
+
+Every field is also masked by a frozen copy of the 0.2.54 steps, and every span
+that copy masked is masked again. That costs time: on the comparison inputs,
+masking took up to about four times as long as 0.2.54 (a one-megabyte field of
+dense e-mail addresses, about 170 ms), and up to about three times on the
+others. Where the copy's output cannot be lined up with the text, the whole
+field is masked. Some text next to a masked value can then be hidden although it
+is not personal: a title without a dot (`Bay`, `Bayan`) next to a masked number,
+or a custom rule's label written literally in the source text. On the model
+path, when the same title without a dot starts line after line (`Sayin Ahmet`,
+`Sayin Mehmet`, …), the copy's output can fit the text in more than one way,
+and the masks over those lines can then merge into one.
+
+## Custom patterns: what is refused, and the engine they run on
+<!-- s: custom-pattern-shapes -->
+
+Custom patterns run on a linear-time regular expression engine (re2js), so no
+accepted pattern can hold a field's masking for minutes; in 0.2.54 some could.
+The patterns refused when the policy loads are the ones 0.2.54 refused
+(lookaround, backreferences, `+`, `*`, an open-ended `{n,}`, and the older group
+rules), plus four forms where the engine would match differently from
+JavaScript:
+
+- a modifier group that turns on the multiline flag (`(?m:…)`; JavaScript's
+  multiline `^` and `$` also stop at a carriage return, U+2028 and U+2029);
+- a pattern with a case-insensitive modifier group (`(?i:…)`) that also uses
+  `\w`, `\W`, `\b` or `\B` anywhere (on Node 24 such a group makes `\w` take the
+  Kelvin sign and the long s, outside the group as well);
+- an optional or repeated group that lists an empty choice before a non-empty
+  one, such as `(?:|a)?` or `(?:a??)?` (JavaScript skips the empty choice in
+  that position, the engine takes it). The rule is structural, so it also
+  refuses some groups both engines would match the same way, such as
+  `(?:$|a)?`;
+- a surrogate escape that is not half of a `\uHHHH\uLLLL` pair, such as
+  `\u{D83D}`, or a lone surrogate typed as a raw character.
+
+The 0.2.54 quantifier cap also reads a braced escape written with decimal
+digits only as a quantifier: `\u{100}`, `\u{65}` and `\u{2028}` are refused as
+unbounded or nested quantifiers, in 0.2.54 as now; `\u0100`, `\u0065` and
+`\u2028` are accepted.
+
+One more refusal comes from the engine itself: repeats nested so that their
+largest counts multiply past 1000, such as `(?:(?:a{32})){32}`, are refused as
+unbounded or nested quantifiers. 0.2.54 accepted them. Up to 1000, such as
+`(?:(?:a{25})){40}`, they are accepted.
+
+Modifier groups compile only on Node versions that support them, in 0.2.54 as
+now. Unicode property classes (`\p{…}`, `\P{…}`) take their code points from
+the JavaScript engine Conarium runs on, so they match what 0.2.54 matched on
+the same Node; the first use of each property costs about 25 to 45 ms when the
+policy loads, once per process. Matches are meant to equal JavaScript's with the
+`u` flag. That was tested on generated patterns over letters, digits, classes
+and negated classes (with `\s`, `\S` and `\b` inside them), `[^]`, `.`, `\s`,
+`\d`, `\w`, `\b`, `^`, `$`, `\u` escapes, bounded and lazy quantifiers,
+alternation with empty choices and `i`/`s` modifier groups, with line breaks,
+no-break and other Unicode spaces, the Kelvin sign and the long s in the text;
+on listed surrogate-pair and class corners; and on every Unicode property name
+JavaScript accepts on Node 24: all general categories by short and long name,
+every binary property in the ECMAScript table with its alias, and 175 scripts
+with 169 four-letter aliases under `Script=`, `sc=`, `Script_Extensions=` and
+`scx=`. Two differences stay:
+
+- a match of nothing (for example `\B`) between the two halves of an emoji,
+  which JavaScript reports and the engine does not; it hides no text either way;
+- inside a case-insensitive modifier group and outside a class, seven letters
+  beyond Latin-1, typed or escaped (Ÿ, ſ, Μ, μ, ẞ, the Kelvin sign `\u212A` and
+  the Angstrom sign `\u212B`), match their Latin-1 case partners (ÿ; s and S;
+  µ; µ; ß; k and K; å and Å) in the engine on every text. On Node 24,
+  JavaScript matches them only when the text also holds a character beyond
+  Latin-1. The engine masks more there; it shows nothing JavaScript would hide.
+  Inside a class (`(?i:[\u212A])`) both match the partners.
 
 ## One production install
 <!-- s: one-prod-install -->

@@ -12,7 +12,7 @@ güvence. Bağımsız sızma testi de henüz yok — o yol haritasında.
 ## 1.0 değil
 <!-- s: not-1.0 -->
 
-Sürüm 0.2.x. API kırılabilir.
+Sürüm 0.3.x. API kırılabilir.
 
 ## Taban Node 20, ve Node 20 artık yama almıyor
 <!-- s: node-20-floor -->
@@ -51,6 +51,101 @@ sipariş numarası ve benzeri kimliklerle çakışır. Ölçülmüş sınır, un
 Yapılandırılmış kolonlar: deterministik (`maskColumns`).
 Serbest metin: en iyi çaba (bu politikanın zaten maskelediği değerlerin taşınması; etiketli isimler).
 Düz cümledeki çıplak isim yakalanmaz.
+
+## Etiketli bir sır ilk ayırıcıya kadar maskelenir
+<!-- s: labelled-secret-first-delimiter -->
+
+`password:` ya da `pwd:` gibi bir etiketten sonra değer ilk boşluğa, virgüle,
+noktalı virgüle, tırnağa ya da süslü paranteze kadar maskelenir. Kalanı ancak
+başka bir dedektör tanırsa maskelenir. `pwd: 4111 1111 1111 1112` girdisinde
+`1111 1111 1112` okunur kalır, çünkü o kart numarası sağlamadan geçmez. 0.2.54
+de aynısını yapıyordu.
+
+## Komşularına bitişik bir numara ancak kendini kanıtlarsa bulunur
+<!-- s: joined-number-windows -->
+
+Bir numara çevresindeki kelimelere ya da numaralara tek ayırıcıyla bitişikse,
+içindeki bir parça ancak sağlamadan geçerse (kart, T.C. kimlik numarası) ya da
+Türk cep telefonu numarasıysa maskelenir. Bitişik bir sabit hat (`siparis 2024
+02321234567`) ve önünde ayırıcı olmayan bir numara (`siparis 202410000000146`)
+okunur kalır. Bazı
+grupları tesadüfen sağlamadan geçen uzun bir grup dizisi, tek bir numara olmadığı
+hâlde maskelenebilir.
+
+## Her alan 0.2.54'ün maskeleme adımlarından da geçer
+<!-- s: legacy-belt -->
+
+Her alan 0.2.54 adımlarının dondurulmuş bir kopyasından da geçirilir ve o
+kopyanın maskelediği her aralık yeniden maskelenir. Bunun bir süre bedeli var:
+karşılaştırma girdilerinde maskeleme 0.2.54'ün en çok yaklaşık dört katı sürdü
+(yoğun e-posta adresleriyle dolu bir megabaytlık alan, yaklaşık 170 ms), diğerlerinde
+en çok yaklaşık üç katı. Kopyanın çıktısı metinle hizalanamazsa alanın tamamı
+maskelenir. O zaman maskeli bir değerin yanındaki, kişisel olmayan bir metin de
+gizlenebilir: maskeli bir numaranın yanındaki noktasız bir unvan (`Bay`, `Bayan`)
+ya da kaynak metinde aynen geçen bir özel kural etiketi. Model yolunda aynı
+noktasız unvan satır satır tekrarlanırsa (`Sayın Ahmet`, `Sayın Mehmet`, …)
+kopyanın çıktısı metne birden çok biçimde oturabilir; o zaman o satırlardaki
+maskeler tek maskede birleşebilir.
+
+## Özel desenler: neler reddedilir ve hangi motorda çalışırlar
+<!-- s: custom-pattern-shapes -->
+
+Özel desenler doğrusal zamanlı bir düzenli ifade motorunda (re2js) çalışır; bu
+yüzden kabul edilen hiçbir desen bir alanın maskelenmesini dakikalarca
+kilitleyemez. 0.2.54'te bazıları kilitleyebiliyordu. Politika yüklenirken
+reddedilen desenler 0.2.54'ün reddettikleridir (ileri/geri bakış, geri başvuru,
+`+`, `*`, üst sınırı olmayan `{n,}` ve eski grup kuralları); buna, motorun
+JavaScript'ten farklı eşleşeceği dört biçim eklendi:
+
+- çok satır bayrağını açan bir değiştirici grup (`(?m:…)`; JavaScript'in çok
+  satırlı `^` ve `$`'ı satır başı karakterinde, U+2028 ve U+2029'da da durur);
+- büyük/küçük harf duyarsız bir değiştirici grup (`(?i:…)`) içeren ve herhangi
+  bir yerinde `\w`, `\W`, `\b` ya da `\B` kullanan bir desen (Node 24'te böyle bir
+  grup, `\w`'nin grubun dışında da Kelvin işaretini ve uzun s'yi almasına yol
+  açar);
+- boş bir seçeneği boş olmayan bir seçenekten önce sayan isteğe bağlı ya da
+  yinelenen bir grup, örneğin `(?:|a)?` veya `(?:a??)?` (JavaScript o konumda
+  boş seçeneği atlar, motor alır). Kural yapısaldır; bu yüzden iki motorun aynı
+  eşleyeceği bazı grupları da reddeder, örneğin `(?:$|a)?`;
+- bir `\uHHHH\uLLLL` çiftinin yarısı olmayan bir vekil kaçışı, örneğin
+  `\u{D83D}`, ya da ham karakter olarak yazılmış tek bir vekil.
+
+0.2.54'ün niceleyici sınırı, yalnız ondalık rakamlarla yazılmış süslü
+parantezli bir kaçışı da niceleyici sayar: `\u{100}`, `\u{65}` ve `\u{2028}`,
+0.2.54'te olduğu gibi, sınırsız ya da iç içe niceleyici diye reddedilir;
+`\u0100`, `\u0065` ve `\u2028` kabul edilir.
+
+Bir ret de motorun kendisinden gelir: en büyük sayılarının çarpımı 1000'i
+aşacak biçimde iç içe geçmiş tekrarlar, örneğin `(?:(?:a{32})){32}`, sınırsız ya
+da iç içe niceleyici diye reddedilir. 0.2.54 bunları kabul ediyordu. 1000'e
+kadar olanlar, örneğin `(?:(?:a{25})){40}`, kabul edilir.
+
+Değiştirici gruplar, 0.2.54'te olduğu gibi, yalnız bunları destekleyen Node
+sürümlerinde derlenir. Unicode özellik sınıfları (`\p{…}`, `\P{…}`) kod
+noktalarını Conarium'un çalıştığı JavaScript motorundan alır; bu yüzden aynı
+Node'da 0.2.54'ün eşlediğini eşler. Her özelliğin ilk kullanımı politika
+yüklenirken süreç başına bir kez yaklaşık 25–45 ms tutar. Eşleşmelerin
+JavaScript'in `u` bayraklı eşleşmeleriyle aynı olması amaçlanır. Bu, harf, rakam,
+sınıf ve olumsuz sınıf (içlerinde `\s`, `\S` ve `\b` ile), `[^]`, `.`, `\s`, `\d`,
+`\w`, `\b`, `^`, `$`, `\u` kaçışları, sınırlı ve tembel niceleyici, boş seçenekli
+alternasyon ve `i`/`s` değiştirici grupları içeren üretilmiş desenlerde, metinde
+satır sonu, bölünmez boşluk ve diğer Unicode boşlukları, Kelvin işareti ve uzun s
+ile; listelenmiş vekil çifti ve sınıf kenar durumlarında; ve JavaScript'in Node
+24'te kabul ettiği her Unicode özellik adında sınandı: kısa ve uzun adıyla bütün
+genel kategoriler, ECMAScript tablosundaki her ikili özellik ve kısaltması, ve
+`Script=`, `sc=`, `Script_Extensions=` ve `scx=` altında 175 betik ile 169 dört
+harfli kısaltması. İki fark kalır:
+
+- bir emojinin iki yarısı arasındaki boş eşleşme (örneğin `\B`); JavaScript bunu
+  bildirir, motor bildirmez. İki durumda da hiçbir metin gizlenmez;
+- büyük/küçük harf duyarsız bir değiştirici grubun içinde ve bir sınıfın
+  dışında, Latin-1 dışındaki yedi harf, ister harf ister kaçış olarak yazılsın
+  (Ÿ, ſ, Μ, μ, ẞ, Kelvin işareti `\u212A` ve Ångström işareti `\u212B`), motorda
+  her metinde Latin-1'deki büyük/küçük eşleriyle (ÿ; s ve S; µ; µ; ß; k ve K; å
+  ve Å) eşleşir. Node 24'te JavaScript bunları yalnız metinde Latin-1 dışında
+  bir karakter de varsa eşler. Motor orada daha çok maskeler; JavaScript'in
+  gizleyeceği hiçbir şeyi açık bırakmaz. Bir sınıfın içinde (`(?i:[\u212A])`)
+  ikisi de eşleri eşler.
 
 ## Tek üretim kurulumu
 <!-- s: one-prod-install -->
