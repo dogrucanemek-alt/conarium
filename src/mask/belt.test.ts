@@ -14,14 +14,14 @@ import { maskSensitiveText } from './legacy_0254/legacy_mask_text.js'
 import { normalizePiiText } from './legacy_0254/pii_normalize.js'
 import type { CustomPiiPattern, GovernancePolicy } from './legacy_0254/types.js'
 
-const GOLDEN = join(dirname(fileURLToPath(import.meta.url)), 'legacy_0254', 'golden.json')
+const GOLDEN = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'test', 'fixtures', 'mask_golden_0254.json')
 const BUILTIN = ['[MASKED_SECRET]', '[MASKED_PII]']
 
 describe('frozen 0.2.54 corpus', () => {
-  it('reads golden.json and matches every frozen output', () => {
+  it('reads the golden corpus and matches every frozen output', () => {
     if (!existsSync(GOLDEN)) {
       throw new Error(
-        'src/mask/legacy_0254/golden.json is missing. The gate must supply the 0.2.54 corpus; this test does not skip.',
+        'test/fixtures/mask_golden_0254.json is missing. The gate must supply the 0.2.54 corpus; this test does not skip.',
       )
     }
     const rows = readGolden(GOLDEN)
@@ -588,15 +588,15 @@ function readGolden(path: string): Array<{ expected: unknown; input: string; pip
     ? (parsed as { cases: unknown[] }).cases
     : null
   if (!list) {
-    throw new Error('golden.json must be an array, or an object with a cases array')
+    throw new Error('the golden corpus must be an array, or an object with a cases array')
   }
   return list.map((row, index) => {
-    if (!row || typeof row !== 'object') throw new Error(`golden.json row ${index} is not an object`)
+    if (!row || typeof row !== 'object') throw new Error(`golden corpus row ${index} is not an object`)
     const rec = row as Record<string, unknown>
     const input = firstString(rec, ['input', 'raw', 'text'])
-    if (input === undefined) throw new Error(`golden.json row ${index} has no input`)
+    if (input === undefined) throw new Error(`golden corpus row ${index} has no input`)
     const expected = rec.expected ?? rec.output ?? rec.masked
-    if (expected === undefined) throw new Error(`golden.json row ${index} has no output`)
+    if (expected === undefined) throw new Error(`golden corpus row ${index} has no output`)
     const pipeline = rec.pipeline === 'governance' || rec.kind === 'governance' ? 'governance' : 'text'
     const options = rec.options && typeof rec.options === 'object' ? rec.options as Record<string, unknown> : rec
     return { expected, input, pipeline, options }
