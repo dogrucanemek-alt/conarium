@@ -86,8 +86,8 @@ field is masked. Some text next to a masked value can then be hidden although it
 is not personal: a title without a dot (`Bay`, `Bayan`) next to a masked number,
 or a custom rule's label written literally in the source text. On the model
 path, when the same title without a dot starts line after line (`Sayin Ahmet`,
-`Sayin Mehmet`, …), the copy's output fits the text in more than one way; those
-lines are then masked as one region, from the first name to the last.
+`Sayin Mehmet`, …), the copy's output fits the text in more than one way, and
+the masks over those lines can merge into one.
 
 ## Custom patterns: what is refused, and the engine they run on
 <!-- s: custom-pattern-shapes -->

@@ -84,8 +84,8 @@ maskelenir. O zaman maskeli bir değerin yanındaki, kişisel olmayan bir metin 
 gizlenebilir: maskeli bir numaranın yanındaki noktasız bir unvan (`Bay`, `Bayan`)
 ya da kaynak metinde aynen geçen bir özel kural etiketi. Model yolunda aynı
 noktasız unvan satır satır tekrarlanırsa (`Sayın Ahmet`, `Sayın Mehmet`, …)
-kopyanın çıktısı metne birden çok biçimde oturur; o satırlar ilk addan son ada
-kadar tek bölge olarak maskelenir.
+kopyanın çıktısı metne birden çok biçimde oturur ve o satırlardaki maskeler tek
+maskede birleşebilir.
 
 ## Özel desenler: neler reddedilir ve hangi motorda çalışırlar
 <!-- s: custom-pattern-shapes -->
