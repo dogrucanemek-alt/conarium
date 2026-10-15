@@ -129,6 +129,12 @@ describe('G9 — many labelled names in one field are each masked, not the field
     expect(out).not.toContain('Ahmet')
     expect(out.split('[MASKED_PII]').length - 1).toBe(200)
   })
+  it(`Governance.maskPII: 200 titled names, one per line`, () => {
+    // 0.2.54 takes two lines per mask here (its name pattern runs across the line
+    // break): 100 masks. The field as one mask is not "each masked".
+    const out = String(new Governance({}).maskPII('Bay Ab\n'.repeat(200)).masked)
+    expect(out).toBe('Bay [MASKED_PII]\n'.repeat(100))
+  })
 })
 
 describe('G10 — a custom rule with many matches stays linear in the belt', () => {
@@ -267,4 +273,28 @@ describe('G10 — a title or label before a name keeps its text and its space', 
       })
     }
   }
+})
+
+describe('G11 — titles without a dot on many lines keep 0.2.54 output, in linear time and memory', () => {
+  // A title without a dot (Sayın, Bay) leaves no dot in the 0.2.54 output to align on;
+  // the belt must still line each mask up with its own lines, not stretch every
+  // mask across the field. Expected strings are what 0.2.54 returns.
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+    ['three lines', 'Sayın Ahmet\nSayın Mehmet\nSayın Ali\n', 'Sayın [MASKED_PII]\nSayın [MASKED_PII]\n'],
+    ['16 380 characters, the default scan cap', 'Bay Ab\n'.repeat(2340), 'Bay [MASKED_PII]\n'.repeat(1170)],
+  ]
+  for (const [label, input, expected] of cases) {
+    it(`Governance.maskPII: ${label}`, () => {
+      expect(String(new Governance({}).maskPII(input).masked)).toBe(expected)
+    })
+  }
+  it('Governance.maskPII: 32 768 characters with the scan cap raised', () => {
+    // 0.2.54: about 1 ms and 2 341 masks. Quadratic alignment: about 750 ms and one mask.
+    const g = new Governance({ scanCharCap: 1_048_576 })
+    const s = 'Bay Ab\n'.repeat(4682).slice(0, 32_768)
+    const t = performance.now()
+    const out = String(g.maskPII(s).masked)
+    expect(performance.now() - t).toBeLessThan(250)
+    expect(out.split('[MASKED_PII]').length - 1).toBeGreaterThan(1000)
+  })
 })
