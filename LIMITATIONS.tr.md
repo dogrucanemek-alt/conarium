@@ -82,7 +82,10 @@ karşılaştırma girdilerinde maskeleme 0.2.54'ün en çok yaklaşık dört kat
 en çok yaklaşık üç katı. Kopyanın çıktısı metinle hizalanamazsa alanın tamamı
 maskelenir. O zaman maskeli bir değerin yanındaki, kişisel olmayan bir metin de
 gizlenebilir: maskeli bir numaranın yanındaki noktasız bir unvan (`Bay`, `Bayan`)
-ya da kaynak metinde aynen geçen bir özel kural etiketi.
+ya da kaynak metinde aynen geçen bir özel kural etiketi. Model yolunda aynı
+noktasız unvan satır satır tekrarlanırsa (`Sayın Ahmet`, `Sayın Mehmet`, …)
+kopyanın çıktısı metne birden çok biçimde oturur; o satırlar ilk addan son ada
+kadar tek bölge olarak maskelenir.
 
 ## Özel desenler: neler reddedilir ve hangi motorda çalışırlar
 <!-- s: custom-pattern-shapes -->
