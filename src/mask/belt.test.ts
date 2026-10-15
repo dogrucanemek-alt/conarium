@@ -69,14 +69,16 @@ describe('beltCover', () => {
     expect(result).toEqual({ ok: true, spans: [], wholeField: '[WIDE]', added: 1 })
   })
 
-  it('returns two adjacent custom spans for ab', () => {
+  it('covers two adjacent custom matches for ab with disjoint spans', () => {
+    // "[A][B]" fits more than one placement; the widest range of each token is
+    // the whole field. One span, not the same span twice.
     const result = beltCover(textInput('ab', [
       { name: 'a', pattern: 'a', label: '[A]' },
       { name: 'b', pattern: 'b', label: '[B]' },
     ]))
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.spans).toHaveLength(2)
+    expect(result.spans).toEqual([{ start: 0, end: 2 }])
     expect(covered(result.spans, 2)).toEqual(new Set([0, 1]))
   })
 

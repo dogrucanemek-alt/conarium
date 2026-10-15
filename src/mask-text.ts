@@ -82,7 +82,7 @@ function beltOnlySpans(core: readonly Span[], belt: readonly { start: number; en
     else if (iv.end > cur.end) cur.end = iv.end
   }
 
-  const ordered = beltByStart(belt)
+  const ordered = unionBelt(beltByStart(belt))
   const out: Span[] = []
   // `head` only moves forward. Belt ranges are in start order, so an interval
   // that ended before this range cannot meet a later one.
@@ -102,6 +102,34 @@ function beltOnlySpans(core: readonly Span[], belt: readonly { start: number; en
     if (cursor < sp.end) out.push(legacySpan(cursor, sp.end))
   }
   return out
+}
+
+// Widest ranges of an ambiguous mask overlap. Cut the gaps once, on the
+// union, or each range rebuilds the same gaps and the piece count squares.
+function unionBelt(
+  ordered: readonly { start: number; end: number }[],
+): readonly { start: number; end: number }[] {
+  for (let i = 1; i < ordered.length; i++) {
+    if (ordered[i].start < ordered[i - 1].end) return mergeBelt(ordered)
+  }
+  return ordered
+}
+
+function mergeBelt(
+  ordered: readonly { start: number; end: number }[],
+): { start: number; end: number }[] {
+  const merged: { start: number; end: number }[] = []
+  for (let i = 0; i < ordered.length; i++) {
+    const sp = ordered[i]
+    if (sp.end <= sp.start) continue
+    const cur = merged[merged.length - 1]
+    if (cur && sp.start < cur.end) {
+      if (sp.end > cur.end) cur.end = sp.end
+    } else {
+      merged.push({ start: sp.start, end: sp.end })
+    }
+  }
+  return merged
 }
 
 function beltByStart(

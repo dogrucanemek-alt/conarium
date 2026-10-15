@@ -99,8 +99,11 @@ export function alignRegions(
 ): { ok: true; spans: BeltSpan[] } | { ok: false; reason: string } {
   const budget = new Budget(1_000_000_000)
   try {
-    if (mode === 'plain') return alignOutput(source, output, tokens, budget)
-    return alignTrimmed(source, output, tokens, budget)
+    const aligned = mode === 'plain'
+      ? alignOutput(source, output, tokens, budget)
+      : alignTrimmed(source, output, tokens, budget)
+    if (!aligned.ok) return aligned
+    return { ok: true, spans: unionOverlaps(aligned.spans) }
   } catch (err) {
     if (err instanceof BudgetExceeded) return { ok: false, reason: 'budget' }
     return { ok: false, reason: 'exception' }
@@ -143,8 +146,41 @@ function cover(input: BeltInput): BeltResult {
   if (stepped.text === input.normalized) return { ok: true, spans: [], added: 0 }
   const aligned = alignTrimmed(input.normalized, stepped.text, tokens, budget)
   if (!aligned.ok) return aligned
-  const spans = trimSpanEdges(input.normalized, aligned.spans)
+  const spans = unionOverlaps(trimSpanEdges(input.normalized, aligned.spans))
   return { ok: true, spans, added: spans.length }
+}
+
+// Repeated titles fit many placements, so the widest range of each token
+// overlaps the next. Gaps inside those ranges are built per token, and the
+// work grows with the square of the mask count. Overlaps become one range.
+function unionOverlaps(spans: BeltSpan[]): BeltSpan[] {
+  if (spans.length < 2) return spans
+  let ordered = spans
+  for (let i = 1; i < spans.length; i++) {
+    if (spans[i].start < spans[i - 1].start) {
+      ordered = spans.slice().sort((a, b) => a.start - b.start || a.end - b.end)
+      break
+    }
+  }
+  for (let i = 1; i < ordered.length; i++) {
+    if (ordered[i].start < ordered[i - 1].end) return mergeOverlaps(ordered)
+  }
+  return ordered === spans ? spans : ordered
+}
+
+function mergeOverlaps(ordered: BeltSpan[]): BeltSpan[] {
+  const merged: BeltSpan[] = []
+  for (let i = 0; i < ordered.length; i++) {
+    const sp = ordered[i]
+    if (sp.end <= sp.start) continue
+    const cur = merged[merged.length - 1]
+    if (cur && sp.start < cur.end) {
+      if (sp.end > cur.end) cur.end = sp.end
+    } else {
+      merged.push({ start: sp.start, end: sp.end })
+    }
+  }
+  return merged
 }
 
 // A space is not a value. A span that starts on one is glued to the word
@@ -281,6 +317,10 @@ function tokenSpans(text: string, tokens: string[], budget: Budget): Array<[numb
   let i = 0
   while (i < text.length) {
     budget.tick(1)
+    if (text.charCodeAt(i) !== 91) {
+      i++
+      continue
+    }
     const tok = tokens.find((token) => token.length > 0 && text.startsWith(token, i))
     if (tok) {
       spans.push([i, i + tok.length])
