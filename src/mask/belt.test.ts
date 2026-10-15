@@ -632,3 +632,29 @@ function runFrozen(row: { input: string; pipeline: 'text' | 'governance'; option
     customPatterns: patterns,
   })
 }
+
+describe('belt spans for titles without a dot on many lines', () => {
+  // Repeated `\nBay ` literals fit many placements of the 0.2.54 masks. Every
+  // name must stay covered, and the spans must not overlap: overlapping widest
+  // spans are what made the work grow with the square of the mask count.
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ['three lines', 'Sayın Ahmet\nSayın Mehmet\nSayın Ali\n'],
+    ['2 340 lines', 'Bay Ab\n'.repeat(2340)],
+  ]
+  for (const [label, raw] of cases) {
+    it(`${label}: spans are disjoint and cover every name`, () => {
+      const input = govInput(raw)
+      const result = beltCover(input)
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      const spans = [...result.spans].sort((a, b) => a.start - b.start)
+      for (let i = 1; i < spans.length; i++) expect(spans[i].start).toBeGreaterThanOrEqual(spans[i - 1].end)
+      const hidden = covered(result.spans, input.normalized.length)
+      const names = [...input.normalized.matchAll(/(?<=(?:Sayın|Bay) )[^\n]+/g)]
+      expect(names.length).toBeGreaterThan(0)
+      for (const m of names) {
+        for (let i = m.index; i < m.index + m[0].length; i++) expect(hidden.has(i)).toBe(true)
+      }
+    })
+  }
+})
