@@ -69,6 +69,10 @@ Time: each field also runs the 0.2.54 copy. On the comparison inputs masking
 took up to about four times as long as 0.2.54 (a one-megabyte field of dense
 e-mail addresses, about 170 ms) and up to about three times on the others.
 
+The package description is 250 characters. npm keeps 255 and cut the 0.2.x
+description off mid-word, after "coverage reconciliation a"; a test now holds
+the description under that limit.
+
 ## 0.2.54 - two operator scripts leave the tarball
 
 Nothing in the tool's behaviour changed. `scripts/conarium_sabah_brief.mjs` and
