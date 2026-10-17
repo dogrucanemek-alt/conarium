@@ -10,6 +10,6 @@
   },
   "dependencies": {
     "@conarium-ai/core": "0.2.46",
-    "@modelcontextprotocol/sdk": "^1.25.0"
+    "@modelcontextprotocol/sdk": "^1.32.1"
   }
 }
