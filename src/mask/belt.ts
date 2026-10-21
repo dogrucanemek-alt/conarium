@@ -174,17 +174,17 @@ function splitAtLineBreaks(source: string, spans: BeltSpan[]): BeltSpan[] {
     let split = false
     for (let i = sp.start; i < sp.end; i++) {
       const c = source.charCodeAt(i)
-      if (c === 10 || c === 13) {
+      if (isLineBreakCode(c)) {
         if (start < i) {
           if (isExactLabel(source, start, i)) split = true
-          else kept.push({ start, end: i })
+          else if (!isBlank(source, start, i)) kept.push({ start, end: i })
         }
         start = i + 1
       }
     }
     if (start < sp.end) {
       if (isExactLabel(source, start, sp.end)) split = true
-      else kept.push({ start, end: sp.end })
+      else if (!isBlank(source, start, sp.end)) kept.push({ start, end: sp.end })
     }
     if (!split) {
       out.push(sp)
@@ -205,17 +205,48 @@ function dropExactLabels(source: string, spans: BeltSpan[]): BeltSpan[] {
   return kept
 }
 
-function isExactLabel(source: string, start: number, end: number): boolean {
+function isLineBreakCode(c: number): boolean {
+  return c === 10 || c === 13 || c === 0x2028 || c === 0x2029 || c === 0x85
+}
+
+function isHorizWs(ch: string): boolean {
+  const c = ch.charCodeAt(0)
+  if (isLineBreakCode(c)) return false
+  return /\s/u.test(ch)
+}
+
+function followedByColon(source: string, at: number): boolean {
+  let i = at
+  while (i < source.length && isHorizWs(source[i])) i++
+  return source[i] === ':'
+}
+
+function trimmedEnds(source: string, start: number, end: number): [number, number] {
   let lo = start
   let hi = end
   while (lo < hi && isWs(source[lo])) lo++
   while (hi > lo && isWs(source[hi - 1])) hi--
-  if (lo >= hi) return true
+  return [lo, hi]
+}
+
+function isBlank(source: string, start: number, end: number): boolean {
+  const [lo, hi] = trimmedEnds(source, start, end)
+  return lo >= hi
+}
+
+function isExactLabel(source: string, start: number, end: number): boolean {
+  const [lo, hi] = trimmedEnds(source, start, end)
+  if (lo >= hi) return false
   const lower = source.slice(lo, hi).toLowerCase()
+  let known = false
   for (let i = 0; i < LABELS.length; i++) {
-    if (LABELS[i] === lower) return true
+    if (LABELS[i] === lower) {
+      known = true
+      break
+    }
   }
-  return false
+  if (!known) return false
+  return followedByColon(source, hi)
 }
 
 // Repeated titles fit many placements, so the widest range of each token

@@ -6,7 +6,7 @@ import type { Span } from '../core.js'
 
 const PII = '[MASKED_PII]'
 /** Horizontal space only: a line break is not a name-word separator. */
-const HORIZ = String.raw`[^\S\r\n]`
+const HORIZ = String.raw`[^\S\r\n\u2028\u2029\u0085]`
 const NAME_SHAPE = String.raw`\p{Lu}\p{L}+(?:${HORIZ}+\p{Lu}\p{L}+){0,2}`
 const TITLE = String.raw`Sn\.|Sayın|Sayin|Bayan|Bay|Mrs\.|Mr\.|Ms\.|Dr\.|Av\.|Prof\.`
 const LABEL_WORDS = [
@@ -35,12 +35,31 @@ const LABEL_RE = new RegExp(
 )
 const NAME_AFTER_LABEL = new RegExp(String.raw`^\s*(${NAME_SHAPE})`, 'u')
 
-function isKnownLabel(value: string): boolean {
-  const lower = value.toLowerCase()
-  for (let i = 0; i < LABEL_WORDS.length; i++) {
-    if (LABEL_WORDS[i] === lower) return true
+function isLineBreakCode(c: number): boolean {
+  return c === 10 || c === 13 || c === 0x2028 || c === 0x2029 || c === 0x85
+}
+
+function followedByColon(text: string, at: number): boolean {
+  let i = at
+  while (i < text.length) {
+    const c = text.charCodeAt(i)
+    if (isLineBreakCode(c) || !/\s/u.test(text[i])) break
+    i++
   }
-  return false
+  return text[i] === ':'
+}
+
+function isKnownLabel(value: string, text: string, end: number): boolean {
+  const lower = value.toLowerCase()
+  let known = false
+  for (let i = 0; i < LABEL_WORDS.length; i++) {
+    if (LABEL_WORDS[i] === lower) {
+      known = true
+      break
+    }
+  }
+  if (!known) return false
+  return followedByColon(text, end)
 }
 
 function pushNames(text: string, re: RegExp, out: Span[]): void {
@@ -50,8 +69,8 @@ function pushNames(text: string, re: RegExp, out: Span[]): void {
     let m: RegExpExecArray | null
     while ((m = re.exec(text)) !== null) {
       const name = m[m.length - 1]
-      if (name && !isKnownLabel(name)) {
-        const start = m.index + m[0].length - name.length
+      const start = name ? m.index + m[0].length - name.length : -1
+      if (name && !isKnownLabel(name, text, start + name.length)) {
         out.push({
           start,
           end: start + name.length,
@@ -79,8 +98,8 @@ function pushLabelledNames(text: string, out: Span[]): void {
       const after = m.index + m[0].length
       const found = NAME_AFTER_LABEL.exec(text.slice(after))
       const name = found?.[1]
-      if (name && !isKnownLabel(name)) {
-        const start = after + found[0].length - name.length
+      const start = name && found ? after + found[0].length - name.length : -1
+      if (name && !isKnownLabel(name, text, start + name.length)) {
         out.push({
           start,
           end: start + name.length,
