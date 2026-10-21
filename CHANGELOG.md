@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.1 - every name in a labelled list is masked, and each line keeps its label
+
+A name written after its label, one per line, could run on into the next
+line. The words of a name were allowed to be separated by a line break, and
+the label pattern was case-insensitive, so the next line's `name` read as a
+third word of the name. The first match took the next line's label with it,
+the next name had no label in front of it, and every second name in the list
+stayed readable:
+
+- `name: Ahmet Yilmaz`, `name: Mehmet Kaya`, `name: Ali Can`, one per line,
+  came out as `name: [MASKED_PII]: Mehmet Kaya` and `name: [MASKED_PII]`.
+  Each line now keeps its label and each name is masked. The same holds for
+  the other labels (`customer:`, `musteri:`, …) and for CRLF line ends.
+- `Prof. Dr. Ahmet Yilmaz` left the name readable. A chain of titles is now
+  read as one prefix, and the name after it is masked.
+
+In 0.2.54, `Governance.maskPII` had the same every-second-name result and
+`maskSensitiveText` did not mask labelled names at all. 0.3.0 masked them on
+both paths and carried the same result to both.
+
+The words of a name no longer span a line break: LF, CR, U+2028, U+2029 or
+U+0085. A label or a title may still be followed by its value on the next line
+(`name:` then `Ahmet Yilmaz`), and that value is masked, as in 0.3.0. A label
+word counts as a label only when its colon follows it, so `Name:` followed by
+`Name: Mehmet Kaya` masks the name and keeps both labels, while a value that
+happens to be a label word (`contact: Name`, `Dr. Name`) is still masked.
+
+On the model path the frozen 0.2.54 steps still run alongside and still find
+the run-on range. That range is cut at line breaks only where one of its
+pieces is the next line's label followed by its colon; that piece is no longer
+masked and the rest of the range is. A run-on range with no such piece is left
+as one range, and the cut is made after overlapping ranges are merged, so
+masking a field of repeated titles stays linear in its length.
+
 ## 0.3.0 - masking rewritten: each detector reads the original text, and the 0.2.54 steps run alongside
 
 The masking that runs over audit arguments and error text (`maskSensitiveText`)

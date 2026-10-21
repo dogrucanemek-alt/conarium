@@ -146,8 +146,107 @@ function cover(input: BeltInput): BeltResult {
   if (stepped.text === input.normalized) return { ok: true, spans: [], added: 0 }
   const aligned = alignTrimmed(input.normalized, stepped.text, tokens, budget)
   if (!aligned.ok) return aligned
-  const spans = unionOverlaps(trimSpanEdges(input.normalized, aligned.spans))
+  // Union first so splitAtLineBreaks walks each source character once.
+  // Overlapping widest ranges from repeated titles become one span; a later
+  // split still drops a label that sat inside a mask, then edges are trimmed.
+  const spans = trimSpanEdges(
+    input.normalized,
+    dropExactLabels(
+      input.normalized,
+      splitAtLineBreaks(
+        input.normalized,
+        unionOverlaps(trimSpanEdges(input.normalized, aligned.spans)),
+      ),
+    ),
+  )
   return { ok: true, spans, added: spans.length }
+}
+
+// Frozen 0.2.54 name shape treats a line break as a word gap, so a mask can
+// end on the next line's label. Split only when a piece is that label; a
+// title run with no label stays one range, so the mask count does not grow.
+function splitAtLineBreaks(source: string, spans: BeltSpan[]): BeltSpan[] {
+  const out: BeltSpan[] = []
+  for (let s = 0; s < spans.length; s++) {
+    const sp = spans[s]
+    const kept: BeltSpan[] = []
+    let start = sp.start
+    let split = false
+    for (let i = sp.start; i < sp.end; i++) {
+      const c = source.charCodeAt(i)
+      if (isLineBreakCode(c)) {
+        if (start < i) {
+          if (isExactLabel(source, start, i)) split = true
+          else if (!isBlank(source, start, i)) kept.push({ start, end: i })
+        }
+        start = i + 1
+      }
+    }
+    if (start < sp.end) {
+      if (isExactLabel(source, start, sp.end)) split = true
+      else if (!isBlank(source, start, sp.end)) kept.push({ start, end: sp.end })
+    }
+    if (!split) {
+      out.push(sp)
+      continue
+    }
+    for (let k = 0; k < kept.length; k++) out.push(kept[k])
+  }
+  return out
+}
+
+function dropExactLabels(source: string, spans: BeltSpan[]): BeltSpan[] {
+  const kept: BeltSpan[] = []
+  for (let i = 0; i < spans.length; i++) {
+    const sp = spans[i]
+    if (isExactLabel(source, sp.start, sp.end)) continue
+    kept.push(sp)
+  }
+  return kept
+}
+
+function isLineBreakCode(c: number): boolean {
+  return c === 10 || c === 13 || c === 0x2028 || c === 0x2029 || c === 0x85
+}
+
+function isHorizWs(ch: string): boolean {
+  const c = ch.charCodeAt(0)
+  if (isLineBreakCode(c)) return false
+  return /\s/u.test(ch)
+}
+
+function followedByColon(source: string, at: number): boolean {
+  let i = at
+  while (i < source.length && isHorizWs(source[i])) i++
+  return source[i] === ':'
+}
+
+function trimmedEnds(source: string, start: number, end: number): [number, number] {
+  let lo = start
+  let hi = end
+  while (lo < hi && isWs(source[lo])) lo++
+  while (hi > lo && isWs(source[hi - 1])) hi--
+  return [lo, hi]
+}
+
+function isBlank(source: string, start: number, end: number): boolean {
+  const [lo, hi] = trimmedEnds(source, start, end)
+  return lo >= hi
+}
+
+function isExactLabel(source: string, start: number, end: number): boolean {
+  const [lo, hi] = trimmedEnds(source, start, end)
+  if (lo >= hi) return false
+  const lower = source.slice(lo, hi).toLowerCase()
+  let known = false
+  for (let i = 0; i < LABELS.length; i++) {
+    if (LABELS[i] === lower) {
+      known = true
+      break
+    }
+  }
+  if (!known) return false
+  return followedByColon(source, hi)
 }
 
 // Repeated titles fit many placements, so the widest range of each token
