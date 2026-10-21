@@ -20,17 +20,19 @@ In 0.2.54, `Governance.maskPII` had the same every-second-name result and
 `maskSensitiveText` did not mask labelled names at all. 0.3.0 masked them on
 both paths and carried the same result to both.
 
-The words of a name no longer span a line break. A label or a title may still
-be followed by its value on the next line (`name:` then `Ahmet Yilmaz`), and
-that value is masked, as in 0.3.0. A value that is itself a known label is not
-taken as a name, so `Name:` followed by `Name: Mehmet Kaya` masks the name and
-keeps both labels.
+The words of a name no longer span a line break: LF, CR, U+2028, U+2029 or
+U+0085. A label or a title may still be followed by its value on the next line
+(`name:` then `Ahmet Yilmaz`), and that value is masked, as in 0.3.0. A label
+word counts as a label only when its colon follows it, so `Name:` followed by
+`Name: Mehmet Kaya` masks the name and keeps both labels, while a value that
+happens to be a label word (`contact: Name`, `Dr. Name`) is still masked.
 
 On the model path the frozen 0.2.54 steps still run alongside and still find
-the run-on range. A piece of that range that is only the next line's label is
-no longer masked; the rest of the range is. When the run-on range holds no
-label, it is left as one range, so masking a field of repeated titles stays
-linear in its length.
+the run-on range. That range is cut at line breaks only where one of its
+pieces is the next line's label followed by its colon; that piece is no longer
+masked and the rest of the range is. A run-on range with no such piece is left
+as one range, and the cut is made after overlapping ranges are merged, so
+masking a field of repeated titles stays linear in its length.
 
 ## 0.3.0 - masking rewritten: each detector reads the original text, and the 0.2.54 steps run alongside
 
