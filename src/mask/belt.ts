@@ -146,8 +146,55 @@ function cover(input: BeltInput): BeltResult {
   if (stepped.text === input.normalized) return { ok: true, spans: [], added: 0 }
   const aligned = alignTrimmed(input.normalized, stepped.text, tokens, budget)
   if (!aligned.ok) return aligned
-  const spans = unionOverlaps(trimSpanEdges(input.normalized, aligned.spans))
+  const spans = unionOverlaps(
+    dropExactLabels(
+      input.normalized,
+      trimSpanEdges(input.normalized, splitAtLineBreaks(input.normalized, aligned.spans)),
+    ),
+  )
   return { ok: true, spans, added: spans.length }
+}
+
+// Frozen 0.2.54 name shape treats a line break as a word gap, so a mask can
+// end on the next line's label. That label is not a value; keep the line.
+function splitAtLineBreaks(source: string, spans: BeltSpan[]): BeltSpan[] {
+  const out: BeltSpan[] = []
+  for (let s = 0; s < spans.length; s++) {
+    const sp = spans[s]
+    let start = sp.start
+    for (let i = sp.start; i < sp.end; i++) {
+      const c = source.charCodeAt(i)
+      if (c === 10 || c === 13) {
+        if (start < i) out.push({ start, end: i })
+        start = i + 1
+      }
+    }
+    if (start < sp.end) out.push({ start, end: sp.end })
+  }
+  return out
+}
+
+function dropExactLabels(source: string, spans: BeltSpan[]): BeltSpan[] {
+  const kept: BeltSpan[] = []
+  for (let i = 0; i < spans.length; i++) {
+    const sp = spans[i]
+    if (isExactLabel(source, sp.start, sp.end)) continue
+    kept.push(sp)
+  }
+  return kept
+}
+
+function isExactLabel(source: string, start: number, end: number): boolean {
+  let lo = start
+  let hi = end
+  while (lo < hi && isWs(source[lo])) lo++
+  while (hi > lo && isWs(source[hi - 1])) hi--
+  if (lo >= hi) return true
+  const lower = source.slice(lo, hi).toLowerCase()
+  for (let i = 0; i < LABELS.length; i++) {
+    if (LABELS[i] === lower) return true
+  }
+  return false
 }
 
 // Repeated titles fit many placements, so the widest range of each token
