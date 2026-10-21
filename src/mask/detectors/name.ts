@@ -1,5 +1,6 @@
 /**
  * Title-marked and label-marked personal names. The title or label stays outside the span.
+ * Name words stay on one line; a label/title may reach the value across a line break.
  */
 import type { Span } from '../core.js'
 
@@ -8,15 +9,39 @@ const PII = '[MASKED_PII]'
 const HORIZ = String.raw`[^\S\r\n]`
 const NAME_SHAPE = String.raw`\p{Lu}\p{L}+(?:${HORIZ}+\p{Lu}\p{L}+){0,2}`
 const TITLE = String.raw`Sn\.|Sayın|Sayin|Bayan|Bay|Mrs\.|Mr\.|Ms\.|Dr\.|Av\.|Prof\.`
+const LABEL_WORDS = [
+  'müşteri',
+  'musteri',
+  'yetkili',
+  'kişi',
+  'kisi',
+  'temsilci',
+  'adı soyadı',
+  'adi soyadi',
+  'ad soyad',
+  'customer',
+  'contact',
+  'full name',
+  'name',
+] as const
+// Title/label to value uses \s (0.3.0). Name words stay on HORIZ. No (?i:…) — Node 20.
 const TITLED_NAME_RE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}])(?:(?:${TITLE})${HORIZ}+)+(${NAME_SHAPE})`,
+  String.raw`(?<![\p{L}\p{N}])(?:(?:${TITLE})\s+)+(${NAME_SHAPE})`,
   'gu',
 )
 const LABEL_RE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}])(müşteri|musteri|yetkili|kişi|kisi|temsilci|adı soyadı|adi soyadi|ad soyad|customer|contact|full name|name)${HORIZ}*:`,
+  String.raw`(?<![\p{L}\p{N}])(${LABEL_WORDS.join('|')})\s*:`,
   'giu',
 )
-const NAME_AFTER_LABEL = new RegExp(String.raw`^${HORIZ}*(${NAME_SHAPE})`, 'u')
+const NAME_AFTER_LABEL = new RegExp(String.raw`^\s*(${NAME_SHAPE})`, 'u')
+
+function isKnownLabel(value: string): boolean {
+  const lower = value.toLowerCase()
+  for (let i = 0; i < LABEL_WORDS.length; i++) {
+    if (LABEL_WORDS[i] === lower) return true
+  }
+  return false
+}
 
 function pushNames(text: string, re: RegExp, out: Span[]): void {
   const prev = re.lastIndex
@@ -25,7 +50,7 @@ function pushNames(text: string, re: RegExp, out: Span[]): void {
     let m: RegExpExecArray | null
     while ((m = re.exec(text)) !== null) {
       const name = m[m.length - 1]
-      if (name) {
+      if (name && !isKnownLabel(name)) {
         const start = m.index + m[0].length - name.length
         out.push({
           start,
@@ -54,7 +79,7 @@ function pushLabelledNames(text: string, out: Span[]): void {
       const after = m.index + m[0].length
       const found = NAME_AFTER_LABEL.exec(text.slice(after))
       const name = found?.[1]
-      if (name) {
+      if (name && !isKnownLabel(name)) {
         const start = after + found[0].length - name.length
         out.push({
           start,

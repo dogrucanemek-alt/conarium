@@ -146,10 +146,17 @@ function cover(input: BeltInput): BeltResult {
   if (stepped.text === input.normalized) return { ok: true, spans: [], added: 0 }
   const aligned = alignTrimmed(input.normalized, stepped.text, tokens, budget)
   if (!aligned.ok) return aligned
-  const spans = unionOverlaps(
+  // Union first so splitAtLineBreaks walks each source character once.
+  // Overlapping widest ranges from repeated titles become one span; a later
+  // split still drops a label that sat inside a mask, then edges are trimmed.
+  const spans = trimSpanEdges(
+    input.normalized,
     dropExactLabels(
       input.normalized,
-      trimSpanEdges(input.normalized, splitAtLineBreaks(input.normalized, aligned.spans)),
+      splitAtLineBreaks(
+        input.normalized,
+        unionOverlaps(trimSpanEdges(input.normalized, aligned.spans)),
+      ),
     ),
   )
   return { ok: true, spans, added: spans.length }
