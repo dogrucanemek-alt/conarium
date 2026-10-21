@@ -74,6 +74,28 @@ describe('labelled names, one per line', () => {
       expect(out.split('\n').map((line) => line.slice(0, line.indexOf(':') + 1))).toEqual(['Name:', 'Name:'])
     })
 
+    // A value that happens to be a label word is still a value, as in 0.3.0.
+    // Only a label that is followed by its colon is a label.
+    const LABEL_WORD_VALUES: ReadonlyArray<readonly [string, readonly string[]]> = [
+      ['contact: Name', ['Name']],
+      ['name: Customer', ['Customer']],
+      ['name: Full Name', ['Full', 'Name']],
+      ['Dr. Name', ['Name']],
+    ]
+    for (const [input, words] of LABEL_WORD_VALUES) {
+      it(`${pipeline}: a value that is a label word is masked: ${JSON.stringify(input)}`, () => {
+        const out = mask(input)
+        for (const word of words) expect(out).not.toContain(word)
+      })
+    }
+
+    it(`${pipeline}: U+2028 ends a line the way LF does`, () => {
+      const input = 'name: Ahmet Yilmaz name: Mehmet Kaya'
+      const out = mask(input)
+      for (const word of ['Ahmet', 'Yilmaz', 'Mehmet', 'Kaya']) expect(out).not.toContain(word)
+      expect(out.split(' ').map((line) => line.slice(0, line.indexOf(':') + 1))).toEqual(['name:', 'name:'])
+    })
+
     it(`${pipeline}: a chain of titles does not leave the name readable`, () => {
       const out = mask('Prof. Dr. Ahmet Yılmaz')
       expect(out).not.toContain('Ahmet')
