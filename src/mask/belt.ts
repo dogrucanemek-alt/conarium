@@ -156,20 +156,34 @@ function cover(input: BeltInput): BeltResult {
 }
 
 // Frozen 0.2.54 name shape treats a line break as a word gap, so a mask can
-// end on the next line's label. That label is not a value; keep the line.
+// end on the next line's label. Split only when a piece is that label; a
+// title run with no label stays one range, so the mask count does not grow.
 function splitAtLineBreaks(source: string, spans: BeltSpan[]): BeltSpan[] {
   const out: BeltSpan[] = []
   for (let s = 0; s < spans.length; s++) {
     const sp = spans[s]
+    const kept: BeltSpan[] = []
     let start = sp.start
+    let split = false
     for (let i = sp.start; i < sp.end; i++) {
       const c = source.charCodeAt(i)
       if (c === 10 || c === 13) {
-        if (start < i) out.push({ start, end: i })
+        if (start < i) {
+          if (isExactLabel(source, start, i)) split = true
+          else kept.push({ start, end: i })
+        }
         start = i + 1
       }
     }
-    if (start < sp.end) out.push({ start, end: sp.end })
+    if (start < sp.end) {
+      if (isExactLabel(source, start, sp.end)) split = true
+      else kept.push({ start, end: sp.end })
+    }
+    if (!split) {
+      out.push(sp)
+      continue
+    }
+    for (let k = 0; k < kept.length; k++) out.push(kept[k])
   }
   return out
 }

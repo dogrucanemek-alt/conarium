@@ -51,6 +51,29 @@ describe('labelled names, one per line', () => {
       })
     }
 
+    // 0.3.0 masks a name that follows its label or title on the next line.
+    // Stopping name words at a line break must not stop the label from
+    // reaching across one.
+    const NEXT_LINE: ReadonlyArray<readonly [string, readonly string[]]> = [
+      ['name:\nAhmet Yılmaz', ['Ahmet', 'Yılmaz']],
+      ['Müşteri:\r\nAyşe Demir', ['Ayşe', 'Demir']],
+      ['customer:\n  John Smith', ['John', 'Smith']],
+      ['Sayın\nAhmet Yılmaz', ['Ahmet', 'Yılmaz']],
+    ]
+    for (const [input, words] of NEXT_LINE) {
+      it(`${pipeline}: value on the line after its label or title: ${JSON.stringify(input)}`, () => {
+        const out = mask(input)
+        for (const word of words) expect(out).not.toContain(word)
+      })
+    }
+
+    it(`${pipeline}: a label followed by another label on the next line masks the name and keeps both labels`, () => {
+      const out = mask('Name:\nName: Mehmet Kaya')
+      expect(out).not.toContain('Mehmet')
+      expect(out).not.toContain('Kaya')
+      expect(out.split('\n').map((line) => line.slice(0, line.indexOf(':') + 1))).toEqual(['Name:', 'Name:'])
+    })
+
     it(`${pipeline}: a chain of titles does not leave the name readable`, () => {
       const out = mask('Prof. Dr. Ahmet Yılmaz')
       expect(out).not.toContain('Ahmet')
