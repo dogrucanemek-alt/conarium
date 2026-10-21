@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.1 - every name in a labelled list is masked, and each line keeps its label
+
+A name written after its label, one per line, could run on into the next
+line. The words of a name were allowed to be separated by a line break, and
+the label pattern was case-insensitive, so the next line's `name` read as a
+third word of the name. The first match took the next line's label with it,
+the next name had no label in front of it, and every second name in the list
+stayed readable:
+
+- `name: Ahmet Yilmaz`, `name: Mehmet Kaya`, `name: Ali Can`, one per line,
+  came out as `name: [MASKED_PII]: Mehmet Kaya` and `name: [MASKED_PII]`.
+  Each line now keeps its label and each name is masked. The same holds for
+  the other labels (`customer:`, `musteri:`, …) and for CRLF line ends.
+- `Prof. Dr. Ahmet Yilmaz` left the name readable. A chain of titles is now
+  read as one prefix, and the name after it is masked.
+
+In 0.2.54, `Governance.maskPII` had the same every-second-name result and
+`maskSensitiveText` did not mask labelled names at all. 0.3.0 masked them on
+both paths and carried the same result to both.
+
+The words of a name no longer span a line break. A label or a title may still
+be followed by its value on the next line (`name:` then `Ahmet Yilmaz`), and
+that value is masked, as in 0.3.0. A value that is itself a known label is not
+taken as a name, so `Name:` followed by `Name: Mehmet Kaya` masks the name and
+keeps both labels.
+
+On the model path the frozen 0.2.54 steps still run alongside and still find
+the run-on range. A piece of that range that is only the next line's label is
+no longer masked; the rest of the range is. When the run-on range holds no
+label, it is left as one range, so masking a field of repeated titles stays
+linear in its length.
+
 ## 0.3.0 - masking rewritten: each detector reads the original text, and the 0.2.54 steps run alongside
 
 The masking that runs over audit arguments and error text (`maskSensitiveText`)
