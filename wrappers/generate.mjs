@@ -121,7 +121,7 @@ MIT licensed.
 
 const pkg = (name, what) => ({
   name,
-  version: '1.0.0',
+  version: '1.1.0',
   description: `Launcher for the ${name} command from ${CORE_NAME} (${what}).`,
   keywords: ['conarium', 'cli', 'audit', 'receipts', 'verification'],
   license: 'MIT',

@@ -1,6 +1,6 @@
 {
   "name": "conarium-countersign-verify",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-countersign-verify command from @conarium-ai/core (verify a countersignature).",
   "keywords": [
     "conarium",

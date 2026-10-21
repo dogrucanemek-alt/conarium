@@ -1,6 +1,6 @@
 {
   "name": "conarium-suggest-policy",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-suggest-policy command from @conarium-ai/core (suggest a policy from observed traffic).",
   "keywords": [
     "conarium",

@@ -1,6 +1,6 @@
 {
   "name": "conarium-anchor-service",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-anchor-service command from @conarium-ai/core (submit a chain head for anchoring).",
   "keywords": [
     "conarium",

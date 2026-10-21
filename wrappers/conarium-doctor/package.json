@@ -1,6 +1,6 @@
 {
   "name": "conarium-doctor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-doctor command from @conarium-ai/core (check an installation).",
   "keywords": [
     "conarium",
