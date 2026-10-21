@@ -1,6 +1,6 @@
 {
   "name": "conarium-reconcile",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-reconcile command from @conarium-ai/core (reconcile a chain against the source database).",
   "keywords": [
     "conarium",

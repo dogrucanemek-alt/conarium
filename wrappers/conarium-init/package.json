@@ -1,6 +1,6 @@
 {
   "name": "conarium-init",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-init command from @conarium-ai/core (write keys and a fail-closed config).",
   "keywords": [
     "conarium",

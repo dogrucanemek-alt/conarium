@@ -1,6 +1,6 @@
 {
   "name": "conarium-coverage",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-coverage command from @conarium-ai/core (report policy coverage).",
   "keywords": [
     "conarium",

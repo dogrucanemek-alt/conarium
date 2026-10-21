@@ -1,6 +1,6 @@
 {
   "name": "conarium",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium command from @conarium-ai/core (the Conarium gateway).",
   "keywords": [
     "conarium",

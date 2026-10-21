@@ -1,6 +1,6 @@
 {
   "name": "conarium-verify",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-verify command from @conarium-ai/core (verify a receipt chain).",
   "keywords": [
     "conarium",

@@ -1,6 +1,6 @@
 {
   "name": "conarium-token-sync",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Launcher for the conarium-token-sync command from @conarium-ai/core (sync API tokens).",
   "keywords": [
     "conarium",
