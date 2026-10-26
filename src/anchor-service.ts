@@ -305,7 +305,8 @@ export function createAnchorService(opts: AnchorServiceOptions) {
   }
 
   const app = express()
-  app.use(express.json({ limit: '16kb' }))
+  // inflate: false — a compressed body would be decoded before auth runs.
+  app.use(express.json({ limit: '16kb', inflate: false }))
 
   function auth(req: Request, res: Response): string | null {
     const header = req.header('authorization') ?? ''

@@ -211,7 +211,8 @@ export function createConsoleApp(opts: {
   const limiter = new RateLimiter({ perWindow: Number(process.env.CONARIUM_CONSOLE_RATE_PER_MIN ?? 60) })
   const sweepTimer = setInterval(() => limiter.sweep(), 5 * 60_000)
   sweepTimer.unref()   // an open timer must not keep the process alive
-  app.use(express.json({ limit: '64kb' }))
+  // inflate: false — a compressed body would be decoded before any route check.
+  app.use(express.json({ limit: '64kb', inflate: false }))
 
   const publicDir = path.join(__dirname, '../public')
   const assetsDir = path.join(__dirname, '../assets')
