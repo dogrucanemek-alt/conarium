@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.2 - compressed JSON bodies are refused, and zod moves to 4.6.7
+
+The anchor service and the console parsed JSON request bodies with
+`express.json()`, which decodes a gzip, deflate or br body before any route or
+token check runs, so an anonymous caller could feed bytes to the Node
+decompressors. Both now parse with `inflate: false`: a compressed body is
+answered with 415 and is not decoded (`src/json-no-inflate.test.ts` sends gzip
+and br to each). Node's October 21 release fixed an out-of-bounds write in the
+Brotli decoder (CVE-2026-111497); this keeps that path closed on a runtime
+without the fix.
+
+`zod`, which `@conarium-ai/core` pins exactly, moves from 4.5.4 to 4.6.7 for
+GHSA-mrhx-c7xc-m3w5: validating a large array against a schema with no length
+bound could exhaust memory. The console's policy patch has such arrays; its
+request body was already limited to 64 kB.
+
+The repository lockfiles also move `body-parser` to 2.4.0 (with `qs` 6.16.1),
+`fast-uri` to 3.1.9, `proxy-addr` to 2.0.8, `@modelcontextprotocol/sdk` to
+1.32.1, `vite` to 8.3.5 and `source-map-js` to 1.2.2. A lockfile is not
+published with the package, so these reach the tests, the CI and the examples;
+an installed `@conarium-ai/core` resolves its own dependency ranges.
+
 ## 0.3.1 - every name in a labelled list is masked, and each line keeps its label
 
 A name written after its label, one per line, could run on into the next
