@@ -29,9 +29,10 @@ No dates. Shipping 1.0 is a decision, not a document.
 
 ## What 1.0 would not promise
 
-- A JavaScript import surface. `package.json` has `main` pointing at the
-  stdio gateway. There is no `exports` map. `import { Governance } from
-  '@conarium-ai/core'` is not an API.
+- A JavaScript import surface. The package root (`main`, and `"."` in the
+  `exports` map) is the stdio gateway and runs it on import. The one library
+  entry, `@conarium-ai/core/mask`, is experimental (see Package exports).
+  `import { Governance } from '@conarium-ai/core'` is not an API.
 - MySQL. The SQL gate is Postgres, Microsoft SQL Server, and Oracle. Oracle synonyms and database links are not resolved.
 - That an OpenTimestamps stamp is confirmed. `pending` is a valid
   outcome.
@@ -162,10 +163,13 @@ Env: `CONARIUM_CONSOLE_HOST`, `CONARIUM_CONSOLE_PORT`,
 | Entry | Label |
 |---|---|
 | `bin` map above | see CLI |
-| `"main": "./dist/index.js"` | experimental — process entry, not a library |
-| `exports` field | **absent** |
+| `"main": "./dist/index.js"`, `exports["."]` | experimental — process entry, not a library; importing it starts the stdio gateway |
+| `exports["./mask"]` → `./dist/mask.js` | experimental — `maskField`, `maskSensitiveText`, `compileCustomPatterns` and their types; importing it starts no server (`test/mask_entry.mjs`) |
+| `maskField` options `only`, results `classes` and `masked` | experimental — `only` lists the classes to mask; `classes` counts what the core found per class, `masked` what was replaced (`unclassified`, or `{ whole: 1 }`); counts, never values (`src/mask-classes.test.ts`) |
+| package `@conarium-ai/mask` (`packages/mask`) | experimental — the same `src/mask.ts`, built on its own with `@eslint-community/regexpp` and `re2js` as its only dependencies (`test/mask_package.mjs`) |
+| `exports["./*"]` → `./*` | a deep path that names a file, extension included, resolves to that file; extensionless `require` paths, which resolved before the map existed, no longer do. What it reaches is **internal** |
 | `dist/governance.js`, `dist/ots/*`, `dist/http.js`, … | **internal** |
-| TypeScript types in `src/types.ts` | **internal** until an `exports` map exists |
+| TypeScript types in `src/types.ts` | **internal**, except the ones `./mask` re-exports |
 
 ---
 

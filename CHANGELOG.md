@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.3.3 - the masking engine as a library: @conarium-ai/mask, and per-class masking
+
+Importing `@conarium-ai/core` runs the stdio gateway: `dist/index.js` calls
+`main()` on import, so a program that only wanted to mask a value had nothing
+it could import. `@conarium-ai/core/mask` is that entry. It exports
+`maskField`, `maskSensitiveText` and `compileCustomPatterns` with their types,
+the same functions the gateway calls (`src/governance.ts`, `src/audit.ts`),
+and importing it starts no server: `test/mask_entry.mjs` imports it by name
+with stdin left open and requires the process to exit with no output.
+
+`@conarium-ai/mask` is the same entry as a package of its own, built from the
+same `src/mask.ts` into `packages/mask`. Its only dependencies are the two the
+engine imports, `@eslint-community/regexpp` and `re2js`, at the root's pins, so
+a program that masks does not install the gateway's server and database
+dependencies. `test/mask_package.mjs` checks the version, the pins, that the
+built tree imports nothing else, what npm ships, and that importing it starts
+nothing.
+
+`maskField` can now mask some classes and leave others. `only` lists the
+classes to mask. The result gains `classes`, how many spans of each class the
+core found, and `masked`, what was replaced: a count per class,
+`unclassified` for regions the 0.2.54 belt masks without a class (those are
+always masked), or `{ whole: 1 }` when the whole field was replaced. The
+counts carry no values, and a zero-length match (a custom pattern that can
+match the empty string, such as `^|SECRET`) is not counted: before this was
+caught in review, `"SECRET"` came back as `[MASKED_PII]SECRET` with
+`masked: { custom: 1 }`. Without `only` the masked text is what it was. Before
+this, `byClass` was the only count and it covered custom patterns alone; it
+keeps that meaning.
+
+The package now has an `exports` map. `"."` is the gateway as before,
+`"./mask"` is the new entry, and `"./*"` resolves a deep path to the same
+file. One thing that resolved before no longer does: an extensionless
+`require` path such as `@conarium-ai/core/dist/governance`. Name the file with
+its extension. What deep paths reach stays internal.
+
+`docs/API-STABILITY.md` said there was no `exports` map. It now lists the
+three entries with their labels, and `test/api_stability_exports.mjs` fails
+when a key of the map is missing from that table or when the document says
+the map is absent.
+
 ## 0.3.2 - compressed JSON bodies are refused, and zod moves to 4.6.7
 
 The anchor service and the console parsed JSON request bodies with

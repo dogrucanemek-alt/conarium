@@ -16,9 +16,9 @@ FROM node:26-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.mask.json ./
 COPY src ./src
-RUN npm run build            # tsc -> dist/
+RUN npm run build            # tsc -> dist/ (and packages/mask/dist, not copied to the runtime stage)
 
 # --- runtime stage ---
 FROM node:26-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS runtime
