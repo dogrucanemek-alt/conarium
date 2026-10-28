@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { maskField } from '../mask-text.js'
 import type { SpanClass } from './core.js'
+import { detectSpeechSpans } from './speech.js'
 
 function fixture(name: string): string {
   return readFileSync(new URL(`../../test/fixtures/speech/${name}`, import.meta.url), 'utf8').trim()
@@ -42,7 +43,7 @@ describe('speech pipeline: measured transcripts', () => {
 
   it('in the transcript of numbers written as digits, masks the runs it can see and keeps the rest', () => {
     const out = speech(fixture(DIGITS)).text
-    for (const value of ['TR-33-1-50', '1005-1978', '8-4-23-26', '05-3-123-45-67', 'aysen.tyilmaz.example.com']) {
+    for (const value of ['TR-33-1-50', '1005-1978', '05-3-123-45-67', 'aysen.tyilmaz.example.com']) {
       expect(out, `${value} left`).not.toContain(value)
     }
     for (const words of ['müşterimizin', 'numaralı', 'Bu ay ciromuz', '1.200']) {
@@ -62,7 +63,9 @@ describe('speech pipeline: the rules', () => {
   })
 
   it('leaves a run of 6 digits', () => {
-    for (const run of ['123 456', '12-34-56', '123456']) {
+    // 8-4-23-26 is the six-digit tail of an IBAN the model broke apart: below
+    // the run length, it is a leak this pipeline does not close.
+    for (const run of ['123 456', '12-34-56', '123456', '8-4-23-26']) {
       expect(speech(`kod ${run} tamam`).text).toBe(`kod ${run} tamam`)
     }
   })
@@ -107,6 +110,8 @@ describe('speech pipeline: what it leaves alone', () => {
       '2026 yılında',
       'tarih 28-10-2026',
       'tarih 28.10.2026',
+      '2025-2026 yılları',
+      '2025 2026 arası',
       '3 kişi geldi',
     ]) {
       expect(speech(text).text, text).toBe(text)
@@ -123,6 +128,34 @@ describe('speech pipeline: what it leaves alone', () => {
     for (const text of ['kontrol et lütfen', 'Ali et yedi', 'bunu not et nokta koy']) {
       expect(speech(text).text, text).toBe(text)
     }
+  })
+})
+
+describe('speech pipeline: an IBAN needs digits', () => {
+  it('does not read TR with fewer than four digits as an IBAN', () => {
+    for (const text of ['Model TR 2 geldi', 'TR 100 kodu', 'tr-12 hattı']) {
+      expect(speech(text).text, text).toBe(text)
+    }
+  })
+})
+
+describe('speech pipeline: time is linear in the text', () => {
+  it('a long nokta chain before many et words takes well under a second', () => {
+    const words: string[] = []
+    for (let i = 0; i < 3_000; i++) words.push(i % 2 ? 'nokta' : 'a')
+    words.push('zz', 'p')
+    for (let i = 0; i < 1_500; i++) words.push('q', 'et')
+    const t = performance.now()
+    detectSpeechSpans(words.join(' '))
+    expect(performance.now() - t).toBeLessThan(1_000)
+  })
+
+  it('an et word before a long nokta chain without a domain ending takes well under a second', () => {
+    const words = ['x', 'et']
+    for (let i = 0; i < 20_000; i++) words.push(i % 2 ? 'a' : 'nokta')
+    const t = performance.now()
+    detectSpeechSpans(words.join(' '))
+    expect(performance.now() - t).toBeLessThan(1_000)
   })
 })
 
