@@ -203,21 +203,31 @@ function wholeMasked(): Record<string, number> {
   return bag
 }
 
+// A speech span that overlaps a span of its own class widens it; otherwise
+// it is added. Walking every kept span for every extra one is quadratic:
+// 40 000 dotted addresses spent two seconds in that inner loop. Sort by
+// class and start, then merge in one pass.
 function absorbSpeech(spans: Span[], extra: readonly Span[]): void {
-  for (let e = 0; e < extra.length; e++) {
-    const sp = extra[e]
-    let merged = false
-    for (let i = 0; i < spans.length; i++) {
-      const cur = spans[i]
-      if (cur.cls !== sp.cls) continue
-      if (sp.start >= cur.end || cur.start >= sp.end) continue
-      if (sp.start < cur.start) cur.start = sp.start
-      if (sp.end > cur.end) cur.end = sp.end
-      merged = true
-      break
+  if (extra.length === 0) return
+  for (let e = 0; e < extra.length; e++) spans.push(extra[e])
+  mergeSameClass(spans)
+}
+
+function mergeSameClass(spans: Span[]): void {
+  if (spans.length < 2) return
+  spans.sort((a, b) => (a.cls < b.cls ? -1 : a.cls > b.cls ? 1 : a.start - b.start || a.end - b.end))
+  let w = 0
+  for (let r = 1; r < spans.length; r++) {
+    const cur = spans[w]
+    const nxt = spans[r]
+    if (cur.cls === nxt.cls && nxt.start < cur.end) {
+      if (nxt.end > cur.end) cur.end = nxt.end
+    } else {
+      w++
+      spans[w] = nxt
     }
-    if (!merged) spans.push(sp)
   }
+  spans.length = w + 1
 }
 
 function coreToApply(spans: readonly Span[], only: readonly SpanClass[] | undefined): readonly Span[] {
