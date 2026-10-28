@@ -170,6 +170,32 @@ describe('speech pipeline: time is linear in the text', () => {
   })
 })
 
+describe('speech pipeline: mixed and Turkish-cased addresses', () => {
+  it('reads an ending written with a Turkish capital İ', () => {
+    for (const said of ['mail ali.yilmaz.conarium.Aİ', 'mail ali et conarium nokta Aİ']) {
+      const res = speech(said)
+      expect(res.text, said).toBe('mail [MASKED_PII]')
+      expect(res.classes.email, said).toBe(1)
+    }
+  })
+
+  it('reads an address that mixes written dots and spoken nokta on either side of et', () => {
+    for (const said of [
+      'mail ayşe.yılmaz et example nokta com',
+      'mail ayşe nokta yılmaz et example.com',
+      'mail ayşe.yılmaz et example.com',
+    ]) {
+      const res = speech(`${said} yazın`)
+      expect(res.text, said).toBe('mail [MASKED_PII] yazın')
+      expect(res.classes.email, said).toBe(1)
+    }
+  })
+
+  it('does not read the Turkish word biz as a domain ending', () => {
+    expect(speech('mail ali et example nokta com nokta Biz geldik').text).toBe('mail [MASKED_PII] nokta Biz geldik')
+  })
+})
+
 describe('speech pipeline: endings and operator patterns', () => {
   it('reads a spoken or dotted address ending in a common newer domain', () => {
     for (const said of ['mail ayse nokta yilmaz et example nokta dev', 'mail ayse.yilmaz.example.app']) {
