@@ -110,6 +110,7 @@ describe('speech pipeline: what it leaves alone', () => {
       '2026 yılında',
       'tarih 28-10-2026',
       'tarih 28.10.2026',
+      'tarih 28 10 2026',
       '2025-2026 yılları',
       '2025 2026 arası',
       '3 kişi geldi',
@@ -148,6 +149,15 @@ describe('speech pipeline: time is linear in the text', () => {
     const t = performance.now()
     detectSpeechSpans(words.join(' '))
     expect(performance.now() - t).toBeLessThan(1_000)
+  })
+
+  it('forty thousand dotted addresses through maskField take well under a second', () => {
+    const text = 'a.b.c.com '.repeat(40_000)
+    const t = performance.now()
+    const res = maskField(text, { pipeline: 'speech', scanCharCap: 1_048_576 })
+    expect(performance.now() - t).toBeLessThan(1_000)
+    expect(res.masked.whole ?? 0).toBe(0)
+    expect(res.classes.email).toBe(40_000)
   })
 
   it('an et word before a long nokta chain without a domain ending takes well under a second', () => {
