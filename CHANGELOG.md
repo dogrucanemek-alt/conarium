@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.3 - @conarium-ai/core/mask: the masking engine without the server
+## 0.3.3 - the masking engine as a library: @conarium-ai/mask, and per-class masking
 
 Importing `@conarium-ai/core` runs the stdio gateway: `dist/index.js` calls
 `main()` on import, so a program that only wanted to mask a value had nothing
@@ -9,8 +9,23 @@ it could import. `@conarium-ai/core/mask` is that entry. It exports
 the same functions the gateway calls (`src/governance.ts`, `src/audit.ts`),
 and importing it starts no server: `test/mask_entry.mjs` imports it by name
 with stdin left open and requires the process to exit with no output.
-`maskField` returns the masked text, the number of masked regions and a count
-per class.
+
+`@conarium-ai/mask` is the same entry as a package of its own, built from the
+same `src/mask.ts` into `packages/mask`. Its only dependencies are the two the
+engine imports, `@eslint-community/regexpp` and `re2js`, at the root's pins, so
+a program that masks does not install the gateway's server and database
+dependencies. `test/mask_package.mjs` checks the version, the pins, that the
+built tree imports nothing else, what npm ships, and that importing it starts
+nothing.
+
+`maskField` can now mask some classes and leave others. `only` lists the
+classes to mask. The result gains `classes`, how many spans of each class the
+core found, and `masked`, what was replaced: a count per class,
+`unclassified` for regions the 0.2.54 belt masks without a class (those are
+always masked), or `{ whole: 1 }` when the whole field was replaced. The
+counts carry no values. Without `only` the masked text is what it was. Before
+this, `byClass` was the only count and it covered custom patterns alone; it
+keeps that meaning.
 
 The package now has an `exports` map. `"."` is the gateway as before,
 `"./mask"` is the new entry, and `"./*"` resolves a deep path to the same
