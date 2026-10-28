@@ -19,7 +19,7 @@
   ],
   "dependencies": {
     "@eslint-community/regexpp": "4.12.2",
-    "re2js": "2.8.6"
+    "re2js": "2.8.7"
   },
   "repository": {
     "type": "git",

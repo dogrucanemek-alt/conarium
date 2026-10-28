@@ -23,6 +23,10 @@ with spaces (`1 250 000`) are a run and are masked. `1234567,89` is a run
 of 7 digits and is masked, and so is a decimal part of 7 or more digits
 (`0,1234567`). The text pipeline is unchanged.
 
+`re2js`, which runs operator patterns, is 2.8.7 in both packages: 2.8.6 has
+quadratic-time lookbehind matching (GHSA-gg6h-894w-4m9c), and an operator
+pattern may use lookbehind.
+
 ## 0.3.3 - the masking engine as a library: @conarium-ai/mask, and per-class masking
 
 Importing `@conarium-ai/core` runs the stdio gateway: `dist/index.js` calls
