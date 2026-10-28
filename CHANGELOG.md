@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+`maskField` now accepts `pipeline: 'speech'` for text a local speech model
+wrote from a recording. That pipeline masks digit runs split by spaces or
+hyphens (a valid TCKN, a phone shape the text pipeline already accepts, a
+Luhn-valid 13-to-19-digit card, or a run with no class, which is always
+masked), `TR` plus such a run as an IBAN, and addresses said with `et` / `at`
+and `nokta` or written as four or more dotted labels without `@`. The text
+pipeline is unchanged.
+
 ## 0.3.3 - the masking engine as a library: @conarium-ai/mask, and per-class masking
 
 Importing `@conarium-ai/core` runs the stdio gateway: `dist/index.js` calls

@@ -166,6 +166,7 @@ Env: `CONARIUM_CONSOLE_HOST`, `CONARIUM_CONSOLE_PORT`,
 | `"main": "./dist/index.js"`, `exports["."]` | experimental — process entry, not a library; importing it starts the stdio gateway |
 | `exports["./mask"]` → `./dist/mask.js` | experimental — `maskField`, `maskSensitiveText`, `compileCustomPatterns` and their types; importing it starts no server (`test/mask_entry.mjs`) |
 | `maskField` options `only`, results `classes` and `masked` | experimental — `only` lists the classes to mask; `classes` counts what the core found per class, `masked` what was replaced (`unclassified`, or `{ whole: 1 }`); counts, never values (`src/mask-classes.test.ts`) |
+| `maskField` option `pipeline: 'speech'` | experimental — text a local speech model wrote from a recording; digit runs split by spaces or hyphens, spoken and dotted addresses without `@`, and `TR` plus a digit run as an IBAN (`src/mask/speech.ts`). The text pipeline is unchanged. |
 | package `@conarium-ai/mask` (`packages/mask`) | experimental — the same `src/mask.ts`, built on its own with `@eslint-community/regexpp` and `re2js` as its only dependencies (`test/mask_package.mjs`) |
 | `exports["./*"]` → `./*` | a deep path that names a file, extension included, resolves to that file; extensionless `require` paths, which resolved before the map existed, no longer do. What it reaches is **internal** |
 | `dist/governance.js`, `dist/ots/*`, `dist/http.js`, … | **internal** |
