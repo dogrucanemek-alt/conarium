@@ -71,9 +71,14 @@ await check('the built tree imports nothing else', () => {
 
 await check('npm ships dist, README.md, LICENSE and package.json only', () => {
   assert.ok(pkg, 'packages/mask/package.json is missing')
-  const r = spawnSync('npm', ['pack', '--dry-run', '--json'], { cwd: dir, encoding: 'utf8', shell: process.platform === 'win32' })
+  // One command string: on Windows npm is npm.cmd and needs a shell; nothing here is user input.
+  const r = spawnSync('npm pack --dry-run --json', { cwd: dir, encoding: 'utf8', shell: true })
   assert.equal(r.status, 0, r.stderr)
-  const files = JSON.parse(r.stdout.slice(r.stdout.indexOf('[')))[0].files.map((f) => f.path)
+  // npm 10 prints an array of packs, npm 12 an object keyed by package name.
+  const json = r.stdout.trimStart()
+  const parsed = JSON.parse(json.slice(Math.min(...['[', '{'].map((c) => (json.indexOf(c) < 0 ? Infinity : json.indexOf(c))))))
+  const pack = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0]
+  const files = pack.files.map((f) => f.path)
   for (const need of ['dist/mask.js', 'dist/mask.d.ts', 'README.md', 'LICENSE', 'package.json']) assert.ok(files.includes(need), `${need} is not shipped`)
   const extra = files.filter((f) => !/^(dist\/|README\.md$|LICENSE$|package\.json$)/.test(f))
   assert.deepEqual(extra, [], `ships files outside dist: ${extra.join(', ')}`)

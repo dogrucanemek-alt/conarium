@@ -1,0 +1,36 @@
+{
+  "name": "@conarium-ai/mask",
+  "version": "0.3.3",
+  "description": "The Conarium masking engine as a library, built from the same source as @conarium-ai/core.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/mask.js",
+  "types": "./dist/mask.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/mask.d.ts",
+      "default": "./dist/mask.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@eslint-community/regexpp": "4.12.2",
+    "re2js": "2.8.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dogrucanemek-alt/conarium.git",
+    "directory": "packages/mask"
+  },
+  "homepage": "https://github.com/dogrucanemek-alt/conarium",
+  "bugs": {
+    "url": "https://github.com/dogrucanemek-alt/conarium/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

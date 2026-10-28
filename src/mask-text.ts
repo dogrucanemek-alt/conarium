@@ -6,7 +6,7 @@ import { normalizePiiText } from './pii_normalize.js'
 import { resolveScanCharCap } from './digit_pii.js'
 import type { CompiledCustomPattern } from './custom_patterns.js'
 import type { DetectorToggles } from './types.js'
-import { apply, detect, type Span } from './mask/core.js'
+import { apply, detect, type Span, type SpanClass } from './mask/core.js'
 import { beltCover } from './mask/belt.js'
 
 export interface MaskTextOptions {
@@ -30,6 +30,7 @@ export interface MaskFieldOptions extends MaskTextOptions {
   pipeline: 'text' | 'governance'
   column?: string
   maskLabelledNames?: boolean
+  only?: readonly SpanClass[]
 }
 
 function tokenTier(token: string): number {
@@ -161,15 +162,75 @@ function ownByClass(src: Record<string, number> | undefined): Record<string, num
   return bag
 }
 
+function emptyBag(): Record<string, number> {
+  return Object.create(null)
+}
+
+function addCount(bag: Record<string, number>, key: string, n = 1): void {
+  if (!(n > 0)) return
+  const prev = Object.prototype.hasOwnProperty.call(bag, key) ? bag[key] : 0
+  Object.defineProperty(bag, key, {
+    value: prev + n,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  })
+}
+
+function countClasses(spans: readonly Span[]): Record<string, number> {
+  const bag = emptyBag()
+  for (let i = 0; i < spans.length; i++) addCount(bag, spans[i].cls)
+  return bag
+}
+
+function countMasked(core: readonly Span[], beltOnly: readonly Span[]): Record<string, number> {
+  const bag = emptyBag()
+  for (let i = 0; i < core.length; i++) addCount(bag, core[i].cls)
+  for (let i = 0; i < beltOnly.length; i++) addCount(bag, 'unclassified')
+  return bag
+}
+
+function wholeMasked(): Record<string, number> {
+  const bag = emptyBag()
+  addCount(bag, 'whole')
+  return bag
+}
+
+function coreToApply(spans: readonly Span[], only: readonly SpanClass[] | undefined): readonly Span[] {
+  if (!only) return spans
+  const allow = new Set(only)
+  const out: Span[] = []
+  for (let i = 0; i < spans.length; i++) {
+    if (allow.has(spans[i].cls)) out.push(spans[i])
+  }
+  return out
+}
+
+function wholeFieldResult(
+  text: string,
+  byClass: Record<string, number>,
+  classes: Record<string, number>,
+): {
+  text: string
+  count: number
+  byClass: Record<string, number>
+  classes: Record<string, number>
+  masked: Record<string, number>
+} {
+  return { text, count: 1, byClass, classes, masked: wholeMasked() }
+}
+
 // The core detects on its own. The belt keeps every span 0.2.54 masked.
 // When the belt cannot decide, the whole field is masked.
 export function maskField(text: string, opts: MaskFieldOptions): {
   text: string
   count: number
   byClass: Record<string, number>
+  classes: Record<string, number>
+  masked: Record<string, number>
 } {
   if (text.length > resolveScanCharCap(opts.scanCharCap)) {
-    return { text: PII, count: 1, byClass: Object.create(null) }
+    return wholeFieldResult(PII, emptyBag(), emptyBag())
   }
   try {
     const normalized = normalizePiiText(text)
@@ -194,13 +255,22 @@ export function maskField(text: string, opts: MaskFieldOptions): {
       scanCharCap: opts.scanCharCap,
     })
     const byClass = ownByClass(detected.byClass)
-    if (!belt.ok) return { text: PII, count: 1, byClass }
+    const classes = countClasses(detected.spans)
+    if (!belt.ok) return wholeFieldResult(PII, byClass, classes)
     const whole = preferToken(detected.wholeField?.token, belt.wholeField, rules)
-    if (whole) return { text: whole, count: 1, byClass }
-    const applied = apply(normalized, detected.spans.concat(beltOnlySpans(detected.spans, belt.spans)))
-    return { text: applied.text, count: applied.regions, byClass }
+    if (whole) return wholeFieldResult(whole, byClass, classes)
+    const coreApplied = coreToApply(detected.spans, opts.only)
+    const beltOnly = beltOnlySpans(detected.spans, belt.spans)
+    const applied = apply(normalized, coreApplied.concat(beltOnly))
+    return {
+      text: applied.text,
+      count: applied.regions,
+      byClass,
+      classes,
+      masked: countMasked(coreApplied, beltOnly),
+    }
   } catch {
-    return { text: PII, count: 1, byClass: Object.create(null) }
+    return wholeFieldResult(PII, emptyBag(), emptyBag())
   }
 }
 

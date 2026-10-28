@@ -110,7 +110,7 @@
     "conarium-suggest-policy": "bin/conarium-suggest-policy.mjs"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc -p tsconfig.mask.json",
     "test": "vitest run",
     "test:anchor-verify": "npm run build && node test/anchor_verify.mjs",
     "test:checks": "npm run build && node test/run-checks.mjs",

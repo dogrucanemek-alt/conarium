@@ -1,5 +1,6 @@
 node_modules/
 dist/
+packages/mask/dist/
 *.env
 .env*
 nexus.config.json

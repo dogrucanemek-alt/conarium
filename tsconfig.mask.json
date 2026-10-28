@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "packages/mask/dist",
+    "types": ["node"]
+  },
+  "files": ["src/mask.ts"],
+  "include": []
+}
