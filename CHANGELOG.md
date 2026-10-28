@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.3 - @conarium-ai/core/mask: the masking engine without the server
+
+Importing `@conarium-ai/core` runs the stdio gateway: `dist/index.js` calls
+`main()` on import, so a program that only wanted to mask a value had nothing
+it could import. `@conarium-ai/core/mask` is that entry. It exports
+`maskField`, `maskSensitiveText` and `compileCustomPatterns` with their types,
+the same functions the gateway calls (`src/governance.ts`, `src/audit.ts`),
+and importing it starts no server: `test/mask_entry.mjs` imports it by name
+with stdin left open and requires the process to exit with no output.
+`maskField` returns the masked text, the number of masked regions and a count
+per class.
+
+The package now has an `exports` map. `"."` is the gateway as before,
+`"./mask"` is the new entry, and `"./*"` resolves a deep path to the same
+file. One thing that resolved before no longer does: an extensionless
+`require` path such as `@conarium-ai/core/dist/governance`. Name the file with
+its extension. What deep paths reach stays internal.
+
+`docs/API-STABILITY.md` said there was no `exports` map. It now lists the
+three entries with their labels, and `test/api_stability_exports.mjs` fails
+when a key of the map is missing from that table or when the document says
+the map is absent.
+
 ## 0.3.2 - compressed JSON bodies are refused, and zod moves to 4.6.7
 
 The anchor service and the console parsed JSON request bodies with
