@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.4 - a speech pipeline for hyphenated digits and spoken addresses
+
+`maskField` now accepts `pipeline: 'speech'` for text a local speech model
+wrote from a recording. That pipeline masks digit runs of 7 or more digits
+split by spaces or hyphens (a valid TCKN, a phone shape the text pipeline
+already accepts, a Luhn-valid 13-to-19-digit card, or a run with no class,
+which is always masked), `TR` plus digits split the same way when there are
+at least four of them as an IBAN, and addresses said with `et` / `at` and
+`nokta` or written as four or more dotted labels whose first two are
+letters only, without `@`, when a word is in the fixed list
+`DOMAIN_ENDINGS` in `src/mask/speech.ts`: the last label of a dotted run;
+a spoken address is read up to its last listed word, so
+`example nokta dev nokta jp` leaves `nokta jp`. An address with no listed
+word is not masked by these rules. It leaves an amount with thousands
+separators (`1.250.000`, `1.250,00`) or under 7 digits before its decimal
+comma, and a time with a colon, dates (`28-10-2026`, `28.10.2026`,
+`28 10 2026`), two years joined by one space or one hyphen (`2025-2026`,
+`2025 2026`), and a six-digit run: `8-4-23-26` is the broken-up tail of an
+IBAN, and this pipeline does not close that leak. The same digits written
+with spaces (`1 250 000`) are a run and are masked. `1234567,89` is a run
+of 7 digits and is masked, and so is a decimal part of 7 or more digits
+(`0,1234567`). The text pipeline is unchanged.
+
+`re2js`, which runs operator patterns, is 2.8.7 in both packages: 2.8.6 has
+quadratic-time lookbehind matching (GHSA-gg6h-894w-4m9c), and an operator
+pattern may use lookbehind.
+
 ## 0.3.3 - the masking engine as a library: @conarium-ai/mask, and per-class masking
 
 Importing `@conarium-ai/core` runs the stdio gateway: `dist/index.js` calls

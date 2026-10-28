@@ -8,6 +8,7 @@ import type { CompiledCustomPattern } from './custom_patterns.js'
 import type { DetectorToggles } from './types.js'
 import { apply, detect, type Span, type SpanClass } from './mask/core.js'
 import { beltCover } from './mask/belt.js'
+import { detectSpeechSpans } from './mask/speech.js'
 
 export interface MaskTextOptions {
   scanCharCap?: number
@@ -27,7 +28,7 @@ const SECRET = '[MASKED_SECRET]'
 const PII = '[MASKED_PII]'
 
 export interface MaskFieldOptions extends MaskTextOptions {
-  pipeline: 'text' | 'governance'
+  pipeline: 'text' | 'governance' | 'speech'
   column?: string
   maskLabelledNames?: boolean
   only?: readonly SpanClass[]
@@ -202,6 +203,52 @@ function wholeMasked(): Record<string, number> {
   return bag
 }
 
+// Fold each speech span into a core span of its class that it overlaps
+// (widening that core span); otherwise add it. Core spans stay as the
+// text pipeline produced them — two overlapping operator patterns stay
+// two. Sort the speech spans and walk each class's cores once; do not
+// walk every span for every speech span.
+function absorbSpeech(spans: Span[], extra: readonly Span[]): void {
+  if (extra.length === 0) return
+  const speech = extra.slice()
+  speech.sort((a, b) => (a.cls < b.cls ? -1 : a.cls > b.cls ? 1 : a.start - b.start || a.end - b.end))
+
+  const byClass: Record<string, Span[]> = Object.create(null)
+  for (let i = 0; i < spans.length; i++) {
+    const sp = spans[i]
+    const list = Object.prototype.hasOwnProperty.call(byClass, sp.cls)
+      ? byClass[sp.cls]
+      : (byClass[sp.cls] = [])
+    list.push(sp)
+  }
+  for (const key of Object.keys(byClass)) {
+    byClass[key].sort((a, b) => a.start - b.start || a.end - b.end)
+  }
+
+  let cls = ''
+  let cores: Span[] = []
+  let c = 0
+  for (let i = 0; i < speech.length; i++) {
+    const sp = speech[i]
+    if (sp.cls !== cls) {
+      cls = sp.cls
+      cores = Object.prototype.hasOwnProperty.call(byClass, cls) ? byClass[cls] : []
+      c = 0
+    }
+    while (c < cores.length && cores[c].end <= sp.start) c++
+    let folded = false
+    for (let k = c; k < cores.length && cores[k].start < sp.end; k++) {
+      if (sp.start < cores[k].end) {
+        if (sp.start < cores[k].start) cores[k].start = sp.start
+        if (sp.end > cores[k].end) cores[k].end = sp.end
+        folded = true
+        break
+      }
+    }
+    if (!folded) spans.push(sp)
+  }
+}
+
 function coreToApply(spans: readonly Span[], only: readonly SpanClass[] | undefined): readonly Span[] {
   if (!only) return spans
   const allow = new Set(only)
@@ -247,10 +294,16 @@ export function maskField(text: string, opts: MaskFieldOptions): {
       column: opts.column,
       maskLabelledNames: opts.maskLabelledNames,
     })
+    let speechUnclassified: { start: number; end: number }[] = []
+    if (opts.pipeline === 'speech') {
+      const found = detectSpeechSpans(normalized)
+      absorbSpeech(detected.spans, found.classified)
+      speechUnclassified = found.unclassified
+    }
     const belt = beltCover({
       raw: text,
       normalized,
-      pipeline: opts.pipeline,
+      pipeline: opts.pipeline === 'governance' ? 'governance' : 'text',
       policy: {
         detectors: opts.detectors,
         scanCharCap: opts.scanCharCap,
@@ -266,7 +319,10 @@ export function maskField(text: string, opts: MaskFieldOptions): {
     const whole = preferToken(detected.wholeField?.token, belt.wholeField, rules)
     if (whole) return wholeFieldResult(whole, byClass, classes)
     const coreApplied = coreToApply(detected.spans, opts.only)
-    const beltOnly = beltOnlySpans(detected.spans, belt.spans)
+    const beltRanges = speechUnclassified.length === 0
+      ? belt.spans
+      : belt.spans.concat(speechUnclassified)
+    const beltOnly = beltOnlySpans(detected.spans, beltRanges)
     const applied = apply(normalized, coreApplied.concat(beltOnly))
     return {
       text: applied.text,
