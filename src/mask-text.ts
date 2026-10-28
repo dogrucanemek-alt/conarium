@@ -8,6 +8,7 @@ import type { CompiledCustomPattern } from './custom_patterns.js'
 import type { DetectorToggles } from './types.js'
 import { apply, detect, type Span, type SpanClass } from './mask/core.js'
 import { beltCover } from './mask/belt.js'
+import { detectSpeechSpans } from './mask/speech.js'
 
 export interface MaskTextOptions {
   scanCharCap?: number
@@ -27,7 +28,7 @@ const SECRET = '[MASKED_SECRET]'
 const PII = '[MASKED_PII]'
 
 export interface MaskFieldOptions extends MaskTextOptions {
-  pipeline: 'text' | 'governance'
+  pipeline: 'text' | 'governance' | 'speech'
   column?: string
   maskLabelledNames?: boolean
   only?: readonly SpanClass[]
@@ -202,6 +203,23 @@ function wholeMasked(): Record<string, number> {
   return bag
 }
 
+function absorbSpeech(spans: Span[], extra: readonly Span[]): void {
+  for (let e = 0; e < extra.length; e++) {
+    const sp = extra[e]
+    let merged = false
+    for (let i = 0; i < spans.length; i++) {
+      const cur = spans[i]
+      if (cur.cls !== sp.cls) continue
+      if (sp.start >= cur.end || cur.start >= sp.end) continue
+      if (sp.start < cur.start) cur.start = sp.start
+      if (sp.end > cur.end) cur.end = sp.end
+      merged = true
+      break
+    }
+    if (!merged) spans.push(sp)
+  }
+}
+
 function coreToApply(spans: readonly Span[], only: readonly SpanClass[] | undefined): readonly Span[] {
   if (!only) return spans
   const allow = new Set(only)
@@ -247,10 +265,16 @@ export function maskField(text: string, opts: MaskFieldOptions): {
       column: opts.column,
       maskLabelledNames: opts.maskLabelledNames,
     })
+    let speechUnclassified: { start: number; end: number }[] = []
+    if (opts.pipeline === 'speech') {
+      const found = detectSpeechSpans(normalized)
+      absorbSpeech(detected.spans, found.classified)
+      speechUnclassified = found.unclassified
+    }
     const belt = beltCover({
       raw: text,
       normalized,
-      pipeline: opts.pipeline,
+      pipeline: opts.pipeline === 'governance' ? 'governance' : 'text',
       policy: {
         detectors: opts.detectors,
         scanCharCap: opts.scanCharCap,
@@ -266,7 +290,10 @@ export function maskField(text: string, opts: MaskFieldOptions): {
     const whole = preferToken(detected.wholeField?.token, belt.wholeField, rules)
     if (whole) return wholeFieldResult(whole, byClass, classes)
     const coreApplied = coreToApply(detected.spans, opts.only)
-    const beltOnly = beltOnlySpans(detected.spans, belt.spans)
+    const beltRanges = speechUnclassified.length === 0
+      ? belt.spans
+      : belt.spans.concat(speechUnclassified)
+    const beltOnly = beltOnlySpans(detected.spans, beltRanges)
     const applied = apply(normalized, coreApplied.concat(beltOnly))
     return {
       text: applied.text,
