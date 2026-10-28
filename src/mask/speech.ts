@@ -67,7 +67,7 @@ function isDateRun(raw: string): boolean {
   }
   if (n === 0 || i >= raw.length) return false
   const sep = raw[i]
-  if (sep !== '-' && sep !== '.') return false
+  if (sep !== '-' && sep !== '.' && sep !== ' ') return false
   i++
   let month = 0
   n = 0
