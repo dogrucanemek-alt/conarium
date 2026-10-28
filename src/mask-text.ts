@@ -203,31 +203,50 @@ function wholeMasked(): Record<string, number> {
   return bag
 }
 
-// A speech span that overlaps a span of its own class widens it; otherwise
-// it is added. Walking every kept span for every extra one is quadratic:
-// 40 000 dotted addresses spent two seconds in that inner loop. Sort by
-// class and start, then merge in one pass.
+// Fold each speech span into a core span of its class that it overlaps
+// (widening that core span); otherwise add it. Core spans stay as the
+// text pipeline produced them — two overlapping operator patterns stay
+// two. Sort the speech spans and walk each class's cores once; do not
+// walk every span for every speech span.
 function absorbSpeech(spans: Span[], extra: readonly Span[]): void {
   if (extra.length === 0) return
-  for (let e = 0; e < extra.length; e++) spans.push(extra[e])
-  mergeSameClass(spans)
-}
+  const speech = extra.slice()
+  speech.sort((a, b) => (a.cls < b.cls ? -1 : a.cls > b.cls ? 1 : a.start - b.start || a.end - b.end))
 
-function mergeSameClass(spans: Span[]): void {
-  if (spans.length < 2) return
-  spans.sort((a, b) => (a.cls < b.cls ? -1 : a.cls > b.cls ? 1 : a.start - b.start || a.end - b.end))
-  let w = 0
-  for (let r = 1; r < spans.length; r++) {
-    const cur = spans[w]
-    const nxt = spans[r]
-    if (cur.cls === nxt.cls && nxt.start < cur.end) {
-      if (nxt.end > cur.end) cur.end = nxt.end
-    } else {
-      w++
-      spans[w] = nxt
-    }
+  const byClass: Record<string, Span[]> = Object.create(null)
+  for (let i = 0; i < spans.length; i++) {
+    const sp = spans[i]
+    const list = Object.prototype.hasOwnProperty.call(byClass, sp.cls)
+      ? byClass[sp.cls]
+      : (byClass[sp.cls] = [])
+    list.push(sp)
   }
-  spans.length = w + 1
+  for (const key of Object.keys(byClass)) {
+    byClass[key].sort((a, b) => a.start - b.start || a.end - b.end)
+  }
+
+  let cls = ''
+  let cores: Span[] = []
+  let c = 0
+  for (let i = 0; i < speech.length; i++) {
+    const sp = speech[i]
+    if (sp.cls !== cls) {
+      cls = sp.cls
+      cores = Object.prototype.hasOwnProperty.call(byClass, cls) ? byClass[cls] : []
+      c = 0
+    }
+    while (c < cores.length && cores[c].end <= sp.start) c++
+    let folded = false
+    for (let k = c; k < cores.length && cores[k].start < sp.end; k++) {
+      if (sp.start < cores[k].end) {
+        if (sp.start < cores[k].start) cores[k].start = sp.start
+        if (sp.end > cores[k].end) cores[k].end = sp.end
+        folded = true
+        break
+      }
+    }
+    if (!folded) spans.push(sp)
+  }
 }
 
 function coreToApply(spans: readonly Span[], only: readonly SpanClass[] | undefined): readonly Span[] {
