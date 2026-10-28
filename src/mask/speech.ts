@@ -87,18 +87,24 @@ function isDateRun(raw: string): boolean {
   return day >= 1 && day <= 31 && month >= 1 && month <= 12
 }
 
-function hyphenSeps(text: string, start: number, end: number): number {
-  let n = 0
-  for (let i = start; i < end; i++) {
-    if (text.charCodeAt(i) === 45) n++
+function yearValue(raw: string, from: number): number | null {
+  if (from + 4 > raw.length) return null
+  let y = 0
+  for (let k = 0; k < 4; k++) {
+    const c = raw[from + k]
+    if (!isDigit(c)) return null
+    y = y * 10 + (c.charCodeAt(0) - 48)
   }
-  return n
+  if (y < 1900 || y > 2099) return null
+  return y
 }
 
-/** 7+ digits, or a 6-digit run split by 3 or more hyphens (ASR IBAN tail). */
-function longEnoughRun(digits: number, text: string, start: number, end: number): boolean {
-  if (digits >= 7) return true
-  return digits === 6 && hyphenSeps(text, start, end) >= 3
+/** Exactly two 4-digit years 1900–2099 joined by one space or one hyphen. */
+function isYearRange(raw: string): boolean {
+  if (raw.length !== 9) return false
+  const sep = raw[4]
+  if (sep !== '-' && sep !== ' ') return false
+  return yearValue(raw, 0) !== null && yearValue(raw, 5) !== null
 }
 
 function readDigitRun(text: string, start: number): { end: number; digits: string } | null {
@@ -150,10 +156,11 @@ function findDigitRuns(text: string, classified: Span[], unclassified: { start: 
     const start = i
     const end = run.end
     i = end
-    if (!longEnoughRun(run.digits.length, text, start, end)) continue
+    if (run.digits.length < 7) continue
     if (!isolatedRun(text, start, end)) continue
-    if (isDateRun(text.slice(start, end))) continue
-    const cls = classifyDigits(run.digits, text.slice(start, end))
+    const raw = text.slice(start, end)
+    if (isDateRun(raw) || isYearRange(raw)) continue
+    const cls = classifyDigits(run.digits, raw)
     if (cls) pushClassified(classified, start, end, cls)
     else unclassified.push({ start, end })
   }
@@ -177,7 +184,7 @@ function findIbans(text: string, classified: Span[]): void {
       j++
     }
     const run = readDigitRun(text, j)
-    if (!run) {
+    if (!run || run.digits.length < 4) {
       i++
       continue
     }
@@ -205,24 +212,54 @@ function singleSpace(text: string, from: number, to: number): boolean {
   return to === from + 1 && text.charCodeAt(from) === 32
 }
 
-function isNoktaChain(words: readonly Word[], from: number, to: number, text: string): boolean {
-  const n = to - from + 1
-  if (n < 1 || n % 2 === 0) return false
-  for (let k = from; k <= to; k++) {
-    if (k > from && !singleSpace(text, words[k - 1].end, words[k].start)) return false
-    if ((k - from) % 2 === 1 && words[k].lower !== 'nokta') return false
-  }
-  return true
+function noktaLink(words: readonly Word[], text: string, left: number, right: number): boolean {
+  if (right !== left + 2) return false
+  const mid = words[left + 1]
+  return (
+    mid.lower === 'nokta'
+    && singleSpace(text, words[left].end, mid.start)
+    && singleSpace(text, mid.end, words[right].start)
+  )
 }
 
-function tldChain(words: readonly Word[], from: number, to: number): boolean {
-  const last = words[to]
-  if ((to - from) % 2 !== 0) return false
-  return TLD.has(last.lower)
+/**
+ * For each word, how far a nokta chain extends left and right, plus the
+ * rightmost TLD that sits on that right-hand chain. Built in two linear
+ * passes so each `et` / `at` is then a constant-time lookup.
+ */
+function noktaExtents(words: readonly Word[], text: string): {
+  leftExtent: number[]
+  rightExtent: number[]
+  rightmostTld: number[]
+} {
+  const n = words.length
+  const leftExtent = new Array<number>(n)
+  const rightExtent = new Array<number>(n)
+  const rightmostTld = new Array<number>(n)
+
+  for (let i = 0; i < n; i++) {
+    leftExtent[i] = i >= 2 && noktaLink(words, text, i - 2, i) ? leftExtent[i - 2] : i
+  }
+
+  for (let i = n - 1; i >= 0; i--) {
+    if (i + 2 < n && noktaLink(words, text, i, i + 2)) {
+      rightExtent[i] = rightExtent[i + 2]
+      const further = rightmostTld[i + 2]
+      rightmostTld[i] = further >= 0 ? further : TLD.has(words[i].lower) ? i : -1
+    } else {
+      rightExtent[i] = i
+      rightmostTld[i] = TLD.has(words[i].lower) ? i : -1
+    }
+  }
+
+  return { leftExtent, rightExtent, rightmostTld }
 }
 
 function findSpokenEmails(text: string, classified: Span[]): void {
   const words = collectWords(text)
+  if (words.length === 0) return
+  const { leftExtent, rightExtent, rightmostTld } = noktaExtents(words, text)
+
   for (let e = 0; e < words.length; e++) {
     const mark = words[e].lower
     if (mark !== 'et' && mark !== 'at') continue
@@ -230,21 +267,9 @@ function findSpokenEmails(text: string, classified: Span[]): void {
     if (!singleSpace(text, words[e - 1].end, words[e].start)) continue
     if (!singleSpace(text, words[e].end, words[e + 1].start)) continue
 
-    let left = -1
-    for (let s = 0; s < e; s++) {
-      if (isNoktaChain(words, s, e - 1, text)) {
-        left = s
-        break
-      }
-    }
-    if (left < 0) continue
-
-    let right = -1
-    for (let t = e + 3; t < words.length; t += 2) {
-      if (!isNoktaChain(words, e + 1, t, text)) break
-      if (tldChain(words, e + 1, t)) right = t
-    }
-    if (right < 0) continue
+    const left = leftExtent[e - 1]
+    const right = rightmostTld[e + 1]
+    if (right < e + 3 || right > rightExtent[e + 1]) continue
     pushClassified(classified, words[left].start, words[right].end, 'email')
   }
 }
