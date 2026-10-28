@@ -86,6 +86,14 @@
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./mask": {
+      "types": "./dist/mask.d.ts",
+      "default": "./dist/mask.js"
+    },
+    "./*": "./*"
+  },
   "bin": {
     "conarium": "dist/index.js",
     "conarium-doctor": "bin/conarium-doctor.mjs",
