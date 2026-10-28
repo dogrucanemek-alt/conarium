@@ -1,14 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.3.4 - a speech pipeline for hyphenated digits and spoken addresses
 
 `maskField` now accepts `pipeline: 'speech'` for text a local speech model
-wrote from a recording. That pipeline masks digit runs split by spaces or
-hyphens (a valid TCKN, a phone shape the text pipeline already accepts, a
-Luhn-valid 13-to-19-digit card, or a run with no class, which is always
-masked), `TR` plus such a run as an IBAN, and addresses said with `et` / `at`
-and `nokta` or written as four or more dotted labels without `@`. The text
-pipeline is unchanged.
+wrote from a recording. That pipeline masks digit runs of 7 or more digits
+split by spaces or hyphens (a valid TCKN, a phone shape the text pipeline
+already accepts, a Luhn-valid 13-to-19-digit card, or a run with no class,
+which is always masked), `TR` plus digits split the same way when there are
+at least four of them as an IBAN, and addresses said with `et` / `at` and
+`nokta` or written as four or more dotted labels without `@`. It leaves
+amounts, times, dates, two years joined by one space or one hyphen
+(`2025-2026`, `2025 2026`), and a six-digit run: `8-4-23-26` is the
+broken-up tail of an IBAN, and this pipeline does not close that leak. The
+text pipeline is unchanged.
 
 ## 0.3.3 - the masking engine as a library: @conarium-ai/mask, and per-class masking
 

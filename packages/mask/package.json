@@ -1,6 +1,6 @@
 {
   "name": "@conarium-ai/mask",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "The Conarium masking engine as a library, built from the same source as @conarium-ai/core.",
   "license": "MIT",
   "type": "module",
