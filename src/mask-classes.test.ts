@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { maskField } from './mask.js'
+import { compileCustomPatterns, maskField } from './mask.js'
 
 // A gate in front of an agent's tool calls decides per class: mask the TCKN,
 // let the e-mail address through. maskField has to say which classes it found,
@@ -41,6 +41,17 @@ describe('maskField: classes and only', () => {
     const r = maskField(long, { pipeline: 'text', scanCharCap: 20, only: [] })
     expect(r.text).toBe('[MASKED_PII]')
     expect(r.masked).toEqual({ whole: 1 })
+  })
+
+  // Cursor (Sol) review of 0.3.3: "^|SECRET" on "SECRET" gave "[MASKED_PII]SECRET" with
+  // masked { custom: 1 }: a zero-length match was counted as masked while the secret stayed.
+  // Patterns that can match the empty string stay allowed (custom_patterns.edges.test.ts relies on
+  // them); what changes is that the counts only report what was actually replaced.
+  it('a zero-length match is not counted as found or masked', () => {
+    const customPatterns = compileCustomPatterns([{ name: 'z', pattern: '^|SECRET' }])
+    const r = maskField('SECRET', { pipeline: 'text', customPatterns })
+    expect(r.masked.custom ?? 0).toBe(0)
+    expect(r.classes.custom ?? 0).toBe(0)
   })
 
   it('phone and iban are counted under their own names', () => {

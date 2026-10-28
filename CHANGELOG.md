@@ -23,7 +23,10 @@ classes to mask. The result gains `classes`, how many spans of each class the
 core found, and `masked`, what was replaced: a count per class,
 `unclassified` for regions the 0.2.54 belt masks without a class (those are
 always masked), or `{ whole: 1 }` when the whole field was replaced. The
-counts carry no values. Without `only` the masked text is what it was. Before
+counts carry no values, and a zero-length match (a custom pattern that can
+match the empty string, such as `^|SECRET`) is not counted: before this was
+caught in review, `"SECRET"` came back as `[MASKED_PII]SECRET` with
+`masked: { custom: 1 }`. Without `only` the masked text is what it was. Before
 this, `byClass` was the only count and it covered custom patterns alone; it
 keeps that meaning.
 

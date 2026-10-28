@@ -179,14 +179,20 @@ function addCount(bag: Record<string, number>, key: string, n = 1): void {
 
 function countClasses(spans: readonly Span[]): Record<string, number> {
   const bag = emptyBag()
-  for (let i = 0; i < spans.length; i++) addCount(bag, spans[i].cls)
+  for (let i = 0; i < spans.length; i++) {
+    if (spans[i].end > spans[i].start) addCount(bag, spans[i].cls)
+  }
   return bag
 }
 
 function countMasked(core: readonly Span[], beltOnly: readonly Span[]): Record<string, number> {
   const bag = emptyBag()
-  for (let i = 0; i < core.length; i++) addCount(bag, core[i].cls)
-  for (let i = 0; i < beltOnly.length; i++) addCount(bag, 'unclassified')
+  for (let i = 0; i < core.length; i++) {
+    if (core[i].end > core[i].start) addCount(bag, core[i].cls)
+  }
+  for (let i = 0; i < beltOnly.length; i++) {
+    if (beltOnly[i].end > beltOnly[i].start) addCount(bag, 'unclassified')
+  }
   return bag
 }
 
