@@ -7,6 +7,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { compileCustomPatterns } from '../custom_patterns.js'
 import { maskField } from '../mask-text.js'
 import type { SpanClass } from './core.js'
 import { detectSpeechSpans } from './speech.js'
@@ -166,6 +167,28 @@ describe('speech pipeline: time is linear in the text', () => {
     const t = performance.now()
     detectSpeechSpans(words.join(' '))
     expect(performance.now() - t).toBeLessThan(1_000)
+  })
+})
+
+describe('speech pipeline: endings and operator patterns', () => {
+  it('reads a spoken or dotted address ending in a common newer domain', () => {
+    for (const said of ['mail ayse nokta yilmaz et example nokta dev', 'mail ayse.yilmaz.example.app']) {
+      const res = speech(said)
+      expect(res.text, said).not.toContain('example')
+      expect(res.classes.email, said).toBe(1)
+    }
+  })
+
+  it('leaves operator patterns as the text pipeline masks and counts them', () => {
+    const customPatterns = compileCustomPatterns([
+      { name: 'FIRST', pattern: 'bc' },
+      { name: 'SECOND', pattern: 'abc' },
+    ])
+    const text = 'abc 1234567890'
+    const plain = maskField(text, { pipeline: 'text', customPatterns })
+    const spoken = maskField(text, { pipeline: 'speech', customPatterns })
+    expect(spoken.text).toBe(plain.text)
+    expect(spoken.classes.custom).toBe(plain.classes.custom)
   })
 })
 
