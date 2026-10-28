@@ -10,7 +10,54 @@ import type { Span, SpanClass } from './core.js'
 import { detectNumericSpans } from './detectors/numeric.js'
 
 const PII = '[MASKED_PII]'
-const TLD = new Set(['com', 'net', 'org', 'edu', 'gov', 'io', 'ai', 'tr'])
+// Shared by the spoken `et`/`at`+`nokta` rule and the dotted-label rule.
+// An address whose last label is not in this list is not masked by either.
+// `at` is omitted: it is also the spoken `@`.
+const DOMAIN_ENDINGS = new Set([
+  'com',
+  'net',
+  'org',
+  'edu',
+  'gov',
+  'mil',
+  'int',
+  'info',
+  'biz',
+  'io',
+  'ai',
+  'app',
+  'dev',
+  'co',
+  'me',
+  'tv',
+  'xyz',
+  'online',
+  'site',
+  'tech',
+  'cloud',
+  'email',
+  'tr',
+  'uk',
+  'de',
+  'fr',
+  'nl',
+  'it',
+  'es',
+  'eu',
+  'us',
+  'ca',
+  'au',
+  'ch',
+  'be',
+  'se',
+  'no',
+  'dk',
+  'fi',
+  'pl',
+  'ru',
+  'az',
+  'cy',
+])
 const SCHEMES = new Set(['http', 'https', 'ftp', 'mailto', 'file'])
 const MAX_LABELS = 32
 
@@ -245,10 +292,10 @@ function noktaExtents(words: readonly Word[], text: string): {
     if (i + 2 < n && noktaLink(words, text, i, i + 2)) {
       rightExtent[i] = rightExtent[i + 2]
       const further = rightmostTld[i + 2]
-      rightmostTld[i] = further >= 0 ? further : TLD.has(words[i].lower) ? i : -1
+      rightmostTld[i] = further >= 0 ? further : DOMAIN_ENDINGS.has(words[i].lower) ? i : -1
     } else {
       rightExtent[i] = i
-      rightmostTld[i] = TLD.has(words[i].lower) ? i : -1
+      rightmostTld[i] = DOMAIN_ENDINGS.has(words[i].lower) ? i : -1
     }
   }
 
@@ -324,7 +371,7 @@ function findDottedEmails(text: string, classified: Span[]): void {
       labels.length >= 4
       && lettersOnly(labels[0].raw)
       && lettersOnly(labels[1].raw)
-      && TLD.has(labels[labels.length - 1].lower)
+      && DOMAIN_ENDINGS.has(labels[labels.length - 1].lower)
       && (end === text.length || !isLabelChar(text[end]))
     ) {
       pushClassified(classified, first.start, end, 'email')
