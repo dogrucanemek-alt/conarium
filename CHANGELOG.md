@@ -8,11 +8,13 @@ split by spaces or hyphens (a valid TCKN, a phone shape the text pipeline
 already accepts, a Luhn-valid 13-to-19-digit card, or a run with no class,
 which is always masked), `TR` plus digits split the same way when there are
 at least four of them as an IBAN, and addresses said with `et` / `at` and
-`nokta` or written as four or more dotted labels without `@`. It leaves
-amounts, times, dates, two years joined by one space or one hyphen
-(`2025-2026`, `2025 2026`), and a six-digit run: `8-4-23-26` is the
-broken-up tail of an IBAN, and this pipeline does not close that leak. The
-text pipeline is unchanged.
+`nokta` or written as four or more dotted labels whose first two are
+letters only, without `@`. It leaves an amount written with dots or commas
+and a time with a colon, dates (`28-10-2026`, `28.10.2026`, `28 10 2026`),
+two years joined by one space or one hyphen (`2025-2026`, `2025 2026`),
+and a six-digit run: `8-4-23-26` is the broken-up tail of an IBAN, and this
+pipeline does not close that leak. The same digits written with spaces
+(`1 250 000`) are a run and are masked. The text pipeline is unchanged.
 
 ## 0.3.3 - the masking engine as a library: @conarium-ai/mask, and per-class masking
 
