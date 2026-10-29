@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { compileCustomPatterns } from '../custom_patterns.js'
 import { luhnOk } from '../digit_pii.js'
 import { isTd3Mrz, mrzCheckDigit } from '../mrz.js'
+import { maskField } from '../mask-text.js'
 import { apply, detect, type CoreOptions } from './core.js'
 
 function masked(text: string, opts?: CoreOptions): string {
@@ -277,9 +278,12 @@ describe('embedded and whole-field base64', () => {
     expect(masked(`ref: ${plainHex}`)).toBe(`ref: ${plainHex}`)
   })
 
-  it('matches 0.2.54 on an id-prefixed hex that happens to pass the IBAN checksum', () => {
-    // maskSensitiveText and maskPII both returned [MASKED_PII]69. ID68… satisfies mod-97 by chance.
-    expect(masked('id 68656c6c6f2068656c6c6f206869')).toBe('[MASKED_PII]69')
+  it('an id-prefixed hex that passes the IBAN checksum by chance: the core leaves it, the 0.2.54 belt masks it', () => {
+    // maskSensitiveText and maskPII both returned [MASKED_PII]69. ID68… satisfies
+    // mod-97 by chance; ID is not an IBAN country, so the core no longer reads it.
+    const hex = 'id 68656c6c6f2068656c6c6f206869'
+    expect(masked(hex)).toBe(hex)
+    expect(maskField(hex, { pipeline: 'text' }).text).toBe('[MASKED_PII]69')
   })
 })
 
