@@ -9,7 +9,7 @@
     "bypass": "node bypass.mjs"
   },
   "dependencies": {
-    "@conarium-ai/core": "0.3.2",
+    "@conarium-ai/core": "0.3.4",
     "@modelcontextprotocol/sdk": "^1.25.0"
   }
 }
