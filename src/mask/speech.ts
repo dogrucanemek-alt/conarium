@@ -12,7 +12,8 @@ import { detectNumericSpans } from './detectors/numeric.js'
 const PII = '[MASKED_PII]'
 // Shared by the spoken `et`/`at`+`nokta` rule and the dotted-label rule.
 // An address whose last label is not in this list is not masked by either.
-// `at` is omitted: it is also the spoken `@`.
+// `at` is omitted: it is also the spoken `@`. `biz` is omitted: it is
+// the Turkish word "we".
 const DOMAIN_ENDINGS = new Set([
   'com',
   'net',
@@ -22,7 +23,6 @@ const DOMAIN_ENDINGS = new Set([
   'mil',
   'int',
   'info',
-  'biz',
   'io',
   'ai',
   'app',
@@ -92,6 +92,22 @@ function lettersOnly(s: string): boolean {
     if (!isLetter(s[i])) return false
   }
   return true
+}
+
+/** Ending lookup only: `'İ'.toLowerCase()` is `'i' + U+0307`, which misses `ai`. */
+function endingKey(s: string): string {
+  const lower = s.toLowerCase()
+  let out = ''
+  for (let i = 0; i < lower.length; i++) {
+    const c = lower[i]
+    if (c === '\u0307') continue
+    out += c === 'ı' ? 'i' : c
+  }
+  return out
+}
+
+function isDomainEnding(s: string): boolean {
+  return DOMAIN_ENDINGS.has(endingKey(s))
 }
 
 function isolatedRun(text: string, start: number, end: number): boolean {
@@ -292,20 +308,76 @@ function noktaExtents(words: readonly Word[], text: string): {
     if (i + 2 < n && noktaLink(words, text, i, i + 2)) {
       rightExtent[i] = rightExtent[i + 2]
       const further = rightmostTld[i + 2]
-      rightmostTld[i] = further >= 0 ? further : DOMAIN_ENDINGS.has(words[i].lower) ? i : -1
+      rightmostTld[i] = further >= 0 ? further : isDomainEnding(words[i].lower) ? i : -1
     } else {
       rightExtent[i] = i
-      rightmostTld[i] = DOMAIN_ENDINGS.has(words[i].lower) ? i : -1
+      rightmostTld[i] = isDomainEnding(words[i].lower) ? i : -1
     }
   }
 
   return { leftExtent, rightExtent, rightmostTld }
 }
 
+/**
+ * For each word, the start of the dotted run it sits in, and, when the
+ * word begins a dotted run of two or more labels whose last is a listed
+ * ending, that run's end. One left-to-right pass so each `et` / `at`
+ * then reads these in constant time.
+ */
+function dottedExtents(words: readonly Word[], text: string): {
+  runStart: number[]
+  endingEnd: number[]
+} {
+  const n = words.length
+  const runStart = new Array<number>(n)
+  const endingEnd = new Array<number>(n)
+  for (let w = 0; w < n; w++) {
+    runStart[w] = words[w].start
+    endingEnd[w] = -1
+  }
+
+  let i = 0
+  let wi = 0
+  while (i < text.length) {
+    if (!isLetter(text[i]) && !isDigit(text[i])) {
+      i++
+      continue
+    }
+    if (i > 0 && isLabelChar(text[i - 1])) {
+      i++
+      continue
+    }
+    const parsed = parseDotted(text, i)
+    if (!parsed) {
+      i++
+      continue
+    }
+    const { labels, end } = parsed
+    while (wi < n && words[wi].start < i) wi++
+    const first = wi
+    while (wi < n && words[wi].start < end) {
+      runStart[wi] = i
+      wi++
+    }
+    if (
+      first < n
+      && words[first].start === i
+      && labels.length >= 2
+      && isDomainEnding(labels[labels.length - 1].lower)
+      && (end === text.length || !isLabelChar(text[end]))
+    ) {
+      endingEnd[first] = end
+    }
+    i = end
+  }
+  return { runStart, endingEnd }
+}
+
 function findSpokenEmails(text: string, classified: Span[]): void {
   const words = collectWords(text)
   if (words.length === 0) return
   const { leftExtent, rightExtent, rightmostTld } = noktaExtents(words, text)
+  const { runStart, endingEnd } = dottedExtents(words, text)
 
   for (let e = 0; e < words.length; e++) {
     const mark = words[e].lower
@@ -315,9 +387,16 @@ function findSpokenEmails(text: string, classified: Span[]): void {
     if (!singleSpace(text, words[e].end, words[e + 1].start)) continue
 
     const left = leftExtent[e - 1]
-    const right = rightmostTld[e + 1]
-    if (right < e + 3 || right > rightExtent[e + 1]) continue
-    pushClassified(classified, words[left].start, words[right].end, 'email')
+    const start = runStart[left]
+    const spokenRight = rightmostTld[e + 1]
+    if (spokenRight >= e + 3 && spokenRight <= rightExtent[e + 1]) {
+      pushClassified(classified, start, words[spokenRight].end, 'email')
+      continue
+    }
+    const dottedEnd = endingEnd[e + 1]
+    if (dottedEnd > words[e + 1].start) {
+      pushClassified(classified, start, dottedEnd, 'email')
+    }
   }
 }
 
@@ -371,7 +450,7 @@ function findDottedEmails(text: string, classified: Span[]): void {
       labels.length >= 4
       && lettersOnly(labels[0].raw)
       && lettersOnly(labels[1].raw)
-      && DOMAIN_ENDINGS.has(labels[labels.length - 1].lower)
+      && isDomainEnding(labels[labels.length - 1].lower)
       && (end === text.length || !isLabelChar(text[end]))
     ) {
       pushClassified(classified, first.start, end, 'email')
