@@ -12,8 +12,7 @@ import { detectNumericSpans } from './detectors/numeric.js'
 const PII = '[MASKED_PII]'
 // Shared by the spoken `et`/`at`+`nokta` rule and the dotted-label rule.
 // An address whose last label is not in this list is not masked by either.
-// `at` is omitted: it is also the spoken `@`. `biz` is omitted: it is
-// the Turkish word "we".
+// `at` is omitted: it is also the spoken `@`.
 const DOMAIN_ENDINGS = new Set([
   'com',
   'net',
@@ -23,6 +22,7 @@ const DOMAIN_ENDINGS = new Set([
   'mil',
   'int',
   'info',
+  'biz',
   'io',
   'ai',
   'app',
@@ -58,6 +58,10 @@ const DOMAIN_ENDINGS = new Set([
   'az',
   'cy',
 ])
+// Endings that are also Turkish words (`biz` is "we"). A spoken nokta
+// chain reads one only when no other listed ending is on that chain; a
+// dotted run reads it as any other ending.
+const WORD_ENDINGS = new Set(['biz'])
 const SCHEMES = new Set(['http', 'https', 'ftp', 'mailto', 'file'])
 const MAX_LABELS = 32
 
@@ -287,35 +291,44 @@ function noktaLink(words: readonly Word[], text: string, left: number, right: nu
 
 /**
  * For each word, how far a nokta chain extends left and right, plus the
- * rightmost TLD that sits on that right-hand chain. Built in two linear
- * passes so each `et` / `at` is then a constant-time lookup.
+ * rightmost TLD that sits on that right-hand chain, and separately the
+ * rightmost one of `WORD_ENDINGS`. Built in two linear passes so each
+ * `et` / `at` is then a constant-time lookup.
  */
 function noktaExtents(words: readonly Word[], text: string): {
   leftExtent: number[]
   rightExtent: number[]
   rightmostTld: number[]
+  rightmostWordTld: number[]
 } {
   const n = words.length
   const leftExtent = new Array<number>(n)
   const rightExtent = new Array<number>(n)
   const rightmostTld = new Array<number>(n)
+  const rightmostWordTld = new Array<number>(n)
 
   for (let i = 0; i < n; i++) {
     leftExtent[i] = i >= 2 && noktaLink(words, text, i - 2, i) ? leftExtent[i - 2] : i
   }
 
   for (let i = n - 1; i >= 0; i--) {
+    const key = endingKey(words[i].lower)
+    const word = WORD_ENDINGS.has(key) ? i : -1
+    const tld = word < 0 && DOMAIN_ENDINGS.has(key) ? i : -1
     if (i + 2 < n && noktaLink(words, text, i, i + 2)) {
       rightExtent[i] = rightExtent[i + 2]
       const further = rightmostTld[i + 2]
-      rightmostTld[i] = further >= 0 ? further : isDomainEnding(words[i].lower) ? i : -1
+      rightmostTld[i] = further >= 0 ? further : tld
+      const furtherWord = rightmostWordTld[i + 2]
+      rightmostWordTld[i] = furtherWord >= 0 ? furtherWord : word
     } else {
       rightExtent[i] = i
-      rightmostTld[i] = isDomainEnding(words[i].lower) ? i : -1
+      rightmostTld[i] = tld
+      rightmostWordTld[i] = word
     }
   }
 
-  return { leftExtent, rightExtent, rightmostTld }
+  return { leftExtent, rightExtent, rightmostTld, rightmostWordTld }
 }
 
 /**
@@ -376,7 +389,7 @@ function dottedExtents(words: readonly Word[], text: string): {
 function findSpokenEmails(text: string, classified: Span[]): void {
   const words = collectWords(text)
   if (words.length === 0) return
-  const { leftExtent, rightExtent, rightmostTld } = noktaExtents(words, text)
+  const { leftExtent, rightExtent, rightmostTld, rightmostWordTld } = noktaExtents(words, text)
   const { runStart, endingEnd } = dottedExtents(words, text)
 
   for (let e = 0; e < words.length; e++) {
@@ -388,7 +401,8 @@ function findSpokenEmails(text: string, classified: Span[]): void {
 
     const left = leftExtent[e - 1]
     const start = runStart[left]
-    const spokenRight = rightmostTld[e + 1]
+    const tld = rightmostTld[e + 1]
+    const spokenRight = tld >= e + 3 ? tld : rightmostWordTld[e + 1]
     if (spokenRight >= e + 3 && spokenRight <= rightExtent[e + 1]) {
       pushClassified(classified, start, words[spokenRight].end, 'email')
       continue

@@ -191,8 +191,21 @@ describe('speech pipeline: mixed and Turkish-cased addresses', () => {
     }
   })
 
-  it('does not read the Turkish word biz as a domain ending', () => {
+  it('does not read the Turkish word biz past another ending on a spoken chain', () => {
     expect(speech('mail ali et example nokta com nokta Biz geldik').text).toBe('mail [MASKED_PII] nokta Biz geldik')
+  })
+
+  it('reads biz as an ending in a dotted run and on a spoken chain with no other ending', () => {
+    for (const said of [
+      'mail ali.yilmaz.firma.biz',
+      'mail ali et firma nokta biz',
+      'mail ali et firma.biz',
+      'mail ali nokta yilmaz et firma nokta biz',
+    ]) {
+      const res = speech(`${said} yazın`)
+      expect(res.text, said).toBe('mail [MASKED_PII] yazın')
+      expect(res.classes.email, said).toBe(1)
+    }
   })
 })
 

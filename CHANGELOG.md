@@ -19,8 +19,10 @@ dots and spoken `nokta` on either side of `et` / `at`
 with a Turkish dotted capital I (U+0130) is read: for the ending lookup
 only, the word is lowercased, U+0307 is dropped and U+0131 is read as `i`,
 so `AI` with U+0130 matches `ai`.
-`biz` is not in the list: it is the Turkish word "we", so
-`example nokta com nokta Biz` is masked up to `com` and leaves `nokta Biz`.
+`biz` is in the list and is also the Turkish word "we": a spoken address
+is read up to `biz` only when no other listed word is on its chain, so
+`example nokta com nokta Biz` is masked up to `com` and leaves `nokta Biz`,
+while `firma nokta biz` and a dotted `ali.yilmaz.firma.biz` are masked.
 An address with no listed word is not masked by these rules. Classes come
 from the text pipeline's core detectors first, as in 0.3.3, so a
 Luhn-valid card written in phone-shaped groups (`4111-11-111-111-1111`)
