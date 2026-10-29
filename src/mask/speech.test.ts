@@ -191,6 +191,16 @@ describe('speech pipeline: mixed and Turkish-cased addresses', () => {
     }
   })
 
+  it('reads an address whose spoken et the speech model glued to a mailbox provider', () => {
+    // A real large-v3-turbo transcript: "... et gmail nokta com" came out as one dotted run.
+    for (const said of ['ZAKDIRIZUTDURU.ETGMAIL.COM', 'ali.atoutlook.com', 'ayse.yilmaz.ethotmail.com.tr']) {
+      const res = speech(`Mailim ${said} Telefonum`)
+      expect(res.text, said).toBe('Mailim [MASKED_PII] Telefonum')
+      expect(res.classes.email, said).toBe(1)
+    }
+    expect(speech('Mailim rapor.etiket.com Telefonum').text).toBe('Mailim rapor.etiket.com Telefonum')
+  })
+
   it('does not read the Turkish word biz past another ending on a spoken chain', () => {
     expect(speech('mail ali et example nokta com nokta Biz geldik').text).toBe('mail [MASKED_PII] nokta Biz geldik')
   })

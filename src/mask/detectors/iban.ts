@@ -1,63 +1,76 @@
 /**
  * Checksum-valid IBAN spans. An IBAN-shaped word that fails mod-97 is not a span.
  *
- * Every letter-pair anchor is a start: a word-initial pair, or the same pair
- * glued inside a word. A hit is not consumed. The next search begins one
- * character later, so a later valid IBAN that overlaps the first is still
- * returned. apply merges overlaps. Each start reads at most 34 alphanumerics.
+ * A start is a letter pair whose country code is in `IBAN_LENGTHS`: a
+ * word-initial pair, or a pair glued inside a word with its check digits
+ * right after it (`acctTR33…`). A pair inside a word with a separator before
+ * the digits (`numaram 29…`) is the end of a word, not a country code. The
+ * candidate is exactly that country's length in alphanumerics, and it ends
+ * where a word or a digit run ends, or where its digits meet letters
+ * (`…3000ABC`); it never ends inside a word or a digit run. A hit is not
+ * consumed. The next search begins one character later, so a later valid
+ * IBAN that overlaps the first is still returned. apply merges overlaps.
  */
 import { ibanMod97Ok, looksLikeIban, normalizeIban } from '../../iban.js'
 import type { Span } from '../core.js'
+import { IBAN_LENGTHS } from './iban_lengths.js'
 
 const PII = '[MASKED_PII]'
 const ANCHOR_SRC = /[A-Za-z]{2}[\s-]*\d{2}/g
 
-function isAlnum(c: string): boolean {
-  return /[A-Za-z0-9]/.test(c)
+function isAlnum(c: string | undefined): boolean {
+  return c !== undefined && /[A-Za-z0-9]/.test(c)
+}
+
+function isDigit(c: string | undefined): boolean {
+  return c !== undefined && c >= '0' && c <= '9'
 }
 
 function isSep(c: string): boolean {
   return /[\s-]/.test(c)
 }
 
-function runFrom(s: string, start: number): string {
+/** End index of the first `count` alphanumerics from `start`, separators allowed between them; -1 when the run is shorter. */
+function endAfter(s: string, start: number, count: number): number {
   let i = start
   let alnum = 0
-  let end = start
-  while (i < s.length && alnum < 34) {
+  while (i < s.length) {
     if (isAlnum(s[i])) {
       alnum++
       i++
-      end = i
+      if (alnum === count) return i
       continue
     }
     if (isSep(s[i])) {
       let j = i
       while (j < s.length && isSep(s[j])) j++
-      if (j < s.length && isAlnum(s[j]) && alnum < 34) {
+      if (isAlnum(s[j])) {
         i = j
         continue
       }
     }
     break
   }
-  return s.slice(start, end)
+  return -1
 }
 
-function trimTrailingIbanChar(s: string): string {
-  return s.replace(/[\s-]*[A-Za-z0-9]$/i, '')
+function endsCleanly(s: string, end: number): boolean {
+  if (!isAlnum(s[end])) return true
+  return isDigit(s[end - 1]) && !isDigit(s[end])
 }
 
-function longestValid(raw: string): string | null {
-  let candidate = raw
-  while (candidate.length >= 15) {
-    const normalized = normalizeIban(candidate)
-    if (looksLikeIban(normalized) && ibanMod97Ok(normalized)) return candidate
-    const next = trimTrailingIbanChar(candidate)
-    if (next === candidate) break
-    candidate = next
+function validAt(text: string, at: number): number {
+  const glued = isAlnum(text[at - 1])
+  if (glued && !isDigit(text[at + 2])) return -1
+  const lengths = IBAN_LENGTHS[text.slice(at, at + 2).toUpperCase()]
+  if (!lengths) return -1
+  for (let k = lengths.length - 1; k >= 0; k--) {
+    const end = endAfter(text, at, lengths[k])
+    if (end < 0 || !endsCleanly(text, end)) continue
+    const normalized = normalizeIban(text.slice(at, end))
+    if (looksLikeIban(normalized) && ibanMod97Ok(normalized)) return end
   }
-  return null
+  return -1
 }
 
 export function detectIbanSpans(text: string): Span[] {
@@ -69,18 +82,15 @@ export function detectIbanSpans(text: string): Span[] {
     let anchor: RegExpExecArray | null
     while ((anchor = ANCHOR_SRC.exec(text)) !== null) {
       const at = anchor.index
-      const run = runFrom(text, at)
-      if (run.length >= 15) {
-        const valid = longestValid(run)
-        if (valid) {
-          out.push({
-            start: at,
-            end: at + valid.length,
-            cls: 'iban',
-            token: PII,
-            source: 'iban',
-          })
-        }
+      const end = validAt(text, at)
+      if (end > at) {
+        out.push({
+          start: at,
+          end,
+          cls: 'iban',
+          token: PII,
+          source: 'iban',
+        })
       }
       const next = at + 1
       if (next > text.length) break

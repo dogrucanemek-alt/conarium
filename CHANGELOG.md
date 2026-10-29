@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.5 - IBAN spans start at a country code and end at a word; a glued spoken address is read
+
+Both changes come from a real large-v3-turbo transcript of an operator's own
+test recording read through the `speech` pipeline.
+
+The IBAN detector took any two letters followed by two digits as a start,
+including the end of a word (`numaram 296-…` started at `am`), read up to 34
+letters and digits, and shortened the run one character at a time until the
+mod-97 check passed. A long run passed by chance often: 223 of 3 000
+generated sentences with a digit run between words gave an IBAN span, and a
+valid IBAN followed by a name took the first letters of the name with it.
+A start now needs a country code with a known IBAN length (`IBAN_LENGTHS` in
+`src/mask/detectors/iban_lengths.ts`, generated from the ibantools 4.5.4 and
+iban 0.0.14 data sets), two letters inside a word count only when the check
+digits follow them directly (`acctTR33…`), the candidate is exactly that
+country's length, and it ends where a word or a digit run ends or where its
+digits meet letters (`…3000ABC`). On the same 3 000 sentences one span is
+left (`no`, Norway, whose 15 characters pass mod-97 by chance).
+
+What the 0.2.54 steps masked is still masked: the belt is unchanged, so a
+region the stricter detector no longer reads as an IBAN but 0.2.54 did is
+masked and counted as `unclassified` instead of `iban`. On the transcript
+above the masked text is the same as in 0.3.4 (`TC kimlik [MASKED_PII]imlik`
+is still the 0.2.54 region); the class counts change.
+
+The `speech` pipeline reads an address whose spoken `et` / `at` the speech
+model glued to a mailbox provider: `ZAKDIRIZUTDURU.ETGMAIL.COM`, a dotted run
+of three or more labels with a middle label that is `et` or `at` followed by
+`gmail`, `hotmail`, `outlook`, `yahoo`, `icloud`, `yandex`, `protonmail` or
+`live`, ending in a listed word, is one `email` span. `rapor.etiket.com` is
+left. A glued provider after a space (`ali etgmail.com`) is not read.
+
 ## 0.3.4 - a speech pipeline for hyphenated digits and spoken addresses
 
 `maskField` now accepts `pipeline: 'speech'` for text a local speech model
