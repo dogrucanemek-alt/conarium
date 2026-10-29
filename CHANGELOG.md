@@ -12,8 +12,24 @@ at least four of them as an IBAN, and addresses said with `et` / `at` and
 letters only, without `@`, when a word is in the fixed list
 `DOMAIN_ENDINGS` in `src/mask/speech.ts`: the last label of a dotted run;
 a spoken address is read up to its last listed word, so
-`example nokta dev nokta jp` leaves `nokta jp`. An address with no listed
-word is not masked by these rules. It leaves an amount with thousands
+`example nokta dev nokta jp` leaves `nokta jp`. An address may mix written
+dots and spoken `nokta` on either side of `et` / `at`
+(`ayse.yilmaz et example nokta com`, `ayse nokta yilmaz et example.com`,
+`ayse.yilmaz et example.com`) and is one `email` span. An ending written
+with a Turkish dotted capital I (U+0130) is read: for the ending lookup
+only, the word is lowercased, U+0307 is dropped and U+0131 is read as `i`,
+so `AI` with U+0130 matches `ai`.
+`biz` is in the list and is also the Turkish word "we": a spoken address
+is read up to `biz` only when no other listed word is on its chain, so
+`example nokta com nokta Biz` is masked up to `com` and leaves `nokta Biz`,
+while `firma nokta biz` and a dotted `ali.yilmaz.firma.biz` are masked.
+An address with no listed word is not masked by these rules. Classes come
+from the text pipeline's core detectors first, as in 0.3.3, so a
+Luhn-valid card written in phone-shaped groups (`4111-11-111-111-1111`)
+counts as `phone`, and an 11-digit run that fails the TCKN checksum counts
+as `tckn`; when the core and the speech rules name different classes for
+one number (`1-000-000-0146`: `phone` and `tckn`), both are counted and it
+is masked if either class is asked for. It leaves an amount with thousands
 separators (`1.250.000`, `1.250,00`) or under 7 digits before its decimal
 comma, and a time with a colon, dates (`28-10-2026`, `28.10.2026`,
 `28 10 2026`), two years joined by one space or one hyphen (`2025-2026`,
