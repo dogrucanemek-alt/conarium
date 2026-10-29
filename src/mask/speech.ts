@@ -62,6 +62,9 @@ const DOMAIN_ENDINGS = new Set([
 // chain reads one only when no other listed ending is on that chain; a
 // dotted run reads it as any other ending.
 const WORD_ENDINGS = new Set(['biz'])
+// Mailbox providers a speech model glues a spoken `et` / `at` onto:
+// `ali et gmail nokta com` comes out as `ali.etgmail.com`.
+const FUSED_PROVIDERS = new Set(['gmail', 'hotmail', 'outlook', 'yahoo', 'icloud', 'yandex', 'protonmail', 'live'])
 const SCHEMES = new Set(['http', 'https', 'ftp', 'mailto', 'file'])
 const MAX_LABELS = 32
 
@@ -112,6 +115,11 @@ function endingKey(s: string): string {
 
 function isDomainEnding(s: string): boolean {
   return DOMAIN_ENDINGS.has(endingKey(s))
+}
+
+function isFusedProvider(s: string): boolean {
+  const key = endingKey(s)
+  return (key.startsWith('et') || key.startsWith('at')) && FUSED_PROVIDERS.has(key.slice(2))
 }
 
 function isolatedRun(text: string, start: number, end: number): boolean {
@@ -460,12 +468,11 @@ function findDottedEmails(text: string, classified: Span[]): void {
       i = end
       continue
     }
+    const ending = isDomainEnding(labels[labels.length - 1].lower) && (end === text.length || !isLabelChar(text[end]))
+    const fused = labels.length >= 3 && labels.slice(1, -1).some((l) => isFusedProvider(l.lower))
     if (
-      labels.length >= 4
-      && lettersOnly(labels[0].raw)
-      && lettersOnly(labels[1].raw)
-      && isDomainEnding(labels[labels.length - 1].lower)
-      && (end === text.length || !isLabelChar(text[end]))
+      ending
+      && ((labels.length >= 4 && lettersOnly(labels[0].raw) && lettersOnly(labels[1].raw)) || fused)
     ) {
       pushClassified(classified, first.start, end, 'email')
       i = end
