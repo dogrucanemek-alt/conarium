@@ -14,10 +14,11 @@ letters only, without `@`, when a word is in the fixed list
 a spoken address is read up to its last listed word, so
 `example nokta dev nokta jp` leaves `nokta jp`. An address may mix written
 dots and spoken `nokta` on either side of `et` / `at`
-(`ayşe.yılmaz et example nokta com`, `ayşe nokta yılmaz et example.com`,
-`ayşe.yılmaz et example.com`) and is one `email` span. An ending written
-with a Turkish capital İ is read: for the ending lookup only, the word is
-lowercased, U+0307 is dropped and `ı` is read as `i`, so `Aİ` matches `ai`.
+(`ayse.yilmaz et example nokta com`, `ayse nokta yilmaz et example.com`,
+`ayse.yilmaz et example.com`) and is one `email` span. An ending written
+with a Turkish dotted capital I (U+0130) is read: for the ending lookup
+only, the word is lowercased, U+0307 is dropped and U+0131 is read as `i`,
+so `AI` with U+0130 matches `ai`.
 `biz` is not in the list: it is the Turkish word "we", so
 `example nokta com nokta Biz` is masked up to `com` and leaves `nokta Biz`.
 An address with no listed word is not masked by these rules. Classes come

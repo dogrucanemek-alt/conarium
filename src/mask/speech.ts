@@ -94,14 +94,14 @@ function lettersOnly(s: string): boolean {
   return true
 }
 
-/** Ending lookup only: `'İ'.toLowerCase()` is `'i' + U+0307`, which misses `ai`. */
+/** Ending lookup only: U+0130 lowercases to `i` + U+0307, which misses `ai`. */
 function endingKey(s: string): string {
   const lower = s.toLowerCase()
   let out = ''
   for (let i = 0; i < lower.length; i++) {
     const c = lower[i]
     if (c === '\u0307') continue
-    out += c === 'ı' ? 'i' : c
+    out += c === '\u0131' ? 'i' : c
   }
   return out
 }
