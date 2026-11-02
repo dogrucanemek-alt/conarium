@@ -1,6 +1,6 @@
 {
   "name": "@conarium-ai/core",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "mcpName": "io.github.dogrucanemek-alt/conarium",
   "//files-artefakt": "Generated files under examples/ (private key, receipt/audit JSONL) are EXCLUDED. .gitignore does not bind npm: because the allow-list contained 'examples', `npm publish` on a machine that had run the demo was shipping _keys/audit-ed25519.pem (PRIVATE KEY) and the receipts. test/pack_artefakt.mjs locks this. The exclusions are LIMITED to examples/: receipts.jsonl and .pub.pem under test-vectors/ MUST ship, or a third party cannot run the conformance vectors.",
   "//files": "Allow-list of what enters the package. Without it npm sent everything: 296 files / 1.5 MB — CI workflows, gitleaks config, a 137 KB marketing image, the site's api/chat.js. A bank security team opens the tarball and sees those. scripts/ is here ON PURPOSE: conarium-reconcile references scripts/pg-snapshot.sql at runtime; without it the user files a support mail.",
@@ -51,7 +51,7 @@
     "LIMITATIONS.tr.md",
     "CHANGELOG.md"
   ],
-  "description": "Governed MCP gateway for AI data access: policy enforcement and PII masking, an Ed25519-signed receipt per mediated access that a third party verifies offline (written when a receipt sink is configured, which conarium-init sets), coverage reconciliation against the database's own query counters to surface access that bypassed the gateway, and conformance vectors so the receipt format can be implemented without us. Self-hosted, MIT.",
+  "description": "Self-hosted, governed MCP gateway for AI data access: policy enforcement, PII masking, a signed receipt per access once a receipt sink is configured (conarium-init sets one), and coverage reconciliation against the database's own query counters. MIT.",
   "keywords": [
     "mcp",
     "ai",
@@ -126,9 +126,9 @@
   },
   "dependencies": {
     "@eslint-community/regexpp": "4.12.2",
-    "@guanmingchiu/sqlparser-ts": "^0.62.0",
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "express": "^5.2.1",
+    "@guanmingchiu/sqlparser-ts": "^0.63.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "express": "^5.3.0",
     "node-sql-parser": "^5.4.0",
     "pgsql-ast-parser": "^12.0.2",
     "postgres": "^3.4.4",
@@ -138,10 +138,10 @@
   "devDependencies": {
     "@jazzer.js/core": "^4.0.0",
     "@types/express": "^5.0.6",
-    "@types/node": "^26.4.1",
-    "fast-check": "^4.9.0",
-    "supertest": "^7.2.2",
-    "tsx": "^4.23.13",
+    "@types/node": "^26.6.5",
+    "fast-check": "^4.10.2",
+    "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },

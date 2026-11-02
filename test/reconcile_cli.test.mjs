@@ -701,6 +701,113 @@ describe('coverage-reconciliation/2 projection', () => {
     expect(v2.items[0].outcome).toBe('indeterminate')
   })
 
+  describe('what a declared bound is compared with (LIMITATIONS.md)', () => {
+    const SQL_CUSTOMERS_2 = `${SQL_CUSTOMERS} /* second pattern */`
+    const profileIn = (dir) => {
+      const profilePath = join(dir, 'profile.json')
+      writeFileSync(
+        profilePath,
+        JSON.stringify({
+          v: 'conarium-mapping-profile/0.1',
+          version: '1',
+          multiplicity: { maxStatementsPerReceipt: 1 },
+        }),
+      )
+      return profilePath
+    }
+    const inWindow = (minute) => `2026-08-06T11:0${minute}:00.000Z`
+
+    it('three receipts do not raise a bound of 1 for three statements, and the run exits 0', () => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 3 }],
+        receipts: [0, 1, 2].map((m) => receipt({ ts: inWindow(m), objects: ['zion.customers'] })),
+      })
+      const r = run([...args, '--profile', profileIn(dir), '--json-v2'])
+      const v2 = JSON.parse(r.stdout)
+      expect(v2.outcome).toBe('exceptions')
+      expect(v2.items[0].reason).toBe('multiplicity-exceeded')
+      expect(r.code).toBe(0)
+    })
+
+    it('separate patterns are not added together against one receipt', () => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [
+          { queryid: '1', query: SQL_CUSTOMERS, calls: 1 },
+          { queryid: '2', query: SQL_CUSTOMERS_2, calls: 1 },
+        ],
+        receipts: [receipt({ ts: inWindow(0), objects: ['zion.customers'] })],
+      })
+      const v2 = JSON.parse(run([...args, '--profile', profileIn(dir), '--json-v2']).stdout)
+      expect(v2.counts.matched).toBe(2)
+      expect(v2.outcome).toBe('no-exceptions')
+    })
+  })
+
+  describe('a boundary item carries what the outcome alone does not show', () => {
+    const early = '2026-08-06T09:59:57.000Z'
+    const boundaryRun = ({ delta, bound, jsonV2 = true }) => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: delta }],
+        receipts: [receipt({ ts: early, objects: ['zion.customers'] })],
+      })
+      const extra = []
+      if (bound != null) {
+        const profilePath = join(dir, 'profile.json')
+        writeFileSync(
+          profilePath,
+          JSON.stringify({
+            v: 'conarium-mapping-profile/0.1',
+            version: '1',
+            multiplicity: { maxStatementsPerReceipt: bound },
+          }),
+        )
+        extra.push('--profile', profilePath)
+      }
+      if (jsonV2) extra.push('--json-v2')
+      return run([...args, ...extra])
+    }
+
+    it('10,000 statements against one bound of 1 stay indeterminate and say the bound is exceeded', () => {
+      const r = boundaryRun({ delta: 10000, bound: 1 })
+      expect(r.code).toBe(41)
+      const [item] = JSON.parse(r.stdout).items
+      expect(item.outcome).toBe('indeterminate')
+      expect(item.reason).toBe('window-boundary')
+      expect(item.requiredSkewMs).toBe(3000)
+      expect(item.objects).toEqual(['public.customers'])
+      expect(item.multiplicity).toEqual({ bound: 1, statements: 10000, exceededIfAdmitted: true })
+    })
+
+    it('a single statement against the same bound is a different item', () => {
+      const [item] = JSON.parse(boundaryRun({ delta: 1, bound: 1 }).stdout).items
+      expect(item.outcome).toBe('indeterminate')
+      expect(item.multiplicity).toEqual({ bound: 1, statements: 1, exceededIfAdmitted: false })
+    })
+
+    it('without a declared bound the item states no multiplicity comparison', () => {
+      const [item] = JSON.parse(boundaryRun({ delta: 10000 }).stdout).items
+      expect(item.reason).toBe('window-boundary')
+      expect(item.objects).toEqual(['public.customers'])
+      expect(item).not.toHaveProperty('multiplicity')
+    })
+
+    it('the text report names the exceeded bound and still does not call it unreceipted', () => {
+      const r = boundaryRun({ delta: 10000, bound: 1, jsonV2: false })
+      expect(r.code).toBe(41)
+      expect(r.stderr).toMatch(/10000 statements exceed the declared multiplicity bound of 1/)
+      expect(r.stderr).toMatch(/NOT reported as unreceipted access/)
+    })
+
+    it('the text report stays silent about a bound that holds', () => {
+      const r = boundaryRun({ delta: 1, bound: 1, jsonV2: false })
+      expect(r.code).toBe(41)
+      expect(r.stderr).not.toMatch(/exceed the declared multiplicity bound/)
+    })
+  })
+
   it('--skew and clocks.skew that parse to the same milliseconds are one declaration', () => {
     const { dir, args } = setup({
       beforeEntries: [],

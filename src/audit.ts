@@ -248,6 +248,7 @@ const LOCK_POLL_MS = 15
 // until it is this old. The cost is bounded: such a crash blocks the sink for
 // LOCK_STALE_MS and, being fail-closed, blocks access with it.
 const LOCK_STALE_MS = 30_000
+const LOCK_HINT = ': each running gateway needs its own audit.sink and audit.receiptSink path'
 
 // A lock that vanished between the failed create and this call reads as
 // infinitely old, which sends the caller down the retry path — the same place
@@ -292,15 +293,15 @@ function acquireSinkLockOnce(sink: string): string | undefined {
         return lockPath
       }
       if (otherPid != null && pidAlive(otherPid)) {
-        throw new Error(`another process holds the audit sink lock (pid ${otherPid})`)
+        throw new Error(`another process holds the audit sink lock (pid ${otherPid})${LOCK_HINT}`)
       }
       if (otherPid == null && lockAgeMs(lockPath) < LOCK_STALE_MS) {
-        throw new Error('another process holds the audit sink lock (pid unreadable)')
+        throw new Error(`another process holds the audit sink lock (pid unreadable)${LOCK_HINT}`)
       }
       try { unlinkSync(lockPath) } catch { /* stale steal */ }
     }
   }
-  throw new Error('another process holds the audit sink lock (pid unknown)')
+  throw new Error(`another process holds the audit sink lock (pid unknown)${LOCK_HINT}`)
 }
 
 function acquireSinkLock(sink: string, opts: { wait?: boolean } = {}): string | undefined {

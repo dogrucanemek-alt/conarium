@@ -1,0 +1,17 @@
+{
+  "id": "reconciliation/v2-window-boundary-bound-held",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-customers-10.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-15.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers-early.jsonl",
+  "mappingProfile": "conformance/fixtures/reconciliation/profile-multiplicity.json",
+  "expectOutcome": "exceptions",
+  "expectItemOutcomes": ["indeterminate"],
+  "forbidItemOutcomes": ["matched", "observed-without-receipt"],
+  "expectItemFields": { "reason": "window-boundary", "multiplicity": { "bound": 8, "statements": 5, "exceededIfAdmitted": false } },
+  "rationale": "Same evidence as v2-window-boundary-bound-exceeded with a bound of 8: the count fits the bound, so the clock alone keeps this item from being matched. A held bound never turns a boundary item into matched.",
+  "doesNotTest": "A declared skew bound. That is v2-clocks-declared."
+}

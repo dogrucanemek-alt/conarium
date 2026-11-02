@@ -579,6 +579,13 @@ bound does not decide), and `receipted-without-observation` makes
 `outcome` `exceptions`. `bounds.exclusion` is `operator-declared` only
 when the profile lists at least one exclusion rule.
 
+A `/2` item whose `reason` is `window-boundary` carries `requiredSkewMs` and the
+uncovered `objects`. When the profile declares a multiplicity bound it also
+carries `multiplicity: { bound, statements, exceededIfAdmitted }`: `statements` is
+the pattern's call delta in the window, and `exceededIfAdmitted` is
+`statements > bound`, the comparison a pattern inside the window gets. The item
+stays `indeterminate` either way, and `false` is not a pass.
+
 ### Mapping Profile (`conarium-mapping-profile/0.1`)
 
 A Mapping Profile is an operator declaration. It is versioned, serialized as
@@ -606,7 +613,7 @@ undeclared, not defaulted.
 
 | Field | Type | Encoding | What it declares |
 |---|---|---|---|
-| `multiplicity.maxStatementsPerReceipt` | integer ≥ 1 | JSON number | how many source statements one receipt may cover |
+| `multiplicity.maxStatementsPerReceipt` | integer ≥ 1 | JSON number | how many source statements one receipt may cover. This implementation compares it with one pattern's statement count in the window, so more receipts do not raise it (`LIMITATIONS.md`) |
 | `exclusions[]` | array | `{ "id": string, "version": string }` | rules that remove items before comparison |
 | `clocks.observation` | string | clock identifier | the clock that stamps the observation window (the Data Source). This implementation writes it on `/1` as `clocks.window`. Typical value here: `pg_stat_statements`. |
 | `clocks.receipt` | string | clock identifier | the clock that stamps receipts (the Gateway). This implementation writes it on `/1` as `clocks.receipts`. Typical value here: `gateway`. |
