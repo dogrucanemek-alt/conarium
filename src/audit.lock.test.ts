@@ -4,6 +4,7 @@ import { join } from 'path'
 import { spawn } from 'child_process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Audit } from './audit.js'
+import { writeKeyPairFiles } from './keys.js'
 
 const PREV_UNSIGNED = process.env.CONARIUM_AUDIT_UNSIGNED
 beforeAll(() => { process.env.CONARIUM_AUDIT_UNSIGNED = '1' })
@@ -17,6 +18,34 @@ function sinkPath() {
 }
 
 describe('G5 — multi-process audit sink lock', () => {
+  it('a held receipt sink times out without telling the operator to change audit.sink', async () => {
+    const sink = sinkPath()
+    const receiptSink = `${sink}.receipts`
+    const { privatePath } = writeKeyPairFiles(`${sink}.key`, 'g5')
+    const prevKey = process.env.CONARIUM_AUDIT_SIGNING_KEY
+    process.env.CONARIUM_AUDIT_SIGNING_KEY = privatePath
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e6)'], {
+      stdio: 'ignore',
+    })
+    const audit = new Audit({ sink, receiptSink, consumer: 'g5' })
+    try {
+      writeFileSync(`${receiptSink}.lock`, JSON.stringify({ pid: child.pid, startedAt: Date.now() }) + '\n')
+      let message = ''
+      try {
+        audit.log({ tool: 't', denied: false })
+      } catch (err) {
+        message = (err as Error).message
+      }
+      expect(message).toMatch(/Audit sink lock wait timed out/)
+      expect(message).not.toMatch(/needs its own audit\.sink/)
+    } finally {
+      child.kill()
+      audit.close()
+      if (prevKey === undefined) delete process.env.CONARIUM_AUDIT_SIGNING_KEY
+      else process.env.CONARIUM_AUDIT_SIGNING_KEY = prevKey
+    }
+  }, 20_000)
+
   it('a live foreign PID holding <sink>.lock rejects the second writer', async () => {
     const sink = sinkPath()
     const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e6)'], {
