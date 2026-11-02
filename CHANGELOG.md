@@ -28,6 +28,10 @@ The package description is 250 characters. npm keeps 255 and cut the 0.2.x
 description off mid-word, after "coverage reconciliation a"; a test now holds
 the description under that limit.
 
+Dependencies: `express` 5.3.0, `@modelcontextprotocol/sdk` 1.32.2 and
+`@guanmingchiu/sqlparser-ts` 0.63.0. `postgres` stays on 3.x and `re2js` on
+2.8.7 in this release.
+
 ## 0.3.5 - IBAN spans start at a country code and end at a word; a glued spoken address is read
 
 Both changes come from a real large-v3-turbo transcript of an operator's own
