@@ -248,7 +248,7 @@ const LOCK_POLL_MS = 15
 // until it is this old. The cost is bounded: such a crash blocks the sink for
 // LOCK_STALE_MS and, being fail-closed, blocks access with it.
 const LOCK_STALE_MS = 30_000
-const LOCK_HINT = ': each running gateway needs its own audit.sink and audit.receiptSink path'
+const LOCK_HINT = ': each running gateway needs its own audit.sink path; audit.receiptSink can be shared'
 
 // A lock that vanished between the failed create and this call reads as
 // infinitely old, which sends the caller down the retry path — the same place

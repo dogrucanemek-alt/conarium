@@ -28,7 +28,7 @@ describe('G5 — multi-process audit sink lock', () => {
         /another process holds the audit sink lock \(pid /,
       )
       expect(() => new Audit({ sink, consumer: 'g5' })).toThrow(
-        /each running gateway needs its own audit\.sink and audit\.receiptSink/,
+        /each running gateway needs its own audit\.sink path; audit\.receiptSink can be shared/,
       )
     } finally {
       child.kill()
