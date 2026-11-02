@@ -701,6 +701,50 @@ describe('coverage-reconciliation/2 projection', () => {
     expect(v2.items[0].outcome).toBe('indeterminate')
   })
 
+  describe('what a declared bound is compared with (LIMITATIONS.md)', () => {
+    const SQL_CUSTOMERS_2 = `${SQL_CUSTOMERS} /* second pattern */`
+    const profileIn = (dir) => {
+      const profilePath = join(dir, 'profile.json')
+      writeFileSync(
+        profilePath,
+        JSON.stringify({
+          v: 'conarium-mapping-profile/0.1',
+          version: '1',
+          multiplicity: { maxStatementsPerReceipt: 1 },
+        }),
+      )
+      return profilePath
+    }
+    const inWindow = (minute) => `2026-08-06T11:0${minute}:00.000Z`
+
+    it('three receipts do not raise a bound of 1 for three statements, and the run exits 0', () => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 3 }],
+        receipts: [0, 1, 2].map((m) => receipt({ ts: inWindow(m), objects: ['zion.customers'] })),
+      })
+      const r = run([...args, '--profile', profileIn(dir), '--json-v2'])
+      const v2 = JSON.parse(r.stdout)
+      expect(v2.outcome).toBe('exceptions')
+      expect(v2.items[0].reason).toBe('multiplicity-exceeded')
+      expect(r.code).toBe(0)
+    })
+
+    it('separate patterns are not added together against one receipt', () => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [
+          { queryid: '1', query: SQL_CUSTOMERS, calls: 1 },
+          { queryid: '2', query: SQL_CUSTOMERS_2, calls: 1 },
+        ],
+        receipts: [receipt({ ts: inWindow(0), objects: ['zion.customers'] })],
+      })
+      const v2 = JSON.parse(run([...args, '--profile', profileIn(dir), '--json-v2']).stdout)
+      expect(v2.counts.matched).toBe(2)
+      expect(v2.outcome).toBe('no-exceptions')
+    })
+  })
+
   describe('a boundary item carries what the outcome alone does not show', () => {
     const early = '2026-08-06T09:59:57.000Z'
     const boundaryRun = ({ delta, bound, jsonV2 = true }) => {

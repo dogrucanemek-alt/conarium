@@ -613,7 +613,7 @@ undeclared, not defaulted.
 
 | Field | Type | Encoding | What it declares |
 |---|---|---|---|
-| `multiplicity.maxStatementsPerReceipt` | integer ≥ 1 | JSON number | how many source statements one receipt may cover |
+| `multiplicity.maxStatementsPerReceipt` | integer ≥ 1 | JSON number | how many source statements one receipt may cover. This implementation compares it with one pattern's statement count in the window, so more receipts do not raise it (`LIMITATIONS.md`) |
 | `exclusions[]` | array | `{ "id": string, "version": string }` | rules that remove items before comparison |
 | `clocks.observation` | string | clock identifier | the clock that stamps the observation window (the Data Source). This implementation writes it on `/1` as `clocks.window`. Typical value here: `pg_stat_statements`. |
 | `clocks.receipt` | string | clock identifier | the clock that stamps receipts (the Gateway). This implementation writes it on `/1` as `clocks.receipts`. Typical value here: `gateway`. |
