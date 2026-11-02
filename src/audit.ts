@@ -248,7 +248,7 @@ const LOCK_POLL_MS = 15
 // until it is this old. The cost is bounded: such a crash blocks the sink for
 // LOCK_STALE_MS and, being fail-closed, blocks access with it.
 const LOCK_STALE_MS = 30_000
-const LOCK_HINT = ': each running gateway needs its own audit.sink and audit.receiptSink path'
+const LOCK_HINT = ': each running gateway needs its own audit.sink path; audit.receiptSink can be shared'
 
 // A lock that vanished between the failed create and this call reads as
 // infinitely old, which sends the caller down the retry path — the same place
@@ -293,19 +293,30 @@ function acquireSinkLockOnce(sink: string): string | undefined {
         return lockPath
       }
       if (otherPid != null && pidAlive(otherPid)) {
-        throw new Error(`another process holds the audit sink lock (pid ${otherPid})${LOCK_HINT}`)
+        throw new Error(`another process holds the audit sink lock (pid ${otherPid})`)
       }
       if (otherPid == null && lockAgeMs(lockPath) < LOCK_STALE_MS) {
-        throw new Error(`another process holds the audit sink lock (pid unreadable)${LOCK_HINT}`)
+        throw new Error('another process holds the audit sink lock (pid unreadable)')
       }
       try { unlinkSync(lockPath) } catch { /* stale steal */ }
     }
   }
-  throw new Error(`another process holds the audit sink lock (pid unknown)${LOCK_HINT}`)
+  throw new Error('another process holds the audit sink lock (pid unknown)')
 }
 
 function acquireSinkLock(sink: string, opts: { wait?: boolean } = {}): string | undefined {
-  if (!opts.wait) return acquireSinkLockOnce(sink)
+  if (!opts.wait) {
+    // Only the constructor takes a lock without waiting, and only on audit.sink.
+    // A write that times out may be waiting on a shared receipt sink, where
+    // changing audit.sink resolves nothing, so the hint stays off that path.
+    try {
+      return acquireSinkLockOnce(sink)
+    } catch (err) {
+      const msg = (err as Error).message
+      if (msg.includes('another process holds')) throw new Error(`${msg}${LOCK_HINT}`)
+      throw err
+    }
+  }
   const deadline = Date.now() + LOCK_WAIT_MS
   for (;;) {
     try {

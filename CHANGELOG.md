@@ -22,7 +22,7 @@ raise it, whatever the field's name suggests. A run whose `/2` outcome is
 
 A second gateway on the same audit sink fails with "another process holds the
 audit sink lock". The message now adds that each running gateway needs its own
-`audit.sink` and `audit.receiptSink` path.
+`audit.sink` path and that `audit.receiptSink` can be shared.
 
 The package description is 250 characters. npm keeps 255 and cut the 0.2.x
 description off mid-word, after "coverage reconciliation a"; a test now holds
