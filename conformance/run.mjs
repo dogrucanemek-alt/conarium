@@ -131,6 +131,13 @@ function runReconcileV2(c) {
       if (body.bounds?.[k] !== n) reasons.push(`bounds.${k} ${body.bounds?.[k]} != ${n}`)
     }
   }
+  if (c.expectItemFields) {
+    const fields = Object.entries(c.expectItemFields)
+    const carried = (body.items || []).some((i) =>
+      fields.every(([k, v]) => JSON.stringify(i[k]) === JSON.stringify(v)),
+    )
+    if (!carried) reasons.push(`no item carries ${JSON.stringify(c.expectItemFields)}`)
+  }
   const itemOutcomes = (body.items || []).map((i) => i.outcome)
   if (Array.isArray(c.expectItemOutcomes)) {
     for (const want of c.expectItemOutcomes) {

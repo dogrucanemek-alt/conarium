@@ -624,15 +624,25 @@ export function projectResultV2(result, ctx) {
     })
   }
 
+  const max = profile?.maxStatementsPerReceipt ?? null
+
+  // The temporal rule keeps a boundary item indeterminate whatever its size, so
+  // the outcome alone shows 1 statement and 10,000 as the same finding. The item
+  // carries the objects and, under a declared bound, the same comparison the
+  // reconciled branch makes, so a reader sees what admitting the receipt would
+  // and would not settle.
   for (const d of result.indeterminate) {
     push('indeterminate', {
       pattern: patternDigest(d.query),
       reason: 'window-boundary',
       requiredSkewMs: d.requiredSkewMs,
+      objects: d.uncoveredTables,
+      ...(max != null
+        ? { multiplicity: { bound: max, statements: d.delta, exceededIfAdmitted: d.delta > max } }
+        : {}),
     })
   }
 
-  const max = profile?.maxStatementsPerReceipt ?? null
   for (const d of result.reconciled) {
     if (max == null) {
       push('indeterminate', {
@@ -870,9 +880,13 @@ async function main(argv = process.argv.slice(2)) {
     if (result.indeterminate.length > 0) {
       const atBoundary = result.indeterminate.filter((d) => d.boundaryPlausible)
       const beyond = result.indeterminate.filter((d) => !d.boundaryPlausible)
+      const max = profile?.maxStatementsPerReceipt ?? null
       const line = (d) =>
         `  ~ (+${d.delta}) table(s) [${d.uncoveredTables.join(', ')}] have a receipt ${d.requiredSkewMs}ms outside ` +
-        `the window: ${truncate(d.query)}`
+        `the window: ${truncate(d.query)}` +
+        (max != null && d.delta > max
+          ? `\n    ${d.delta} statements exceed the declared multiplicity bound of ${max} even if that receipt is admitted`
+          : '')
 
       if (atBoundary.length > 0) {
         const bound =
