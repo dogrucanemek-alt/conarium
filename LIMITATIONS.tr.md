@@ -304,6 +304,14 @@ havuzu, ORM). 1:1 kuralı böyle her kurulumda sahte "kapsanmamış etkinlik"
 `/2` diye okunmaz. Mapping Profile yoksa `/2` çokluğa bağlı kalemleri
 `matched` saymaz, `indeterminate` bırakır.
 
+Beyan edilen çokluk sınırı tek desenin penceredeki ifade sayısıyla kıyaslanır.
+Alanın adı `maxStatementsPerReceipt` olsa da desenin nesnelerini adlandıran
+makbuz sayısı sınırı artırmaz: üç makbuz, üç ifade ve 1 sınırı
+`multiplicity-exceeded` verir. Ayrı desenlerin ifadeleri de tek makbuza karşı
+toplanmaz. `/2` çıkış kodlarını değiştirmez; bu yüzden `/2` sonucu `exceptions`
+olan bir koşu yine 0 ile çıkabilir. Bu kanalı kullanan bir denetim `outcome`
+alanını okur, yalnız çıkış koduna bakmaz.
+
 ## OpenTimestamps istemcisi
 <!-- s: ots-client -->
 
@@ -330,7 +338,10 @@ gateway'den geliyor. Yani sınıra iki ayrı saat karar veriyor. Bir deseni
 kapsayacak olan makbuz pencerenin dışına düşerse sonuç `indeterminate` olur
 (çıkış 41) — "makbuzsuz erişim" denmez, çünkü araç ikisinden hangisinin olduğunu
 bilemez. Bu bir hüküm değil, bir sınır: 41 başarısızlıktır, koşu geçmez, ama
-hiçbir yön kanıtlanmış olmaz.
+hiçbir yön kanıtlanmış olmaz. Sınır beyan edilmişse `/2` kalemi, makbuz kabul
+edilse bile ifade sayısının sınırı aşıp aşmadığını yazar
+(`multiplicity.exceededIfAdmitted`). Sonuç değişmez, kalem yine `indeterminate`
+kalır; `false` değeri de geçti anlamına gelmez.
 
 Aklama, pencerenin kendi uzunluğuyla sınırlı: pencereden uzun bir fark sınır
 etkisiyle açıklanamaz ve rapor bunu mazeret göstermek yerine açıkça yazar.

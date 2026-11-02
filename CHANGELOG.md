@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.6 - a boundary item shows its size; the sink lock error says what resolves it
+
+A pattern uncovered only by the window boundary is `indeterminate`, and
+draft-07 forbids reporting it as `observed-without-receipt`. The outcome alone
+therefore showed 1 statement and 10,000 statements as the same finding. Issue
+#101 reported this: 10,000 statements, one Receipt outside the Window, a bound
+of 1, one `indeterminate` item.
+
+The `/2` item now carries the uncovered `objects` and, when the Mapping Profile
+declares a multiplicity bound,
+`multiplicity: { bound, statements, exceededIfAdmitted }`.
+`exceededIfAdmitted` is the comparison the reconciled branch already makes,
+applied as if the Receipt were admitted. The text report names an exceeded
+bound. Outcomes, counts and exit codes do not change.
+
+`LIMITATIONS.md` now states two things that were true and unwritten. A declared
+bound is compared with one pattern's statement count, so more Receipts do not
+raise it, whatever the field's name suggests. A run whose `/2` outcome is
+`exceptions` can still exit 0, because `/2` does not change the exit codes.
+
+A second gateway on the same audit sink fails with "another process holds the
+audit sink lock". The message now adds that each running gateway needs its own
+`audit.sink` and `audit.receiptSink` path.
+
+The package description is 250 characters. npm keeps 255 and cut the 0.2.x
+description off mid-word, after "coverage reconciliation a"; a test now holds
+the description under that limit.
+
 ## 0.3.5 - IBAN spans start at a country code and end at a word; a glued spoken address is read
 
 Both changes come from a real large-v3-turbo transcript of an operator's own
@@ -240,10 +268,6 @@ Changes an operator can see:
 Time: each field also runs the 0.2.54 copy. On the comparison inputs masking
 took up to about four times as long as 0.2.54 (a one-megabyte field of dense
 e-mail addresses, about 170 ms) and up to about three times on the others.
-
-The package description is 250 characters. npm keeps 255 and cut the 0.2.x
-description off mid-word, after "coverage reconciliation a"; a test now holds
-the description under that limit.
 
 ## 0.2.54 - two operator scripts leave the tarball
 

@@ -308,6 +308,14 @@ statement was itself receipted. `--json-v2` prints a separate
 as `/2`. Without a Mapping Profile the `/2` object leaves multiplicity-bound
 items `indeterminate` rather than treating one receipt as a bound of one.
 
+A declared multiplicity bound is compared with one pattern's statement count in
+the window. The number of receipts naming the pattern's objects does not raise
+it, whatever the field name `maxStatementsPerReceipt` suggests: three receipts,
+three statements and a bound of 1 report `multiplicity-exceeded`. Statements of
+separate patterns are not added together against one receipt either. `/2` does
+not change the exit codes, so a run whose `/2` outcome is `exceptions` can still
+exit 0. A check on this channel reads `outcome`, not only the exit code.
+
 ## Reconciliation cannot tell a trailing clock from a late receipt
 <!-- s: reconcile-trailing-clock -->
 
@@ -317,7 +325,10 @@ A receipt that would have covered a pattern but falls outside the window is
 reported as `indeterminate` (exit 41) rather than as unreceipted access,
 because this tool has no way to know which of the two happened. That is a
 limit, not a verdict: 41 is a failure and the run does not pass, but nothing
-is proven either way.
+is proven either way. Under a declared bound the `/2` item says whether the
+statement count exceeds it even if the receipt were admitted
+(`multiplicity.exceededIfAdmitted`). The outcome does not change: the item stays
+`indeterminate`, and `false` is not a pass.
 
 The exculpation is bounded by the window's own length — an offset larger than
 the window cannot be a boundary artefact, and the report says so instead of

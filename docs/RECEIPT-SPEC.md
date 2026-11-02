@@ -579,6 +579,13 @@ bound does not decide), and `receipted-without-observation` makes
 `outcome` `exceptions`. `bounds.exclusion` is `operator-declared` only
 when the profile lists at least one exclusion rule.
 
+A `/2` item whose `reason` is `window-boundary` carries `requiredSkewMs` and the
+uncovered `objects`. When the profile declares a multiplicity bound it also
+carries `multiplicity: { bound, statements, exceededIfAdmitted }`: `statements` is
+the pattern's call delta in the window, and `exceededIfAdmitted` is
+`statements > bound`, the comparison a pattern inside the window gets. The item
+stays `indeterminate` either way, and `false` is not a pass.
+
 ### Mapping Profile (`conarium-mapping-profile/0.1`)
 
 A Mapping Profile is an operator declaration. It is versioned, serialized as
