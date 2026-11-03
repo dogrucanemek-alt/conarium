@@ -1,0 +1,46 @@
+name: rhel
+
+# node-matrix runs on Ubuntu only, so nothing here said whether Conarium works on
+# Red Hat Enterprise Linux, the system many self-hosting companies run.
+#
+# This job runs the same suite and the documented quickstart inside Red Hat's
+# Universal Base Image 9, which is built from RHEL 9 packages and is free to use.
+#
+# It is worth being exact about what a green run means. It shows the suite passes
+# on the RHEL 9 userland in a container on an Ubuntu kernel. It is not a run on a
+# RHEL host, and it is not a certification by Red Hat.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: suite (ubi9, node 24)
+    runs-on: ubuntu-latest
+    container:
+      image: registry.access.redhat.com/ubi9/nodejs-24@sha256:c4d7c5ca1a074827cf475c08bb2ec6c1803650af241afe4244bc2437a898ef65
+      options: --user 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Show the platform
+        run: |
+          cat /etc/redhat-release
+          node --version
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:checks
+      - name: Documented quickstart
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/quickstart" && cd "$RUNNER_TEMP/quickstart"
+          node "$GITHUB_WORKSPACE/bin/conarium-init.mjs"
+          test -f conarium.config.json
+          test -f audit-ed25519.pem.keyid
+          export CONARIUM_AUDIT_SIGNING_KEY="$PWD/audit-ed25519.pem"
+          export CONARIUM_AUDIT_TRUST_PUBKEYS="$PWD/audit-ed25519.pub.pem"
+          node "$GITHUB_WORKSPACE/bin/conarium-doctor.mjs" --config ./conarium.config.json --no-net
