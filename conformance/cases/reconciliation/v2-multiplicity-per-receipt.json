@@ -1,0 +1,16 @@
+{
+  "id": "reconciliation/v2-multiplicity-per-receipt",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-3.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers-3.jsonl",
+  "mappingProfile": "conformance/fixtures/reconciliation/profile-multiplicity-1.json",
+  "expectOutcome": "no-exceptions",
+  "expectCounts": { "matched": 1, "observed-without-receipt": 0, "indeterminate": 0 },
+  "forbidItemOutcomes": ["observed-without-receipt", "indeterminate"],
+  "rationale": "The multiplicity bound is how many source statements one Receipt may cover. Three Receipts in the Window name the object, the bound is 1, and the pattern has three statements, so the bound admits all three.",
+  "doesNotTest": "Whether each Receipt belongs to one of the statements. The comparison is a count against a declared bound."
+}

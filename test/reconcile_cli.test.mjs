@@ -701,47 +701,336 @@ describe('coverage-reconciliation/2 projection', () => {
     expect(v2.items[0].outcome).toBe('indeterminate')
   })
 
-  describe('what a declared bound is compared with (LIMITATIONS.md)', () => {
+  // #161: the bound is how many statements one Receipt may cover, so the
+  // in-window Receipts naming an object admit receipts × bound statements
+  // against it, and every pattern on that object draws on the same Receipts.
+  describe('what a declared bound is compared with', () => {
     const SQL_CUSTOMERS_2 = `${SQL_CUSTOMERS} /* second pattern */`
-    const profileIn = (dir) => {
+    const SQL_JOIN = 'select c.id from public.customers c join public.orders o on o.customer_id = c.id'
+    const profileIn = (dir, bound) => {
       const profilePath = join(dir, 'profile.json')
       writeFileSync(
         profilePath,
         JSON.stringify({
           v: 'conarium-mapping-profile/0.1',
           version: '1',
-          multiplicity: { maxStatementsPerReceipt: 1 },
+          multiplicity: { maxStatementsPerReceipt: bound },
         }),
       )
       return profilePath
     }
     const inWindow = (minute) => `2026-08-06T11:0${minute}:00.000Z`
+    const customers = (n) =>
+      Array.from({ length: n }, (_, m) => receipt({ ts: inWindow(m), objects: ['zion.customers'], seq: m + 1 }))
+    const bounded = ({ afterEntries, receipts, bound = 1 }) => {
+      const { dir, args } = setup({ beforeEntries: [], afterEntries, receipts })
+      const r = run([...args, '--profile', profileIn(dir, bound), '--json-v2'])
+      return { code: r.code, v2: JSON.parse(r.stdout) }
+    }
 
-    it('three receipts do not raise a bound of 1 for three statements, and the run exits 0', () => {
-      const { dir, args } = setup({
-        beforeEntries: [],
+    it('three receipts at a bound of 1 cover three statements', () => {
+      const { code, v2 } = bounded({
         afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 3 }],
-        receipts: [0, 1, 2].map((m) => receipt({ ts: inWindow(m), objects: ['zion.customers'] })),
+        receipts: customers(3),
       })
-      const r = run([...args, '--profile', profileIn(dir), '--json-v2'])
-      const v2 = JSON.parse(r.stdout)
-      expect(v2.outcome).toBe('exceptions')
-      expect(v2.items[0].reason).toBe('multiplicity-exceeded')
-      expect(r.code).toBe(0)
+      expect(v2.counts.matched).toBe(1)
+      expect(v2.items).toEqual([])
+      expect(v2.outcome).toBe('no-exceptions')
+      expect(code).toBe(0)
     })
 
-    it('separate patterns are not added together against one receipt', () => {
-      const { dir, args } = setup({
-        beforeEntries: [],
+    it('one receipt at a bound of 1 does not cover three statements, and /2 leaves the exit code alone', () => {
+      const { code, v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 3 }],
+        receipts: customers(1),
+      })
+      expect(v2.items).toEqual([
+        {
+          outcome: 'observed-without-receipt',
+          pattern: expect.any(String),
+          objects: ['customers'],
+          reason: 'multiplicity-exceeded',
+          multiplicity: { bound: 1, object: 'customers', receipts: 1, statements: 3 },
+        },
+      ])
+      expect(v2.outcome).toBe('exceptions')
+      expect(code).toBe(0)
+    })
+
+    it('three receipts and one statement are matched', () => {
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+        receipts: customers(3),
+      })
+      expect(v2.counts.matched).toBe(1)
+      expect(v2.outcome).toBe('no-exceptions')
+    })
+
+    it('two patterns against one object draw on the same receipt and neither is matched', () => {
+      const { v2 } = bounded({
         afterEntries: [
           { queryid: '1', query: SQL_CUSTOMERS, calls: 1 },
           { queryid: '2', query: SQL_CUSTOMERS_2, calls: 1 },
         ],
-        receipts: [receipt({ ts: inWindow(0), objects: ['zion.customers'] })],
+        receipts: customers(1),
       })
-      const v2 = JSON.parse(run([...args, '--profile', profileIn(dir), '--json-v2']).stdout)
+      expect(v2.counts.matched).toBe(0)
+      expect(v2.counts.indeterminate).toBe(2)
+      expect(v2.counts['observed-without-receipt']).toBe(0)
+      for (const item of v2.items) {
+        expect(item.outcome).toBe('indeterminate')
+        expect(item.reason).toBe('multiplicity-shared')
+        expect(item.multiplicity).toEqual({ bound: 1, objects: ['customers'], receipts: 1, statements: 2 })
+      }
+      expect(v2.outcome).toBe('exceptions')
+    })
+
+    it('two receipts cover the two patterns', () => {
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_CUSTOMERS, calls: 1 },
+          { queryid: '2', query: SQL_CUSTOMERS_2, calls: 1 },
+        ],
+        receipts: customers(2),
+      })
       expect(v2.counts.matched).toBe(2)
       expect(v2.outcome).toBe('no-exceptions')
+    })
+
+    it('one pattern over its own bound is not softened by a neighbour on the same object', () => {
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_CUSTOMERS, calls: 10000 },
+          { queryid: '2', query: SQL_CUSTOMERS_2, calls: 1 },
+        ],
+        receipts: customers(1),
+      })
+      const byReason = Object.fromEntries(v2.items.map((i) => [i.reason, i]))
+      expect(byReason['multiplicity-exceeded'].outcome).toBe('observed-without-receipt')
+      expect(byReason['multiplicity-exceeded'].multiplicity).toEqual({
+        bound: 1,
+        object: 'customers',
+        receipts: 1,
+        statements: 10000,
+      })
+      expect(byReason['multiplicity-shared'].outcome).toBe('indeterminate')
+      expect(byReason['multiplicity-shared'].multiplicity.statements).toBe(10001)
+    })
+
+    it('a pattern that names two objects is bound by the object with fewer receipts', () => {
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_JOIN, calls: 2 }],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.customers'], seq: 2 }),
+        ],
+      })
+      expect(v2.items).toHaveLength(1)
+      expect(v2.items[0].outcome).toBe('observed-without-receipt')
+      expect(v2.items[0].multiplicity).toEqual({ bound: 1, object: 'orders', receipts: 1, statements: 2 })
+    })
+
+    it('a pattern with an object no receipt names does not draw on its neighbour\'s receipts', () => {
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_CUSTOMERS, calls: 1 },
+          { queryid: '2', query: SQL_JOIN, calls: 1 },
+        ],
+        receipts: customers(1),
+      })
+      expect(v2.counts.matched).toBe(1)
+      expect(v2.items).toHaveLength(1)
+      expect(v2.items[0].outcome).toBe('observed-without-receipt')
+      expect(v2.items[0].objects).toEqual(['public.orders'])
+      expect(v2.items[0]).not.toHaveProperty('multiplicity')
+    })
+
+    it('the receipt counts stay out of the /1 body', () => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 1 }],
+        receipts: customers(1),
+      })
+      const body = JSON.parse(run([...args, '--profile', profileIn(dir, 1), '--json']).stdout)
+      expect(body.v).toBe('conarium-reconcile/0.1')
+      expect(body).not.toHaveProperty('namingReceipts')
+    })
+
+    it('a receipt that names two objects is one budget, not one per object', () => {
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_CUSTOMERS, calls: 1 },
+          { queryid: '2', query: SQL_ORDERS, calls: 1 },
+        ],
+        receipts: [receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'] })],
+      })
+      expect(v2.counts.matched).toBe(0)
+      expect(v2.counts.indeterminate).toBe(2)
+      for (const item of v2.items) {
+        expect(item.reason).toBe('multiplicity-shared')
+        expect(item.multiplicity).toEqual({ bound: 1, objects: ['customers', 'orders'], receipts: 1, statements: 2 })
+      }
+      expect(v2.outcome).toBe('exceptions')
+    })
+
+    it('patterns that fit each object on its own can still be more than their receipts cover together', () => {
+      // customers: 1 statement, 1 receipt. orders: 2 statements, 2 receipts.
+      // Both receipts that name orders are the only ones that can cover the
+      // three statements, and they cover two.
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_CUSTOMERS, calls: 1 },
+          { queryid: '2', query: SQL_ORDERS, calls: 2 },
+        ],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.orders', 'zion.products'], seq: 2 }),
+          receipt({ ts: inWindow(2), objects: ['zion.products'], seq: 3 }),
+        ],
+      })
+      expect(v2.counts.matched).toBe(0)
+      expect(v2.counts.indeterminate).toBe(2)
+      for (const item of v2.items.filter((i) => i.outcome === 'indeterminate')) {
+        expect(item.reason).toBe('multiplicity-shared')
+        expect(item.multiplicity).toEqual({ bound: 1, objects: ['customers', 'orders'], receipts: 2, statements: 3 })
+      }
+    })
+
+    it('a pattern with receipts to spare is matched beside a shortfall it cannot take part in', () => {
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_CUSTOMERS, calls: 1 },
+          { queryid: '2', query: SQL_CUSTOMERS_2, calls: 1 },
+          { queryid: '3', query: SQL_ORDERS, calls: 1 },
+        ],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.orders'], seq: 2 }),
+        ],
+      })
+      expect(v2.counts.matched).toBe(1)
+      expect(v2.counts.indeterminate).toBe(2)
+      for (const item of v2.items) {
+        expect(item.objects).toEqual(['customers'])
+        expect(item.multiplicity).toEqual({ bound: 1, objects: ['customers'], receipts: 1, statements: 2 })
+      }
+    })
+
+    it('one receipt that names both objects of a join covers one statement of it', () => {
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_JOIN, calls: 1 }],
+        receipts: [receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'] })],
+      })
+      expect(v2.counts.matched).toBe(1)
+      expect(v2.outcome).toBe('no-exceptions')
+    })
+
+    it('a join is covered by one receipt for each of its objects', () => {
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_JOIN, calls: 1 }],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.orders'], seq: 2 }),
+        ],
+      })
+      expect(v2.counts.matched).toBe(1)
+      expect(v2.outcome).toBe('no-exceptions')
+    })
+
+    it('a join that some receipt names whole draws only on receipts that name it whole (LIMITATIONS.md)', () => {
+      // One statement on the join receipt, one on the two single-object
+      // receipts would cover both. The comparison does not mix the two ways, so
+      // it does not show that, and the pattern is indeterminate, not matched.
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_JOIN, calls: 2 }],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.customers'], seq: 2 }),
+          receipt({ ts: inWindow(2), objects: ['zion.orders'], seq: 3 }),
+        ],
+      })
+      expect(v2.counts.matched).toBe(0)
+      expect(v2.items).toHaveLength(1)
+      expect(v2.items[0].outcome).toBe('indeterminate')
+      expect(v2.items[0].reason).toBe('multiplicity-shared')
+      expect(v2.items[0].multiplicity).toEqual({ bound: 1, objects: ['customers', 'orders'], receipts: 1, statements: 2 })
+    })
+
+    it('a join covered one receipt per object reports the group furthest over the bound', () => {
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_JOIN, calls: 1 },
+          { queryid: '2', query: SQL_CUSTOMERS, calls: 2 },
+          { queryid: '3', query: SQL_ORDERS, calls: 1 },
+        ],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.orders'], seq: 2 }),
+        ],
+      })
+      const join = v2.items.find((i) => i.objects.length === 2)
+      expect(join.outcome).toBe('indeterminate')
+      expect(join.multiplicity).toEqual({ bound: 1, objects: ['customers'], receipts: 1, statements: 3 })
+    })
+
+    const SQL_JOIN_3 =
+      'select c.id from public.customers c join public.orders o on o.customer_id = c.id join public.products p on p.id = o.product_id'
+
+    it('a join no receipt names whole is covered by receipts that each name some of its objects', () => {
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_JOIN_3, calls: 1 }],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.products'], seq: 2 }),
+        ],
+      })
+      expect(v2.counts.matched).toBe(1)
+      expect(v2.outcome).toBe('no-exceptions')
+    })
+
+    it('a join no receipt names whole, named by receipts that overlap, counts a shared receipt once per object (LIMITATIONS.md)', () => {
+      // The customers-and-orders receipt plus the orders-and-products receipt
+      // cover the statement, one statement each. Drawing per object counts
+      // orders against both, so the pattern is indeterminate, not matched.
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_JOIN_3, calls: 1 }],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.orders', 'zion.products'], seq: 2 }),
+        ],
+      })
+      expect(v2.counts.matched).toBe(0)
+      expect(v2.items).toHaveLength(1)
+      expect(v2.items[0].outcome).toBe('indeterminate')
+      expect(v2.items[0].reason).toBe('multiplicity-shared')
+      expect(v2.items[0].multiplicity).toEqual({
+        bound: 1,
+        objects: ['customers', 'orders', 'products'],
+        receipts: 2,
+        statements: 1,
+      })
+    })
+
+    it('a receipt that names one object twice is one receipt', () => {
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 2 }],
+        receipts: [receipt({ ts: inWindow(0), objects: ['zion.customers', 'public.customers'] })],
+      })
+      expect(v2.items[0].outcome).toBe('observed-without-receipt')
+      expect(v2.items[0].multiplicity.receipts).toBe(1)
+    })
+
+    it('a receipt outside the Window does not count toward an in-window bound (LIMITATIONS.md)', () => {
+      const { v2 } = bounded({
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 2 }],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers'], seq: 1 }),
+          receipt({ ts: '2026-08-06T09:59:57.000Z', objects: ['zion.customers'], seq: 2 }),
+        ],
+      })
+      expect(v2.items[0].outcome).toBe('observed-without-receipt')
+      expect(v2.items[0].reason).toBe('multiplicity-exceeded')
+      expect(v2.items[0].multiplicity.receipts).toBe(1)
     })
   })
 
@@ -778,13 +1067,92 @@ describe('coverage-reconciliation/2 projection', () => {
       expect(item.reason).toBe('window-boundary')
       expect(item.requiredSkewMs).toBe(3000)
       expect(item.objects).toEqual(['public.customers'])
-      expect(item.multiplicity).toEqual({ bound: 1, statements: 10000, exceededIfAdmitted: true })
+      expect(item.multiplicity).toEqual({
+        bound: 1,
+        object: 'customers',
+        receipts: 1,
+        statements: 10000,
+        exceededIfAdmitted: true,
+      })
     })
 
     it('a single statement against the same bound is a different item', () => {
       const [item] = JSON.parse(boundaryRun({ delta: 1, bound: 1 }).stdout).items
       expect(item.outcome).toBe('indeterminate')
-      expect(item.multiplicity).toEqual({ bound: 1, statements: 1, exceededIfAdmitted: false })
+      expect(item.multiplicity).toEqual({
+        bound: 1,
+        object: 'customers',
+        receipts: 1,
+        statements: 1,
+        exceededIfAdmitted: false,
+      })
+    })
+
+    it('every receipt naming the object counts when the item asks what admitting them would settle', () => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 2 }],
+        receipts: [
+          receipt({ ts: early, objects: ['zion.customers'], seq: 1 }),
+          receipt({ ts: '2026-08-06T09:59:58.000Z', objects: ['zion.customers'], seq: 2 }),
+        ],
+      })
+      const profilePath = join(dir, 'profile.json')
+      writeFileSync(
+        profilePath,
+        JSON.stringify({
+          v: 'conarium-mapping-profile/0.1',
+          version: '1',
+          multiplicity: { maxStatementsPerReceipt: 1 },
+        }),
+      )
+      const [item] = JSON.parse(run([...args, '--profile', profilePath, '--json-v2']).stdout).items
+      expect(item.outcome).toBe('indeterminate')
+      expect(item.reason).toBe('window-boundary')
+      expect(item.multiplicity).toEqual({
+        bound: 1,
+        object: 'customers',
+        receipts: 2,
+        statements: 2,
+        exceededIfAdmitted: false,
+      })
+      const text = run([...args, '--profile', profilePath])
+      expect(text.stderr).not.toMatch(/exceed the declared multiplicity bound/)
+    })
+
+    it('a boundary item that names two objects reports the one with fewer receipts', () => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [
+          {
+            queryid: '1',
+            query: 'select c.id from public.customers c join public.orders o on o.customer_id = c.id',
+            calls: 1,
+          },
+        ],
+        receipts: [
+          receipt({ ts: early, objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: '2026-08-06T09:59:58.000Z', objects: ['zion.customers'], seq: 2 }),
+        ],
+      })
+      const profilePath = join(dir, 'profile.json')
+      writeFileSync(
+        profilePath,
+        JSON.stringify({
+          v: 'conarium-mapping-profile/0.1',
+          version: '1',
+          multiplicity: { maxStatementsPerReceipt: 1 },
+        }),
+      )
+      const [item] = JSON.parse(run([...args, '--profile', profilePath, '--json-v2']).stdout).items
+      expect(item.reason).toBe('window-boundary')
+      expect(item.multiplicity).toEqual({
+        bound: 1,
+        object: 'orders',
+        receipts: 1,
+        statements: 1,
+        exceededIfAdmitted: false,
+      })
     })
 
     it('without a declared bound the item states no multiplicity comparison', () => {

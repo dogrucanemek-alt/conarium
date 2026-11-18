@@ -1,0 +1,18 @@
+{
+  "id": "reconciliation/v2-multiplicity-one-receipt-two-objects",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-orders.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers-orders-one.jsonl",
+  "mappingProfile": "conformance/fixtures/reconciliation/profile-multiplicity-1.json",
+  "expectOutcome": "exceptions",
+  "expectCounts": { "matched": 0, "indeterminate": 2, "observed-without-receipt": 0 },
+  "expectItemOutcomes": ["indeterminate"],
+  "forbidItemOutcomes": ["matched", "observed-without-receipt"],
+  "expectItemFields": { "reason": "multiplicity-shared", "multiplicity": { "bound": 1, "objects": ["customers", "orders"], "receipts": 1, "statements": 2 } },
+  "rationale": "The bound is how many statements one Receipt may cover, however many objects the Receipt names. One Receipt names customers and orders, the bound is 1, and there is one statement on each object, so the Receipt admits one of the two. Each pattern fits on its own, and the evidence does not say which one the Receipt covered, so neither is matched.",
+  "doesNotTest": "Whether the Receipt belongs to either statement. The comparison is a count against a declared bound."
+}

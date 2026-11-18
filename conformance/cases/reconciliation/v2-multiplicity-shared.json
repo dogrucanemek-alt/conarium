@@ -1,0 +1,18 @@
+{
+  "id": "reconciliation/v2-multiplicity-shared",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-customers-two-patterns.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-customers.jsonl",
+  "mappingProfile": "conformance/fixtures/reconciliation/profile-multiplicity-1.json",
+  "expectOutcome": "exceptions",
+  "expectCounts": { "matched": 0, "indeterminate": 2, "observed-without-receipt": 0 },
+  "expectItemOutcomes": ["indeterminate"],
+  "forbidItemOutcomes": ["matched", "observed-without-receipt"],
+  "expectItemFields": { "reason": "multiplicity-shared", "multiplicity": { "bound": 1, "objects": ["customers"], "receipts": 1, "statements": 2 } },
+  "rationale": "A Receipt names objects, not patterns, so two patterns against one object draw on the same Receipts. One Receipt at a bound of 1 admits one of the two statements. Each pattern fits the bound on its own, and the evidence does not say which one the Receipt covered, so neither is matched.",
+  "doesNotTest": "A pattern over the bound on its own. That is observed-without-receipt with reason multiplicity-exceeded."
+}
