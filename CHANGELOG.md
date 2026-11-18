@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased - a boundary item over the bound either way is observed-without-receipt
+
+When a boundary item's `exceededIfAdmitted` is `true`, the item is over the
+declared bound under either reading of the clock, so the clock does not decide
+it. Following draft-08, `/2` reports it as `observed-without-receipt` with
+reason `multiplicity-exceeded`, the offset and the bound, where draft-07
+required `indeterminate`. Issue #101 reported the case: 10,000 statements
+against one Receipt, a bound of 1, one `indeterminate` item. Thanks to
+giskard09 for the report. `/1` still exits 41 for it, and without a declared
+bound no item leaves `indeterminate` this way. The conformance case
+`v2-window-boundary-bound-exceeded` now expects `observed-without-receipt`.
+
 ## 0.3.8 - the patterns beside a join that a Receipt names in part are decided together
 
 0.3.7 said its comparison errs toward `indeterminate` for a pattern over

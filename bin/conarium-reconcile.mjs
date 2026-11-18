@@ -898,17 +898,31 @@ export function projectResultV2(result, ctx) {
     throw new Error('projectResultV2: the result carries no receipt counts; pass the value reconcile() returned')
   }
 
-  // The temporal rule keeps a boundary item indeterminate whatever its size, so
-  // the outcome alone shows 1 statement and 10,000 as the same finding. The item
-  // carries the objects and, under a declared bound, what admitting every
-  // Receipt that names them would and would not settle.
+  // The temporal rule keeps a boundary item indeterminate, because the clock
+  // decides it. Under a declared bound, an item whose count exceeds the bound
+  // even with every Receipt naming its objects admitted is over it under either
+  // reading of the clock, so the clock does not decide it: draft-08 makes it
+  // observed-without-receipt and requires the offset and the bound on the item
+  // (#101). Otherwise the item carries what admitting those Receipts would and
+  // would not settle.
   for (const d of result.indeterminate) {
+    const multiplicity = max != null ? boundaryMultiplicity(d, naming, max) : null
+    if (multiplicity?.exceededIfAdmitted) {
+      push('observed-without-receipt', {
+        pattern: patternDigest(d.query),
+        reason: 'multiplicity-exceeded',
+        requiredSkewMs: d.requiredSkewMs,
+        objects: d.uncoveredTables,
+        multiplicity,
+      })
+      continue
+    }
     push('indeterminate', {
       pattern: patternDigest(d.query),
       reason: 'window-boundary',
       requiredSkewMs: d.requiredSkewMs,
       objects: d.uncoveredTables,
-      ...(max != null ? { multiplicity: boundaryMultiplicity(d, naming, max) } : {}),
+      ...(multiplicity ? { multiplicity } : {}),
     })
   }
 
@@ -1186,7 +1200,8 @@ async function main(argv = process.argv.slice(2)) {
         const m = boundaryMultiplicity(d, result.namingReceipts, max)
         return m.exceededIfAdmitted
           ? `\n    ${d.delta} statements exceed the declared multiplicity bound of ${max} even if all ` +
-              `${m.receipts} receipt(s) naming ${m.object} are admitted`
+              `${m.receipts} receipt(s) naming ${m.object} are admitted, so the clock does not decide it: ` +
+              '/2 reports it as observed-without-receipt'
           : ''
       }
       const line = (d) =>

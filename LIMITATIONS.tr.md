@@ -364,8 +364,11 @@ kapsayacak olan makbuz pencerenin dışına düşerse sonuç `indeterminate` olu
 bilemez. Bu bir hüküm değil, bir sınır: 41 başarısızlıktır, koşu geçmez, ama
 hiçbir yön kanıtlanmış olmaz. Sınır beyan edilmişse `/2` kalemi, nesnelerini
 adlandıran her makbuz kabul edilse bile ifade sayısının sınırı aşıp aşmadığını yazar
-(`multiplicity.exceededIfAdmitted`). Sonuç değişmez, kalem yine `indeterminate`
-kalır; `false` değeri de geçti anlamına gelmez.
+(`multiplicity.exceededIfAdmitted`). Aşıyorsa saatin iki okuması da aynı sonucu
+verir, yani kalemi saat belirlemez: `/2` onu `observed-without-receipt` olarak,
+`multiplicity-exceeded` gerekçesi, fark ve sınırla raporlar (draft-08). `/1`
+sonucu ve 41 çıkış kodu değişmez. Aşmıyorsa kalem `indeterminate` kalır;
+`false` değeri de geçti anlamına gelmez.
 
 Aklama, pencerenin kendi uzunluğuyla sınırlı: pencereden uzun bir fark sınır
 etkisiyle açıklanamaz ve rapor bunu mazeret göstermek yerine açıkça yazar.
