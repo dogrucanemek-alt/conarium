@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.7 - a multiplicity bound counts per Receipt
+
+`multiplicity.maxStatementsPerReceipt` is documented as how many source
+statements one Receipt may cover, and issue #161 reported that the `/2` result
+compared it with one pattern's statement count, whatever the number of
+Receipts. Three Receipts, three statements and a bound of 1 reported
+`multiplicity-exceeded`. Two patterns of one statement each against one Receipt
+were both `matched`, which erred the other way.
+
+A Receipt's bound is now one budget, however many objects the Receipt names,
+and the patterns whose objects all have a Receipt in the Window draw on the
+in-window Receipts together. A statement is covered by one Receipt that names
+all of its pattern's objects or, when none does, by a Receipt for each object.
+Of the patterns that draw, one whose statements are more than bound × the
+in-window Receipts naming one of its objects is `observed-without-receipt`
+with reason `multiplicity-exceeded`, as before, and carries
+`multiplicity: { bound, object, receipts, statements }`. The statements of the
+patterns that draw, that one's included, are then assigned to Receipts as a
+maximum flow. Any other pattern that draws and that some maximum assignment
+leaves with a statement uncovered is `indeterminate` with the new reason
+`multiplicity-shared`, and carries `multiplicity: { bound, objects, receipts,
+statements }` for the patterns it competes with. One Receipt that names
+customers and orders, at a bound of 1, admits one of a customers statement and
+an orders statement, not both. Two cases err toward `indeterminate`;
+`LIMITATIONS.md` names them.
+
+A boundary item's `multiplicity` gains `object` and `receipts`, and
+`exceededIfAdmitted` now counts every Receipt with a readable timestamp that
+names the object: two Receipts just outside the Window at a bound of 1 admit
+two statements. Its
+outcome stays `indeterminate`, as draft-07 requires.
+
+This changes which `/2` items are `matched`. The `/1` JSON body and the exit
+codes do not change. Three conformance cases are added,
+`v2-multiplicity-per-receipt`, `v2-multiplicity-shared` and
+`v2-multiplicity-one-receipt-two-objects`.
+
 ## 0.3.6 - a boundary item shows its size; the sink lock error says what resolves it
 
 A pattern uncovered only by the window boundary is `indeterminate`, and

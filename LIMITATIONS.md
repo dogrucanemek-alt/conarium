@@ -308,13 +308,28 @@ statement was itself receipted. `--json-v2` prints a separate
 as `/2`. Without a Mapping Profile the `/2` object leaves multiplicity-bound
 items `indeterminate` rather than treating one receipt as a bound of one.
 
-A declared multiplicity bound is compared with one pattern's statement count in
-the window. The number of receipts naming the pattern's objects does not raise
-it, whatever the field name `maxStatementsPerReceipt` suggests: three receipts,
-three statements and a bound of 1 report `multiplicity-exceeded`. Statements of
-separate patterns are not added together against one receipt either. `/2` does
-not change the exit codes, so a run whose `/2` outcome is `exceptions` can still
-exit 0. A check on this channel reads `outcome`, not only the exit code.
+A declared multiplicity bound is how many statements one receipt may cover,
+however many objects the receipt names. A statement is covered by one receipt
+in the window that names all of its pattern's objects or, when none names them
+all, by a receipt for each object. The patterns whose objects all have a
+receipt in the window draw on those receipts together; a pattern with an
+object no receipt in the window names takes its outcome from that object and
+draws on none. Of the patterns that draw, one whose statements are more than
+bound × the receipts in the window that name one of its objects is
+`observed-without-receipt` with reason `multiplicity-exceeded`. Any other
+pattern that draws, whose statements the receipts cannot be shown to cover
+beside the patterns that draw on the same receipts, is `indeterminate` with reason `multiplicity-shared`, because the
+evidence does not say which statements the receipts covered. The comparison
+errs toward `indeterminate` in two cases. A pattern over several objects that
+some receipt in the window names whole draws only on the receipts that name it
+whole, even when the others would cover the rest. A pattern over several
+objects that no receipt in the window names whole counts a receipt that names
+two of its objects once for each, unless every receipt that names one of the
+two names the other. Receipts outside the window do not count toward this comparison, even
+when one of them would cover the shortfall: such an item is decided by the
+in-window receipts alone, not reported as a boundary item. `/2` does not change the exit
+codes, so a run whose `/2` outcome is `exceptions` can still exit 0. A check on
+this channel reads `outcome`, not only the exit code.
 
 ## Reconciliation cannot tell a trailing clock from a late receipt
 <!-- s: reconcile-trailing-clock -->
@@ -326,9 +341,9 @@ reported as `indeterminate` (exit 41) rather than as unreceipted access,
 because this tool has no way to know which of the two happened. That is a
 limit, not a verdict: 41 is a failure and the run does not pass, but nothing
 is proven either way. Under a declared bound the `/2` item says whether the
-statement count exceeds it even if the receipt were admitted
-(`multiplicity.exceededIfAdmitted`). The outcome does not change: the item stays
-`indeterminate`, and `false` is not a pass.
+statement count exceeds it even if every receipt naming its objects were
+admitted (`multiplicity.exceededIfAdmitted`). The outcome does not change: the
+item stays `indeterminate`, and `false` is not a pass.
 
 The exculpation is bounded by the window's own length — an offset larger than
 the window cannot be a boundary artefact, and the report says so instead of
