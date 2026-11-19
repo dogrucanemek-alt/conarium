@@ -454,7 +454,8 @@ reconciler attributes the pattern to the data objects it touches and
 checks whether any Receipt in the Window names those objects. Matching is
 per pattern and per data object, not per call count: one client-level
 request may legitimately produce more than one source-level statement, so
-call counts and receipt counts MUST NOT be compared one-to-one. A pattern
+call counts and receipt counts MUST NOT be compared at any ratio other than
+a multiplicity bound the Mapping Profile declares ({{cr-mapping}}). A pattern
 whose target objects cannot be determined MUST NOT be silently ignored; it
 receives the `indeterminate` outcome below.
 
@@ -489,8 +490,9 @@ statement names these outcomes as fields ({{cr-result}}):
 : The evidence or the Mapping Profile does not determine an outcome — the
   pattern's objects could not be attributed, a required multiplicity or skew
   bound is undeclared, the item's only naming Receipt falls outside the Window
-  and admitting it would not settle the item against a declared multiplicity
-  bound, or the Window's evidence is insufficient to decide.
+  by no more than a declared skew bound, or with no skew bound declared, and
+  the item does not exceed a declared multiplicity bound with that Receipt
+  admitted, or the Window's evidence is insufficient to decide.
 
 An implementation MUST NOT report an item as `matched` when the outcome is
 `indeterminate`; the absence of a decision is not a decision. In
@@ -557,7 +559,7 @@ they were observed. Any other pattern that draws is `matched` only if every
 assignment of statements to Receipts within the bound that covers as many
 statements as possible covers all of its statements; otherwise it is
 `indeterminate`, because the evidence does not say which statements the
-Receipts covered. A verifier that cannot establish this reports
+Receipts covered. An implementation that cannot establish this reports
 `indeterminate`, not `matched`.
 
 The profile also declares the temporal correspondence. The operator knows
@@ -639,7 +641,7 @@ An implementation MAY, absent a declared bound, decline to offer the boundary
 as the explanation for an offset larger than the Window itself, on the ground
 that a boundary artefact cannot exceed the interval it bounds. This is a
 reporting choice about what an implementation is willing to suggest, not a
-change of outcome: the item is `indeterminate` either way. The
+change of outcome: the item has the same outcome either way. The
 twenty-three hour case that motivated this choice is in
 {{implementation-status}}.
 
@@ -1072,7 +1074,8 @@ One implementation of both mechanisms exists: the Conarium gateway
 (TypeScript, MIT license, `@conarium-ai/core` on npm). It has run at one
 site since July 2026. Its receipts carry per-class masking counts as in
 {{transformation-evidence}}. Its `conarium-reconcile` tool implements
-{{cr-procedure}} against PostgreSQL statement statistics. The tool is a
+{{cr-procedure}} against PostgreSQL statement statistics, with the gaps stated
+below. The tool is a
 single file. It has no dependency on the package. A third party can run
 it without trusting the implementation under audit. Conformance test
 vectors ship with the package.
@@ -1090,13 +1093,6 @@ and still carries `conarium-reconcile/0.1`. The `/2` result carries
 `profile`, `bounds`, `outcome`, `items`, and `counts` under the names used
 here. It reads Mapping Profiles ({{cr-mapping}}), including the three
 `clocks` fields.
-
-As of 0.3.7 the tool counts a multiplicity bound per Receipt, as
-{{cr-mapping}} states. In two situations, which its documentation names, it
-reports `indeterminate` where an exact assignment would report `matched`;
-{{cr-mapping}} permits that. It does not implement the exception in
-{{cr-procedure}} for an item over the bound under either reading of the
-clock. 0.3.7 reports such an item `indeterminate`, as -07 required.
 
 The behaviour below was observed on one fixture: a Receipt naming the object,
 timestamped three seconds before a two-hour Window, together with one
@@ -1124,8 +1120,8 @@ infrastructure statement.
   unless the two parse to the same number of milliseconds; a `clocks` member
   carrying a fourth key fails and names the key it rejected.
 
-One gap remains. The tool's exit codes predate this vocabulary. They are
-not a mapping of it. They were left unchanged on purpose. An exit code is
+Gaps remain. One is in the tool's exit codes, which predate this
+vocabulary. They are not a mapping of it. They were left unchanged on purpose. An exit code is
 a compatibility contract. Renumbering them to match this document would
 break installations. That would make a specification look implemented.
 One code was added rather than renumbered. It is for the temporal
@@ -1162,9 +1158,31 @@ resolutions. Change the code back. Or write the revision that says what
 the code now does. Editing a posted draft is not one of them. The cost of
 drift is then a document, not a diff.
 
+More gaps were measured against the published 0.3.7 package, not 0.2.38,
+and the check does not run them. Two are against this revision. 0.3.7 does
+not implement the exception in {{cr-procedure}} for an item over a declared
+multiplicity bound under either reading of the clock: it reports such an item
+`indeterminate`, as -07 required, and the conformance case it ships for that
+item expects `indeterminate` and rejects `observed-without-receipt`. And 0.3.7
+counts a multiplicity bound per Receipt, but it draws a pattern over several
+objects that some Receipt names whole only on those Receipts. Beside such a
+pattern it can report `matched` a pattern that {{cr-mapping}} makes
+`indeterminate`. With a bound of 1, Receipts naming customers and orders,
+customers, and orders, two statements of a customers-orders join and one on
+orders, it reports the orders pattern `matched`.
+
+Three predate this revision. 0.3.7 digests a Mapping Profile as the bytes of
+its file, not as {{digests}} requires, so the same profile written with
+different whitespace has a different digest. On a counter regression it exits
+with code 20 and writes no result statement, where {{cr-result}} gives the
+outcome `invalid-window`. And it accepts a fractional duration such as
+`0.0001ms`, which the grammar for `clocks.skew` does not admit.
+
 A second check covers the conformance class rather than this document.
-Every outcome the result statement can carry has a case that produces it.
-Each independent ground for `indeterminate` has a case of its own. The
+Every outcome an item in the tool's result can carry has a case that
+produces it. The result-level `invalid-window` is not among them, because the
+tool writes no result statement for an unreliable Window. Each independent
+ground for `indeterminate` has a case of its own. The
 list of outcomes is read from the tool's own result. It is not restated
 in the check. An outcome added to the vocabulary arrives there without a
 reminder. It arrives failing until some case produces it. A conformance
@@ -1203,14 +1221,19 @@ attacked to learn it.
 
 *This section is to be removed before publication as an RFC.*
 
-Changed the outcome of an item that exceeds the declared multiplicity bound
-under either reading of the clock: it is now `observed-without-receipt`, where
--07 required `indeterminate`. An implementation of -07 reports such an item
-differently. Extended the definition of `observed-without-receipt` to activity
-beyond the declared bound, and qualified the definition of `indeterminate` and
-the semantics section to match. Stated how a multiplicity bound is counted:
-one budget per Receipt, shared by the patterns that draw on it. Acknowledges a
-report by giskard09.
+Changed the outcome of an item that the temporal rule of {{cr-procedure}} kept
+`indeterminate` and whose statement count exceeds the declared multiplicity
+bound even with every Receipt naming its objects counted: it is now
+`observed-without-receipt`, where -07 required `indeterminate`. An
+implementation of -07 reports such an item differently. Extended the
+definition of `observed-without-receipt` to activity beyond the declared
+bound, and qualified the definition of `indeterminate` and the semantics
+section to match. Stated how a multiplicity bound is counted: one budget per
+Receipt, shared by the patterns that draw on it. Qualified the rule against
+comparing call counts with receipt counts one-to-one: they are compared at no
+ratio other than a declared multiplicity bound. Stated in
+{{implementation-status}} the gaps measured between 0.3.7 and this revision.
+Acknowledges a report by giskard09.
 
 # Acknowledgments
 {:numbered="false"}
