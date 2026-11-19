@@ -768,8 +768,9 @@ does not state why. Gateway bypass produces it. Receipt sink failure
 produces it. Accounting scope mismatch produces it. A Receipt that names
 the object but falls outside the Window on the two clocks also produced
 it. {{cr-procedure}} therefore removes that case from this outcome, except
-where the item exceeds a declared multiplicity bound under either reading of
-the clock. An
+where the Receipt falls further outside the Window than a declared skew bound
+allows, or the item exceeds a declared multiplicity bound under either reading
+of the clock. An
 earlier revision listed the mirror condition under
 `receipted-without-observation` only. This text names both directions so
 the omission is visible. A result statement MUST NOT
@@ -1074,8 +1075,8 @@ One implementation of both mechanisms exists: the Conarium gateway
 (TypeScript, MIT license, `@conarium-ai/core` on npm). It has run at one
 site since July 2026. Its receipts carry per-class masking counts as in
 {{transformation-evidence}}. Its `conarium-reconcile` tool implements
-{{cr-procedure}} against PostgreSQL statement statistics, with the gaps stated
-below. The tool is a
+{{cr-procedure}} against PostgreSQL statement statistics, but not all of it:
+the gaps found so far are stated below, and others may remain. The tool is a
 single file. It has no dependency on the package. A third party can run
 it without trusting the implementation under audit. Conformance test
 vectors ship with the package.
@@ -1171,12 +1172,15 @@ pattern it can report `matched` a pattern that {{cr-mapping}} makes
 customers, and orders, two statements of a customers-orders join and one on
 orders, it reports the orders pattern `matched`.
 
-Three predate this revision. 0.3.7 digests a Mapping Profile as the bytes of
+Four predate this revision. 0.3.7 digests a Mapping Profile as the bytes of
 its file, not as {{digests}} requires, so the same profile written with
 different whitespace has a different digest. On a counter regression it exits
 with code 20 and writes no result statement, where {{cr-result}} gives the
-outcome `invalid-window`. And it accepts a fractional duration such as
-`0.0001ms`, which the grammar for `clocks.skew` does not admit.
+outcome `invalid-window`. It accepts a fractional duration such as
+`0.0001ms`, which the grammar for `clocks.skew` does not admit. And it reports
+a Receipt as `receipted-without-observation` only when none of the objects the
+Receipt names shows activity: a Receipt naming customers and orders, with
+activity on customers alone, produces no item for orders.
 
 A second check covers the conformance class rather than this document.
 Every outcome an item in the tool's result can carry has a case that
