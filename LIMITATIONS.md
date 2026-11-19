@@ -320,15 +320,15 @@ bound × the receipts in the window that name one of its objects is
 pattern that draws, whose statements the receipts cannot be shown to cover
 beside the patterns that draw on the same receipts, is `indeterminate` with reason `multiplicity-shared`, because the
 evidence does not say which statements the receipts covered. The comparison
-is approximate for a pattern over several objects when a receipt in the window
-names one of its objects but not all of them. If some receipt in the window
+is approximate for a pattern that draws, over several objects, when a receipt
+in the window names one of its objects but not all of them. If some receipt in the window
 names the pattern whole, it draws only on the receipts that name it whole, even
 when the others would cover the rest. If none does, it counts a receipt that
 names two of its objects once for each, unless every receipt that names one of
 the two names the other. Either way, a pattern beside it could look covered
-when another assignment would leave it short. So every pattern that shares a
-receipt in the window with such a pattern, directly or through other patterns,
-is decided together with it: if any of their statements is left uncovered,
+when another assignment would leave it short. So every pattern that draws and
+shares a receipt in the window with such a pattern, directly or through other
+patterns that draw, is decided together with it: if any of their statements is left uncovered,
 each of them not over the bound on its own is `indeterminate`, even one that a
 closer count would show covered. The comparison errs only toward
 `indeterminate`. Receipts outside the window do not count toward this comparison, even

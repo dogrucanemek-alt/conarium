@@ -316,15 +316,17 @@ fazla olan desen `observed-without-receipt` olur, gerekçesi
 `multiplicity-exceeded`. Pay alan ve ifadelerinin, aynı makbuzlardan pay alan
 desenlerin yanında makbuzlarca karşılandığı gösterilemeyen başka her desen
 `indeterminate` olur, gerekçesi `multiplicity-shared`; çünkü kanıt, makbuzların hangi ifadeleri karşıladığını
-söylemez. Birden çok nesneli bir desende, pencere içindeki bir makbuz
-nesnelerinden birini adlandırıp hepsini adlandırmıyorsa kıyas yaklaşıktır.
+söylemez. Pay alan ve birden çok nesneli bir desende, pencere içindeki bir
+makbuz nesnelerinden birini adlandırıp hepsini adlandırmıyorsa kıyas
+yaklaşıktır.
 Deseni pencere içinde bütünüyle adlandıran bir makbuz varsa desen yalnız onu
 bütünüyle adlandıran makbuzlardan pay alır, ötekiler kalanı karşılayacak olsa
 bile. Yoksa iki nesnesini adlandıran bir makbuzu her biri için ayrı sayar; o
 iki nesneden birini adlandıran her makbuz ötekini de adlandırıyorsa saymaz. İki
 durumda da yanındaki bir desen, başka bir atamada açıkta kalacakken karşılanmış
-görünebilir. Bu yüzden böyle bir desenle pencere içinde doğrudan ya da başka
-desenler üzerinden makbuz paylaşan her desen onunla birlikte karara bağlanır:
+görünebilir. Bu yüzden pay alan ve böyle bir desenle pencere içinde doğrudan ya
+da pay alan başka desenler üzerinden makbuz paylaşan her desen onunla birlikte
+karara bağlanır:
 ifadelerinden biri açıkta kalırsa, tek başına sınırı aşmayan her biri
 `indeterminate` olur, daha yakın bir sayımın karşılanmış göstereceği bir desen
 bile. Kıyas yalnız `indeterminate` yönüne yanılır. Pencere dışındaki makbuzlar bu

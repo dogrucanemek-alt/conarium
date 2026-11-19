@@ -596,15 +596,17 @@ one that some maximum assignment leaves with a statement uncovered is
 `indeterminate` with reason `multiplicity-shared`: the evidence does not say
 which statements the Receipts covered. Every other pattern is `matched`.
 
-The assignment is exact except for a pattern over several objects where an
-in-window Receipt names one of its objects but not all of them. Such a pattern
+The assignment is exact except for a pattern that draws, over several objects,
+where an in-window Receipt names one of its objects but not all of them. Such a
+pattern
 draws only on the Receipts that name it whole, where there are any. Where there
 are none, it is drawn against each object's Receipts: objects named by exactly
 the same Receipts share one draw, and a Receipt that names two of its objects
 that do not share a draw is counted once for each. Either way the assignment
 can show a pattern beside it covered when another maximum assignment would not.
-So the patterns that share an in-window Receipt with such a pattern, directly
-or through other patterns, are taken together. When the assignment leaves any
+So the patterns that draw and share an in-window Receipt with such a pattern,
+directly or through other patterns that draw, are taken together; a pattern
+that draws on none is not among them. When the assignment leaves any
 of their statements uncovered, every one of them not over the bound on its own
 is `indeterminate` with reason `multiplicity-shared`. When it covers them all,
 the assignment is a real one, and they are `matched`. The comparison therefore
