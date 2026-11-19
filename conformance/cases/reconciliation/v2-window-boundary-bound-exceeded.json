@@ -11,7 +11,7 @@
   "expectOutcome": "exceptions",
   "expectItemOutcomes": ["indeterminate"],
   "forbidItemOutcomes": ["matched", "observed-without-receipt"],
-  "expectItemFields": { "reason": "window-boundary", "multiplicity": { "bound": 1, "statements": 5, "exceededIfAdmitted": true } },
-  "rationale": "An item uncovered only by the window boundary stays indeterminate under the temporal rule of the draft, and it reports that its statement count exceeds the declared bound even if the Receipt outside the Window were admitted. The outcome alone would present 5 statements and 10,000 statements as the same finding.",
-  "doesNotTest": "Whether the Receipt belongs to the recorded access, or a bound per Receipt: the comparison is the one the reconciled branch uses, the pattern's statement count against the declared bound."
+  "expectItemFields": { "reason": "window-boundary", "multiplicity": { "bound": 1, "object": "customers", "receipts": 1, "statements": 5, "exceededIfAdmitted": true } },
+  "rationale": "An item uncovered only by the window boundary stays indeterminate under the temporal rule of the draft, and it reports that its statement count exceeds the declared bound even if every Receipt naming its objects were admitted. The outcome alone would present 5 statements and 10,000 statements as the same finding.",
+  "doesNotTest": "Whether the Receipt belongs to the recorded access."
 }

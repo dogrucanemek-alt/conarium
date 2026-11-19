@@ -11,7 +11,7 @@
   "expectOutcome": "exceptions",
   "expectItemOutcomes": ["indeterminate"],
   "forbidItemOutcomes": ["matched", "observed-without-receipt"],
-  "expectItemFields": { "reason": "window-boundary", "multiplicity": { "bound": 8, "statements": 5, "exceededIfAdmitted": false } },
+  "expectItemFields": { "reason": "window-boundary", "multiplicity": { "bound": 8, "object": "customers", "receipts": 1, "statements": 5, "exceededIfAdmitted": false } },
   "rationale": "Same evidence as v2-window-boundary-bound-exceeded with a bound of 8: the count fits the bound, so the clock alone keeps this item from being matched. A held bound never turns a boundary item into matched.",
   "doesNotTest": "A declared skew bound. That is v2-clocks-declared."
 }

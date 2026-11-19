@@ -579,12 +579,51 @@ bound does not decide), and `receipted-without-observation` makes
 `outcome` `exceptions`. `bounds.exclusion` is `operator-declared` only
 when the profile lists at least one exclusion rule.
 
+A declared multiplicity bound is how many statements one Receipt may cover,
+however many objects the Receipt names. A statement is covered by one in-window
+Receipt that names all of its pattern's objects or, when no in-window Receipt
+names them all, by an in-window Receipt for each object. The patterns whose
+objects all have a Receipt in the Window draw on the in-window Receipts; a
+pattern with an object no Receipt in the Window names takes its outcome from
+that object and draws on none.
+
+Of the patterns that draw, one whose call delta is more than bound × the
+in-window Receipts that name one of its objects is `observed-without-receipt`
+with reason `multiplicity-exceeded`; it still draws on the Receipts, because its statements
+were observed. The statements of the patterns that draw are assigned to
+Receipts as a maximum flow. Of the patterns not over the bound on their own,
+one that some maximum assignment leaves with a statement uncovered is
+`indeterminate` with reason `multiplicity-shared`: the evidence does not say
+which statements the Receipts covered. Every other pattern is `matched`. The
+comparison errs toward `indeterminate` in two situations. A pattern over
+several objects that some in-window Receipt names whole draws only on the
+Receipts that name it whole. A pattern over several objects that no in-window
+Receipt names whole is drawn
+against each object's Receipts, and objects named by exactly the same Receipts
+share one draw; a Receipt that names two of its objects that do not share a
+draw is counted once for each.
+
+A `multiplicity-exceeded` item carries
+`multiplicity: { bound, object, receipts, statements }`: `object` is the object
+whose bound decided it, as Receipts are matched to it (the last name segment,
+lower case), `receipts` the in-window Receipts naming it, and `statements` the
+pattern's call delta. A `multiplicity-shared` item carries
+`multiplicity: { bound, objects, receipts, statements }` for the patterns it
+competes with for Receipts: `objects` are the objects they draw for, `receipts`
+the in-window Receipts they can draw on, and `statements` their call deltas
+added together. A pattern drawn one Receipt per object can compete in two such
+groups; it reports the one whose statements are furthest over
+`receipts × bound`.
+
 A `/2` item whose `reason` is `window-boundary` carries `requiredSkewMs` and the
 uncovered `objects`. When the profile declares a multiplicity bound it also
-carries `multiplicity: { bound, statements, exceededIfAdmitted }`: `statements` is
-the pattern's call delta in the window, and `exceededIfAdmitted` is
-`statements > bound`, the comparison a pattern inside the window gets. The item
-stays `indeterminate` either way, and `false` is not a pass.
+carries `multiplicity: { bound, object, receipts, statements, exceededIfAdmitted }`:
+`statements` is the pattern's call delta in the window, `receipts` the number of
+Receipts with a readable timestamp that name `object`, inside the Window or out,
+and `object` the one of the pattern's objects with the fewest such Receipts.
+`exceededIfAdmitted` is `statements > receipts × bound`: the count exceeds the
+bound even with every Receipt naming the object admitted. The item stays
+`indeterminate` either way, and `false` is not a pass.
 
 ### Mapping Profile (`conarium-mapping-profile/0.1`)
 
@@ -613,7 +652,7 @@ undeclared, not defaulted.
 
 | Field | Type | Encoding | What it declares |
 |---|---|---|---|
-| `multiplicity.maxStatementsPerReceipt` | integer ≥ 1 | JSON number | how many source statements one receipt may cover. This implementation compares it with one pattern's statement count in the window, so more receipts do not raise it (`LIMITATIONS.md`) |
+| `multiplicity.maxStatementsPerReceipt` | integer ≥ 1 | JSON number | how many source statements one receipt may cover, however many objects it names. The patterns whose objects all have a receipt in the window draw on the in-window receipts together |
 | `exclusions[]` | array | `{ "id": string, "version": string }` | rules that remove items before comparison |
 | `clocks.observation` | string | clock identifier | the clock that stamps the observation window (the Data Source). This implementation writes it on `/1` as `clocks.window`. Typical value here: `pg_stat_statements`. |
 | `clocks.receipt` | string | clock identifier | the clock that stamps receipts (the Gateway). This implementation writes it on `/1` as `clocks.receipts`. Typical value here: `gateway`. |

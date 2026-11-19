@@ -284,6 +284,201 @@ export function outsideBoundaryCoverage(receipts, fromMs, toMs) {
 }
 
 /**
+ * How many Receipts name each object: those in the window, and all of them.
+ * A Receipt that names one object twice is one Receipt. Same attribution rule
+ * as receiptCoverage. A Receipt whose timestamp does not parse is in neither
+ * count, because no reading of the clock admits it.
+ *
+ * `groups` holds the in-window Receipts by the set of objects they name.
+ * Receipts that name the same objects are interchangeable against a bound, so
+ * one group stands for all of them.
+ */
+export function namingReceiptCounts(receipts, fromMs, toMs) {
+  const inWindow = new Map()
+  const all = new Map()
+  const groups = new Map()
+  for (const r of receipts) {
+    const t = Date.parse(r.ts)
+    if (Number.isNaN(t)) continue
+    const named = new Set()
+    for (const ref of r.dataRefs || []) if (ref.object) named.add(normalizeObject(ref.object))
+    if (r.request?.tool === 'describe_table' && r.request?.target) named.add(normalizeObject(r.request.target))
+    const inside = t >= fromMs && t <= toMs
+    for (const key of named) {
+      all.set(key, (all.get(key) ?? 0) + 1)
+      if (inside) inWindow.set(key, (inWindow.get(key) ?? 0) + 1)
+    }
+    if (inside && named.size > 0) {
+      const objects = [...named].sort()
+      const key = objects.join('\u0000')
+      const g = groups.get(key)
+      if (g) g.count += 1
+      else groups.set(key, { objects, count: 1 })
+    }
+  }
+  return { inWindow, all, groups: [...groups.values()] }
+}
+
+/**
+ * Maximum flow (Dinic) over integer capacities. `reachable()` after `run()` is
+ * the set of nodes reachable from the source in the residual graph: the same
+ * set for every maximum flow.
+ */
+class FlowNetwork {
+  constructor(n) {
+    this.head = new Array(n).fill(-1)
+    this.to = []
+    this.cap = []
+    this.next = []
+  }
+
+  add(u, v, c) {
+    for (const [a, b, k] of [[u, v, c], [v, u, 0]]) {
+      this.to.push(b)
+      this.cap.push(k)
+      this.next.push(this.head[a])
+      this.head[a] = this.to.length - 1
+    }
+  }
+
+  levels(s) {
+    const level = new Array(this.head.length).fill(-1)
+    level[s] = 0
+    const queue = [s]
+    for (let i = 0; i < queue.length; i++) {
+      const u = queue[i]
+      for (let e = this.head[u]; e !== -1; e = this.next[e]) {
+        if (this.cap[e] > 0 && level[this.to[e]] < 0) {
+          level[this.to[e]] = level[u] + 1
+          queue.push(this.to[e])
+        }
+      }
+    }
+    return level
+  }
+
+  run(s, t) {
+    let total = 0
+    for (;;) {
+      const level = this.levels(s)
+      if (level[t] < 0) return total
+      const it = [...this.head]
+      const push = (u, f) => {
+        if (u === t) return f
+        for (; it[u] !== -1; it[u] = this.next[it[u]]) {
+          const e = it[u]
+          const v = this.to[e]
+          if (this.cap[e] > 0 && level[v] === level[u] + 1) {
+            const got = push(v, Math.min(f, this.cap[e]))
+            if (got > 0) {
+              this.cap[e] -= got
+              this.cap[e ^ 1] += got
+              return got
+            }
+          }
+        }
+        return 0
+      }
+      for (let f = push(s, Infinity); f > 0; f = push(s, Infinity)) total += f
+    }
+  }
+
+  reachable(s) {
+    const level = this.levels(s)
+    return (u) => level[u] >= 0
+  }
+}
+
+/**
+ * Which reconciled patterns the in-window Receipts can be shown to cover under
+ * a bound of `max` statements per Receipt.
+ *
+ * A statement is covered by one Receipt that names all of its pattern's
+ * objects or, when no in-window Receipt names them all, by one Receipt for each
+ * object; a Receipt covers at most `max` statements. Every reconciled pattern
+ * draws on the Receipts, including one over the bound on its own, because its
+ * statements were observed. A pattern is shared when some maximum assignment
+ * leaves one of its statements uncovered: the evidence does not say which
+ * statements the Receipts covered. The rest are covered in every maximum
+ * assignment.
+ *
+ * A shared pattern's `group` is the patterns and Receipt groups it competes
+ * with: their statements are more than those Receipts admit.
+ */
+export function boundAssignment(reconciled, groups, max) {
+  const S = 0
+  const T = 1
+  const groupNode = (gi) => 2 + gi
+  let next = 2 + groups.length
+  const nodes = [] // { pattern, demand, targets }
+  for (const [pi, d] of reconciled.entries()) {
+    const tables = [...new Set(d.tables)]
+    const full = groups.flatMap((g, gi) => (tables.every((t) => g.objects.includes(t)) ? [gi] : []))
+    if (full.length > 0) {
+      nodes.push({ pattern: pi, objects: tables, demand: d.delta, targets: full })
+      continue
+    }
+    // Objects named by exactly the same Receipt groups are covered by one
+    // Receipt per statement, so they share a node.
+    const byTargets = new Map()
+    for (const t of tables) {
+      const targets = groups.flatMap((g, gi) => (g.objects.includes(t) ? [gi] : []))
+      const key = targets.join(',')
+      if (byTargets.has(key)) byTargets.get(key).objects.push(t)
+      else byTargets.set(key, { pattern: pi, objects: [t], demand: d.delta, targets })
+    }
+    nodes.push(...byTargets.values())
+  }
+  const net = new FlowNetwork(next + nodes.length)
+  for (const [gi, g] of groups.entries()) net.add(groupNode(gi), T, g.count * max)
+  for (const n of nodes) {
+    n.id = next++
+    net.add(S, n.id, n.demand)
+    for (const gi of n.targets) net.add(n.id, groupNode(gi), n.demand)
+  }
+  net.run(S, T)
+  const inS = net.reachable(S)
+
+  // Groups of competing patterns: the nodes reachable from the source,
+  // connected through the edges between pattern and Receipt group nodes.
+  const parent = new Map()
+  const find = (x) => (parent.get(x) === x ? x : (parent.set(x, find(parent.get(x))), parent.get(x)))
+  const join = (a, b) => parent.set(find(a), find(b))
+  for (const n of nodes) {
+    if (!inS(n.id)) continue
+    if (!parent.has(n.id)) parent.set(n.id, n.id)
+    for (const gi of n.targets) {
+      const g = groupNode(gi)
+      if (!parent.has(g)) parent.set(g, g)
+      join(n.id, g)
+    }
+  }
+  const byRoot = new Map()
+  for (const n of nodes) {
+    if (!inS(n.id)) continue
+    const root = find(n.id)
+    if (!byRoot.has(root)) byRoot.set(root, { patterns: new Set(), objects: new Set(), groups: new Set() })
+    const c = byRoot.get(root)
+    c.patterns.add(n.pattern)
+    for (const o of n.objects) c.objects.add(o)
+    for (const gi of n.targets) c.groups.add(gi)
+  }
+  // A pattern covered one Receipt per object can sit in two groups; it reports
+  // the one furthest over the bound.
+  const shared = new Map()
+  const over = (g) => g.statements - g.receipts * max
+  for (const c of byRoot.values()) {
+    const group = {
+      objects: [...c.objects].sort(),
+      receipts: [...c.groups].reduce((sum, gi) => sum + groups[gi].count, 0),
+      statements: [...c.patterns].reduce((sum, pi) => sum + reconciled[pi].delta, 0),
+    }
+    for (const pi of c.patterns) if (!shared.has(pi) || over(group) > over(shared.get(pi))) shared.set(pi, group)
+  }
+  return shared
+}
+
+/**
  * Receipts in the window that name an object the database counters did not
  * increment. Distinct from `unassigned` (receipt named nothing).
  *
@@ -424,7 +619,7 @@ export function reconcile(before, after, receipts, opts = {}) {
   }
   const unobserved = unobservedReceipts(receipts, fromMs, toMs, observedTables)
 
-  return {
+  const out = {
     v: RECONCILE_V,
     window: { start: before.ts, end: after.ts },
     role: before.role,
@@ -449,6 +644,10 @@ export function reconcile(before, after, receipts, opts = {}) {
     infrastructure,
     unobserved,
   }
+  // Read by the /2 projection only. Not enumerable, so the /1 body, which is a
+  // compatibility contract, does not change shape.
+  Object.defineProperty(out, 'namingReceipts', { value: namingReceiptCounts(receipts, fromMs, toMs) })
+  return out
 }
 
 // ─── /2 projection ───────────────────────────────────────────────────────────
@@ -573,6 +772,21 @@ function infraRuleId(query) {
 }
 
 /**
+ * What admitting every Receipt that names a boundary item's objects would
+ * settle against a declared bound. Each statement of the pattern touches every
+ * object it names, so the object with the fewest naming Receipts binds. This
+ * is the most generous reading of the clock: `exceededIfAdmitted: true` holds
+ * however the boundary is read.
+ */
+export function boundaryMultiplicity(d, naming, max) {
+  const tables = [...new Set(classifyPattern(d.query).tables.map((t) => t.table))]
+  const count = (t) => naming.all.get(t) ?? 0
+  const object = tables.reduce((a, t) => (count(t) < count(a) ? t : a))
+  const receipts = count(object)
+  return { bound: max, object, receipts, statements: d.delta, exceededIfAdmitted: d.delta > receipts * max }
+}
+
+/**
  * Project a /1 reconcile() result onto coverage-reconciliation/2.
  * Does not change /1 fields or exit codes.
  */
@@ -625,40 +839,72 @@ export function projectResultV2(result, ctx) {
   }
 
   const max = profile?.maxStatementsPerReceipt ?? null
+  const naming = result.namingReceipts
+  if (max != null && !naming) {
+    throw new Error('projectResultV2: the result carries no receipt counts; pass the value reconcile() returned')
+  }
 
   // The temporal rule keeps a boundary item indeterminate whatever its size, so
   // the outcome alone shows 1 statement and 10,000 as the same finding. The item
-  // carries the objects and, under a declared bound, the same comparison the
-  // reconciled branch makes, so a reader sees what admitting the receipt would
-  // and would not settle.
+  // carries the objects and, under a declared bound, what admitting every
+  // Receipt that names them would and would not settle.
   for (const d of result.indeterminate) {
     push('indeterminate', {
       pattern: patternDigest(d.query),
       reason: 'window-boundary',
       requiredSkewMs: d.requiredSkewMs,
       objects: d.uncoveredTables,
-      ...(max != null
-        ? { multiplicity: { bound: max, statements: d.delta, exceededIfAdmitted: d.delta > max } }
-        : {}),
+      ...(max != null ? { multiplicity: boundaryMultiplicity(d, naming, max) } : {}),
     })
   }
 
-  for (const d of result.reconciled) {
+  // The bound is how many statements one Receipt may cover. A Receipt names
+  // objects, not patterns, and its bound is one budget however many objects it
+  // names. Only patterns whose objects all have an in-window Receipt draw. A
+  // pattern with an unnamed object is decided by that object, and counting its
+  // statements here would let a bypass on one object turn a receipted neighbour
+  // into a finding. A pattern over the bound on its own, against the Receipts
+  // that name one of its objects, is observed-without-receipt. A pattern that
+  // fits on its own but that the Receipts cannot be shown to cover beside its
+  // neighbours is indeterminate: the evidence does not say which statements
+  // the Receipts covered (boundAssignment).
+  const receiptsIn = (t) => naming?.inWindow.get(t) ?? 0
+  const excess = (t, statements) => statements - receiptsIn(t) * max
+  const worst = (tables, statementsOf) =>
+    tables.reduce((a, t) => (excess(t, statementsOf(t)) > excess(a, statementsOf(a)) ? t : a))
+  const shared = max != null ? boundAssignment(result.reconciled, naming.groups, max) : new Map()
+
+  for (const [pi, d] of result.reconciled.entries()) {
     if (max == null) {
       push('indeterminate', {
         pattern: patternDigest(d.query),
         reason: 'multiplicity-undeclared',
         objects: d.tables || [],
       })
-    } else if (d.delta <= max) {
-      counts.matched += 1
-    } else {
+      continue
+    }
+    const tables = [...new Set(d.tables)]
+    const alone = worst(tables, () => d.delta)
+    if (excess(alone, d.delta) > 0) {
       push('observed-without-receipt', {
         pattern: patternDigest(d.query),
         objects: d.tables || [],
         reason: 'multiplicity-exceeded',
+        multiplicity: { bound: max, object: alone, receipts: receiptsIn(alone), statements: d.delta },
       })
+      continue
     }
+    const group = shared.get(pi)
+    if (group) {
+      push('indeterminate', {
+        pattern: patternDigest(d.query),
+        objects: d.tables || [],
+        reason: 'multiplicity-shared',
+        multiplicity: { bound: max, ...group },
+      })
+      continue
+    }
+    counts.matched += 1
   }
 
   for (const u of result.unobserved) {
@@ -881,12 +1127,18 @@ async function main(argv = process.argv.slice(2)) {
       const atBoundary = result.indeterminate.filter((d) => d.boundaryPlausible)
       const beyond = result.indeterminate.filter((d) => !d.boundaryPlausible)
       const max = profile?.maxStatementsPerReceipt ?? null
+      const exceeded = (d) => {
+        if (max == null) return ''
+        const m = boundaryMultiplicity(d, result.namingReceipts, max)
+        return m.exceededIfAdmitted
+          ? `\n    ${d.delta} statements exceed the declared multiplicity bound of ${max} even if all ` +
+              `${m.receipts} receipt(s) naming ${m.object} are admitted`
+          : ''
+      }
       const line = (d) =>
         `  ~ (+${d.delta}) table(s) [${d.uncoveredTables.join(', ')}] have a receipt ${d.requiredSkewMs}ms outside ` +
         `the window: ${truncate(d.query)}` +
-        (max != null && d.delta > max
-          ? `\n    ${d.delta} statements exceed the declared multiplicity bound of ${max} even if that receipt is admitted`
-          : '')
+        exceeded(d)
 
       if (atBoundary.length > 0) {
         const bound =

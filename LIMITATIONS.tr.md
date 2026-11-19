@@ -304,13 +304,30 @@ havuzu, ORM). 1:1 kuralı böyle her kurulumda sahte "kapsanmamış etkinlik"
 `/2` diye okunmaz. Mapping Profile yoksa `/2` çokluğa bağlı kalemleri
 `matched` saymaz, `indeterminate` bırakır.
 
-Beyan edilen çokluk sınırı tek desenin penceredeki ifade sayısıyla kıyaslanır.
-Alanın adı `maxStatementsPerReceipt` olsa da desenin nesnelerini adlandıran
-makbuz sayısı sınırı artırmaz: üç makbuz, üç ifade ve 1 sınırı
-`multiplicity-exceeded` verir. Ayrı desenlerin ifadeleri de tek makbuza karşı
-toplanmaz. `/2` çıkış kodlarını değiştirmez; bu yüzden `/2` sonucu `exceptions`
-olan bir koşu yine 0 ile çıkabilir. Bu kanalı kullanan bir denetim `outcome`
-alanını okur, yalnız çıkış koduna bakmaz.
+Beyan edilen çokluk sınırı, bir makbuzun kaç ifadeyi karşılayabileceğidir;
+makbuzun kaç nesne adlandırdığı bunu değiştirmez. Bir ifadeyi, pencere içinde
+deseninin bütün nesnelerini adlandıran tek bir makbuz karşılar; hiçbiri hepsini
+adlandırmıyorsa her nesne için bir makbuz karşılar. Bütün nesneleri pencere
+içinde bir makbuzla adlandırılan desenler bu makbuzlardan birlikte pay alır;
+pencere içinde hiçbir makbuzun adlandırmadığı bir nesnesi olan desen sonucunu o
+nesneden alır ve bu makbuzlardan pay almaz. Pay alan desenlerden ifadeleri,
+nesnelerinden birini pencere içinde adlandıran makbuzların sınır katından
+fazla olan desen `observed-without-receipt` olur, gerekçesi
+`multiplicity-exceeded`. Pay alan ve ifadelerinin, aynı makbuzlardan pay alan
+desenlerin yanında makbuzlarca karşılandığı gösterilemeyen başka her desen
+`indeterminate` olur, gerekçesi `multiplicity-shared`; çünkü kanıt, makbuzların hangi ifadeleri karşıladığını
+söylemez. Kıyas iki durumda `indeterminate` yönüne kayar. Birden çok nesneli
+bir deseni pencere içinde bütünüyle adlandıran bir makbuz varsa desen yalnız
+onu bütünüyle adlandıran makbuzlardan pay alır, ötekiler kalanı karşılayacak
+olsa bile. Birden çok nesneli ve pencere içinde hiçbir makbuzun bütünüyle
+adlandırmadığı desen, iki nesnesini adlandıran bir makbuzu her biri için ayrı
+sayar; o iki nesneden birini adlandıran her makbuz ötekini de adlandırıyorsa
+saymaz. Pencere dışındaki makbuzlar bu
+kıyasa girmez, açığı kapatacak olsalar bile: böyle bir kalem yalnız pencere
+içindeki makbuzlarla karara bağlanır, sınır kalemi olarak raporlanmaz. `/2` çıkış kodlarını
+değiştirmez; bu yüzden `/2` sonucu `exceptions` olan bir koşu yine 0 ile
+çıkabilir. Bu kanalı kullanan bir denetim `outcome` alanını okur, yalnız çıkış
+koduna bakmaz.
 
 ## OpenTimestamps istemcisi
 <!-- s: ots-client -->
@@ -338,8 +355,8 @@ gateway'den geliyor. Yani sınıra iki ayrı saat karar veriyor. Bir deseni
 kapsayacak olan makbuz pencerenin dışına düşerse sonuç `indeterminate` olur
 (çıkış 41) — "makbuzsuz erişim" denmez, çünkü araç ikisinden hangisinin olduğunu
 bilemez. Bu bir hüküm değil, bir sınır: 41 başarısızlıktır, koşu geçmez, ama
-hiçbir yön kanıtlanmış olmaz. Sınır beyan edilmişse `/2` kalemi, makbuz kabul
-edilse bile ifade sayısının sınırı aşıp aşmadığını yazar
+hiçbir yön kanıtlanmış olmaz. Sınır beyan edilmişse `/2` kalemi, nesnelerini
+adlandıran her makbuz kabul edilse bile ifade sayısının sınırı aşıp aşmadığını yazar
 (`multiplicity.exceededIfAdmitted`). Sonuç değişmez, kalem yine `indeterminate`
 kalır; `false` değeri de geçti anlamına gelmez.
 
