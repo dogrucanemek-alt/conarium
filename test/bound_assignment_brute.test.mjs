@@ -121,6 +121,11 @@ function shortInSomeMaximum({ groups, reconciled, max }) {
   return shortAtBest
 }
 
+// A pattern over several objects that some group names in part.
+function rough({ groups }, d) {
+  return d.tables.length > 1 && groups.some((g) => d.tables.some((t) => g.objects.includes(t)) && !d.tables.every((t) => g.objects.includes(t)))
+}
+
 function overOnItsOwn({ groups, max }, d) {
   return d.tables.some((t) => d.delta > max * groups.reduce((n, g) => n + (g.objects.includes(t) ? g.count : 0), 0))
 }
@@ -129,8 +134,10 @@ describe('boundAssignment against every assignment of small inputs', () => {
   it('never matches a pattern that some maximum assignment leaves uncovered', () => {
     const rand = rng(161)
     let checked = 0
+    let exactInputs = 0
     let conservative = 0
     const misses = []
+    const inexact = []
     for (let attempt = 0; checked < 400 && attempt < 5000; attempt++) {
       const inst = instance(rand)
       if (inst.reconciled.length === 0) continue
@@ -138,15 +145,24 @@ describe('boundAssignment against every assignment of small inputs', () => {
       if (!truth) continue
       checked += 1
       const shared = boundAssignment(inst.reconciled, inst.groups, inst.max)
+      const exact = !inst.reconciled.some((d) => rough(inst, d))
+      if (exact) exactInputs += 1
       for (const [pi, d] of inst.reconciled.entries()) {
         if (overOnItsOwn(inst, d)) continue
         if (truth.has(pi) && !shared.has(pi)) misses.push({ inst, pattern: pi })
-        if (!truth.has(pi) && shared.has(pi)) conservative += 1
+        if (!truth.has(pi) && shared.has(pi)) {
+          conservative += 1
+          if (exact) inexact.push({ inst, pattern: pi })
+        }
       }
     }
     expect(checked).toBe(400)
+    // Never matched where some maximum assignment leaves the pattern uncovered.
     expect(misses, JSON.stringify(misses.slice(0, 2))).toEqual([])
-    // The conservative side exists and is documented; it is not asserted.
-    expect(conservative).toBeGreaterThanOrEqual(0)
+    // With no pattern a group names in part, the flow is exact both ways.
+    expect(exactInputs).toBeGreaterThan(50)
+    expect(inexact, JSON.stringify(inexact.slice(0, 2))).toEqual([])
+    // The conservative side is real: some pattern the rule matches is shared.
+    expect(conservative).toBeGreaterThan(0)
   })
 })

@@ -979,6 +979,10 @@ describe('coverage-reconciliation/2 projection', () => {
         expect(item.outcome).toBe('indeterminate')
         expect(item.reason).toBe('multiplicity-shared')
       }
+      // Shared only because it is taken together with the join, the orders
+      // pattern reports every pattern and Receipt taken together.
+      const orders = v2.items.find((i) => i.objects.length === 1)
+      expect(orders.multiplicity).toEqual({ bound: 1, objects: ['customers', 'orders'], receipts: 3, statements: 3 })
     })
 
     it('a pattern on a receipt that a join could take for one of its objects is not matched beside the join', () => {
