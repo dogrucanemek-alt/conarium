@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - a boundary item over the bound either way is observed-without-receipt
+## 0.3.9 - a boundary item over the bound either way is observed-without-receipt
 
 When a boundary item's `exceededIfAdmitted` is `true`, the item is over the
 declared bound under either reading of the clock, so the clock does not decide
