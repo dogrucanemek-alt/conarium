@@ -581,8 +581,8 @@ when the profile lists at least one exclusion rule.
 
 A declared multiplicity bound is how many statements one Receipt may cover,
 however many objects the Receipt names. A statement is covered by one in-window
-Receipt that names all of its pattern's objects or, when no in-window Receipt
-names them all, by an in-window Receipt for each object. The patterns whose
+Receipt that names all of its pattern's objects or by an in-window Receipt for
+each object. The patterns whose
 objects all have a Receipt in the Window draw on the in-window Receipts; a
 pattern with an object no Receipt in the Window names takes its outcome from
 that object and draws on none.
@@ -594,14 +594,23 @@ were observed. The statements of the patterns that draw are assigned to
 Receipts as a maximum flow. Of the patterns not over the bound on their own,
 one that some maximum assignment leaves with a statement uncovered is
 `indeterminate` with reason `multiplicity-shared`: the evidence does not say
-which statements the Receipts covered. Every other pattern is `matched`. The
-comparison errs toward `indeterminate` in two situations. A pattern over
-several objects that some in-window Receipt names whole draws only on the
-Receipts that name it whole. A pattern over several objects that no in-window
-Receipt names whole is drawn
-against each object's Receipts, and objects named by exactly the same Receipts
-share one draw; a Receipt that names two of its objects that do not share a
-draw is counted once for each.
+which statements the Receipts covered. Every other pattern is `matched`.
+
+The assignment is exact except for a pattern that draws, over several objects,
+where an in-window Receipt names one of its objects but not all of them. Such a
+pattern
+draws only on the Receipts that name it whole, where there are any. Where there
+are none, it is drawn against each object's Receipts: objects named by exactly
+the same Receipts share one draw, and a Receipt that names two of its objects
+that do not share a draw is counted once for each. Either way the assignment
+can show a pattern beside it covered when another maximum assignment would not.
+So the patterns that draw and share an in-window Receipt with such a pattern,
+directly or through other patterns that draw, are taken together; a pattern
+that draws on none is not among them. When the assignment leaves any
+of their statements uncovered, every one of them not over the bound on its own
+is `indeterminate` with reason `multiplicity-shared`. When it covers them all,
+the assignment is a real one, and they are `matched`. The comparison therefore
+errs only toward `indeterminate`.
 
 A `multiplicity-exceeded` item carries
 `multiplicity: { bound, object, receipts, statements }`: `object` is the object
@@ -613,7 +622,10 @@ competes with for Receipts: `objects` are the objects they draw for, `receipts`
 the in-window Receipts they can draw on, and `statements` their call deltas
 added together. A pattern drawn one Receipt per object can compete in two such
 groups; it reports the one whose statements are furthest over
-`receipts × bound`.
+`receipts × bound`. A pattern that is `indeterminate` only because it is taken
+together with a pattern over several objects reports all the patterns taken
+together: their objects, the in-window Receipts that name one of them, and
+their call deltas added together.
 
 A `/2` item whose `reason` is `window-boundary` carries `requiredSkewMs` and the
 uncovered `objects`. When the profile declares a multiplicity bound it also

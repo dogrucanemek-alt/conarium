@@ -1,0 +1,18 @@
+{
+  "id": "reconciliation/v2-multiplicity-join-neighbour",
+  "regime": "conformance",
+  "profile": "GACS-C1",
+  "claim": "reconciliation",
+  "harness": "reconcile-v2",
+  "before": "conformance/fixtures/reconciliation/before-empty.json",
+  "after": "conformance/fixtures/reconciliation/after-join-and-orders.json",
+  "receipts": "conformance/fixtures/reconciliation/receipts-join-whole-and-parts.jsonl",
+  "mappingProfile": "conformance/fixtures/reconciliation/profile-multiplicity-1.json",
+  "expectOutcome": "exceptions",
+  "expectCounts": { "matched": 0, "indeterminate": 2, "observed-without-receipt": 0 },
+  "expectItemOutcomes": ["indeterminate"],
+  "forbidItemOutcomes": ["matched", "observed-without-receipt"],
+  "expectItemFields": { "reason": "multiplicity-shared" },
+  "rationale": "The bound is 1. One Receipt names customers and orders, one names customers, one names orders. A customers-orders join has two statements and an orders pattern has one. Covering both join statements, one with the join Receipt and one with the customers Receipt and the orders Receipt, leaves the orders statement uncovered, and no assignment covers more than two statements. So the orders pattern is not shown covered, and neither is the join.",
+  "doesNotTest": "Whether the Receipts belong to the statements. The comparison is a count against a declared bound."
+}

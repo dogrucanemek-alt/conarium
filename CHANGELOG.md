@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.8 - the patterns beside a join that a Receipt names in part are decided together
+
+0.3.7 said its comparison errs toward `indeterminate` for a pattern over
+several objects that a Receipt names in part. That was not so for the patterns
+beside it. With a bound of 1, Receipts naming customers and orders, customers,
+and orders, two statements of a customers-orders join and one on orders, 0.3.7
+reported the orders pattern `matched`. Covering both join statements, one with
+the join Receipt and one with the other two, leaves the orders statement
+uncovered and covers as many statements as any assignment can, so the orders
+pattern is `indeterminate`. In 0.3.8 the patterns that share a Receipt with
+such a pattern are decided together: if any of their statements is left
+uncovered, each of them not over the bound on its own is `indeterminate`. The
+conformance case `v2-multiplicity-join-neighbour` is added; it fails on 0.3.7.
+The `/1` JSON body and the exit codes do not change.
+
 ## 0.3.7 - a multiplicity bound counts per Receipt
 
 `multiplicity.maxStatementsPerReceipt` is documented as how many source

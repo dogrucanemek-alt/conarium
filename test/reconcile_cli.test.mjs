@@ -956,6 +956,57 @@ describe('coverage-reconciliation/2 projection', () => {
       expect(v2.items[0].multiplicity).toEqual({ bound: 1, objects: ['customers', 'orders'], receipts: 1, statements: 2 })
     })
 
+    it('a pattern beside a join that some receipt names whole is not matched when the join could take its receipt', () => {
+      // Two statements of the join, one on orders. Covering both join
+      // statements (the join receipt for one, the customers and orders
+      // receipts for the other) leaves the orders statement uncovered, and
+      // that covers as many statements as any assignment can. The join drawing
+      // only on the join receipt must not make the orders pattern matched.
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_JOIN, calls: 2 },
+          { queryid: '2', query: SQL_ORDERS, calls: 1 },
+        ],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.customers'], seq: 2 }),
+          receipt({ ts: inWindow(2), objects: ['zion.orders'], seq: 3 }),
+        ],
+      })
+      expect(v2.counts.matched).toBe(0)
+      expect(v2.items).toHaveLength(2)
+      for (const item of v2.items) {
+        expect(item.outcome).toBe('indeterminate')
+        expect(item.reason).toBe('multiplicity-shared')
+      }
+      // Shared only because it is taken together with the join, the orders
+      // pattern reports every pattern and Receipt taken together.
+      const orders = v2.items.find((i) => i.objects.length === 1)
+      expect(orders.multiplicity).toEqual({ bound: 1, objects: ['customers', 'orders'], receipts: 3, statements: 3 })
+    })
+
+    it('a pattern on a receipt that a join could take for one of its objects is not matched beside the join', () => {
+      // The join could cover its second statement with the customers-and-x
+      // receipt and the orders receipt, leaving the x statement uncovered;
+      // that covers as many statements as any assignment can.
+      const SQL_X = 'select id from public.x'
+      const { v2 } = bounded({
+        afterEntries: [
+          { queryid: '1', query: SQL_JOIN, calls: 2 },
+          { queryid: '2', query: SQL_X, calls: 1 },
+        ],
+        receipts: [
+          receipt({ ts: inWindow(0), objects: ['zion.customers', 'zion.orders'], seq: 1 }),
+          receipt({ ts: inWindow(1), objects: ['zion.customers', 'zion.x'], seq: 2 }),
+          receipt({ ts: inWindow(2), objects: ['zion.orders'], seq: 3 }),
+        ],
+      })
+      expect(v2.counts.matched).toBe(0)
+      const x = v2.items.find((i) => i.objects.includes('x'))
+      expect(x.outcome).toBe('indeterminate')
+      expect(x.reason).toBe('multiplicity-shared')
+    })
+
     it('a join covered one receipt per object reports the group furthest over the bound', () => {
       const { v2 } = bounded({
         afterEntries: [
