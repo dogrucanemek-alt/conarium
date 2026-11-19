@@ -394,16 +394,21 @@ class FlowNetwork {
  * a bound of `max` statements per Receipt.
  *
  * A statement is covered by one Receipt that names all of its pattern's
- * objects or, when no in-window Receipt names them all, by one Receipt for each
- * object; a Receipt covers at most `max` statements. Every reconciled pattern
- * draws on the Receipts, including one over the bound on its own, because its
- * statements were observed. A pattern is shared when some maximum assignment
- * leaves one of its statements uncovered: the evidence does not say which
- * statements the Receipts covered. The rest are covered in every maximum
- * assignment.
+ * objects or by one Receipt for each object; a Receipt covers at most `max`
+ * statements. Every reconciled pattern draws on the Receipts, including one
+ * over the bound on its own, because its statements were observed. A pattern
+ * is shared when some maximum assignment leaves one of its statements
+ * uncovered: the evidence does not say which statements the Receipts covered.
+ * The rest are covered in every maximum assignment.
+ *
+ * The flow is exact except for a pattern over several objects that a Receipt
+ * names in part (rough). Where one draws, the patterns that share Receipts with
+ * it are all shared unless the flow covers every one of their statements, so
+ * the result errs only toward shared.
  *
  * A shared pattern's `group` is the patterns and Receipt groups it competes
- * with: their statements are more than those Receipts admit.
+ * with: their statements are more than those Receipts admit, or, for a pattern
+ * shared only beside a rough one, all the patterns taken together with it.
  */
 export function boundAssignment(reconciled, groups, max) {
   const S = 0
@@ -411,6 +416,18 @@ export function boundAssignment(reconciled, groups, max) {
   const groupNode = (gi) => 2 + gi
   let next = 2 + groups.length
   const nodes = [] // { pattern, demand, targets }
+  // The groups a pattern can draw on in fact: every one that names one of its
+  // objects. A pattern over several objects that one of them names without the
+  // rest is drawn on fewer, or on some twice, so the assignment below only
+  // approximates it (rough).
+  const reach = new Map()
+  const rough = new Set()
+  for (const [pi, d] of reconciled.entries()) {
+    const tables = [...new Set(d.tables)]
+    const naming = groups.flatMap((g, gi) => (tables.some((t) => g.objects.includes(t)) ? [gi] : []))
+    reach.set(pi, naming)
+    if (tables.length > 1 && naming.some((gi) => !tables.every((t) => groups[gi].objects.includes(t)))) rough.add(pi)
+  }
   for (const [pi, d] of reconciled.entries()) {
     const tables = [...new Set(d.tables)]
     const full = groups.flatMap((g, gi) => (tables.every((t) => g.objects.includes(t)) ? [gi] : []))
@@ -474,6 +491,43 @@ export function boundAssignment(reconciled, groups, max) {
       statements: [...c.patterns].reduce((sum, pi) => sum + reconciled[pi].delta, 0),
     }
     for (const pi of c.patterns) if (!shared.has(pi) || over(group) > over(shared.get(pi))) shared.set(pi, group)
+  }
+
+  // Where a rough pattern draws, the assignment can leave a neighbour covered
+  // that another maximum assignment would not. So when the patterns that share
+  // Receipts with a rough pattern are not all covered, none of them is shown
+  // covered. When they are all covered, the assignment is a real one, and every
+  // maximum assignment covers them all.
+  const all = new Map()
+  const findAll = (x) => (all.get(x) === x ? x : (all.set(x, findAll(all.get(x))), all.get(x)))
+  const unite = (a, b) => {
+    for (const x of [a, b]) if (!all.has(x)) all.set(x, x)
+    all.set(findAll(a), findAll(b))
+  }
+  const patternKey = (pi) => `p${pi}`
+  for (const [pi] of reconciled.entries()) {
+    unite(patternKey(pi), patternKey(pi))
+    for (const gi of reach.get(pi)) unite(patternKey(pi), `g${gi}`)
+  }
+  const components = new Map()
+  for (const [pi] of reconciled.entries()) {
+    const root = findAll(patternKey(pi))
+    if (!components.has(root)) components.set(root, { patterns: new Set(), objects: new Set(), groups: new Set(), short: false, rough: false })
+    const c = components.get(root)
+    c.patterns.add(pi)
+    for (const t of reconciled[pi].tables || []) c.objects.add(t)
+    for (const gi of reach.get(pi)) c.groups.add(gi)
+    if (rough.has(pi)) c.rough = true
+  }
+  for (const n of nodes) if (inS(n.id)) components.get(findAll(patternKey(n.pattern))).short = true
+  for (const c of components.values()) {
+    if (!c.rough || !c.short) continue
+    const group = {
+      objects: [...c.objects].sort(),
+      receipts: [...c.groups].reduce((sum, gi) => sum + groups[gi].count, 0),
+      statements: [...c.patterns].reduce((sum, pi) => sum + reconciled[pi].delta, 0),
+    }
+    for (const pi of c.patterns) if (!shared.has(pi)) shared.set(pi, group)
   }
   return shared
 }
