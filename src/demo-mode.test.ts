@@ -422,7 +422,7 @@ describe('conarium --demo', () => {
 })
 
 describe('C11 package version', () => {
-  it('package.json is 0.3.7', () => {
-    expect(pkg.version).toBe('0.3.7')
+  it('package.json is 0.3.8', () => {
+    expect(pkg.version).toBe('0.3.8')
   })
 })
