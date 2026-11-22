@@ -93,6 +93,22 @@ Introduction, and `ADOPTION-EVIDENCE.md` lists the public records that reproduce
 cited, or adopted wording from this draft, labelled by kind and checked
 against the source: none is an independent implementation.
 
+**What `-08` added.** One outcome changes. An item that the temporal rule of
+Section 4.3 kept `indeterminate`, and whose statement count exceeds the
+declared multiplicity bound even with every Receipt naming its objects
+counted, is now `observed-without-receipt`: with those Receipts admitted they
+do not cover the count, and without them no Receipt in the Window names the
+object, so the clock does not decide it. The result statement carries the
+offset and the bound, and the exception does not apply where no bound is
+declared. An implementation of `-07` reports such an item differently. `-08`
+also states how a multiplicity bound is counted, one budget per Receipt shared
+by the patterns that draw on it, and that call counts and receipt counts are
+compared at no ratio other than a declared bound. The change came from a
+report against the implementation (issue #101), which `-08` acknowledges. Its
+Implementation Status names six gaps measured against the published 0.3.7, two
+of them against this revision: 0.3.8 closed the one beside a join, and 0.3.9
+implements the exception.
+
 This file has been wrong before when it copied posting status. The Datatracker
 link above is the check; a revision history in this paragraph is not.
 
