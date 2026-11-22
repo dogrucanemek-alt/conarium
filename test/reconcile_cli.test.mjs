@@ -1110,12 +1110,17 @@ describe('coverage-reconciliation/2 projection', () => {
       return run([...args, ...extra])
     }
 
-    it('10,000 statements against one bound of 1 stay indeterminate and say the bound is exceeded', () => {
+    // #101, draft-08: over the bound under either reading of the clock, the
+    // clock does not decide the item. /1 and its exit code do not change.
+    it('10,000 statements against one bound of 1 are observed-without-receipt with the offset and the bound', () => {
       const r = boundaryRun({ delta: 10000, bound: 1 })
       expect(r.code).toBe(41)
-      const [item] = JSON.parse(r.stdout).items
-      expect(item.outcome).toBe('indeterminate')
-      expect(item.reason).toBe('window-boundary')
+      const v2 = JSON.parse(r.stdout)
+      expect(v2.counts['observed-without-receipt']).toBe(1)
+      expect(v2.counts.indeterminate).toBe(0)
+      const [item] = v2.items
+      expect(item.outcome).toBe('observed-without-receipt')
+      expect(item.reason).toBe('multiplicity-exceeded')
       expect(item.requiredSkewMs).toBe(3000)
       expect(item.objects).toEqual(['public.customers'])
       expect(item.multiplicity).toEqual({
@@ -1213,11 +1218,37 @@ describe('coverage-reconciliation/2 projection', () => {
       expect(item).not.toHaveProperty('multiplicity')
     })
 
-    it('the text report names the exceeded bound and still does not call it unreceipted', () => {
+    it('the text report names the exceeded bound and says what /2 reports', () => {
       const r = boundaryRun({ delta: 10000, bound: 1, jsonV2: false })
       expect(r.code).toBe(41)
       expect(r.stderr).toMatch(/10000 statements exceed the declared multiplicity bound of 1/)
+      expect(r.stderr).toMatch(/the clock does not decide it: \/2 reports it as observed-without-receipt/)
+    })
+
+    it('the text report still does not call a bound that holds unreceipted', () => {
+      const r = boundaryRun({ delta: 1, bound: 1, jsonV2: false })
       expect(r.stderr).toMatch(/NOT reported as unreceipted access/)
+      expect(r.stderr).not.toMatch(/observed-without-receipt/)
+    })
+
+    it('a beyond-window offset over the bound is observed-without-receipt too', () => {
+      const { dir, args } = setup({
+        beforeEntries: [],
+        afterEntries: [{ queryid: '1', query: SQL_CUSTOMERS, calls: 10000 }],
+        receipts: [receipt({ ts: '2026-08-05T09:00:00.000Z', objects: ['zion.customers'] })],
+      })
+      const profilePath = join(dir, 'profile.json')
+      writeFileSync(
+        profilePath,
+        JSON.stringify({
+          v: 'conarium-mapping-profile/0.1',
+          version: '1',
+          multiplicity: { maxStatementsPerReceipt: 1 },
+        }),
+      )
+      const [item] = JSON.parse(run([...args, '--profile', profilePath, '--json-v2']).stdout).items
+      expect(item.outcome).toBe('observed-without-receipt')
+      expect(item.requiredSkewMs).toBe(25 * 3600 * 1000)
     })
 
     it('the text report stays silent about a bound that holds', () => {

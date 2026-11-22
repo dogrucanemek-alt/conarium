@@ -348,8 +348,11 @@ because this tool has no way to know which of the two happened. That is a
 limit, not a verdict: 41 is a failure and the run does not pass, but nothing
 is proven either way. Under a declared bound the `/2` item says whether the
 statement count exceeds it even if every receipt naming its objects were
-admitted (`multiplicity.exceededIfAdmitted`). The outcome does not change: the
-item stays `indeterminate`, and `false` is not a pass.
+admitted (`multiplicity.exceededIfAdmitted`). When it does, both readings of the
+clock give the same answer, so the clock does not decide the item: `/2` reports
+it as `observed-without-receipt` with reason `multiplicity-exceeded`, the offset
+and the bound (draft-08). The `/1` result and exit 41 do not change. When it
+does not, the item stays `indeterminate`, and `false` is not a pass.
 
 The exculpation is bounded by the window's own length — an offset larger than
 the window cannot be a boundary artefact, and the report says so instead of

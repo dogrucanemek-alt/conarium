@@ -634,8 +634,13 @@ carries `multiplicity: { bound, object, receipts, statements, exceededIfAdmitted
 Receipts with a readable timestamp that name `object`, inside the Window or out,
 and `object` the one of the pattern's objects with the fewest such Receipts.
 `exceededIfAdmitted` is `statements > receipts × bound`: the count exceeds the
-bound even with every Receipt naming the object admitted. The item stays
-`indeterminate` either way, and `false` is not a pass.
+bound even with every Receipt naming the object admitted. When it is `true`,
+both readings of the clock give the same answer, and the item is
+`observed-without-receipt` with reason `multiplicity-exceeded` instead of
+`window-boundary`, carrying the same `requiredSkewMs`, `objects` and
+`multiplicity` (draft-08). When it is `false`, the item stays `indeterminate`,
+and `false` is not a pass. Without a declared bound no item leaves
+`indeterminate` this way.
 
 ### Mapping Profile (`conarium-mapping-profile/0.1`)
 

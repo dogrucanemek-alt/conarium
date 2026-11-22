@@ -9,9 +9,9 @@
   "receipts": "conformance/fixtures/reconciliation/receipts-customers-early.jsonl",
   "mappingProfile": "conformance/fixtures/reconciliation/profile-multiplicity-1.json",
   "expectOutcome": "exceptions",
-  "expectItemOutcomes": ["indeterminate"],
-  "forbidItemOutcomes": ["matched", "observed-without-receipt"],
-  "expectItemFields": { "reason": "window-boundary", "multiplicity": { "bound": 1, "object": "customers", "receipts": 1, "statements": 5, "exceededIfAdmitted": true } },
-  "rationale": "An item uncovered only by the window boundary stays indeterminate under the temporal rule of the draft, and it reports that its statement count exceeds the declared bound even if every Receipt naming its objects were admitted. The outcome alone would present 5 statements and 10,000 statements as the same finding.",
+  "expectItemOutcomes": ["observed-without-receipt"],
+  "forbidItemOutcomes": ["matched", "indeterminate"],
+  "expectItemFields": { "reason": "multiplicity-exceeded", "requiredSkewMs": 3000, "multiplicity": { "bound": 1, "object": "customers", "receipts": 1, "statements": 5, "exceededIfAdmitted": true } },
+  "rationale": "The only Receipt naming the object falls outside the Window, and the statement count exceeds the declared bound even with that Receipt admitted. Under either reading of the clock the item is observed-without-receipt, so the clock does not decide it and the temporal rule does not keep it indeterminate. The item carries the offset and the bound.",
   "doesNotTest": "Whether the Receipt belongs to the recorded access."
 }
