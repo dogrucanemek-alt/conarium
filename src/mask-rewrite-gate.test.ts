@@ -274,20 +274,50 @@ describe('G11 — titles without a dot on many lines are masked in linear time',
   // output ambiguous to align: the same text fits many placements. The belt may
   // cover the ambiguous region as one mask; it may not take quadratic time or
   // memory over it, or leave a name readable.
-  it('Governance.maskPII: 16 380 characters, the default scan cap', () => {
-    const s = 'Bay Ab\n'.repeat(2340)
-    const t = performance.now()
-    const out = String(new Governance({}).maskPII(s).masked)
-    expect(performance.now() - t).toBeLessThan(100)
-    expect(out).not.toContain('Ab')
+  //
+  // Linear time is checked by growth, not by a wall-clock limit: a shared CI
+  // runner can be several times slower than a laptop, and the first call also
+  // pays for compiling the patterns. Each input is timed after a warm-up call;
+  // the runs of the two inputs alternate, so a busy moment on the runner slows
+  // both, and the fastest of nine runs counts. Sixteen times the input may take
+  // at most 64 times as long: linear work grows about 16 times, quadratic about
+  // 256, so either side has a margin of about four.
+  const RUNS = 9
+  const MAX_GROWTH = 64
+  let sink = 0
+  const growth = (run: (s: string) => void, small: string, large: string): number => {
+    run(large)
+    run(small)
+    let fastSmall = Infinity
+    let fastLarge = Infinity
+    for (let i = 0; i < RUNS; i++) {
+      let t = performance.now()
+      run(small)
+      fastSmall = Math.min(fastSmall, performance.now() - t)
+      t = performance.now()
+      run(large)
+      fastLarge = Math.min(fastLarge, performance.now() - t)
+    }
+    return fastLarge / Math.max(fastSmall, 0.01)
+  }
+
+  it('the growth check goes red on quadratic work', () => {
+    const quadratic = (s: string) => {
+      for (let i = 0; i < s.length; i++) for (let j = 0; j < s.length; j++) sink += s.charCodeAt(j) & 1
+    }
+    expect(growth(quadratic, 'a'.repeat(250), 'a'.repeat(4000))).toBeGreaterThan(MAX_GROWTH)
   })
-  it('Governance.maskPII: 32 768 characters with the scan cap raised', () => {
-    // 0.2.54: about 1 ms. Quadratic alignment: about 750 ms and 300 MB.
+  it('Governance.maskPII: 1 022 to 16 380 characters, up to the default scan cap', () => {
+    const g = new Governance({})
+    const large = 'Bay Ab\n'.repeat(2340)
+    expect(growth((s) => g.maskPII(s), 'Bay Ab\n'.repeat(146), large)).toBeLessThan(MAX_GROWTH)
+    expect(String(g.maskPII(large).masked)).not.toContain('Ab')
+  })
+  it('Governance.maskPII: 2 048 to 32 768 characters with the scan cap raised', () => {
+    // 0.2.54: about 1 ms at 32 768. Quadratic alignment: about 750 ms and 300 MB.
     const g = new Governance({ scanCharCap: 1_048_576 })
-    const s = 'Bay Ab\n'.repeat(4682).slice(0, 32_768)
-    const t = performance.now()
-    const out = String(g.maskPII(s).masked)
-    expect(performance.now() - t).toBeLessThan(250)
-    expect(out).not.toContain('Ab')
+    const large = 'Bay Ab\n'.repeat(4682).slice(0, 32_768)
+    expect(growth((s) => g.maskPII(s), 'Bay Ab\n'.repeat(293).slice(0, 2_048), large)).toBeLessThan(MAX_GROWTH)
+    expect(String(g.maskPII(large).masked)).not.toContain('Ab')
   })
 })
