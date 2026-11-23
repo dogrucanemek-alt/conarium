@@ -18,8 +18,8 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@eslint-community/regexpp": "4.12.2",
-    "re2js": "2.8.7"
+    "@eslint-community/regexpp": "4.12.3",
+    "re2js": "2.10.0"
   },
   "repository": {
     "type": "git",
