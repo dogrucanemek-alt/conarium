@@ -126,7 +126,7 @@
   },
   "dependencies": {
     "@eslint-community/regexpp": "4.12.3",
-    "@guanmingchiu/sqlparser-ts": "^0.63.0",
+    "@guanmingchiu/sqlparser-ts": "^0.64.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "express": "^5.3.0",
     "node-sql-parser": "^5.4.0",
